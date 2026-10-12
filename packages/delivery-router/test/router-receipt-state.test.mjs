@@ -373,3 +373,26 @@ test("a second live recipient appearing during refresh keeps the message queued"
   assert.equal(outcome.errorCode, "ambiguous_recipient_sessions");
   assert.equal(offers, 0);
 });
+
+test("a router that loads adapters on demand loads only the recipient's, when it offers", async () => {
+  let offers = 0;
+  const f = await fixture(async ({ binding }) => {
+    offers += 1;
+    return { accepted: true, transport: "codex-app-server", clientVersion: binding.clientVersion };
+  });
+  const loaded = [];
+  const router = createDeliveryRouter({ service: f.service, clock: f.clock, platform: PLATFORM,
+    readLivePolicy: async ({ binding }) => binding.livePolicy,
+    loadAdapter: async adapterId => {
+      loaded.push(adapterId);
+      return adapterId === f.adapter.id ? f.adapter : null;
+    } });
+  await publish(f.service, f.recipient);
+  const message = await send(f, "on_demand");
+  assert.deepEqual(loaded, [], "nothing loads before a message is routed");
+
+  assert.deepEqual(await router.offer(message), [{ recipientParticipantId: "models",
+    outcome: "offered", transport: "codex-app-server" }]);
+  assert.deepEqual(loaded, ["fixture_adapter"]);
+  assert.equal(offers, 1);
+});

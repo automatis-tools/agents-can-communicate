@@ -6,7 +6,8 @@ import test from "node:test";
 
 import { createDeliveryRouter } from "@agents-can-communicate/delivery-router";
 
-import { main, recordAndOffer, recordedText } from "../src/main.mjs";
+import { main, recordAndOffer } from "../src/main.mjs";
+import { recordedText } from "../src/recorded-text.mjs";
 
 const message = { messageId: "message_a", toParticipantIds: ["models"] };
 

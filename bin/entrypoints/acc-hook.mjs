@@ -12,33 +12,13 @@ import { createId } from "@agents-can-communicate/protocol";
 import { runHook } from "@agents-can-communicate/hook-runner";
 import { hookEntrypointFor, resolvePinnedGeneration }
   from "@agents-can-communicate/cli/hook-support";
+import { loadAdapters } from "@agents-can-communicate/cli/adapters";
 
 // A hook runs one client's adapter, and loads only that one: every other
 // adapter was a set of modules loaded on each turn and never run, about a
-// millisecond each on windows-latest.
-const ADAPTERS = {
-  // Registered like any other client. Its hook commands carry an extra
-  // argument - the event name - because this client's payload has none.
-  antigravity: () => import("@agents-can-communicate/adapter-antigravity")
-    .then(module => module.createAntigravityAdapter()),
-  claude_code: () => import("@agents-can-communicate/adapter-claude-code")
-    .then(module => module.createClaudeCodeAdapter()),
-  codex: () => import("@agents-can-communicate/adapter-codex")
-    .then(module => module.createCodexAdapter()),
-  gemini_cli: () => import("@agents-can-communicate/adapter-gemini-cli")
-    .then(module => module.createGeminiCliAdapter()),
-  grok: () => import("@agents-can-communicate/adapter-grok")
-    .then(module => module.createGrokAdapter()),
-  kimi: () => import("@agents-can-communicate/adapter-kimi")
-    .then(module => module.createKimiAdapter()),
-};
-
-// The adapters this hook can use: its own, or none for an id nobody registered,
-// which runHook answers the way it always has.
-async function adaptersFor(adapterId) {
-  if (!Object.hasOwn(ADAPTERS, adapterId)) return {};
-  return { [adapterId]: await ADAPTERS[adapterId]() };
-}
+// millisecond each on windows-latest. An id nobody registered gets none, which
+// runHook answers the way it always has.
+const adaptersFor = adapterId => loadAdapters([adapterId]);
 
 const readStdin = () => new Promise(resolve => {
   // A hook is always given its payload on stdin, but a client that closes it

@@ -5,10 +5,6 @@
 import { AccError, CONFIG_FILENAME, EXIT, GENERIC_MESSAGE_KINDS, VALID_OBLIGATIONS,
   failure, ok }
   from "@agents-can-communicate/protocol";
-import { createCoordinationService } from "@agents-can-communicate/core";
-import { shellQuote } from "@agents-can-communicate/adapter-sdk";
-import { describeNativeReason } from "@agents-can-communicate/installer";
-import { openFilesystemStore } from "@agents-can-communicate/storage-filesystem";
 
 import { parseArgs, positiveNumber } from "./args.mjs";
 
@@ -16,18 +12,10 @@ import { parseArgs, positiveNumber } from "./args.mjs";
 // with the argument already half-applied.
 const usage = message => new AccError(EXIT.USAGE, message);
 import { commandHelpText, describeCommand, describeCommands, helpText } from "./help.mjs";
-import { runUpdateCommand } from "./update-command.mjs";
-import { runConfigCommand } from "./config-command.mjs";
-import { ALL_ADAPTERS, runInstallCommand } from "./install-command.mjs";
-import { runDoctor } from "./doctor-command.mjs";
-import { runManagementDoctor } from "./managed-runtime/diagnostics.mjs";
-import { runStoreMigration } from "./store-migration-command.mjs";
+import { loadAdapters } from "./adapter-catalog.mjs";
 import { createGitProbe } from "./git-probe.mjs";
-import { runClaimCommand, runReleaseCommand } from "./claim-command.mjs";
 import { platformDataHome, runtimePaths } from "./runtime-paths.mjs";
 import { resolveOwner } from "./session-owner.mjs";
-import { discoverWorkspace } from "./workspace-discovery.mjs";
-import { resolveSavedHookWorkspace } from "./hook-workspace.mjs";
 
 const DEFAULT_CADENCE_MS = 30_000;
 
@@ -39,6 +27,10 @@ const DEFAULT_CADENCE_MS = 30_000;
  * looking is safe.
  */
 async function locateContext(options, runtime) {
+  // Workspace discovery reads through the store's no-follow opens, so it is
+  // loaded by the commands that use a workspace, never by `version` (#270).
+  const [{ discoverWorkspace }, { resolveSavedHookWorkspace }] = await Promise.all([
+    import("./workspace-discovery.mjs"), import("./hook-workspace.mjs")]);
   const dataHome = runtime.dataHome ?? platformDataHome({ platform: runtime.platform,
     env: runtime.env });
   const discovery = {
@@ -59,6 +51,10 @@ async function locateContext(options, runtime) {
 }
 
 async function withService({ descriptor, paths, dataHome }, runtime) {
+  // Loaded here rather than at the top: `version`, `help` and the commands
+  // that work on a machine never open a store (#270).
+  const [{ openFilesystemStore }, { createCoordinationService }] = await Promise.all([
+    import("@agents-can-communicate/storage-filesystem"), import("@agents-can-communicate/core")]);
   const store = await openFilesystemStore({ root: paths.root, clock: runtime.clock,
     ids: runtime.ids, workspaceId: descriptor.id });
   const service = createCoordinationService({ store, clock: runtime.clock, ids: runtime.ids });
@@ -120,35 +116,10 @@ function obligationFor(kind, explicit, addressed) {
   return obligation;
 }
 
-export function recordedText(message, delivery) {
-  const diagnostics = delivery.map(item => item.outcome === "offered"
-    ? `live offered to ${item.recipientParticipantId} via ${item.transport}`
-    : item.outcome === "woken" && item.pendingApproval === true
-      ? `sent a wake to ${item.recipientParticipantId} via ${item.transport}, which its session holds `
-        + "for approval because it bypasses permission prompts; the message arrives with its next turn"
-    : item.outcome === "woken"
-      ? `woke ${item.recipientParticipantId} via ${item.transport}; the message arrives with its next turn`
-    : item.outcome === "queued"
-      ? item.errorCode === "transport_permission_denied"
-        ? "live offer blocked by sender permissions; message remains queued; retry the same command "
-          + "through approved execution"
-          + (typeof message.clientMessageId === "string"
-            ? ` with --client-message-id ${shellQuote(message.clientMessageId)}` : " with its original retry key")
-        : item.errorCode === "no_live_transport"
-          ? `${item.recipientParticipantId} has no live transport`
-            + `${item.nativeReasonCode ? ` (${describeNativeReason(item.nativeReasonCode,
-              { launchOption: item.nativeLaunchOption })})` : ""}`
-            + "; the message waits in its inbox"
-        : item.errorCode === "recipient_offline" && item.endReason === "clear"
-          ? `${item.recipientParticipantId}'s conversation was cleared (/clear); the message waits `
-            + "until that conversation resumes"
-        : item.errorCode === "recipient_offline"
-          ? `${item.recipientParticipantId} has no open session; the message waits until it starts `
-            + "or resumes one"
-          : `live offer unavailable (${item.errorCode ?? "durable_fallback"})`
-      : `delivery already ${item.outcome}`);
-  return [`recorded ${message.messageId}`, ...diagnostics].join("; ");
-}
+// What a sent message met, in words. Its diagnostics load with the first
+// message a command sends, not with `acc version` (#270).
+const describeRecorded = async (message, delivery) =>
+  (await import("./recorded-text.mjs")).recordedText(message, delivery);
 
 export async function recordAndOffer({ record, router, selectMessage = value => value }) {
   const recorded = await record();
@@ -179,7 +150,7 @@ export async function recordAndOffer({ record, router, selectMessage = value => 
  * A live binding wakes on the router's own rule: a current lease, or a lapsed
  * one the adapter can re-verify. Without that the next send is durable.
  */
-export function presenceBreakdown(participants = [], adapters = ALL_ADAPTERS()) {
+export function presenceBreakdown(participants = [], adapters = []) {
   const nextTurn = new Set(adapters.filter(adapter => adapter.capabilities?.delivery?.nextTurn === true)
     .map(adapter => adapter.id));
   const refreshes = new Set(adapters.filter(adapter => typeof adapter.refreshNativeSession === "function")
@@ -212,13 +183,13 @@ export function describePresence({ live = 0, stale = 0 } = {},
   return `${live} live (${parts.join("; ")})`;
 }
 
-export function describeStatus(status) {
+export function describeStatus(status, adapters = []) {
   // `live` counts everyone present, which includes sessions gone stale - a
   // client that exited without its session being closed keeps a record that
   // stops being answered but does not disappear. Printing the number alone
   // said "1 live" about a workspace where the last agent had left minutes
   // before, which is the one thing a person reads this line to find out.
-  const line = `${describePresence(status.counts, presenceBreakdown(status.participants))}; `
+  const line = `${describePresence(status.counts, presenceBreakdown(status.participants, adapters))}; `
     + `${status.counts.claims} claim(s); `
     + `protection ${status.protection}`;
   // A transport accepting a message is not a model reading it. Said only when
@@ -294,8 +265,8 @@ const HANDLERS = Object.freeze({
     return { data: intent, text: `intent: ${intent.summary}` };
   },
 
-  claim: runClaimCommand,
-  release: runReleaseCommand,
+  claim: async input => (await import("./claim-command.mjs")).runClaimCommand(input),
+  release: async input => (await import("./claim-command.mjs")).runReleaseCommand(input),
 
   message: async ({ options, context }) => {
     const kind = options.type ?? "note";
@@ -310,7 +281,7 @@ const HANDLERS = Object.freeze({
       subject: options.subject, body: options.body, descriptor: context.descriptor }) });
     const message = routed.recorded;
     return { data: { message, delivery: routed.delivery },
-      text: recordedText(message, routed.delivery) };
+      text: await describeRecorded(message, routed.delivery) };
   },
 
   inbox: async ({ options, context }) => {
@@ -337,7 +308,7 @@ const HANDLERS = Object.freeze({
       subject: options.subject, clientMessageId: clientMessageId(options, context) }) });
     const result = routed.recorded;
     return { data: { message: result.reply, receipt: result.receipt, delivery: routed.delivery },
-      text: `${recordedText(result.reply, routed.delivery)}; acknowledged ${result.receipt.messageId}` };
+      text: `${await describeRecorded(result.reply, routed.delivery)}; acknowledged ${result.receipt.messageId}` };
   },
 
   request: async ({ options, context }) => {
@@ -355,7 +326,7 @@ const HANDLERS = Object.freeze({
     }) });
     const message = routed.recorded;
     return { data: { message, delivery: routed.delivery },
-      text: recordedText(message, routed.delivery) };
+      text: await describeRecorded(message, routed.delivery) };
   },
 
   ack: async ({ options, context }) => {
@@ -374,17 +345,20 @@ const HANDLERS = Object.freeze({
       remaining: options.remaining ?? [], blockers: options.blocker ?? [] }) });
     const handoff = routed.recorded;
     return { data: { message: handoff.message, delivery: routed.delivery },
-      text: recordedText(handoff.message, routed.delivery) };
+      text: await describeRecorded(handoff.message, routed.delivery) };
   },
 
   status: async ({ options, context, runtime }) => {
     await registerNativeSessions(runtime, context);
     const status = await context.service.collectStatus({
       participantId: options.participant, all: options.all === true });
-    return { data: status, text: describeStatus(status) };
+    // Only the clients present here say how their idle sessions are reached.
+    const adapters = await loadAdapters((status.participants ?? []).map(item => item.harness));
+    return { data: status, text: describeStatus(status, Object.values(adapters)) };
   },
 
   config: async ({ options, runtime }) => {
+    const { runConfigCommand } = await import("./config-command.mjs");
     const result = await runConfigCommand({ subcommand: options.subcommand,
       cwd: options.cwd ?? runtime.cwd,
       // A pipe is not a person. Without a TTY there is nobody to answer, so the
@@ -411,11 +385,11 @@ const HANDLERS = Object.freeze({
       text: result.written ? `wrote ${result.file}` : `not written: ${result.file}` };
   },
 
-  install: async ({ options, runtime }) =>
-    runInstallCommand({ options, runtime, action: "install" }),
+  install: async ({ options, runtime }) => (await import("./install-command.mjs"))
+    .runInstallCommand({ options, runtime, action: "install" }),
 
-  uninstall: async ({ options, runtime }) =>
-    runInstallCommand({ options, runtime, action: "uninstall" }),
+  uninstall: async ({ options, runtime }) => (await import("./install-command.mjs"))
+    .runInstallCommand({ options, runtime, action: "uninstall" }),
 
   prune: async ({ options, context }) => {
     const result = await context.service.prune({
@@ -435,9 +409,12 @@ const HANDLERS = Object.freeze({
     return { data: result, text };
   },
 
-  doctor: async input => input.options.migrateStore ? runStoreMigration(input) : runDoctor(input),
+  doctor: async input => input.options.migrateStore
+    ? (await import("./store-migration-command.mjs")).runStoreMigration(input)
+    : (await import("./doctor-command.mjs")).runDoctor(input),
 
-  update: async ({ options, runtime }) => runUpdateCommand({ options, runtime }),
+  update: async ({ options, runtime }) => (await import("./update-command.mjs"))
+    .runUpdateCommand({ options, runtime }),
 
   help: async ({ options }) => {
     if (options.helpCommand === undefined) {
@@ -499,8 +476,9 @@ export async function main(argv, runtime) {
     const options = context === null ? parsed.options
       : await resolveOwner({ command: parsed.command, options: parsed.options,
         context, env: runtime.env });
-    const { data, text, error: outcome } = await (managementDoctor ? runManagementDoctor : HANDLERS[parsed.command])(
-      { options, context, runtime });
+    const handler = managementDoctor
+      ? (await import("./managed-runtime/diagnostics.mjs")).runManagementDoctor : HANDLERS[parsed.command];
+    const { data, text, error: outcome } = await handler({ options, context, runtime });
     // A handler may have done real work and still failed: `acc install` writes
     // for the clients it could and reports the one it could not. The data is
     // printed either way, and the command still fails.

@@ -142,3 +142,30 @@ test("an adapter whose discovery never answers cannot hold status past the budge
   assert.deepEqual(result, []);
   assert.ok(Date.now() - started < 1_000, `returned after ${Date.now() - started} ms`);
 });
+
+test("discovery that loads adapters on demand loads the installed ones only", async t => {
+  const h = await setup(t);
+  const { workspaceId } = await h.register({ event: { sessionId: "thread-0", cwd: h.root } });
+  const found = [{ sessionId: "thread-1", cwd: h.root, clientPid: DAEMON }];
+  const adapter = { ...daemonHosted(h.binds), discoverNativeSessions: async () => found };
+  const asked = [];
+  const result = await registerDiscoveredSessions({ workspaceId, dataHome: h.dataHome,
+    loadAdapters: async adapterIds => {
+      asked.push(...adapterIds);
+      return adapterIds.includes("hosted") ? { hosted: adapter } : {};
+    },
+    env: { HOME: "/Users/someone" }, probeClientVersion: async () => "1.0.0", platform });
+  assert.deepEqual(asked, ["hosted"]);
+  assert.deepEqual(result.map(item => item.participantId), [participantFor("hosted", "thread-1")]);
+});
+
+test("adapters that load past the budget cannot hold status either", async t => {
+  const h = await setup(t);
+  const started = Date.now();
+  const result = await registerDiscoveredSessions({ dataHome: h.dataHome, env: {},
+    budgetMs: 200, loadAdapters: () => new Promise(() => {}) });
+  assert.deepEqual(result, []);
+  assert.ok(Date.now() - started < 1_000, `returned after ${Date.now() - started} ms`);
+  assert.deepEqual(await registerDiscoveredSessions({ dataHome: h.dataHome, env: {},
+    loadAdapters: async () => { throw new Error("cannot load"); } }), []);
+});

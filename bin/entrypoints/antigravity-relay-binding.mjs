@@ -3,7 +3,7 @@ import { loadSessionBinding, storeNativeAttempt } from "@agents-can-communicate/
 import { createCoordinationService } from "@agents-can-communicate/core";
 import { establishNativeBinding } from "@agents-can-communicate/hook-runner/native-binding";
 import { withSessionLifecycle } from "@agents-can-communicate/hook-runner/session-lifecycle";
-import { readInstalledLivePolicyState } from "@agents-can-communicate/installer";
+import { readInstalledLivePolicyState } from "@agents-can-communicate/installer/live-policy";
 import { openFilesystemStore } from "@agents-can-communicate/storage-filesystem";
 
 // No hook runs when the agent starts a relay mid-turn, and the next

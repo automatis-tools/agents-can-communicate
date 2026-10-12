@@ -93,12 +93,17 @@ test("the outer indicator deadline cancels a footer that starts late", async t =
   const driver = path.join(f.root, "indicator.mjs");
   // Advance the reader's clock after its modules load. A parent-side sleep can
   // expire during a slow import and accidentally exercise the footer's timer.
+  // The adapter loads inside the reader, before it arms its deadline, so it is
+  // loaded here first and the reader is given a turn to arm it.
   await writeFile(driver, `import {mock} from 'node:test';
     import {PassThrough} from 'node:stream';
     import {runIndicator} from ${JSON.stringify(pathToFileURL(path.resolve("packages/cli/src/indicator-command.mjs")).href)};
+    import {loadAdapter} from ${JSON.stringify(pathToFileURL(path.resolve("packages/cli/src/adapter-catalog.mjs")).href)};
+    await loadAdapter('antigravity');
     mock.timers.enable({apis:['setTimeout']});
     const stdin=new PassThrough();
     const pending=runIndicator({argv:process.argv.slice(2),stdin});
+    await new Promise(resolve=>setImmediate(resolve));
     mock.timers.tick(1000);
     stdin.end('{"conversation_id":"unregistered"}');
     process.once('message',()=>mock.timers.tick(500));
