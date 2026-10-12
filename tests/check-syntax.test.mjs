@@ -30,7 +30,7 @@ async function trackedRepository(t, files) {
   await run("git", ["add", ...Object.keys(files)], { cwd: root, env });
   const check = (extra = {}) => run(process.execPath, [script, "--tracked"], { cwd: root, env: { ...env, ...extra } })
     .then(({ stdout, stderr }) => ({ code: 0, stdout, stderr }), error => error);
-  return { root, check };
+  return { root, env, check };
 }
 
 const valid = count => Object.fromEntries(Array.from({ length: count },
@@ -57,7 +57,7 @@ test("each module that does not parse is named, however many run at once", async
 // Rechecking cached files or accepting a stale receipt would respectively erase
 // the speedup or allow a tracked parse failure through the real checker.
 test("unchanged parses are reused, but changed and previously broken modules are checked", async t => {
-  const { root, check } = await trackedRepository(t, { "a.mjs": "export const value = 1;\n" });
+  const { root, env, check } = await trackedRepository(t, { "a.mjs": "export const value = 1;\n" });
   const first = await check();
   assert.equal(first.code, 0, first.stderr);
   assert.match(first.stdout, /1 checked, 0 cached/);
@@ -77,6 +77,6 @@ test("unchanged parses are reused, but changed and previously broken modules are
   assert.equal(repaired.code, 0, repaired.stderr);
   assert.match(repaired.stdout, /1 checked, 0 cached/);
   await writeFile(path.join(root, "new.mjs"), "export const = ;\n");
-  await run("git", ["add", "new.mjs"], { cwd: root });
+  await run("git", ["add", "new.mjs"], { cwd: root, env });
   assert.equal((await check()).code, 1, "a newly tracked file was omitted");
 });

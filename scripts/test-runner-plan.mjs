@@ -63,26 +63,27 @@ export function testEnvironment(env = process.env, { platform = process.platform
   return { ...env, NODE_OPTIONS: options.includes(preload) ? options : `${options} ${preload}`.trim() };
 }
 
-export const TEST_FILE_CONCURRENCY = fileConcurrency(process.platform, {
-  fsyncSkipped: skipsFsync(), limit: process.env.ACC_TEST_FILE_CONCURRENCY });
+const concurrencyFor = env => fileConcurrency(process.platform, {
+  fsyncSkipped: skipsFsync({ env }), limit: env.ACC_TEST_FILE_CONCURRENCY });
+export const TEST_FILE_CONCURRENCY = concurrencyFor(process.env);
 
 // CI sets ACC_TEST_TIMEOUT_MS so that one hung test fails with its name instead
 // of holding the whole job until the runner's own limit.
-const perTestTimeout = () => {
-  const value = Number(process.env.ACC_TEST_TIMEOUT_MS ?? 300_000);
+const perTestTimeout = env => {
+  const value = Number(env.ACC_TEST_TIMEOUT_MS ?? 300_000);
   if (!Number.isSafeInteger(value) || value < 1) throw new Error("ACC_TEST_TIMEOUT_MS must be a positive integer");
   return [`--test-timeout=${value}`];
 };
 
 // ACC_TEST_FORCE_EXIT ends a file's process once its tests are done, so a child
 // process a failed test left behind cannot hold a concurrency slot for good.
-const forceExit = () => (process.env.ACC_TEST_FORCE_EXIT === "1" ? ["--test-force-exit"] : []);
+const forceExit = env => (env.ACC_TEST_FORCE_EXIT === "1" ? ["--test-force-exit"] : []);
 
-export const nodeTestArguments = (files, { timings } = {}) => [
+export const nodeTestArguments = (files, { timings, env = process.env } = {}) => [
   "--test",
-  `--test-concurrency=${TEST_FILE_CONCURRENCY}`,
-  ...perTestTimeout(),
-  ...forceExit(),
+  `--test-concurrency=${concurrencyFor(env)}`,
+  ...perTestTimeout(env),
+  ...forceExit(env),
   `--import=${FILE_WATCHDOG_PRELOAD}`,
   ...(timings === undefined ? [] : ["--test-reporter=spec", "--test-reporter-destination=stdout",
     `--test-reporter=${TIMING_REPORTER}`, `--test-reporter-destination=${timings}`]),

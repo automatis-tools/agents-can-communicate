@@ -155,19 +155,20 @@ test("Git's injected default exec path normalizes, but a custom executable path 
   const clean = { ...env };
   delete clean.GIT_EXEC_PATH;
   const defaultPath = (await run("git", ["--exec-path"], { env: clean })).stdout.trim();
-  const manualPath = env.PATH.split(path.delimiter).filter(entry => entry !== defaultPath).join(path.delimiter);
-  const initial = await fingerprint({ GIT_EXEC_PATH: undefined, PATH: manualPath });
-  const hook = await fingerprint({ GIT_EXEC_PATH: defaultPath, PATH: manualPath });
+  const pathKey = Object.keys(env).find(name => name.toUpperCase() === "PATH");
+  const manualPath = env[pathKey].split(path.delimiter).filter(entry => entry !== defaultPath).join(path.delimiter);
+  const initial = await fingerprint({ GIT_EXEC_PATH: undefined, [pathKey]: manualPath });
+  const hook = await fingerprint({ GIT_EXEC_PATH: defaultPath, [pathKey]: manualPath });
   assert.equal(hook.key, initial.key, "a default Git hook variable disabled manual-suite reuse");
   // Keep both command searches on Git's actual binary. An OS shim selecting
   // another executable is intentionally a conservative cache miss.
   const pathBaseline = [defaultPath, manualPath].join(path.delimiter);
-  const baseline = await fingerprint({ GIT_EXEC_PATH: undefined, PATH: pathBaseline });
+  const baseline = await fingerprint({ GIT_EXEC_PATH: undefined, [pathKey]: pathBaseline });
   const hookPath = await fingerprint({ GIT_EXEC_PATH: defaultPath,
-    PATH: [defaultPath, pathBaseline].join(path.delimiter) });
+    [pathKey]: [defaultPath, pathBaseline].join(path.delimiter) });
   assert.equal(hookPath.key, baseline.key, "Git's injected exec directory in PATH disabled reuse");
   const alteredPath = await fingerprint({ GIT_EXEC_PATH: defaultPath,
-    PATH: [defaultPath, "/custom/commands", pathBaseline].join(path.delimiter) });
+    [pathKey]: [defaultPath, "/custom/commands", pathBaseline].join(path.delimiter) });
   assert.notEqual(alteredPath.key, baseline.key, "an unrelated command-search change was ignored");
   const custom = await fingerprint({ GIT_EXEC_PATH: "/custom/git-tools" });
   assert.ok(custom?.key);

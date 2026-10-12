@@ -9,7 +9,7 @@ export async function runTestBatch(files, { cwd, env, report, output = process.s
   errorOutput = process.stderr }) {
   const selected = new Set(await Promise.all(files.map(file => realpath(path.resolve(cwd, file)))));
   const timeoutMs = testFileTimeout(env);
-  const child = spawn(process.execPath, nodeTestArguments(files, { timings: report }), {
+  const child = spawn(process.execPath, nodeTestArguments(files, { timings: report, env }), {
     cwd, env, detached: process.platform !== "win32", stdio: ["inherit", "pipe", "pipe", "ipc"],
   });
   return new Promise(resolve => {

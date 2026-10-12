@@ -43,6 +43,12 @@ test("completed files exit naturally and do not wait for the watchdog", async t 
 });
 
 test("the parent deadline closes descendant-held pipes and terminates its test process tree", async t => {
+  const inheritedExit = process.env.ACC_TEST_FORCE_EXIT;
+  process.env.ACC_TEST_FORCE_EXIT = "1";
+  t.after(() => {
+    if (inheritedExit === undefined) delete process.env.ACC_TEST_FORCE_EXIT;
+    else process.env.ACC_TEST_FORCE_EXIT = inheritedExit;
+  });
   const root = await mkdtemp(path.join(tmpdir(), "acc-descendant-deadline-"));
   const pidFile = path.join(root, "descendant.pid");
   let descendant;
@@ -88,4 +94,25 @@ test("the parent deadline closes descendant-held pipes and terminates its test p
   while (await alive() && Date.now() < end) await new Promise(resolve => setTimeout(resolve, 20));
   assert.equal(await alive(), false, "deadline left its descendant running");
   descendant = 0;
+});
+
+test("a batch applies its own per-test deadline instead of the parent's environment", async t => {
+  const inheritedTimeout = process.env.ACC_TEST_TIMEOUT_MS;
+  process.env.ACC_TEST_TIMEOUT_MS = "300000";
+  t.after(() => {
+    if (inheritedTimeout === undefined) delete process.env.ACC_TEST_TIMEOUT_MS;
+    else process.env.ACC_TEST_TIMEOUT_MS = inheritedTimeout;
+  });
+  const root = await mkdtemp(path.join(tmpdir(), "acc-batch-test-deadline-"));
+  t.after(() => removeFixture(root));
+  const file = path.join(root, "slow.test.mjs");
+  await writeFile(file, 'import test from "node:test";\ntest("slow assertion", async () => { await new Promise(resolve => setTimeout(resolve, 600)); });\n');
+  let output = "";
+  const result = await runTestBatch([file], { cwd: repo,
+    env: environment({ ACC_TEST_TIMEOUT_MS: "50", ACC_TEST_FILE_TIMEOUT_MS: "3000", ACC_TEST_FORCE_EXIT: "0" }),
+    report: path.join(root, "timings.jsonl"),
+    output: { write: chunk => { output += chunk; } }, errorOutput: { write: chunk => { output += chunk; } },
+  });
+  assert.equal(result.code, 1, "the batch ignored its explicit per-test deadline");
+  assert.match(output, /test timed out after 50ms/);
 });
