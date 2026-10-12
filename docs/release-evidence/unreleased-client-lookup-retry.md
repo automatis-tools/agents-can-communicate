@@ -9,7 +9,7 @@ artifact, whose original record remains unchanged.
 
 | Fact | Value |
 |---|---|
-| Source commit | `1dc9a9e67f678e127e5d4113dc49bfb443ad186c` |
+| Source commit | `ca134908b3e428adefe60bdc05d409519f84253b` |
 | Source state at pack time | clean feature worktree |
 | Archive | `agents-can-communicate-0.11.0.tgz` |
 | Archive size | 609,126 bytes |
@@ -20,9 +20,9 @@ artifact, whose original record remains unchanged.
 `node scripts/verify-package.mjs` passed on the clean worktree and reported the same
 digest as a separate `npm pack`.
 The fix is commit `94b9bbae`. The recorded commit merges main after PR #293, so the
-archive also carries the Claude indicator read bound.
-At the recorded commit the full suite ran 3391 tests: 3384 passed, 7 were skipped,
-none failed. The machine's load average was 55–60 during the run.
+archive also carries the Claude indicator read bound. Its last commit moves two
+process-table tests to a controlled clock: at load average about 60 a real 40 ms timer
+let one process into a 100 ms walk. The archive bytes did not change.
 
 ## Cause
 
