@@ -1,5 +1,28 @@
 # Changelog
 
+## Unreleased — find a client the session start missed
+
+- A session whose start could not find its client process now finds it on the next
+  prompt. Before, it reported `client_process_unknown` and had no live delivery for its
+  whole life. At load average 56–84 the start's process table read took longer than its
+  1 s limit.
+- On macOS and Linux the hook reads only the chain from itself up to the client, one
+  `ps -p` per process. On this Mac that took 8–12 ms instead of 77–83 ms for the whole
+  table, which took 830–1430 ms at load average 69.
+
+| Development artifact | Value |
+|---|---|
+| Built from | `ca134908b3e428adefe60bdc05d409519f84253b` |
+| Tarball | `agents-can-communicate-0.11.0.tgz`, 609,126 bytes, 374 files |
+| sha256 | `78625791a732a9f081638423cecec30e1009667dd2329bce01860176d5c0bef3` |
+
+The exact archive passed package verification. The hook runner, run under a real
+Claude Code process with a slow `ps` at session start, bound the session to that
+process on the first prompt; the previous build never did. See
+[development evidence](docs/release-evidence/unreleased-client-lookup-retry.md).
+This is not a new published release.
+The package version remains `0.11.0` until a release prepares its own.
+
 ## Unreleased — Claude indicator read bound
 
 - The Claude Code indicator no longer prints "could not read this session's state"

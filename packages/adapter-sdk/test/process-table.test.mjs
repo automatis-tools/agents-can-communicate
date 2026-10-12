@@ -124,16 +124,71 @@ test("the Windows command-line split follows CommandLineToArgvW", () => {
   assert.deepEqual(splitWindowsCommandLine(""), []);
 });
 
-test("posix: the table and arguments still come from ps", async () => {
-  const run = async (file, args) => {
+// A POSIX machine as `ps -p` answers it, one process per call. The hook's own
+// chain on macOS (2026-10-12): node, the client's shell, claude, the terminal's
+// shell, the terminal, launchd.
+const posixProcesses = new Map([
+  [4242, { ppid: 300, comm: "/usr/local/bin/node", args: "node /data/acc-hook.mjs claude_code" }],
+  [300, { ppid: 200, comm: "/bin/zsh", args: "/bin/zsh -c node /data/acc-hook.mjs" }],
+  [200, { ppid: 150, comm: "claude", args: "claude --resume" }],
+  [150, { ppid: 100, comm: "/bin/zsh", args: "-zsh" }],
+  [100, { ppid: 1, comm: "/Applications/IntelliJ IDEA.app/Contents/MacOS/idea", args: "idea" }],
+  [1, { ppid: 0, comm: "/sbin/launchd", args: "/sbin/launchd" }],
+]);
+
+const posixPs = ({ hop = () => {} } = {}) => {
+  const calls = [];
+  const run = async (file, args, options) => {
     assert.equal(file, "ps");
-    if (args.includes("pid=,ppid=,comm=")) return { stdout: "  1   0 launchd\n 100   1 claude\n" };
-    if (args.includes("pid=,args=")) return { stdout: "  1 /sbin/launchd\n 100 claude --resume\n" };
-    return { stdout: "claude --resume\n" };
+    calls.push({ args, timeout: options?.timeout });
+    // The two reads of one process run at once, so a hop costs one read's time.
+    if (args.includes("pid=,ppid=,comm=")) hop();
+    assert.ok(!args.includes("-A"), "the walk never reads the whole table");
+    const pid = Number(args[args.indexOf("-p") + 1]);
+    const entry = posixProcesses.get(pid);
+    if (entry === undefined) throw Object.assign(new Error("ps exited 1"), { code: 1 });
+    if (args.includes("pid=,ppid=,comm=")) return { stdout: `${pid} ${entry.ppid} ${entry.comm}\n` };
+    if (args.includes("pid=,args=")) return { stdout: `${pid} ${entry.args}\n` };
+    return { stdout: `${entry.args}\n` };
   };
-  const table = await readProcessTable({ platform: "darwin", run });
-  assert.deepEqual(table.get(100), { ppid: 1, comm: "claude", args: "claude --resume" });
-  assert.deepEqual(await readProcessArgs(100, { platform: "darwin", run }), ["claude", "--resume"]);
+  return { run, calls };
+};
+
+test("posix: the table is the asking process's chain of parents, one process per call", async () => {
+  const { run, calls } = posixPs();
+  const table = await readProcessTable({ platform: "darwin", from: 4242, run });
+  assert.deepEqual([...table.keys()], [4242, 300, 200, 150, 100]);
+  assert.deepEqual(table.get(200), { ppid: 150, comm: "claude", args: "claude --resume" });
+  assert.deepEqual(table.get(100), { ppid: 1,
+    comm: "/Applications/IntelliJ IDEA.app/Contents/MacOS/idea", args: "idea" });
+  assert.equal(calls.length, 10, "two calls per process, and none for launchd");
+  assert.deepEqual(await readProcessArgs(200, { platform: "darwin", run }), ["claude", "--resume"]);
+});
+
+test("posix: the walk stops at the process the caller is looking for", async () => {
+  const { run, calls } = posixPs();
+  const table = await readProcessTable({ platform: "darwin", from: 4242, run,
+    until: entry => entry.comm === "claude" });
+  assert.deepEqual([...table.keys()], [4242, 300, 200]);
+  assert.equal(calls.length, 6);
+});
+
+test("posix: the time limit bounds the whole walk, not each call", async t => {
+  // A real 40 ms timer can resume after all 100 ms on a loaded machine, which
+  // leaves one process. Control elapsed time: each process costs 40 ms.
+  t.mock.timers.enable({ apis: ["Date"], now: 0 });
+  const { run, calls } = posixPs({ hop: () => t.mock.timers.tick(40) });
+  const table = await readProcessTable({ platform: "darwin", from: 4242, run, timeoutMs: 100 });
+  assert.deepEqual([...table.keys()], [4242, 300, 200], "a slow machine yields the start of the chain");
+  assert.deepEqual(calls.map(({ timeout }) => timeout), [100, 100, 60, 60, 20, 20],
+    "each read gets what is left of the walk's limit");
+});
+
+test("posix: a process that cannot be read ends the chain without an error", async () => {
+  const { run } = posixPs();
+  assert.equal((await readProcessTable({ platform: "darwin", from: 999, run })).size, 0);
+  const failing = async () => { throw new Error("ENOENT"); };
+  assert.equal((await readProcessTable({ platform: "darwin", from: 4242, run: failing })).size, 0);
 });
 
 // A real zombie: the shell's background child exits, and the program the shell

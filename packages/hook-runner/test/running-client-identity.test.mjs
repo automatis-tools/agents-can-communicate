@@ -235,3 +235,67 @@ test("a turn after the client exited and its session closed resumes it on the cl
     assert.equal(after.clientPid, process.ppid);
     assert.equal(after.clientName, "fixture-desktop");
   });
+
+// 2026-10-12, load average 56-84: the start of a Claude Code session read the
+// whole process table past its limit, so the session was opened without its
+// client. No later hook looked again, and the session reported
+// client_process_unknown for its whole life.
+test("a session whose start could not find its client binds it on the next turn", async t => {
+  const { root, dataHome } = await place(t);
+  const fixture = adapter({ identifyClientProcess: identifyDesktop });
+  const run = (kind, table) => runHook({ adapterId: fixture.id, adapters: { [fixture.id]: fixture },
+    dataHome, readProcessTable: async () => table, probeClientVersion: async () => "1.2.16",
+    payload: { kind, sessionId: "late-client", cwd: root, targets: [] } });
+  const binding = async () => {
+    const workspaces = path.join(dataHome, "acc", "workspaces");
+    const [workspace] = await readdir(workspaces);
+    return loadSessionBinding({ runtimeDir: path.join(workspaces, workspace), harnessSessionId: "late-client" });
+  };
+
+  assert.equal((await run("sessionStart", new Map())).failed, undefined);
+  const before = await binding();
+  assert.equal(before.clientPid, undefined);
+  const turn = await run("beforeTurn", new Map([
+    [process.pid, { ppid: process.ppid, comm: "node", args: "node /data/acc-hook.mjs fixture PreInvocation" }],
+    [process.ppid, { ppid: 1, comm: "/Applications/Fixture.app/Contents/Resources/bin/language_server",
+      args: SERVER_ARGS }]]));
+
+  assert.equal(turn.failed, undefined, turn.reason);
+  const after = await binding();
+  assert.equal(after.clientPid, process.ppid);
+  assert.equal(after.clientName, "fixture-desktop");
+  assert.equal(after.accSessionId, before.accSessionId, "the same ACC session continues");
+  assert.equal(after.generation, before.generation);
+});
+
+test("a turn that still cannot find the client keeps the session and looks again next turn", async t => {
+  const { root, dataHome } = await place(t);
+  let reads = 0;
+  const run = kind => runHook({ adapterId: "fixture", adapters: { fixture: adapter() }, dataHome,
+    readProcessTable: async () => { reads += 1; return new Map(); },
+    probeClientVersion: async () => "1.2.16",
+    payload: { kind, sessionId: "never-found", cwd: root, targets: [] } });
+
+  const started = await run("sessionStart");
+  for (let turn = 1; turn <= 2; turn += 1) {
+    const before = reads;
+    const result = await run("beforeTurn");
+    assert.equal(result.failed, undefined, result.reason);
+    assert.equal(result.accSessionId ?? started.accSessionId, started.accSessionId);
+    assert.equal(reads, before + 1, `turn ${turn} looks for the client once`);
+  }
+});
+
+test("an adapter that declares no client command is never looked up on a turn", async t => {
+  const { root, dataHome } = await place(t);
+  let reads = 0;
+  const fixture = adapter({ client: { certificationName: "fixture-cli", versionArgs: ["--version"] } });
+  const run = kind => runHook({ adapterId: fixture.id, adapters: { [fixture.id]: fixture }, dataHome,
+    readProcessTable: async () => { reads += 1; return new Map(); },
+    probeClientVersion: async () => "1.2.16",
+    payload: { kind, sessionId: "no-command", cwd: root, targets: [] } });
+
+  await run("sessionStart");
+  assert.equal((await run("beforeTurn")).failed, undefined);
+  assert.equal(reads, 0);
+});
