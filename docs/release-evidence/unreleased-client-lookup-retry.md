@@ -22,6 +22,8 @@ digest as a separate `npm pack`.
 The fix is commit `94b9bbae`. The recorded commit adds only the Kimi footer test change
 from PR #293, which this machine's load needs for a stable suite; the archive packed
 from both commits has identical bytes.
+At the recorded commit the full suite ran 3385 tests: 3378 passed, 7 were skipped,
+none failed. The machine's load average was about 94 during the run.
 
 ## Cause
 
