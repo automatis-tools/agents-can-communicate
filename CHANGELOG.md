@@ -1,5 +1,38 @@
 # Changelog
 
+## 0.11.1 — release candidate
+
+- A hook's cost no longer grows with everything its workspace ever held: each stored
+  record is read once a hook, and a heartbeat reads its own session. On a copy of a real
+  data home a turn took 1.0 s in an ordinary workspace and 3.2–3.8 s in one with 2,234
+  sessions, where starts timed out and continued without context; the same turns take
+  0.29–0.41 s (#298, #300).
+- The Claude Code indicator no longer prints "could not read this session's state" in
+  every open session on a loaded machine. Each read has five seconds, and only three
+  failed reads in a row show `!` (#293).
+- A session that started without finding its client process finds it on the next
+  prompt, instead of reporting `client_process_unknown` with no live delivery for its
+  whole life. On macOS and Linux the hook reads only its own chain of parent processes
+  (#294).
+- Commands, indicator reads and message delivery load only the client adapters and
+  modules they use. On windows-latest `acc version` starts in 89 ms instead of 284 ms
+  and an indicator read in 143 ms instead of 244 ms (#270, #296).
+- Development only, not in the package: the store symlink check no longer depends on
+  timing (#250, #297), and validation reuse and bounded CI (#299).
+
+| Candidate artifact | Value |
+|---|---|
+| Built from | `80d51698e39ca20b7af19457b8b80d83caf366b0` |
+| Tarball | `agents-can-communicate-0.11.1.tgz`, 610,941 bytes, 376 files |
+| sha256 | `a4f76437f39c15f48585949b0d4e8d4fc8f968ed3b8e6ae57e521d9d81191af3` |
+
+The exact archive passed package verification and an upgrade from published 0.11.0:
+its own updater activated this archive while the old MCP process stayed alive, the
+question it held was answered afterwards, and all 376 archive files were installed
+with the same bytes. Separately packed source passed 24 managed-update checks and two
+real-client model-stub checks with Claude Code 2.1.296 and Codex 0.162.1.
+See [release evidence](docs/release-evidence/v0.11.1.md). This candidate is not published.
+
 ## Unreleased — a hook reads each stored record once
 
 - A hook's cost no longer grows with every message, receipt and session its workspace
