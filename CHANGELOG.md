@@ -21,6 +21,30 @@ Only tests changed; the archive passed package verification. See
 This is not a new published release.
 The package version remains `0.11.0` until a release prepares its own.
 
+## Unreleased — load only the modules a command needs
+
+- `acc version` and `acc help` load 33 modules instead of 234: no client adapter, no
+  store and no router. An indicator read, which a client runs every few seconds, loads
+  92 instead of 199, with its own client's adapter only. `acc status` loads the
+  adapters of the clients present, and a sent message loads its recipients' adapters
+  when it offers to them (#270).
+- On windows-latest `acc version` started in 89 ms instead of 284 ms, and an indicator
+  read in 143 ms instead of 244 ms. A hook already loaded only its own adapter and
+  started about 4 percent sooner.
+- A test fails when `version`, `help`, `status`, an indicator read or a hook loads a
+  client adapter it does not serve.
+
+| Development artifact | Value |
+|---|---|
+| Built from | `cacecc2d5696731254128fb5a7c553cb93cca224` |
+| Tarball | `agents-can-communicate-0.11.0.tgz`, 610,302 bytes, 376 files |
+| sha256 | `e5a6d903af543388648dc149eb3b90214ae780b5197f68d00a2e3d105f91d5dc` |
+
+The exact archive passed package verification. See
+[development evidence](docs/release-evidence/unreleased-load-only-needed-modules.md).
+This is not a new published release.
+The package version remains `0.11.0` until a release prepares its own.
+
 ## Unreleased — find a client the session start missed
 
 - A session whose start could not find its client process now finds it on the next

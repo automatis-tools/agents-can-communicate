@@ -1,9 +1,9 @@
 import { CLAIM_ENFORCEMENTS, CLAIM_MODES, GENERIC_MESSAGE_KINDS, HANDOFF_STATUSES,
   INTENT_MODES, INTENT_STATES, MESSAGE_KINDS, OBLIGATIONS } from "@agents-can-communicate/protocol";
-import { LIVE_POLICIES } from "@agents-can-communicate/installer";
+import { LIVE_POLICIES } from "@agents-can-communicate/installer/live-policy";
 
 import { COMMANDS, commandSpec } from "./args.mjs";
-import { ALL_ADAPTERS } from "./install-command.mjs";
+import { ADAPTER_IDS } from "./adapter-catalog.mjs";
 import { needsOwner } from "./session-owner.mjs";
 
 /**
@@ -65,7 +65,6 @@ export function describeCommands() {
 const DOCS = "https://github.com/automatis-tools/agents-can-communicate"
   + "/blob/main/docs/CLI.md";
 
-const ADAPTER_IDS = Object.freeze(ALL_ADAPTERS().map(adapter => adapter.id));
 const CHOICES = Object.freeze({
   work: { mode: INTENT_MODES, state: INTENT_STATES },
   claim: { mode: CLAIM_MODES, enforcement: CLAIM_ENFORCEMENTS },

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { recordedText } from "../src/main.mjs";
+import { recordedText } from "../src/recorded-text.mjs";
 
 test("a permission fallback names the recorded retry key and an approved execution path", () => {
   const text = recordedText({ messageId: "message_original", clientMessageId: "client_original" },

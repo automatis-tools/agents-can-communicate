@@ -45,9 +45,12 @@ function safeTransport(value, opaqueEndpointRef) {
   return opaqueEndpointRef === "live-adapter" ? "native-live" : "live-adapter";
 }
 
-export function createDeliveryRouter({ service, adapters, clock, readLivePolicy,
+export function createDeliveryRouter({ service, adapters, loadAdapter, clock, readLivePolicy,
   readNativeReason = input => lastNativeReason({ runtimeDir: service.store?.root, ...input }) }) {
   const registry = adaptersById(adapters);
+  // A command that routes one message loads only its recipients' adapters (#270).
+  const adapterFor = typeof loadAdapter === "function" ? loadAdapter
+    : async adapterId => registry.get(adapterId);
   const observeOffer = (binding, reasonCode = null) => {
     // Capture time and order now, but never await optional diagnostic I/O on
     // the delivery path. The SDK bounds its own lifetime for short-lived CLIs.
@@ -119,7 +122,7 @@ export function createDeliveryRouter({ service, adapters, clock, readLivePolicy,
     // that bound no live transport. It reads its inbox, so it is not gone.
     if (bindings.length === 0) return withoutLiveTransport(participantId, target);
     const evaluated = await Promise.all(bindings.map(async binding => {
-      const adapter = registry.get(binding.adapterId);
+      const adapter = await adapterFor(binding.adapterId);
       return { binding, adapter, policy: await policyFor(adapter, binding) };
     }));
     const permitted = evaluated.filter(({ policy }) => permits(policy, message.kind));

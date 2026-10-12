@@ -3,13 +3,26 @@ import { randomBytes } from "node:crypto";
 import { readFile } from "node:fs/promises";
 
 import { createId } from "@agents-can-communicate/protocol";
-import { readInstalledLivePolicy } from "@agents-can-communicate/installer";
-import { createDeliveryRouter } from "@agents-can-communicate/delivery-router";
-import { registerDiscoveredSessions } from "@agents-can-communicate/hook-runner";
-import { ALL_ADAPTERS, askConfirmation, main as runCli } from "@agents-can-communicate/cli";
+import { loadAdapter, loadAdapters } from "@agents-can-communicate/cli/adapters";
+import { askConfirmation } from "@agents-can-communicate/cli/confirm";
+import { main as runCli } from "@agents-can-communicate/cli/main";
+
+// A command loads what it uses: `acc version` no client adapter, store or
+// router, and a message only its recipients' adapters (#270).
+const lazyRouter = ({ service, clock, dataHome }) => {
+  let router;
+  return { offer: async message => {
+    router ??= Promise.all([import("@agents-can-communicate/delivery-router"),
+      import("@agents-can-communicate/installer/live-policy")])
+      .then(([{ createDeliveryRouter }, { readInstalledLivePolicy }]) =>
+        createDeliveryRouter({ service, loadAdapter, clock,
+          readLivePolicy: ({ adapter }) => readInstalledLivePolicy({ dataHome,
+            adapterId: adapter.id }) }));
+    return (await router).offer(message);
+  } };
+};
 
 export async function main({ managerRoot = null, packageRoot, managementOnly = false } = {}) {
-const adapters = Object.fromEntries(ALL_ADAPTERS().map(adapter => [adapter.id, adapter]));
 
 // The composition root is the only place allowed to reach for ambient time and
 // randomness; everything below it receives them as ports.
@@ -24,14 +37,12 @@ const runtime = {
   stderr: process.stderr,
   clock: { now: () => new Date().toISOString() },
   ids: { next: kind => createId(kind, randomBytes) },
-  createDeliveryRouter: ({ service, clock, dataHome }) =>
-    createDeliveryRouter({ service, adapters, clock,
-      readLivePolicy: ({ adapter }) => readInstalledLivePolicy({ dataHome,
-        adapterId: adapter.id }) }),
+  createDeliveryRouter: lazyRouter,
   // Chats a client holds before their first turn, registered before status
   // is read so a peer can address them (#167).
-  registerNativeSessions: ({ workspaceId, dataHome }) =>
-    registerDiscoveredSessions({ adapters, workspaceId, dataHome, env: process.env }),
+  registerNativeSessions: async ({ workspaceId, dataHome }) =>
+    (await import("@agents-can-communicate/hook-runner")).registerDiscoveredSessions({
+      loadAdapters, workspaceId, dataHome, env: process.env }),
   // Asked only by `acc config init`, and only when stdout is a terminal. There
   // was no port here at all, so the question went to the fallback that always
   // answers no: in a real terminal the command printed "not written" and never
