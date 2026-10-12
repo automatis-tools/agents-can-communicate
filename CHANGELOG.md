@@ -1,5 +1,26 @@
 # Changelog
 
+## Unreleased — a placed swap for the store symlink check
+
+- The required check that an ancestor swapped for a symlink cannot serve another
+  directory in the store no longer depends on timing. It swaps the ancestor at every
+  step of the walk through the walk's own seam and requires a refusal each time, and
+  the original directory before and after. Before, it raced a swap loop and failed on
+  a loaded runner when no walk happened to fit between two swaps (#250).
+- The free-running race is kept as `tests/stress/ancestor-symlink-race.mjs`, run on
+  request.
+
+| Development artifact | Value |
+|---|---|
+| Built from | `66d8f42cdddc46299a4a5cd5ca08a7b195a58059` |
+| Tarball | `agents-can-communicate-0.11.0.tgz`, 609,126 bytes, 374 files |
+| sha256 | `78625791a732a9f081638423cecec30e1009667dd2329bce01860176d5c0bef3` |
+
+Only tests changed; the archive passed package verification. See
+[development evidence](docs/release-evidence/unreleased-store-symlink-placed-swap.md).
+This is not a new published release.
+The package version remains `0.11.0` until a release prepares its own.
+
 ## Unreleased — find a client the session start missed
 
 - A session whose start could not find its client process now finds it on the next
