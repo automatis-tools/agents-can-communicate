@@ -19,7 +19,7 @@ const program = `
     injectOutcome: context => ({ stdout: context, stderr: "", exitCode: 0 }),
     renderContext: () => "",
   };
-  const result = await runHook({
+  const result = await runHook({ includeSessions: true,
     adapterId: adapter.id,
     adapters: { [adapter.id]: adapter },
     dataHome: process.env.ACC_TEST_DATA_HOME,

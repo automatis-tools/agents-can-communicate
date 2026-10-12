@@ -19,14 +19,31 @@ export async function readStateEnvelope(paths, { root, workspaceId }, kind, id) 
   return envelope;
 }
 
+// How many records of one kind are read at once. One at a time, a turn spent
+// 0.4 s reading a workspace of a few thousand records; sixteen read it in 0.15 s
+// on the same Mac (#298). The order of the listing is kept.
+const LIST_READS = 16;
+
 export async function listState(paths, root, kind, deadlineAt) {
-  const envelopes = [];
-  for (const filePath of await listJsonFiles(path.join(paths.state, kind), { root })) {
-    assertPublicationDeadline(deadlineAt);
-    const envelope = await readStateEnvelope(paths, { root }, kind, path.basename(filePath, ".json"));
-    if (envelope !== null) envelopes.push(envelope);
-  }
-  return envelopes;
+  const files = await listJsonFiles(path.join(paths.state, kind), { root });
+  const envelopes = new Array(files.length).fill(null);
+  let next = 0;
+  let failed = false;
+  const reader = async () => {
+    while (!failed && next < files.length) {
+      const index = next++;
+      try {
+        assertPublicationDeadline(deadlineAt);
+        envelopes[index] = await readStateEnvelope(paths, { root }, kind,
+          path.basename(files[index], ".json"));
+      } catch (error) {
+        failed = true;
+        throw error;
+      }
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(LIST_READS, files.length) }, reader));
+  return envelopes.filter(envelope => envelope !== null);
 }
 
 export async function loadStateEnvelopes(paths, { root, deadlineAt }, wanted = null) {

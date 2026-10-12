@@ -49,7 +49,7 @@ async function withLiveOffer(t, options = {}) {
   const runtime = { clock: { now: () => new Date(Date.now() + offset).toISOString() },
     ids: { next: kind => createId(kind, randomBytes) }, realpath };
   const rep = adapter(options);
-  const invoke = payload => runHook({ adapterId: "rep", payload, adapters: { rep },
+  const invoke = payload => runHook({ includeSessions: true, adapterId: "rep", payload, adapters: { rep },
     dataHome: place.dataHome, readProcessTable: async () => new Map(),
     probeClientVersion: async () => "1.0.0", platform, runtime });
   const recipient = await invoke(event("sessionStart", place.root));

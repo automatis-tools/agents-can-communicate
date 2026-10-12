@@ -45,7 +45,7 @@ async function machine(t) {
     // deadline: with the five-second default, a loaded machine spent it on the
     // doctor runs and the next write refused with "transaction deadline expired".
     // The budget outlives the test; the hook's own work is the same.
-    const result = await runHook({ adapterId: adapter.id, adapters: { [adapter.id]: adapter },
+    const result = await runHook({ includeSessions: true, adapterId: adapter.id, adapters: { [adapter.id]: adapter },
       payload: { hook_event_name: kind, session_id: name, cwd: project,
         prompt: "secret-prompt-must-not-be-recorded" }, dataHome, env,
       readProcessTable: async () => pid
@@ -254,7 +254,7 @@ test("slow diagnostic I/O cannot hold the hook process open or replace its owner
       budgetNow += 4251; // 749ms remain: below the diagnostic allocation threshold.
       return original.normalizeHook(payload);
     } };
-    const result = await runHook({ adapterId: adapter.id, adapters: { [adapter.id]: adapter },
+    const result = await runHook({ includeSessions: true, adapterId: adapter.id, adapters: { [adapter.id]: adapter },
       budgetMs: 5000, dataHome: process.env.ACC_DATA_HOME, env: process.env,
       payload: { hook_event_name: "UserPromptSubmit", session_id: "slow", cwd: process.cwd() } });
     process.stdout.write(JSON.stringify({ timedOut: result.timedOut, failed: result.failed,

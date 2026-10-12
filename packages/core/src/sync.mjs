@@ -71,7 +71,8 @@ export function createSyncService(ports, sessions) {
     const located = input.sessionId === undefined
       ? null : await sessions.locateSession(input.sessionId, workspaceId);
     const session = located?.record ?? null;
-    const durable = await store.snapshot(workspaceId);
+    // A caller that reads the store once for a whole turn hands that read over (#298).
+    const durable = input.snapshot ?? await store.snapshot(workspaceId);
     const snapshot = durable.workspace !== null
       ? durable
       : { ...durable,

@@ -263,8 +263,12 @@ async function openContext({ event, adapterId, dataHome, runtime, env, deadline 
 // the adapter's context envelope, at the end of one it is a continuation.
 async function projectTurn({ binding, context, adapter, adapterId, render = null,
   activationHint = null, activationNotice = null, repeats = true }) {
+  // One read of the store serves the whole projection. Sync and next-turn
+  // delivery each read every message and receipt the workspace held, twice a
+  // prompt, and nothing is written between the two (#298).
+  const snapshot = await context.service.store.snapshot(context.descriptor.id);
   const sync = await context.service.sync({ sessionId: binding.accSessionId,
-    cursor: null, scope: "delta" });
+    cursor: null, scope: "delta", snapshot });
 
   // Sync already carries the roster. Calling collectStatus here used to read
   // the entire materialised store a second time on every prompt merely to
@@ -288,7 +292,7 @@ async function projectTurn({ binding, context, adapter, adapterId, render = null
     workspaceId: context.descriptor.id,
     participantId: mine?.participantId,
     exceptSessionId: binding.accSessionId,
-    repeats: repeats && canOfferNextTurn });
+    repeats: repeats && canOfferNextTurn, snapshot });
   // New bodies first, so a repeat is what the byte budget drops.
   const messages = [...delivery.queuedMessages, ...delivery.repeatMessages];
   const repeating = new Set(delivery.repeatMessages.map(message => message.messageId));
@@ -833,7 +837,7 @@ export async function runHook({ adapterId, payload, adapters, dataHome, env,
   runtime = defaultRuntime(), budgetMs = DEFAULT_BUDGET_MS,
   readProcessTable = defaultReadProcessTable,
   probeClientVersion = defaultProbeClientVersion,
-  platform = `${process.platform}-${process.arch}` }) {
+  platform = `${process.platform}-${process.arch}`, includeSessions = false }) {
   const deadline = Date.now() + budgetMs;
   const fallback = { stdout: "", exitCode: 0, decision: "allow", sessions: [], deadlineAt: deadline,
     commitOffers: async () => {} };
@@ -904,11 +908,16 @@ export async function runHook({ adapterId, payload, adapters, dataHome, env,
     };
     delete result.offerInputs;
 
-    mark("reading the status");
-    const status = await context.service.collectStatus({
-      workspaceId: context.descriptor.id });
-    assertHookBudget(deadline);
-    result.sessions = status.participants.filter(p => p.presence !== "offline");
+    // Who is present, for a caller that asks; the hook entry point never does.
+    // Reading it took the whole store a second time on every hook, 0.4 s to 4 s
+    // of the five-second budget in real workspaces (#298).
+    if (includeSessions) {
+      mark("reading the status");
+      const status = await context.service.collectStatus({
+        workspaceId: context.descriptor.id });
+      assertHookBudget(deadline);
+      result.sessions = status.participants.filter(p => p.presence !== "offline");
+    }
     result.service = context.service;
     return result;
   };

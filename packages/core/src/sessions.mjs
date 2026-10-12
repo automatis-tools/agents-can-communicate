@@ -101,12 +101,15 @@ export function createSessionService(ports) {
       : await store.ephemeral.update("session", sessionId, async current =>
         current !== null && !await isMaterialised(store, current.workspaceId) ? beat(current) : null);
     if (ephemeral !== null) return ephemeral;
-    return store.transaction(tx => {
+    // One session is read, not every session the workspace ever had: a turn's
+    // heartbeat took about a second in a workspace with 2,234 of them.
+    return store.transaction(async tx => {
+      await tx.load("session", sessionId);
       const beaten = beat(tx.get("session", sessionId));
       if (beaten === null) throw new AccError(EXIT.CONFLICT, "session is not open", { sessionId });
       tx.put("session", sessionId, beaten, tx.generationOf("session", sessionId));
       return beaten;
-    }, { kinds: ["session"] });
+    }, { kinds: ["session"], exactKinds: ["session"] });
   }
 
   /**
