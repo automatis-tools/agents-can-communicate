@@ -278,7 +278,10 @@ test("every variable the code reads from the environment is written down", async
     for (const entry of entries) {
       if (!entry.isFile() || !entry.name.endsWith(".mjs")) continue;
       const file = path.join(entry.parentPath ?? entry.path, entry.name);
-      if (file.includes("node_modules") || file.includes(`${path.sep}test${path.sep}`)) continue;
+      // Judged inside the checkout: one that lives under a directory named
+      // `test` would otherwise skip every file and find nothing to check.
+      const parts = path.relative(repo, file).split(path.sep);
+      if (parts.includes("node_modules") || parts.includes("test")) continue;
       code.push(await readFile(file, "utf8"));
     }
   }
