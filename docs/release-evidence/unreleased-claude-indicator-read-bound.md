@@ -9,7 +9,7 @@ artifact, whose original record remains unchanged.
 
 | Fact | Value |
 |---|---|
-| Source commit | `609e4120a9d239f6d5663e2f9cac6bef83844cbf` |
+| Source commit | `03c12de4688a3044fb190c8c27af703a445165c0` |
 | Source state at pack time | clean feature worktree |
 | Archive | `agents-can-communicate-0.11.0.tgz` |
 | Archive size | 608,110 bytes |
@@ -19,6 +19,8 @@ artifact, whose original record remains unchanged.
 
 `node scripts/verify-package.mjs` passed on the clean worktree and reported the same
 digest as a separate `npm pack`.
+The fix itself is commit `609e4120`. The recorded commit adds only a test change;
+the archive packed from both commits has identical bytes.
 
 ## Cause
 
@@ -64,6 +66,16 @@ and added the delay below before loading the real `acc-indicator`.
 The installed-module tests reproduce the same cases with a scripted host. Before the
 change, five of the six new tests failed: one isolated lost read changed the badge and
 printed the diagnostic, and the bound was 1200 ms.
+
+## Footer composition tests
+
+The first full suite at this change failed two Kimi footer composition tests, which
+already existed on main. Their output was the timeout fallback `ACC ! · acc doctor`:
+at load average 75–114 the real 180 ms Kimi budget expired before the reader
+answered. Repeated alone, they failed in 4 of 8 runs. They check composition and
+sanitising, so they now use the controlled clock their sibling test already used.
+Six repeated runs of the file then passed at load average 114. Separate tests still
+advance time to cover the deadline and the cleanup of a previous footer's processes.
 
 ## Limits
 

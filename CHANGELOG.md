@@ -11,7 +11,7 @@
 
 | Development artifact | Value |
 |---|---|
-| Built from | `609e4120a9d239f6d5663e2f9cac6bef83844cbf` |
+| Built from | `03c12de4688a3044fb190c8c27af703a445165c0` |
 | Tarball | `agents-can-communicate-0.11.0.tgz`, 608,110 bytes, 374 files |
 | sha256 | `20c9240f7bdb5ce180082e2cbf086097d17a609820befae7cc751d2b31552c01` |
 
