@@ -13,6 +13,41 @@ refs=$(cat)
 echo "pre-push: refusing Claude attribution in pushed commits"
 printf '%s\n' "$refs" | node "$(dirname "$0")/../scripts/check-commit-attribution.mjs" --pre-push "$1"
 
+# Deletions carry no content; attribution still runs, but there is no tree to validate.
+has_content=no
+while read -r _local_ref local_sha _remote_ref _remote_sha; do
+  case "$local_sha" in
+    ""|0000000000000000000000000000000000000000|0000000000000000000000000000000000000000000000000000000000000000) ;;
+    *) has_content=yes ;;
+  esac
+done <<EOF
+$refs
+EOF
+if [ "$has_content" = no ]; then
+  echo "pre-push: deletions only; no content gates needed"
+  exit 0
+fi
+
+# A working-tree receipt is relevant only to this exact committed tree. Git
+# index flags can hide changed files, so they conservatively disable reuse.
+reuse_suite=yes
+head_tree=$(git rev-parse 'HEAD^{tree}') || reuse_suite=no
+if ! git -c core.filemode=true diff --no-ext-diff --quiet HEAD --; then reuse_suite=no; fi
+index_flags=$(git ls-files -v) || reuse_suite=no
+if printf '%s\n' "$index_flags" | LC_ALL=C grep -Eq '^([a-z]|S) '; then reuse_suite=no; fi
+if [ "$reuse_suite" = yes ] && ! node "$(dirname "$0")/../scripts/push-tree-check.mjs"; then
+  reuse_suite=no
+fi
+while read -r _local_ref local_sha _remote_ref _remote_sha; do
+  case "$local_sha" in
+    ""|0000000000000000000000000000000000000000|0000000000000000000000000000000000000000000000000000000000000000) continue ;;
+  esac
+  pushed_tree=$(git rev-parse "$local_sha^{tree}") || reuse_suite=no
+  if [ "$pushed_tree" != "$head_tree" ]; then reuse_suite=no; fi
+done <<EOF
+$refs
+EOF
+
 # The lint step runs next, while git's own repository variables are still set,
 # so `git ls-files` resolves this repository without relying on discovery.
 echo "pre-push: syntax-checking tracked .mjs files"
@@ -52,6 +87,10 @@ fi
 # cannot report success having run nothing - which is exactly what the Windows
 # CI job did for as long as the test script relied on shell glob expansion.
 echo "pre-push: running the test suite"
-npm test
+if [ "$reuse_suite" = yes ]; then
+  npm test -- --if-needed
+else
+  npm test
+fi
 
 echo "pre-push: all gates passed"

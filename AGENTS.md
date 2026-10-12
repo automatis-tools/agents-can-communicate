@@ -27,6 +27,20 @@ npm pack && node scripts/verify-package.mjs   # what a user actually receives
 On macOS outside CI, `npm test` skips fsync and runs more test files at once: each flush there
 is a 4 ms F_FULLFSYNC. `ACC_TEST_REAL_FSYNC=1 npm test` keeps every flush; CI always does.
 
+`npm test` always executes the complete suite. A successful local run records a disposable
+receipt outside the checkout. Pre-push uses `npm test -- --if-needed` only for the same clean
+pushed tree: unchanged file bytes, installed workspace links, Node and test environment can
+reuse that receipt for 24 hours. Changed inputs, a failed rerun, uncertain dependencies or an
+unavailable cache run the gate again. Syntax checks likewise reuse only successful parses of
+identical files with the same Node/options. Commit-message and pushed-history checks always run.
+
+CI never reuses local suite receipts. Windows runs `npm test -- --shard 1/2` and `2/2`; their
+union is the whole discovered list, and the existing Windows check requires both to pass.
+`--list` can inspect a shard without packing. Test files have a ten-minute process deadline
+(`ACC_TEST_FILE_TIMEOUT_MS`) in addition to the five-minute default per-test deadline
+(`ACC_TEST_TIMEOUT_MS`), so leaked handles cannot silently hold a gate forever. The runner
+prints the slowest files; `ACC_TEST_TIMINGS` saves file timings as JSONL to the specified path.
+
 Enable the commit-msg and pre-push gates once per clone:
 
 ```bash

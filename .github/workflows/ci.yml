@@ -5,20 +5,23 @@ on:
   push:
     branches: [main]
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 # Actions are pinned to immutable commit SHAs. A moving tag is a dependency
 # somebody else can change after review.
 jobs:
   test:
     name: ${{ matrix.os }} · node ${{ matrix.node }}
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 120
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
-        # Each job here is the only run of the suite on its platform: no
-        # developer machine is Linux or Windows. A green tick on one platform
-        # says nothing about another, so the pull request waits for all three.
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        # Linux and macOS each run the whole suite; Windows runs its exhaustive
+        # partition below. Every platform remains required.
+        os: ['ubuntu-latest', 'macos-latest']
         node: ['24']
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -32,35 +35,14 @@ jobs:
       # No syntax step: the Lint workflow checks every tracked .mjs once, and
       # here it held each job's tests back by 14-40 s (2026-10-06).
 
-      # The suite's temporary files on the runner's local disk. Its system disk,
-      # C:, is remote: beside the suite a 4 KB flush there took 10-33 ms at the
-      # median and up to 1.5 s, and on D: 0.5 ms and at most 27 ms
-      # (windows-latest, 2026-10-02). The hook budget is the product's; that
-      # disk is the runner's, and docs/TROUBLESHOOTING.md says what a machine
-      # with one does.
-      - name: Temporary files on the local disk
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: |
-          $dir = Join-Path $env:RUNNER_TEMP 'tmp'
-          New-Item -ItemType Directory -Force $dir | Out-Null
-          "TEMP=$dir" >> $env:GITHUB_ENV
-          "TMP=$dir" >> $env:GITHUB_ENV
-
       - name: Tests
-        # Unit, process, conformance, docs, security, and packaging - the whole
-        # suite, because splitting it invites a job nobody notices is skipped.
-        # The runner resolves its own file list and fails on an empty one: this
-        # job once reported success having run zero tests, because the globs in
-        # the old npm script are expanded by sh and passed through literally by
-        # PowerShell.
+        # Discovery belongs to the runner, independent of shell expansion.
         run: npm test
         env:
-          # One hung test fails by name; see scripts/test-runner-plan.mjs.
+          # Test and file deadlines fail by name, including leaked workers.
           ACC_TEST_TIMEOUT_MS: '300000'
-          # On Windows a child a failed test leaves behind can hold a file's
-          # process open; its concurrency slot is released when its tests end.
-          ACC_TEST_FORCE_EXIT: ${{ matrix.os == 'windows-latest' && '1' || '0' }}
+          ACC_TEST_FILE_TIMEOUT_MS: '600000'
+          ACC_TEST_TIMINGS: ${{ runner.temp }}/acc-test-timings.jsonl
           # Git exports these into every child process. The suite spawns git in
           # temporary fixture repositories, and inheriting them makes those
           # commands operate on this checkout instead. This repository has been
@@ -68,9 +50,59 @@ jobs:
           GIT_DIR: ''
           GIT_WORK_TREE: ''
 
+  windows-shards:
+    name: windows-latest · node 24 · shard ${{ matrix.shard }}
+    runs-on: windows-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        # Deterministic partitions of the runner's complete discovery; no path
+        # filters or hand-maintained test lists can silently exclude a file.
+        shard: ['1/2', '2/2']
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24'
+      - run: npm ci
+      # Preserve the measured local-disk fixture placement: remote C: flushes
+      # exceeded hook deadlines (windows-latest, 2026-10-02).
+      - name: Temporary files on the local disk
+        shell: pwsh
+        run: |
+          $dir = Join-Path $env:RUNNER_TEMP 'tmp'
+          New-Item -ItemType Directory -Force $dir | Out-Null
+          "TEMP=$dir" >> $env:GITHUB_ENV
+          "TMP=$dir" >> $env:GITHUB_ENV
+      - name: Tests
+        run: npm test -- --shard ${{ matrix.shard }}
+        env:
+          ACC_TEST_TIMEOUT_MS: '300000'
+          ACC_TEST_FILE_TIMEOUT_MS: '600000'
+          ACC_TEST_TIMINGS: ${{ runner.temp }}/acc-test-timings.jsonl
+          ACC_TEST_FORCE_EXIT: '1'
+          GIT_DIR: ''
+          GIT_WORK_TREE: ''
+
+  windows-test:
+    # Retain the existing required check name; cancellation/skips cannot make
+    # this aggregate green when a partition has not passed.
+    name: windows-latest · node 24
+    needs: windows-shards
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Require both Windows partitions
+        env:
+          SHARD_RESULT: ${{ needs['windows-shards'].result }}
+        run: node --input-type=module -e "if (process.env.SHARD_RESULT !== 'success') process.exit(1)"
+
   real-clients:
     name: real clients · ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
@@ -84,6 +116,8 @@ jobs:
           node-version: '24'
       - run: npm ci
       - name: Install the clients
+        # Deliberately check current vendor compatibility on both platforms.
+        # The logged versions are observations, not new certification captures.
         run: npm install --global @anthropic-ai/claude-code @openai/codex
       - name: Versions
         run: |
@@ -110,6 +144,7 @@ jobs:
   package:
     name: package · ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
     strategy:
       fail-fast: false
       matrix:

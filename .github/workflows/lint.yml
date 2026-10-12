@@ -7,15 +7,22 @@ on:
   push:
     branches: [main]
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   Lint:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           # The attribution check reads every commit message, not just the tip.
           fetch-depth: 0
       - name: Syntax-check tracked .mjs files
+        # An edited-event Lint success can replace a failed code-event check.
+        # Every run therefore validates syntax as well as attribution.
         run: node scripts/check-syntax.mjs --tracked
       - name: Refuse Claude attribution in commit messages
         run: node scripts/check-commit-attribution.mjs --history HEAD

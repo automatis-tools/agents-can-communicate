@@ -49,15 +49,15 @@ test("MCP rejects invalid claim selectors before opening a session", async t => 
       cases.push([...release({ ...selectors[left], ...selectors[right] }), /arguments/]);
     }
   }
-  for (const [name, args, diagnostic] of cases) {
-    await t.test(`${name} ${JSON.stringify(args)}`, async caseTest => {
-      await withServer(caseTest, async ({ request, meta }) => {
+  await withServer(t, async ({ request, meta }) => {
+    for (const [name, args, diagnostic] of cases) {
+      await t.test(`${name} ${JSON.stringify(args)}`, async () => {
         const response = await request("tools/call", { name, arguments: args, _meta: meta });
         assert.equal(response.result.isError, true);
         assert.match(response.result.content[0].text, diagnostic);
         const roster = await request("resources/read", { uri: "acc://roster", _meta: meta });
         assert.deepEqual(JSON.parse(roster.result.contents[0].text), []);
       });
-    });
-  }
+    }
+  });
 });

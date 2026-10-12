@@ -9,10 +9,9 @@ import { Readable, Writable } from "node:stream";
 import test, { after } from "node:test";
 
 import { createFakeClock, createFakeIds, createMemoryStore } from "../helpers/memory-store.mjs";
-import { runNpm } from "../helpers/npm-run.mjs";
+import { preparePackedArchive } from "../helpers/packed-template.mjs";
 
 const run = promisify(execFile);
-const repo = path.resolve(import.meta.dirname, "..", "..");
 const temporary = await mkdtemp(path.join(os.tmpdir(), "acc-packed-surface-"));
 after(() => rm(temporary, { recursive: true, force: true }));
 
@@ -47,15 +46,9 @@ async function listMcpSurface(serve, protocolVersion) {
 }
 
 async function loadPackedSurface() {
-  // npm's own script under this node: Windows' npm.cmd cannot be started by
-  // execFile without a shell.
-  const { stdout } = await runNpm(["pack", "--json", "--cache",
-    path.join(temporary, "npm-cache"), "--pack-destination", temporary],
-    { cwd: repo, maxBuffer: 10 * 1024 * 1024 });
-  const [{ filename }] = JSON.parse(stdout);
-  // Relative names: a tar that reads `C:` in an archive name as a remote host
-  // then has nothing to misread.
-  await run("tar", ["-xzf", filename, "-C", "."], { cwd: temporary });
+  const tarball = await preparePackedArchive(temporary);
+  // Keep the archive relative: some Windows tar builds treat C: as a host.
+  await run("tar", ["-xzf", path.relative(temporary, tarball), "-C", "."], { cwd: temporary });
 
   const packageRoot = path.join(temporary, "package");
   const modules = path.join(packageRoot, "node_modules", "@agents-can-communicate");
