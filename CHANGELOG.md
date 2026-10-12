@@ -7,9 +7,9 @@
   92 instead of 199, with its own client's adapter only. `acc status` loads the
   adapters of the clients present, and a sent message loads its recipients' adapters
   when it offers to them (#270).
-- On this Mac at load average 27–35, `acc version` started in 56 ms instead of 132 ms,
-  and an indicator read in 74 ms instead of 110 ms. A hook already loaded only its own
-  adapter, and its start did not change.
+- On windows-latest `acc version` started in 89 ms instead of 284 ms, and an indicator
+  read in 143 ms instead of 244 ms. A hook already loaded only its own adapter and
+  started about 4 percent sooner.
 - A test fails when `version`, `help`, `status`, an indicator read or a hook loads a
   client adapter it does not serve.
 
