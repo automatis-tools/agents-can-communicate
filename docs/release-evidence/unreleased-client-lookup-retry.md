@@ -21,6 +21,8 @@ artifact, whose original record remains unchanged.
 digest as a separate `npm pack`.
 The fix is commit `94b9bbae`. The recorded commit merges main after PR #293, so the
 archive also carries the Claude indicator read bound.
+At the recorded commit the full suite ran 3391 tests: 3384 passed, 7 were skipped,
+none failed. The machine's load average was 55–60 during the run.
 
 ## Cause
 
