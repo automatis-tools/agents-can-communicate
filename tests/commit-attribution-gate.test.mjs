@@ -1,9 +1,11 @@
+// Shared real Git/editor/push fixtures keep these entry-point regressions cohesive.
+// Splitting this file would duplicate cross-platform hook setup.
 // The attribution gate is exercised through its real entry points: the commit-msg
 // hook in a scratch repository, the pre-push hook with a stub npm standing in for
 // the suite, and the two CLI modes the Lint job runs.
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
-import { chmod, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { chmod, mkdtemp, rm, stat, utimes, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -313,4 +315,50 @@ test("the Lint mode checks a pull request description handed over in the environ
 test("an unknown mode is a usage error, not a pass", async () => {
   const result = await attempt(process.execPath, [script, "--everything"], {});
   assert.equal(result.code, 2);
+});
+
+test("deletion-only pushes do not parse the working tree or run the suite", async t => {
+  const { root, git } = await scratch(t,
+    { PATH: await stubNpmPath(t, "#!/bin/sh\necho 'suite ran' >&2\nexit 1\n") });
+  assert.equal((await git(["push", "-q", "origin", "HEAD:refs/heads/measure/delete"])).code, 0);
+  await writeFile(path.join(root, "a.mjs"), "export const = ;\n");
+  const deleted = await git(["push", "-q", "origin", ":refs/heads/measure/delete"]);
+  assert.equal(deleted.code, 0, deleted.stderr);
+  assert.doesNotMatch(deleted.stderr, /suite ran|SyntaxError/);
+});
+
+test("only a clean HEAD tree can request full-suite receipt reuse", async t => {
+  const stub = "#!/bin/sh\nif [ \"$2\" = -- ]; then echo 'receipt requested' >&2; "
+    + "else echo 'suite required' >&2; fi\nexit 0\n";
+  const { root, git, commit } = await scratch(t, { PATH: await stubNpmPath(t, stub) });
+  const clean = await git(["push", "-q", "origin", "HEAD:refs/heads/clean"]);
+  assert.equal(clean.code, 0, clean.stderr);
+  assert.match(clean.stderr, /receipt requested/);
+  await writeFile(path.join(root, "a.mjs"), "export const changed = true;\n");
+  const dirty = await git(["push", "-q", "origin", "HEAD:refs/heads/dirty"]);
+  assert.equal(dirty.code, 0, dirty.stderr);
+  assert.match(dirty.stderr, /suite required/);
+  await git(["update-index", "--assume-unchanged", "a.mjs"]);
+  const hidden = await git(["push", "-q", "origin", "HEAD:refs/heads/hidden"]);
+  assert.equal(hidden.code, 0, hidden.stderr);
+  assert.match(hidden.stderr, /suite required/);
+  await git(["update-index", "--no-assume-unchanged", "a.mjs"]);
+  assert.equal((await commit("chore: another tree\n")).code, 0);
+  const other = await git(["push", "-q", "origin", "HEAD~1:refs/heads/other"]);
+  assert.equal(other.code, 0, other.stderr);
+  assert.match(other.stderr, /suite required/);
+});
+
+test("pushed-tree comparison reads actual bytes even when size and mtime match", async t => {
+  const { root, env, git } = await scratch(t);
+  const treeCheck = path.join(repo, "scripts", "push-tree-check.mjs");
+  const check = () => attempt(process.execPath, [treeCheck], { cwd: root, env });
+  assert.equal((await check()).code, 0, "a committed working tree could not certify reuse");
+  const file = path.join(root, "a.mjs");
+  const before = await stat(file);
+  await git(["config", "core.trustctime", "false"]);
+  await writeFile(file, "throw 12; \n");
+  await utimes(file, before.atime, before.mtime);
+  assert.equal((await stat(file)).size, before.size);
+  assert.equal((await check()).code, 1, "different actual bytes were trusted as the pushed tree");
 });

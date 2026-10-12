@@ -6,7 +6,7 @@ import path from "node:path";
 import test from "node:test";
 import { promisify } from "node:util";
 
-import { COMMAND_LINE_LIMIT, SKIP_FSYNC_PRELOAD, TEST_FILE_CONCURRENCY, commandLineLength, fileConcurrency,
+import { COMMAND_LINE_LIMIT, FILE_WATCHDOG_PRELOAD, SKIP_FSYNC_PRELOAD, TEST_FILE_CONCURRENCY, commandLineLength, fileConcurrency,
   nodeTestArguments, skipsFsync, testBatches, testEnvironment } from "../../scripts/test-runner-plan.mjs";
 
 const run = promisify(execFile);
@@ -71,6 +71,8 @@ test("the runner bounds file concurrency without weakening process races", t => 
   assert.deepEqual(nodeTestArguments(["first.test.mjs", "second.test.mjs"]), [
     "--test",
     concurrency,
+    "--test-timeout=300000",
+    `--import=${FILE_WATCHDOG_PRELOAD}`,
     "first.test.mjs",
     "second.test.mjs",
   ]);
@@ -78,7 +80,8 @@ test("the runner bounds file concurrency without weakening process races", t => 
   process.env.ACC_TEST_TIMEOUT_MS = "600000";
   process.env.ACC_TEST_FORCE_EXIT = "1";
   assert.deepEqual(nodeTestArguments(["first.test.mjs"]),
-    ["--test", concurrency, "--test-timeout=600000", "--test-force-exit", "first.test.mjs"]);
+    ["--test", concurrency, "--test-timeout=600000", "--test-force-exit",
+      `--import=${FILE_WATCHDOG_PRELOAD}`, "first.test.mjs"]);
 });
 
 test("an explicit file concurrency limit can reduce pressure without raising the tested ceiling", () => {

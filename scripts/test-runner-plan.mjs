@@ -41,6 +41,13 @@ export const skipsFsync = ({ platform = process.platform, env = process.env } = 
   platform === "darwin" && !env.CI && env.ACC_TEST_REAL_FSYNC !== "1";
 
 export const SKIP_FSYNC_PRELOAD = new URL("./test-skip-fsync.mjs", import.meta.url).href;
+export const FILE_WATCHDOG_PRELOAD = new URL("./test-file-watchdog.mjs", import.meta.url).href;
+export const TIMING_REPORTER = new URL("./test-timing-reporter.mjs", import.meta.url).href;
+export function testFileTimeout(env = process.env) {
+  const timeout = Number(env.ACC_TEST_FILE_TIMEOUT_MS ?? 600_000);
+  if (!Number.isSafeInteger(timeout) || timeout < 1) throw new Error("ACC_TEST_FILE_TIMEOUT_MS must be a positive integer");
+  return timeout;
+}
 
 // The environment the suite's processes start with: the preload rides in
 // NODE_OPTIONS, so every node process a test starts inherits it with the rest.
@@ -62,19 +69,23 @@ export const TEST_FILE_CONCURRENCY = fileConcurrency(process.platform, {
 // CI sets ACC_TEST_TIMEOUT_MS so that one hung test fails with its name instead
 // of holding the whole job until the runner's own limit.
 const perTestTimeout = () => {
-  const value = Number(process.env.ACC_TEST_TIMEOUT_MS);
-  return Number.isSafeInteger(value) && value > 0 ? [`--test-timeout=${value}`] : [];
+  const value = Number(process.env.ACC_TEST_TIMEOUT_MS ?? 300_000);
+  if (!Number.isSafeInteger(value) || value < 1) throw new Error("ACC_TEST_TIMEOUT_MS must be a positive integer");
+  return [`--test-timeout=${value}`];
 };
 
 // ACC_TEST_FORCE_EXIT ends a file's process once its tests are done, so a child
 // process a failed test left behind cannot hold a concurrency slot for good.
 const forceExit = () => (process.env.ACC_TEST_FORCE_EXIT === "1" ? ["--test-force-exit"] : []);
 
-export const nodeTestArguments = files => [
+export const nodeTestArguments = (files, { timings } = {}) => [
   "--test",
   `--test-concurrency=${TEST_FILE_CONCURRENCY}`,
   ...perTestTimeout(),
   ...forceExit(),
+  `--import=${FILE_WATCHDOG_PRELOAD}`,
+  ...(timings === undefined ? [] : ["--test-reporter=spec", "--test-reporter-destination=stdout",
+    `--test-reporter=${TIMING_REPORTER}`, `--test-reporter-destination=${timings}`]),
   ...files,
 ];
 
@@ -88,8 +99,9 @@ export const COMMAND_LINE_LIMIT = 30_000;
 export const commandLineLength = argv =>
   argv.reduce((total, word) => total + String(word).length + 3, 0);
 
-export function testBatches(files, { limit = COMMAND_LINE_LIMIT, interpreter = process.execPath } = {}) {
-  const head = commandLineLength([interpreter, ...nodeTestArguments([])]);
+export function testBatches(files, { limit = COMMAND_LINE_LIMIT, interpreter = process.execPath,
+  testOptions = {} } = {}) {
+  const head = commandLineLength([interpreter, ...nodeTestArguments([], testOptions)]);
   const batches = [];
   let batch = [];
   let length = head;

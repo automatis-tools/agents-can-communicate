@@ -15,6 +15,8 @@ import os from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
 
+import { clearPassed, hasPassed, savePassed, syntaxFingerprint } from "./gate-cache.mjs";
+
 const run = promisify(execFile);
 const repo = path.resolve(import.meta.dirname, "..");
 const ROOTS = ["packages", "bin", "scripts", "tests"];
@@ -52,16 +54,30 @@ if (files.length === 0 && !trackedOnly) {
 
 const failures = [];
 let next = 0;
+let checked = 0;
+let cached = 0;
 const width = Math.max(1, Math.min(os.availableParallelism(), files.length));
 await Promise.all(Array.from({ length: width }, async () => {
   while (next < files.length) {
     const file = files[next++];
-    await run(process.execPath, ["--check", file])
-      .catch(error => failures.push(`${file}\n${error.stderr}`));
+    const before = await syntaxFingerprint(file);
+    if (await hasPassed("syntax", before)) {
+      cached += 1;
+      continue;
+    }
+    checked += 1;
+    try {
+      await run(process.execPath, ["--check", file]);
+      const after = await syntaxFingerprint(file);
+      if (before?.key && before.key === after?.key) await savePassed("syntax", before);
+    } catch (error) {
+      await clearPassed("syntax", before);
+      failures.push(`${file}\n${error.stderr}`);
+    }
   }
 }));
 if (failures.length > 0) {
   console.error(failures.sort().join("\n"));
   process.exit(1);
 }
-console.log(`syntax ok in ${files.length} file(s)`);
+console.log(`syntax ok in ${files.length} file(s) (${checked} checked, ${cached} cached)`);
