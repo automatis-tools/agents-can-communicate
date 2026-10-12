@@ -1,5 +1,28 @@
 # Changelog
 
+## Unreleased — find a client the session start missed
+
+- A session whose start could not find its client process now finds it on the next
+  prompt. Before, it reported `client_process_unknown` and had no live delivery for its
+  whole life. At load average 56–84 the start's process table read took longer than its
+  1 s limit.
+- On macOS and Linux the hook reads only the chain from itself up to the client, one
+  `ps -p` per process. On this Mac that took 8–12 ms instead of 77–83 ms for the whole
+  table, which took 830–1430 ms at load average 69.
+
+| Development artifact | Value |
+|---|---|
+| Built from | `ea055ffa3dfef7a4d10396789be22a75b44a7321` |
+| Tarball | `agents-can-communicate-0.11.0.tgz`, 608,514 bytes, 374 files |
+| sha256 | `136ca196f968c3885d09df65fb26814ddf2f725b1ade36c9348c79cda62aa4ed` |
+
+The exact archive passed package verification. The hook runner, run under a real
+Claude Code process with a slow `ps` at session start, bound the session to that
+process on the first prompt; the previous build never did. See
+[development evidence](docs/release-evidence/unreleased-client-lookup-retry.md).
+This is not a new published release.
+The package version remains `0.11.0` until a release prepares its own.
+
 ## 0.11.0 — combined release candidate
 
 - Ship atomic batch claim/release from PR #291 together with the per-session
