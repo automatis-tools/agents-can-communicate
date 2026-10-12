@@ -45,7 +45,7 @@ async function fixture(t, { clientVersion = "1.0.0", selectedAdapter = adapter,
   const dataHome = await realpath(await mkdtemp(path.join(tmpdir(), "acc-offer-data-")));
   t.after(() => Promise.all([rm(root, { recursive: true, force: true }),
     rm(dataHome, { recursive: true, force: true })]));
-  const invoke = (kind, sessionId, options = {}) => runHook({ adapterId: "test",
+  const invoke = (kind, sessionId, options = {}) => runHook({ includeSessions: true, adapterId: "test",
     payload: event(kind, root, sessionId), adapters: { test: selectedAdapter }, dataHome,
     readProcessTable: noProcessTable, probeClientVersion: async () => clientVersion,
     ...options });

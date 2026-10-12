@@ -105,7 +105,7 @@ const testProbe = async adapter => ({ kimi: "0.36.1", gemini: "0.37.0",
   codex: "0.147.0" })[adapter.client?.command] ?? null;
 
 const run = (adapterId, payload, { root, dataHome }, options = {}) =>
-  runHook({ adapterId, payload: { ...payload, cwd: payload.cwd ?? root },
+  runHook({ includeSessions: true, adapterId, payload: { ...payload, cwd: payload.cwd ?? root },
     adapters: ADAPTERS, dataHome, readProcessTable: noProcessTable,
     probeClientVersion: testProbe, ...options });
 
@@ -325,7 +325,7 @@ test("an internal failure never breaks the session it is hooked into", async t =
   const place = await workspace(t);
   const broken = { ...kimi, normalizeHook: () => { throw new Error("boom"); } };
 
-  const result = await runHook({ adapterId: "kimi", payload: event("beforeTool"),
+  const result = await runHook({ includeSessions: true, adapterId: "kimi", payload: event("beforeTool"),
     adapters: { kimi: broken }, dataHome: place.dataHome,
     readProcessTable: noProcessTable });
 
@@ -396,17 +396,17 @@ test("a client that denies by exit code is served that way, not with JSON", asyn
     renderContext: () => "" };
   const adapters = { ...ADAPTERS, codex };
 
-  const peer = await runHook({ adapterId: "kimi", adapters, dataHome: place.dataHome,
+  const peer = await runHook({ includeSessions: true, adapterId: "kimi", adapters, dataHome: place.dataHome,
     readProcessTable: noProcessTable, probeClientVersion: testProbe,
     payload: event("sessionStart", { sessionId: "peer", cwd: place.root }) });
   await peer.service.acquireClaim({ sessionId: peer.accSessionId,
     generation: peer.generation, resource: "file:src/**", mode: "exclusive",
     enforcement: "guarded", reason: "held" });
-  await runHook({ adapterId: "codex", adapters, dataHome: place.dataHome,
+  await runHook({ includeSessions: true, adapterId: "codex", adapters, dataHome: place.dataHome,
     readProcessTable: noProcessTable, probeClientVersion: testProbe,
     payload: event("sessionStart", { cwd: place.root }) });
 
-  const denied = await runHook({ adapterId: "codex", adapters, dataHome: place.dataHome,
+  const denied = await runHook({ includeSessions: true, adapterId: "codex", adapters, dataHome: place.dataHome,
     readProcessTable: noProcessTable, probeClientVersion: testProbe,
     payload: event("beforeTool", { tool: "apply_patch", cwd: place.root,
       targets: [path.join(place.root, "src/a.mjs")] }) });
@@ -428,10 +428,10 @@ test("attach declares what the adapter proved, not that it is an adapter", async
     capabilities: { guards: { beforeWrite: false }, lifecycle: { sessionEnd: false } } };
   const adapters = { kimi: guarding, blind };
 
-  await runHook({ adapterId: "kimi", adapters, dataHome: place.dataHome,
+  await runHook({ includeSessions: true, adapterId: "kimi", adapters, dataHome: place.dataHome,
     readProcessTable: noProcessTable, probeClientVersion: testProbe,
     payload: event("sessionStart", { sessionId: "a", cwd: place.root }) });
-  const after = await runHook({ adapterId: "blind", adapters, dataHome: place.dataHome,
+  const after = await runHook({ includeSessions: true, adapterId: "blind", adapters, dataHome: place.dataHome,
     readProcessTable: noProcessTable, probeClientVersion: testProbe,
     payload: event("sessionStart", { sessionId: "b", cwd: place.root }) });
 
@@ -458,13 +458,13 @@ test("the turn context names only a claim overlapping this session's published i
         .map(item => `${item.kind}|${item.summary}`).join(" ") };
     const adapters = { ...ADAPTERS, unguarded };
 
-    const mine = await runHook({ adapterId: "unguarded", adapters, dataHome: place.dataHome,
+    const mine = await runHook({ includeSessions: true, adapterId: "unguarded", adapters, dataHome: place.dataHome,
       readProcessTable: noProcessTable,
       payload: event("sessionStart", { cwd: place.root }) });
     await mine.service.setIntent({ sessionId: mine.accSessionId,
       generation: mine.generation, summary: "editing src", mode: "edit",
       resourceHints: ["file:src/**"] });
-    const turn = await runHook({ adapterId: "unguarded", adapters, dataHome: place.dataHome,
+    const turn = await runHook({ includeSessions: true, adapterId: "unguarded", adapters, dataHome: place.dataHome,
       readProcessTable: noProcessTable,
       payload: event("beforeTurn", { cwd: place.root }) });
 
@@ -480,17 +480,17 @@ test("a session is not warned about its own claim", async t => {
     renderContext: sync => (sync.attention ?? []).map(item => item.summary).join(" ") };
   const adapters = { ...ADAPTERS, rendering };
 
-  const mine = await runHook({ adapterId: "rendering", adapters,
+  const mine = await runHook({ includeSessions: true, adapterId: "rendering", adapters,
     dataHome: place.dataHome, readProcessTable: noProcessTable,
     payload: event("sessionStart", { cwd: place.root }) });
   await mine.service.acquireClaim({ sessionId: mine.accSessionId,
     generation: mine.generation, resource: "file:src/**", mode: "exclusive",
     enforcement: "guarded", reason: "mine" });
-  await runHook({ adapterId: "rendering", adapters, dataHome: place.dataHome,
+  await runHook({ includeSessions: true, adapterId: "rendering", adapters, dataHome: place.dataHome,
     readProcessTable: noProcessTable,
     payload: event("sessionStart", { sessionId: "peer", cwd: place.root }) });
 
-  const turn = await runHook({ adapterId: "rendering", adapters,
+  const turn = await runHook({ includeSessions: true, adapterId: "rendering", adapters,
     dataHome: place.dataHome, readProcessTable: noProcessTable,
     payload: event("beforeTurn", { cwd: place.root }) });
 
@@ -588,7 +588,7 @@ test("an exported live policy alone no longer binds a session", async t => {
   const native = nativeHookAdapter(input => { handshakes.push(input.event.kind); });
   const table = new Map([[process.pid, { ppid: 900, comm: "node" }],
     [900, { ppid: 1, comm: "native-client" }]]);
-  const started = await runHook({ adapterId: "native", adapters: { native },
+  const started = await runHook({ includeSessions: true, adapterId: "native", adapters: { native },
     dataHome: place.dataHome, env: { ACC_NATIVE_DELIVERY_POLICY: "all" },
     readProcessTable: async () => table, probeClientVersion: async () => "2.1.258",
     platform: "darwin-arm64", payload: event("sessionStart", { cwd: place.root }) });
@@ -604,7 +604,7 @@ test("a native adapter binds at start and retries on a later turn under a live p
     [900, { ppid: 1, comm: "native-client" }]]);
   await recordInstall({ dataHome: place.dataHome, adapterId: "native", version: "2.1.258",
     artifacts: [], deliveryPolicy: "actionable" });
-  const runNative = (kind, options = {}) => runHook({ adapterId: "native", adapters: { native },
+  const runNative = (kind, options = {}) => runHook({ includeSessions: true, adapterId: "native", adapters: { native },
     dataHome: place.dataHome, env: {}, readProcessTable: async () => table,
     probeClientVersion: async () => "2.1.258", platform: "darwin-arm64",
     payload: event(kind, { cwd: place.root }), ...options });
@@ -636,7 +636,7 @@ test("recorded off retires an existing binding despite a stale live environment"
     "installation-record");
   const table = new Map([[process.pid, { ppid: 900, comm: "node" }],
     [900, { ppid: 1, comm: "native-client" }]]);
-  const invoke = kind => runHook({ adapterId: "native", adapters: { native },
+  const invoke = kind => runHook({ includeSessions: true, adapterId: "native", adapters: { native },
     dataHome: place.dataHome, env: { ACC_NATIVE_DELIVERY_POLICY: "all" },
     readProcessTable: async () => table, probeClientVersion: async () => "2.1.258",
     platform: "darwin-arm64", payload: event(kind, { cwd: place.root }) });
@@ -676,7 +676,7 @@ test("an offered note is not replayed on the next turn", async t => {
     offeredMessageIds: (sync.messages ?? []).map(message => message.messageId),
     includedAttentionIds: (sync.attention ?? []).map(item => item.sourceId),
   }) };
-  const runEcho = payload => runHook({ adapterId: "kimi",
+  const runEcho = payload => runHook({ includeSessions: true, adapterId: "kimi",
     payload: { ...payload, cwd: payload.cwd ?? place.root },
     adapters: { kimi: echo }, dataHome: place.dataHome, readProcessTable: noProcessTable,
     probeClientVersion: testProbe });
@@ -714,7 +714,7 @@ test("peer text cannot forge delivery of a message omitted by the budget", async
     renderContext: sync => projectContext(sync, { budgetBytes: 500 }),
     renderContextResult: sync => projectContextResult(sync, { budgetBytes: 500 }) };
   const adapters = { kimi: truthful };
-  const invoke = payload => runHook({ adapterId: "kimi", adapters,
+  const invoke = payload => runHook({ includeSessions: true, adapterId: "kimi", adapters,
     payload: { ...payload, cwd: payload.cwd ?? place.root }, dataHome: place.dataHome,
     readProcessTable: noProcessTable, probeClientVersion: testProbe });
   const recipient = await invoke(event("sessionStart"));
@@ -749,7 +749,7 @@ test("an adapter without delivery metadata withholds bodies and reports degradat
   const legacy = { ...kimi,
     renderContext: sync => (sync.messages ?? []).map(message => message.body).join(" ") };
   const adapters = { kimi: legacy };
-  const invoke = payload => runHook({ adapterId: "kimi", adapters,
+  const invoke = payload => runHook({ includeSessions: true, adapterId: "kimi", adapters,
     payload: { ...payload, cwd: payload.cwd ?? place.root }, dataHome: place.dataHome,
     readProcessTable: noProcessTable, probeClientVersion: testProbe });
   const recipient = await invoke(event("sessionStart"));
@@ -788,7 +788,7 @@ test("an uncertified client drops an optional count before an exact inbox recove
     const adapters = { kimi: truthful };
     // Older than every capture this adapter carries, which is the one client
     // that still withholds bodies now that evidence applies forward.
-    const invoke = payload => runHook({ adapterId: "kimi", adapters,
+    const invoke = payload => runHook({ includeSessions: true, adapterId: "kimi", adapters,
       payload: { ...payload, cwd: payload.cwd ?? place.root }, dataHome: place.dataHome,
       readProcessTable: noProcessTable, probeClientVersion: async () => "0.30.0",
       platform });
@@ -835,7 +835,7 @@ test("SessionEnd retires core binding before adapter endpoint cleanup", async t 
     [900, { ppid: 1, comm: "native-client" }]]);
   await recordInstall({ dataHome: place.dataHome, adapterId: "native", version: "2.1.258",
     artifacts: [], deliveryPolicy: "actionable" });
-  const invoke = kind => runHook({ adapterId: "native", adapters: { native },
+  const invoke = kind => runHook({ includeSessions: true, adapterId: "native", adapters: { native },
     dataHome: place.dataHome, env: {},
     readProcessTable: async () => table, probeClientVersion: async () => "2.1.258",
     platform: "darwin-arm64", payload: event(kind, { cwd: place.root }) });

@@ -67,7 +67,9 @@ if (skipsFsync()) {
 // `--list` prints what would run and stops. The suite uses it to assert the
 // discovery is not empty without running itself recursively.
 if (options.list) {
-  console.log(files.join("\n"));
+  // Written before exiting: a pipe takes 64 KiB at a time, and exiting at once cut
+  // the list short where the checkout's path made it longer.
+  await new Promise(resolve => process.stdout.write(`${files.join("\n")}\n`, resolve));
   process.exit(0);
 }
 

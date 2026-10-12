@@ -28,7 +28,7 @@ test("a session start reads the process table while the client reports its versi
     renderContext: () => "",
   };
 
-  const result = await runHook({
+  const result = await runHook({ includeSessions: true,
     adapterId: adapter.id,
     adapters: { [adapter.id]: adapter },
     dataHome,
@@ -77,7 +77,7 @@ test("a session start begins reading the process table before it opens the store
     renderContext: () => "",
   };
 
-  const result = await runHook({
+  const result = await runHook({ includeSessions: true,
     adapterId: adapter.id,
     adapters: { [adapter.id]: adapter },
     dataHome,

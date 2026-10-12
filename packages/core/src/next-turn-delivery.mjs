@@ -6,7 +6,8 @@ export async function nextTurnDelivery(store, input = {}) {
     return { queuedMessages: [], liveOfferedMessageIds: [], reminderMessageIds: [],
       roomMessageIds: [], repeatMessages: [], repeatOffers: [] };
   }
-  const snapshot = await store.snapshot(input.workspaceId ?? store.workspaceId,
+  // A caller that has just read the store hands that read over (#298).
+  const snapshot = input.snapshot ?? await store.snapshot(input.workspaceId ?? store.workspaceId,
     { kinds: ["message", "receipt"] });
   const receiptByMessage = new Map(snapshot.receipts
     .filter(item => item.recipientParticipantId === input.participantId)

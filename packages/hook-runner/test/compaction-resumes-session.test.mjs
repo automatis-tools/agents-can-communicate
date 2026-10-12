@@ -23,7 +23,7 @@ async function place(t) {
   return { root, dataHome };
 }
 
-const start = ({ root, dataHome }) => runHook({
+const start = ({ root, dataHome }) => runHook({ includeSessions: true,
   adapterId: adapter.id,
   adapters: { [adapter.id]: adapter },
   dataHome,

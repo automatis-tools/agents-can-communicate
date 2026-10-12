@@ -15,7 +15,7 @@ async function fixture(t) {
   const { storeSessionBinding } = await load("adapter-sdk");
   const adapter = { id: "fixture", normalizeHook: payload => payload, capabilities: {},
     client: { command: "fixture" }, injectOutcome: context => ({ stdout: context }) };
-  const invoke = (kind, sessionId, extra = {}) => runHook({ adapterId: adapter.id,
+  const invoke = (kind, sessionId, extra = {}) => runHook({ includeSessions: true, adapterId: adapter.id,
     adapters: { [adapter.id]: adapter }, dataHome: packed.dataHome, env: packed.env,
     payload: { kind, sessionId, cwd: packed.project, targets: [] },
     readProcessTable: async () => new Map([[process.pid, { ppid: 1, comm: "fixture" }]]),

@@ -1,5 +1,28 @@
 # Changelog
 
+## Unreleased — a hook reads each stored record once
+
+- A hook's cost no longer grows with every message, receipt and session its workspace
+  ever held. Each turn read every message and receipt three times, and its heartbeat
+  every session. On a copy of a real data home a turn took 1.0 s in an ordinary
+  workspace and 3.2–3.8 s in one with 2,234 sessions, where starts passed the
+  five-second budget and continued without context. The same turns now take
+  0.29–0.41 s (#298).
+- The closing status a hook read for nothing in production is read only on request; the
+  turn's context reads the store once; a heartbeat reads its own session; and records
+  of one kind are read sixteen at a time.
+
+| Development artifact | Value |
+|---|---|
+| Built from | `a0d76652d5162449cc5e22ab8eb4f0bd5adb4536` |
+| Tarball | `agents-can-communicate-0.11.0.tgz`, 610,942 bytes, 376 files |
+| sha256 | `f643015af49bd3051ba2343d685a2779c80fd66b600b2662e971558cbf4a2e21` |
+
+The exact archive passed package verification. See
+[development evidence](docs/release-evidence/unreleased-hook-read-cost.md).
+This is not a new published release.
+The package version remains `0.11.0` until a release prepares its own.
+
 ## Unreleased — a placed swap for the store symlink check
 
 - The required check that an ancestor swapped for a symlink cannot serve another

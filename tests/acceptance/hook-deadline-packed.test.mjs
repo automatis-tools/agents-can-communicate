@@ -155,7 +155,9 @@ test("installed hooks bound the whole invocation and cancel undecided writes", a
       const running = invoke(id, point === "normalize" ? { adapters: { fixture: {
         ...adapter, normalizeHook: async payload => {
           await globalThis.accDeadlineCheckpoint("normalize"); return payload;
-        } } } } : { payload: { kind: "unknown", sessionId: id, cwd: packed.project } });
+        } } } } : { payload: { kind: "unknown", sessionId: id, cwd: packed.project },
+        // The closing status is read only on request; when it is, it stays bounded.
+        includeSessions: point === "status" });
       await checkpoint.wait(running);
       let result;
       try {

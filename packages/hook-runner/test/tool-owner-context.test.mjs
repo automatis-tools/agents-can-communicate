@@ -16,7 +16,7 @@ async function stage(t) {
   // The data home must be outside the workspace even in a test.
   const project = path.join(root, "project");
   await mkdir(project);
-  const hook = (kind, native = "native-owner", options = {}) => runHook({
+  const hook = (kind, native = "native-owner", options = {}) => runHook({ includeSessions: true,
     adapterId: "grok", adapters: { grok: adapter }, dataHome,
     readProcessTable: async () => new Map(), probeClientVersion: async () => "1.0.24",
     payload: { hookEventName: kind, sessionId: native, cwd: project,

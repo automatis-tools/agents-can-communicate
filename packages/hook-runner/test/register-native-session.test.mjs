@@ -49,7 +49,7 @@ async function setup(t) {
     env: { HOME: "/Users/someone" }, probeClientVersion: async () => "1.0.0", platform,
     ...overrides });
   // The chat's first real hook, run by its daemon.
-  const hook = kind => runHook({ adapterId: "hosted", adapters,
+  const hook = kind => runHook({ includeSessions: true, adapterId: "hosted", adapters,
     payload: { kind, sessionId: "thread-1", cwd: root, model: null, parentSessionId: null,
       tool: null, targets: [] },
     dataHome, env: { HOME: "/Users/someone" },

@@ -47,7 +47,7 @@ const event = (kind, root, extra = {}) => ({ kind, sessionId: "harness-session-1
 
 function harness(place, options) {
   const cont = adapter(options);
-  return (payload) => runHook({ adapterId: "cont", payload, adapters: { cont },
+  return (payload) => runHook({ includeSessions: true, adapterId: "cont", payload, adapters: { cont },
     dataHome: place.dataHome, readProcessTable: async () => new Map(),
     probeClientVersion: async () => "1.0.0", platform });
 }

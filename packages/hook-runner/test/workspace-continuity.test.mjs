@@ -36,7 +36,7 @@ async function fixture(t, parentGit = false) {
   for (const directory of [parent, web, api, plain]) await mkdir(directory, { recursive: true });
   const git = (cwd, ...args) => exec("git", args, { cwd, env: hermeticEnv() });
   for (const directory of [web, api, ...(parentGit ? [parent] : [])]) await git(directory, "init", "--quiet");
-  const hook = (kind, sessionId, cwd = parent, extra = {}, env = {}) => runHook({
+  const hook = (kind, sessionId, cwd = parent, extra = {}, env = {}) => runHook({ includeSessions: true,
     adapterId: adapter.id, adapters: { [adapter.id]: adapter }, dataHome,
     readProcessTable: async () => new Map(), probeClientVersion: async () => "1.0.0", platform,
     payload: { kind, sessionId, cwd, targets: [], ...extra }, env,
