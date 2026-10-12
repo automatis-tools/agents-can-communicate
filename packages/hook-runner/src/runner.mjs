@@ -679,8 +679,11 @@ const HANDLERS = {
     // on 2026-10-12, at load average 56-84, the table read outlasted its limit.
     // Every turn looks again until the client is found; nothing else would,
     // and the session would stay without live delivery for its whole life.
+    // Only the open generation this binding names is rebound; a stale binding
+    // never reaches the start path, whatever the table says.
     const known = Number.isInteger(binding.clientPid) && binding.clientPid > 0;
-    const found = known || clientOf(adapter).command === null ? null
+    const bindable = current.record.state === "open" && current.record.generation === binding.generation;
+    const found = known || !bindable || clientOf(adapter).command === null ? null
       : await readClientTable(input.readProcessTable, adapter, deadline);
     const lateClient = found !== null
       && resolveClient({ table: found, from: process.pid, ...clientOf(adapter) }) !== null;
