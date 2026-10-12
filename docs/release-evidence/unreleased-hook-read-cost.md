@@ -10,7 +10,7 @@ artifact, whose original record remains unchanged.
 
 | Fact | Value |
 |---|---|
-| Source commit | `29ff51f037dc17baa0058f301fc0f8457bf6b41e` |
+| Source commit | `a0d76652d5162449cc5e22ab8eb4f0bd5adb4536` |
 | Source state at pack time | clean feature worktree |
 | Archive | `agents-can-communicate-0.11.0.tgz` |
 | Archive size | 610,942 bytes |
@@ -19,7 +19,14 @@ artifact, whose original record remains unchanged.
 | Local environment | macOS, Node 26.5.1 |
 
 `node scripts/verify-package.mjs` passed on the clean worktree and reported the same
-digest as a separate `npm pack`.
+digest as a separate `npm pack`. The fix is commit `29ff51f0`. The recorded commit adds
+test changes only: the archive's bytes are the same.
+
+The first full suite found three tests that read or bounded the closing status without
+asking for it, now passing `includeSessions: true`, and two shard tests that failed in
+this checkout: `scripts/run-tests.mjs --list` exited before a pipe took more than 64 KiB
+of its output, and this worktree's longer path pushed the list past it. It now finishes
+writing first.
 
 ## Cause
 
