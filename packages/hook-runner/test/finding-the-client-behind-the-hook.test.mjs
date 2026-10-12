@@ -168,7 +168,9 @@ test("a failed command-line read leaves the table as it was before", async () =>
   assert.deepEqual(table.get(200), { ppid: 100, comm: "node" });
 });
 
-test("both reads of a process share what is left of the caller's timeout", async () => {
+test("both reads of a process share what is left of the caller's timeout", async t => {
+  // A loaded machine can spend the whole 250 ms before the first read starts.
+  t.mock.timers.enable({ apis: ["Date"], now: 0 });
   const seen = [];
   await readProcessTable({ platform: "darwin", timeoutMs: 250, run: async (file, argv, options) => {
     seen.push({ args: argv.join(" ").includes("args="), timeout: options.timeout,
@@ -176,7 +178,7 @@ test("both reads of a process share what is left of the caller's timeout", async
     return { stdout: "" };
   } });
   assert.equal(seen.length, 2);
-  for (const read of seen) assert.ok(read.timeout > 0 && read.timeout <= 250);
+  assert.deepEqual(seen.map(read => read.timeout), [250, 250]);
   // One command line can reach ARG_MAX (1 MiB on macOS), execFile's default.
   assert.ok(seen.find(read => read.args).maxBuffer > 1024 * 1024);
 });

@@ -136,12 +136,13 @@ const posixProcesses = new Map([
   [1, { ppid: 0, comm: "/sbin/launchd", args: "/sbin/launchd" }],
 ]);
 
-const posixPs = ({ delayMs = 0 } = {}) => {
+const posixPs = ({ hop = () => {} } = {}) => {
   const calls = [];
   const run = async (file, args, options) => {
     assert.equal(file, "ps");
     calls.push({ args, timeout: options?.timeout });
-    if (delayMs > 0) await new Promise(resolve => setTimeout(resolve, delayMs));
+    // The two reads of one process run at once, so a hop costs one read's time.
+    if (args.includes("pid=,ppid=,comm=")) hop();
     assert.ok(!args.includes("-A"), "the walk never reads the whole table");
     const pid = Number(args[args.indexOf("-p") + 1]);
     const entry = posixProcesses.get(pid);
@@ -172,14 +173,15 @@ test("posix: the walk stops at the process the caller is looking for", async () 
   assert.equal(calls.length, 6);
 });
 
-test("posix: the time limit bounds the whole walk, not each call", async () => {
-  const { run, calls } = posixPs({ delayMs: 40 });
-  const started = Date.now();
+test("posix: the time limit bounds the whole walk, not each call", async t => {
+  // A real 40 ms timer can resume after all 100 ms on a loaded machine, which
+  // leaves one process. Control elapsed time: each process costs 40 ms.
+  t.mock.timers.enable({ apis: ["Date"], now: 0 });
+  const { run, calls } = posixPs({ hop: () => t.mock.timers.tick(40) });
   const table = await readProcessTable({ platform: "darwin", from: 4242, run, timeoutMs: 100 });
-  assert.ok(Date.now() - started < 400, "the walk ends near its limit");
-  assert.ok(table.size >= 2 && table.size < posixProcesses.size - 1,
-    `a slow machine yields the start of the chain, got ${table.size}`);
-  for (const { timeout } of calls) assert.ok(timeout > 0 && timeout <= 100);
+  assert.deepEqual([...table.keys()], [4242, 300, 200], "a slow machine yields the start of the chain");
+  assert.deepEqual(calls.map(({ timeout }) => timeout), [100, 100, 60, 60, 20, 20],
+    "each read gets what is left of the walk's limit");
 });
 
 test("posix: a process that cannot be read ends the chain without an error", async () => {
