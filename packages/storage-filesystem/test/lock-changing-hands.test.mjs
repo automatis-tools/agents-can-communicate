@@ -9,7 +9,6 @@ import { EXIT } from "@agents-can-communicate/protocol";
 
 import { storePaths } from "../src/index.mjs";
 import { withWriterMutex } from "../src/writer-mutex.mjs";
-import { performance } from "node:perf_hooks";
 
 /**
  * A lock changing hands is not an attack.
@@ -256,18 +255,19 @@ test("a managed directory reached by another of its own names is not an escape",
  * after it had been checked resolves the rest of the walk into another
  * directory, and both halves of `withRegularNoFollow`'s parent identity check
  * agree with each other because both resolve through the same symlink.
- * Measured at 9 to 11 admissions per 2.5 seconds of this race, each one
- * serving the decoy's directory for the target's path.
+ * Measured at 9 to 11 admissions per 2.5 seconds of a free-running race, each
+ * one serving the decoy's directory for the target's path.
  *
  * What a rename cannot change is which directory a segment lives in, so the
  * parent is the thing held fixed: each segment must resolve to a child of the
- * directory the previous segment validated. Sampled for the same reason as the
- * test above - the window is between two calls inside one walk and cannot be
- * interleaved from here - but it cannot fail spuriously: only an admitted
- * redirect fails it, and the run asserts it exercised the race rather than
- * passing on an empty one.
+ * directory the previous segment validated. The swap is placed, not sampled:
+ * the walk's `afterInspect` seam runs between a segment's check and its
+ * resolution, and the ancestor is swapped there at every step of the walk, and
+ * once before it starts. A free-running race failed required validation on a
+ * loaded runner without having exercised anything (#250); it is kept as
+ * tests/stress/ancestor-symlink-race.mjs.
  */
-test("an ancestor swapped for a symlink cannot serve another directory in the store",
+test("an ancestor swapped for a symlink at any step of the walk cannot serve another directory",
   async t => {
     const { root } = await store(t);
     const { assertManagedDirectory } = await import("../src/safe-directory.mjs");
@@ -277,66 +277,39 @@ test("an ancestor swapped for a symlink cannot serve another directory in the st
     const decoy = path.join(root, "decoy");
     for (const base of [asked, decoy]) await mkdir(path.join(base, ...depth), { recursive: true });
     const leaf = path.join(asked, ...depth);
-    // The walk reports identity as bigint; so must the decoy, or no match is possible.
-    const decoyLeaf = await stat(path.join(decoy, ...depth), { bigint: true });
-    const turn = () => new Promise(resolve => { setImmediate(resolve); });
-    // `admitted` counts a walk that fits between two flips. A fixed 2 ms quiet
-    // window was shorter than one three-level walk on a loaded runner, so no
-    // walk was ever admitted and the proof of exercise failed with nothing
-    // wrong. The window is several walks as measured here, and doubles after a
-    // window no walk fitted in: the load can rise after it was measured - four
-    // copies of this file at once on windows-latest left 2 ms admitting none.
-    const started = performance.now();
-    for (let i = 0; i < 20; i += 1) await assertManagedDirectory(root, leaf);
-    let quietMs = Math.max(2, Math.ceil(((performance.now() - started) / 20) * 4));
+    // The walk reports identity as bigint; so must the directories it is held to.
+    const identity = details => `${details.dev}:${details.ino}`;
+    const original = identity(await stat(leaf, { bigint: true }));
+    const decoyLeaf = identity(await stat(path.join(decoy, ...depth), { bigint: true }));
+    const swap = async () => { await rename(asked, parked); await symlink(decoy, asked); };
+    const restore = async () => { await unlink(asked); await rename(parked, asked); };
+    const refusal = /is not a real directory|escapes the canonical store root|parent directory changed while it resolved/;
+    // A seam keeps the walk out of its cache of validated directories, so every
+    // read below takes the whole walk.
+    const read = afterInspect => assertManagedDirectory(root, leaf, { afterInspect });
 
-    const counts = { admitted: 0, redirected: 0, absent: 0, escaped: 0, notReal: 0, other: 0 };
-    let flips = 0;
-    let churning = true;
-    const churn = (async () => {
-      while (churning) {
-        const seen = counts.admitted;
-        try {
-          await rename(asked, parked);
-          await symlink(decoy, asked);
-          flips += 1;
-          for (let i = 0; i < 6; i += 1) await turn();
-          await unlink(asked);
-          await rename(parked, asked);
-          await new Promise(resolve => { setTimeout(resolve, quietMs); });
-        } catch { /* losing the race against ourselves is expected */ }
-        if (counts.admitted === seen) quietMs = Math.min(quietMs * 2, 250);
+    assert.equal(identity((await read(async () => {})).stat), original,
+      "the walk did not serve the original directory");
+    const steps = [null, asked, ...depth.map((_, index) => path.join(asked, ...depth.slice(0, index + 1)))];
+    for (const step of steps) {
+      const where = step === null ? "before the walk" : `after ${path.relative(root, step)} was checked`;
+      let swapped = false;
+      if (step === null) { await swap(); swapped = true; }
+      try {
+        await assert.rejects(read(async current => {
+          if (!swapped && current === step) { swapped = true; await swap(); }
+        }), error => {
+          assert.match(error.message, refusal, `swapped ${where}: ${error.message}`);
+          return true;
+        }, `the decoy's directory was served for the target's path, swapped ${where}`);
+        assert.equal(swapped, true, `the walk never reached ${where}`);
+      } finally {
+        if (swapped) await restore();
       }
-    })();
-
-    const deadline = Date.now() + 2_500;
-    const reader = async () => {
-      while (Date.now() < deadline) {
-        try {
-          const found = await assertManagedDirectory(root, leaf);
-          if (found.stat.dev === decoyLeaf.dev && found.stat.ino === decoyLeaf.ino) {
-            counts.redirected += 1;
-          } else counts.admitted += 1;
-        } catch (error) {
-          const message = error.message ?? "";
-          if (error.code === "ENOENT") counts.absent += 1;
-          else if (/escapes the canonical store root/.test(message)) counts.escaped += 1;
-          else if (/is not a real directory/.test(message)) counts.notReal += 1;
-          else counts.other += 1;
-        }
-      }
-    };
-    try {
-      await Promise.all(Array.from({ length: 16 }, reader));
-    } finally {
-      churning = false;
-      await churn;
     }
-
-    const report = JSON.stringify({ flips, quietMs, ...counts });
-    assert.equal(counts.redirected, 0, `another directory in the store was served: ${report}`);
-    assert.ok(flips > 0 && counts.admitted > 0 && counts.notReal > 0,
-      `the race never ran, so nothing was proven: ${report}`);
+    assert.notEqual(original, decoyLeaf);
+    assert.equal(identity((await read(async () => {})).stat), original,
+      "the restored directory was not served again");
   });
 
 test("the guard still refuses a record whose parent was swapped", async t => {

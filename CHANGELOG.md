@@ -1,5 +1,26 @@
 # Changelog
 
+## Unreleased — a placed swap for the store symlink check
+
+- The required check that an ancestor swapped for a symlink cannot serve another
+  directory in the store no longer depends on timing. It swaps the ancestor at every
+  step of the walk through the walk's own seam and requires a refusal each time, and
+  the original directory before and after. Before, it raced a swap loop and failed on
+  a loaded runner when no walk happened to fit between two swaps (#250).
+- The free-running race is kept as `tests/stress/ancestor-symlink-race.mjs`, run on
+  request.
+
+| Development artifact | Value |
+|---|---|
+| Built from | `7a8f008876817af46aaa6f71c3e89f543508d7cb` |
+| Tarball | `agents-can-communicate-0.11.0.tgz`, 610,302 bytes, 376 files |
+| sha256 | `e5a6d903af543388648dc149eb3b90214ae780b5197f68d00a2e3d105f91d5dc` |
+
+Only tests changed; the archive passed package verification. See
+[development evidence](docs/release-evidence/unreleased-store-symlink-placed-swap.md).
+This is not a new published release.
+The package version remains `0.11.0` until a release prepares its own.
+
 ## Unreleased — load only the modules a command needs
 
 - `acc version` and `acc help` load 33 modules instead of 234: no client adapter, no
