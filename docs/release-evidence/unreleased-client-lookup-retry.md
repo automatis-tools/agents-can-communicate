@@ -9,12 +9,12 @@ artifact, whose original record remains unchanged.
 
 | Fact | Value |
 |---|---|
-| Source commit | `ea055ffa3dfef7a4d10396789be22a75b44a7321` |
+| Source commit | `94b9bbae9661e6009f188bb22ef9619b98eb32ea` |
 | Source state at pack time | clean feature worktree |
 | Archive | `agents-can-communicate-0.11.0.tgz` |
-| Archive size | 608,514 bytes |
+| Archive size | 608,582 bytes |
 | Packed files | 374 |
-| SHA-256 | `136ca196f968c3885d09df65fb26814ddf2f725b1ade36c9348c79cda62aa4ed` |
+| SHA-256 | `57695a53b3f84ecba5b6fcf15010cddce2155b5603f915eac8b50e6546f88634` |
 | Local environment | macOS, Node 26.5.1 |
 
 `node scripts/verify-package.mjs` passed on the clean worktree and reported the same
@@ -68,13 +68,16 @@ Main's whole-table read took 77–83 ms for about 1,880 processes and named the 
   that declare a client command. A client found then takes the existing restart path,
   with the same ACC session and generation. It binds again with the pid, using the
   table that turn already read. While the client stays unknown, each turn makes one
-  bounded read.
+  bounded read. Only the open generation the binding names is looked up: the first
+  full suite caught a turn on a stale binding that found the fixture client and
+  entered the start path. The start path refuses such a binding too.
 - `client_process_unknown` advice in the indicator, doctor and troubleshooting now
   says the next prompt looks for the client again.
 
 ## Real-process evidence
 
-`bin/acc-hook.mjs` ran as a real hook process, as a child of a shell whose parent was
+At the recorded commit, at load average 89, `bin/acc-hook.mjs` ran as a real hook process,
+as a child of a shell whose parent was
 the running Claude Code 2.1.296 process (pid 89125). It used an isolated
 `ACC_DATA_HOME`, a fixture session id, and no Claude messaging socket. SessionStart ran
 with a `ps` on `PATH` that slept 2 s before it ran the real one. The two prompts that
