@@ -1,5 +1,27 @@
 # Changelog
 
+## Unreleased — ACC website and macOS endpoint discovery
+
+- A separate, light-only website supplies installation documentation, guides,
+  integrations, comparisons, research, and engineering reports. Its reviewed
+  content builds to static HTML with search, canonical URLs, structured data,
+  sitemap and feed. The website is not included in the npm package or deployed
+  by this change.
+- On macOS, Antigravity desktop TCP discovery asks `lsof` to avoid blocking
+  filesystem calls. A stalled mount could otherwise consume its one-second
+  discovery budget and force inbox fallback. Linux discovery flags are unchanged.
+
+| Development artifact | Value |
+|---|---|
+| Built from | `e4c3ca6d731d7800bede7092f074098231c30654` |
+| Tarball | `agents-can-communicate-0.11.1.tgz`, 611,093 bytes, 376 files |
+| sha256 | `242ec5a2bd8367a4e9fcc08a42511f07211b2c8fab28e0dcd3980ae0bc26ca8e` |
+
+The exact archive passed package verification. See
+[development evidence](docs/release-evidence/unreleased-website.md).
+This is not a published release; the package version remains `0.11.1`.
+The earlier candidate and release records below retain their original provenance.
+
 ## 0.11.1 — release candidate
 
 - A hook's cost no longer grows with everything its workspace ever held: each stored
