@@ -162,10 +162,15 @@ async function resolveLsof() {
 }
 
 /** The loopback TCP ports `pid` listens on, in the order lsof lists them. */
-export async function listeningPorts(pid, { run = runFile, lsof = resolveLsof, timeoutMs = 1_000 } = {}) {
+export async function listeningPorts(pid, { run = runFile, lsof = resolveLsof, timeoutMs = 1_000,
+  platform = process.platform } = {}) {
   const file = await lsof();
   if (file === null || !isPid(pid)) return [];
-  const { stdout } = await run(file, ["-nP", "-a", "-p", String(pid), "-iTCP", "-sTCP:LISTEN", "-Fn"],
+  // On macOS, stat/readlink on mounts can stall this TCP-only query for seconds.
+  // Avoid those calls there; leave the unmeasured Linux path unchanged.
+  const args = ["-nP", "-a", "-p", String(pid), "-iTCP", "-sTCP:LISTEN", "-Fn"];
+  if (platform === "darwin") args.unshift("-b");
+  const { stdout } = await run(file, args,
     { timeout: timeoutMs });
   const ports = [];
   for (const line of stdout.split("\n")) {
