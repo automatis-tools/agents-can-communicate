@@ -1,0 +1,4 @@
+dist/
+.impeccable/
+!content/reports/
+!content/reports/*.md

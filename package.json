@@ -34,7 +34,9 @@
   ],
   "scripts": {
     "test": "node scripts/run-tests.mjs",
-    "check": "node scripts/check-syntax.mjs"
+    "check": "node scripts/check-syntax.mjs",
+    "site:build": "node website/build.mjs",
+    "site:preview": "node website/serve.mjs"
   },
   "license": "MIT",
   "author": "Mykola Maksymenko",
@@ -105,5 +107,8 @@
     "@agents-can-communicate/mcp-server",
     "@agents-can-communicate/protocol",
     "@agents-can-communicate/storage-filesystem"
-  ]
+  ],
+  "devDependencies": {
+    "marked": "18.1.1"
+  }
 }

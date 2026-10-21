@@ -1,0 +1,115 @@
+.hero { display: grid; grid-template-columns: 1.04fr 1fr; gap: 60px; align-items: center; padding-block: 76px 75px; }
+.hero h1 { font-size: clamp(60px, 5.9vw, 86px); line-height: 1.035; font-weight: 450; }
+.hero-deck { max-width: 30ch; font-size: 21px; line-height: 1.5; margin-top: 27px; }
+.hero-detail { max-width: 49ch; font-size: 15px; color: var(--muted); margin-top: 19px; line-height: 1.75; }
+.hero .actions { margin-top: 30px; gap: 25px; }
+.hero-note { font-size: 11px; color: var(--muted); margin-top: 20px; }
+.conversation { position: relative; width: 100%; max-width: 520px; padding-block: 20px 10px; }
+.conversation-line { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.message { position: relative; padding: 24px 26px; border-radius: 12px; }
+.message-question { width: 88%; border: 1px solid #b6c5bf; background: #fff; }
+.message-answer { width: 83%; margin-left: 17%; margin-top: 30px; background: var(--reply); }
+.message-sender { display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 6px 12px; font-size: 12px; font-weight: 600; }
+.message-question .message-sender > span:first-child { color: var(--blue); }
+.session-work { color: var(--muted); font-size: 10px; font-weight: 400; }
+.message p { margin-top: 23px; font: 400 27px/1.22 var(--serif); letter-spacing: -.01em; }
+.message-direction { display: block; margin-top: 22px; color: var(--muted); font-size: 10px; }
+.contract { display: flex; justify-content: space-between; gap: 20px; align-items: end; margin-top: 23px; padding-top: 16px; border-top: 1px solid #d3d9b8; }
+.contract code { font-size: 11px; line-height: 1.75; }
+.contract > span { max-width: 9ch; color: #59623b; font-size: 10px; line-height: 1.5; }
+.conversation figcaption { position: relative; max-width: 34ch; margin: 25px 0 0 18%; font-size: 10px; color: var(--muted); line-height: 1.6; }
+.client-strip { display: grid; grid-template-columns: .95fr 1.6fr; gap: 18px 65px; align-items: center; padding-block: 28px 32px; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+.client-strip h2 { font: 500 17px/1.4 var(--sans); letter-spacing: -.01em; }
+.client-strip p { color: var(--muted); font-size: 11px; margin-top: 7px; }
+.client-names { display: flex; flex-wrap: wrap; gap: 18px 26px; align-items: center; }
+.client-names a { font-size: 17px; letter-spacing: -.025em; font-weight: 550; text-decoration: none; white-space: nowrap; }
+.client-strip .quiet-link { grid-column: 2; font-size: 10px; }
+.use-cases { padding-block: 100px; }
+.section-intro { display: flex; justify-content: space-between; align-items: end; gap: 60px; }
+.section-intro h2 { max-width: 18ch; }
+.section-intro > p { color: var(--muted); max-width: 31ch; font-size: 16px; padding-bottom: 5px; }
+.use-case-list { margin-top: 50px; }
+.use-case-list > article { display: grid; grid-template-columns: .8fr 1.1fr; gap: 105px; padding-block: 31px; border-top: 1px solid var(--line); }
+.use-case-list h3 { max-width: 20ch; font: 450 32px/1.17 var(--serif); letter-spacing: -.015em; }
+.use-case-list p { font-size: 16px; color: var(--muted); max-width: 55ch; }
+.use-case-list .text-link { margin-top: 18px; font-size: 12px; }
+.local-section { background: var(--paper); padding-block: 70px; }
+.local-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 110px; align-items: center; }
+.local-art svg { display: block; width: 100%; }
+.local-grid h2 { margin-bottom: 25px; }
+.local-grid p { color: var(--muted); font-size: 15px; }
+.local-grid .text-link { margin-top: 25px; font-size: 12px; }
+.install-section { display: grid; grid-template-columns: .9fr 1.2fr; gap: 105px; padding-block: 105px 85px; scroll-margin-top: 40px; }
+.install-section h2 { margin-bottom: 25px; }
+.install-section > div:first-child > p { color: var(--muted); font-size: 15px; max-width: 34ch; }
+.install-section .text-link { margin-top: 24px; font-size: 12px; }
+.installation ol { margin: 0; padding-left: 25px; }
+.installation li { padding-left: 8px; margin-bottom: 27px; }
+.installation li::marker { color: var(--blue); font-size: 13px; font-weight: 600; }
+.installation h3 { font-size: 16px; }
+.installation p { margin-top: 9px; font-size: 14px; color: var(--muted); }
+.installation pre { margin-block: 14px 0; font-size: 12px; }
+.home-reading { display: grid; grid-template-columns: .9fr 1.2fr; gap: 105px; padding-block: 50px 90px; }
+.home-reading > div:first-child p { color: var(--muted); font-size: 15px; margin-top: 25px; max-width: 32ch; }
+.reading-links { display: grid; gap: 10px; margin-top: 26px; font-size: 12px; }
+.reading-links a { width: fit-content; }
+.home-reading-list .article-link:first-child { padding-top: 0; border-top: 0; }
+.home-reading-list .article-link h2 { font-size: 28px; max-width: 35ch; }
+.home-reading-list .article-link p { font-size: 13px; }
+.home-reading-list .article-link-meta { margin-bottom: 10px; }
+.home-faq { display: grid; grid-template-columns: .9fr 1.2fr; gap: 105px; padding-block: 35px 0; }
+.home-faq h2 { max-width: 13ch; }
+.home-faq details { border-top: 1px solid var(--line); }
+.home-faq summary { cursor: pointer; padding-block: 19px; font-size: 15px; font-weight: 500; }
+.home-faq details p { font-size: 14px; color: var(--muted); padding: 0 12px 22px 18px; }
+.home-faq summary::marker { color: var(--blue); font-size: 11px; }
+@media (max-width: 1000px) {
+  .hero { gap: 34px; padding-top: 62px; }
+  .hero h1 { font-size: 64px; }
+  .hero-deck { font-size: 18px; }
+  .message { padding: 20px; }
+  .message p { font-size: 23px; }
+  .session-work { font-size: 9px; }
+  .use-case-list > article, .local-grid, .install-section, .home-reading, .home-faq { gap: 55px; }
+  .client-strip { gap: 20px 35px; }
+  .client-names { gap: 14px 22px; }
+  .client-names a { font-size: 15px; }
+}
+@media (max-width: 700px) {
+  .hero { grid-template-columns: 1fr; gap: 35px; padding-block: 48px 42px; }
+  .hero h1 { font-size: clamp(39px, 12.4vw, 60px); max-width: none; }
+  .hero-deck { margin-top: 23px; font-size: 19px; max-width: 29ch; }
+  .hero-detail { max-width: 45ch; font-size: 14px; }
+  .hero .actions { gap: 21px; margin-top: 26px; }
+  .hero .actions .text-link { font-size: 12px; }
+  .hero-note { margin-top: 16px; }
+  .conversation { max-width: 470px; margin-inline: auto; padding-top: 12px; }
+  .message-question { width: 87%; }
+  .message-answer { width: 84%; margin-left: 16%; margin-top: 24px; }
+  .message p { font-size: 25px; }
+  .session-work { font-size: 9px; }
+  .conversation figcaption { margin-top: 19px; font-size: 10px; max-width: 34ch; }
+  .client-strip { grid-template-columns: 1fr; gap: 22px; padding-block: 27px; }
+  .client-strip .quiet-link { grid-column: 1; }
+  .client-names { gap: 16px 24px; }
+  .client-names a { font-size: 16px; }
+  .use-cases { padding-block: 65px; }
+  .section-intro { flex-direction: column; align-items: start; gap: 22px; }
+  .section-intro > p { max-width: 34ch; font-size: 15px; }
+  .use-case-list { margin-top: 30px; }
+  .use-case-list > article { grid-template-columns: 1fr; gap: 16px; padding-block: 25px; }
+  .use-case-list h3 { font-size: 29px; max-width: 24ch; }
+  .use-case-list p { font-size: 14px; }
+  .local-section { padding-block: 43px 53px; }
+  .local-grid { grid-template-columns: 1fr; gap: 25px; }
+  .local-art { max-width: 390px; margin-inline: auto; }
+  .local-grid p { font-size: 14px; }
+  .install-section, .home-reading, .home-faq { grid-template-columns: 1fr; gap: 35px; }
+  .install-section { padding-block: 65px 38px; }
+  .installation ol { padding-left: 21px; }
+  .installation pre { padding-inline: 16px; font-size: 11px; }
+  .home-reading { padding-block: 28px 40px; }
+  .home-reading > div:first-child p { max-width: 35ch; }
+  .home-reading-list .article-link:first-child { padding-top: 25px; border-top: 1px solid var(--line); }
+  .home-faq { padding-top: 25px; gap: 28px; }
+}
