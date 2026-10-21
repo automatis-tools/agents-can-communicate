@@ -19,6 +19,11 @@ function requireFrame(route, html) {
   }
   if ((html.match(/<main(?:\s|>)/g) ?? []).length !== 1) throw new Error("one main landmark required: " + route);
   if ((html.match(/<h1(?:\s|>)/g) ?? []).length !== 1) throw new Error("one H1 required: " + route);
+  if (route === "/") {
+    for (const id of ["install", "conversation-title", "review-title", "handoff-title", "clients-title", "local-title", "reading-title", "closing-title"]) {
+      if (!html.includes('id="' + id + '"')) throw new Error("homepage section contract failed: " + id);
+    }
+  }
   const links = [...html.matchAll(/<link\b[^>]*>/g)].map(match => match[0]);
   const canonical = links.filter(tag => attribute(tag, "rel") === "canonical");
   if (canonical.length !== 1 || attribute(canonical[0], "href") !== ORIGIN + route) {
@@ -93,5 +98,11 @@ export async function validateBuiltSite({ outDir, expectedRoutes, articles = [] 
     }
   }
   for (const article of articles) requireManuscript(article, pages.get(article.route));
+  for (const article of articles) {
+    const index = pages.get("/" + article.section + "/");
+    if (!index?.includes('href="' + article.route + '"')) {
+      throw new Error("collection coverage contract failed: " + article.route);
+    }
+  }
   return { pages: pages.size };
 }

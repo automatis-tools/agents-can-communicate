@@ -1,0 +1,7 @@
+---
+import CollectionPage from "../../components/indexes/CollectionPage.astro";
+import { getArticles } from "../../lib/content";
+import { getSection } from "../../data/site";
+const articles = await getArticles();
+---
+<CollectionPage section={getSection("research")} articles={articles}/>

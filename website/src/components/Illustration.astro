@@ -1,0 +1,6 @@
+---
+import type { SectionId } from "../lib/types";
+interface Props { kind: SectionId; class?: string; }
+const { kind, class: className = "section-illustration" } = Astro.props;
+---
+<figure class={className} aria-hidden="true"><img src={`/assets/illustrations/${kind}.webp`} width="512" height="512" alt="" loading="lazy" decoding="async"/></figure>

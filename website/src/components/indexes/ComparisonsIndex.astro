@@ -1,0 +1,21 @@
+---
+import CollectionHeading from "../CollectionHeading.astro";
+import Illustration from "../Illustration.astro";
+import Icon from "../Icon.astro";
+import type { Article, SiteSection } from "../../lib/types";
+interface Props { section: SiteSection; articles: Article[]; }
+import { comparisonDetails } from "../../data/editorial";
+const { section, articles } = Astro.props;
+const overview = articles.find(article => article.type === "comparison-hub") ?? articles[0];
+if (!overview) throw new Error("collection needs reviewed content: compare");
+---
+<CollectionHeading title={section.label} description="Choose the connection that fits how you work." class="compare-heading"/>
+<section class="compare-overview"><Illustration kind="compare"/><div><h2><a href={overview.route}>What kind of connection do you need?</a></h2>
+  <p>Peer conversation, delegation, a mailbox, and terminal automation solve different problems. Start with the work you want to keep.</p></div>
+  <a class="button" href={overview.route}>Read the workflow overview<Icon name="arrow"/></a></section>
+<section class="comparison-index" aria-labelledby="comparison-index-title"><div class="comparison-index-heading"><h2 id="comparison-index-title">Individual comparisons</h2><p>Based on primary documentation.</p></div>
+  <div class="comparison-columns" aria-hidden="true"><span>ACC compared with</span><span>The question to settle</span><span>Focus</span></div>
+  {articles.filter(article => article !== overview).map(article => { const [name, question, focus] = comparisonDetails[article.id] ?? [article.title, article.description, "Workflow"]; return (
+    <article class="comparison-row"><h3><a href={article.route}>{name}</a></h3><p>{question}</p><span class="comparison-focus">{focus}</span></article>
+  );})}
+</section><aside class="comparison-method"><span>How to read these</span><p>These are documentation-based comparisons, not head-to-head client benchmarks. Each article names its sources and the limits of the comparison.</p></aside>

@@ -1,0 +1,7 @@
+---
+import Contents from "./Contents.astro";
+import type { Article } from "../lib/types";
+interface Props { article: Article; label: string; }
+const { article, label } = Astro.props;
+---
+<details class="reading-contents"><summary>{label}</summary><Contents article={article} label={label}/></details>

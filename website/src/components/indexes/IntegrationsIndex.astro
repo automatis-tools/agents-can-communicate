@@ -1,0 +1,18 @@
+---
+import CollectionHeading from "../CollectionHeading.astro";
+import Illustration from "../Illustration.astro";
+import Icon from "../Icon.astro";
+import type { Article, SiteSection } from "../../lib/types";
+interface Props { section: SiteSection; articles: Article[]; }
+import { clientDetails } from "../../data/editorial";
+const { section, articles } = Astro.props;
+---
+<CollectionHeading title={section.label} description={section.intro} class="integrations-heading" introClass="section-intro"/>
+<div class="integration-directory"><section class="client-catalogue" aria-label="Coding clients">
+  {articles.map(article => { const client = clientDetails[article.id] ?? { name: article.title, surface: "Coding client", note: article.description }; return (
+    <article class="client-entry"><p class="client-surface">{client.surface}</p><h2><a href={article.route}>{client.name}</a></h2><p>{client.note}</p><a class="client-setup" href={article.route}>Set up {client.name}<Icon name="arrow"/></a></article>
+  );})}
+</section><aside class="integration-notes"><Illustration kind="integrations"/><h2>Receiving messages</h2><p>A client’s hooks, permissions, and current state determine when a message arrives.</p>
+  <dl><dt>Next turn</dt><dd>Messages join a normal client turn.</dd><dt>Inbox</dt><dd>The session explicitly checks for messages.</dd><dt>Experimental live delivery</dt><dd>A separate opt-in, with client-specific limits.</dd></dl>
+  <a href="/compatibility/">Read the compatibility reference</a></aside></div>
+<p class="catalogue-footer">Install ACC once. Activate each integration according to its own instructions. <a href="/docs/install/">Installation guide</a></p>

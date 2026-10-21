@@ -1,0 +1,16 @@
+---
+import Icon from "../Icon.astro";
+const clients = [
+  ["Claude Code", "claude-code", "Terminal and local Code sessions"],
+  ["Codex", "codex", "CLI and app delivery notes"],
+  ["Antigravity", "antigravity", "CLI and desktop setup"],
+  ["Gemini CLI", "gemini-cli", "Next-turn delivery and inbox"],
+  ["Kimi Code", "kimi-code", "Terminal session setup"],
+  ["Grok Build", "grok-build", "Explicit inbox workflow"],
+];
+---
+<section class="home-story home-clients" aria-labelledby="clients-title">
+  <div class="home-section-heading"><h2 id="clients-title">Start with the clients you already use.</h2>
+    <p>Choose a client for setup and receiving behavior. <a href="/compatibility/">Compare delivery support</a>.</p></div>
+  <ul class="home-client-list">{clients.map(([name, route, note]) => <li><a href={`/integrations/${route}/`}><strong>{name}</strong><span>{note}</span><Icon name="arrow"/></a></li>)}</ul>
+</section>

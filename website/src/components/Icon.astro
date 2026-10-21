@@ -1,0 +1,9 @@
+---
+interface Props { name: "search" | "arrow" | "copy"; }
+const { name } = Astro.props;
+---
+<svg class="icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+  {name === "search" && <><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 4.5 4.5"/></>}
+  {name === "arrow" && <path d="M4 12h15M13 6l6 6-6 6"/>}
+  {name === "copy" && <><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V4H4v12h4"/></>}
+</svg>

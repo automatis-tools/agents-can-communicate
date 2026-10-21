@@ -1,0 +1,20 @@
+---
+import Icon from "./Icon.astro";
+import NavigationLinks from "./NavigationLinks.astro";
+import { REPOSITORY } from "../data/site";
+import type { SectionId } from "../lib/types";
+interface Props { current?: SectionId; }
+const { current } = Astro.props;
+---
+<a class="skip-link" href="#main">Skip to content</a>
+<header class="site-header shell">
+  <a class="brand" href="/" title="ACC home"><img class="brand-symbol" src="/assets/acc-mark.svg" alt="" width="52" height="34"/><span class="wordmark">ACC</span><span class="brand-name">Agents Can Communicate</span></a>
+  <nav class="desktop-nav" aria-label="Main">
+    <NavigationLinks current={current} ids={["guides", "integrations", "docs"]}/>
+    <details class="reading-menu"><summary>Reading</summary><nav aria-label="Reading"><NavigationLinks current={current} ids={["compare", "research", "reports"]}/></nav></details>
+  </nav>
+  <div class="header-actions">
+    <a class="search-link" href="/search/" aria-label="Search the site"><Icon name="search"/></a><a class="github-link" href={REPOSITORY}>GitHub</a>
+    <details class="mobile-nav"><summary>Menu</summary><nav aria-label="Mobile"><NavigationLinks current={current}/><a href={REPOSITORY}>GitHub</a></nav></details>
+  </div>
+</header>

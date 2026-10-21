@@ -1,0 +1,6 @@
+---
+import { installCommand } from "../data/site";
+interface Props { language?: "bash"; trailingNewline?: boolean; }
+const { language, trailingNewline = false } = Astro.props;
+---
+<pre><code class={language ? `language-${language}` : undefined}>{installCommand + (trailingNewline ? "\n" : "")}</code></pre>

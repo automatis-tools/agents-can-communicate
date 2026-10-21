@@ -1,0 +1,30 @@
+---
+import GuideArticle from "./GuideArticle.astro";
+import IntegrationArticle from "./IntegrationArticle.astro";
+import ComparisonArticle from "./ComparisonArticle.astro";
+import ResearchArticle from "./ResearchArticle.astro";
+import ReportArticle from "./ReportArticle.astro";
+import DocumentationArticle from "./DocumentationArticle.astro";
+import SiteLayout from "../../layouts/SiteLayout.astro";
+import Breadcrumbs from "../Breadcrumbs.astro";
+import ArticleLink from "../ArticleLink.astro";
+import { getSection } from "../../data/site";
+import type { Article, ArticleType, SitePage } from "../../lib/types";
+interface Props { article: Article; articles: Article[]; }
+const { article, articles } = Astro.props;
+const section = getSection(article.section);
+const crumbs = [{ label: section.label, route: `/${section.id}/` }, { label: article.title }];
+const layouts = { guide: GuideArticle, integration: IntegrationArticle, comparison: ComparisonArticle,
+  "comparison-hub": ComparisonArticle, research: ResearchArticle, report: ReportArticle,
+  doc: DocumentationArticle, reference: DocumentationArticle } satisfies Record<ArticleType, typeof GuideArticle>;
+const classNames: Record<ArticleType,string> = { guide: "article-guide", integration: "article-integration",
+  comparison: "article-comparison", "comparison-hub": "article-comparison article-comparison-overview",
+  research: "article-research", report: "article-report", doc: "article-doc", reference: "article-reference" };
+const Component = layouts[article.type];
+const related = articles.filter(item => item.route !== article.route && item.section === article.section).slice(0,3);
+const page: SitePage = { route: article.route, kind: "article", section: article.section,
+  title: article.title + " | ACC", description: article.description, article, breadcrumbs: crumbs };
+---
+<SiteLayout page={page}><Breadcrumbs items={crumbs}/><article class:list={["article-page",classNames[article.type]]}><Component article={article} articles={articles}/></article>
+  {related.length > 0 && <section class="related-reading"><h2>Keep reading.</h2><div>{related.map(item => <ArticleLink article={item}/>)}</div></section>}
+</SiteLayout>

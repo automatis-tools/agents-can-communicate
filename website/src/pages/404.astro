@@ -1,0 +1,12 @@
+---
+import SiteLayout from "../layouts/SiteLayout.astro";
+import Icon from "../components/Icon.astro";
+import ActionLink from "../components/ActionLink.astro";
+import type { SitePage } from "../lib/types";
+const page: SitePage = { kind: "error", route: "/404.html", title: "Page not found | ACC",
+  description: "This page is not in the ACC library. Find a guide, search the documentation, or return home.", noindex: true };
+---
+<SiteLayout page={page}><section class="not-found"><h1>404: Page not found.</h1>
+  <p>This page may have moved. Search the library or return to the homepage.</p>
+  <div class="actions"><ActionLink href="/search/" variant="button">Search the site</ActionLink>
+    <ActionLink href="/" variant="text-link">Return home<Icon name="arrow"/></ActionLink></div></section></SiteLayout>

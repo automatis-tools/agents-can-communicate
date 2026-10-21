@@ -1,0 +1,10 @@
+---
+import type { Article } from "../lib/types";
+interface Props { article: Article; }
+const { article } = Astro.props;
+---
+<!-- manuscript:start --><div class="article-intro prose" set:html={article.introHtml}></div><div class="article-sections">{article.sections.map(section => (
+  <section class:list={["article-section", "prose", { "has-table": section.hasTable, "is-sources": section.id === "sources" }]} aria-labelledby={section.id}>
+    <Fragment set:html={section.headingHtml}/><div class="section-content" set:html={section.bodyHtml}></div>
+  </section>
+))}</div><!-- manuscript:end -->

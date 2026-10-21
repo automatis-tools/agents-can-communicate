@@ -1,0 +1,7 @@
+---
+import { readableDate } from "../data/site";
+import type { Article } from "../lib/types";
+interface Props { article: Article; }
+const { article } = Astro.props;
+---
+<span>By {article.author}</span><span>Sources reviewed <time datetime={article.lastVerified}>{readableDate(article.lastVerified)}</time></span><span>{article.minutes} min read</span>

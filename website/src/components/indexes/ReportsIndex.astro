@@ -1,0 +1,17 @@
+---
+import CollectionHeading from "../CollectionHeading.astro";
+import Illustration from "../Illustration.astro";
+import type { Article, SiteSection } from "../../lib/types";
+interface Props { section: SiteSection; articles: Article[]; }
+import { reportDetails } from "../../data/editorial";
+import { readableDate } from "../../data/site";
+const { section, articles } = Astro.props;
+---
+<CollectionHeading title={section.label} supporting="See the evidence behind the software you run." description="Inspect the methods and the limits of their conclusions." class="reports-heading" introClass="reports-intro"/>
+<div class="report-register-heading"><h2>Engineering register</h2><span>Methods and verification</span></div>
+<div class="report-register">{articles.map(article => { const report = reportDetails[article.id] ?? { topic: "Engineering", question: article.description, method: "See the procedure and sources in the report.", boundary: "Read the report’s scope before applying its conclusions." }; return (
+  <article class="report-dossier"><header><span class="report-tab">{report.topic}</span><span class="report-kind">Method report</span></header>
+    <div class="report-dossier-body"><div class="report-title"><h2><a href={article.route}>{article.title}</a></h2><p>{report.question}</p></div>
+      <dl><dt>Procedure</dt><dd>{report.method}</dd><dt>What this does not establish</dt><dd>{report.boundary}</dd></dl></div>
+    <footer><span>Sources reviewed <time datetime={article.lastVerified}>{readableDate(article.lastVerified)}</time></span><span class="read-time">{article.minutes} min read</span><a href={article.route}>Open the report</a></footer></article>
+);})}</div><aside class="reports-note"><Illustration kind="reports"/><h2>Reading the evidence</h2><p>A method is not a new benchmark result. Recorded measurements and client captures keep their original version, environment, and provenance.</p></aside>

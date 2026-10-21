@@ -1,13 +1,14 @@
 # ACC website
 
-Static, light-only website for https://getacc.dev. Node 24+, one exact build-only
-Markdown dependency, and no frontend framework. The ACC package's runtime stays
-independent of the website.
+Static, light-only Astro website for https://getacc.dev. Native components compile
+to complete HTML with no client framework or SPA router. Node 24+ and exact build
+dependencies live in the private website package; ACC runtime remains independent.
 
 ## Work locally
 
 ~~~bash
 npm ci
+npm ci --prefix website
 npm run site:build
 npm run site:preview
 ~~~
@@ -83,7 +84,7 @@ Preserve source links and version/capture qualifications when editing.
 Cloudflare Pages settings:
 
 - Repository root: this checkout.
-- Build command: npm ci && npm run site:build
+- Build command: npm ci && npm ci --prefix website && npm run site:build
 - Output directory: website/dist
 
 The build includes standalone advanced-mode _worker.js. It redirects getacc.app,

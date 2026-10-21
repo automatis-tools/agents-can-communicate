@@ -1,0 +1,9 @@
+---
+import { sections } from "../data/site";
+import type { SectionId } from "../lib/types";
+interface Props { current?: SectionId; ids?: SectionId[]; }
+const { current, ids } = Astro.props;
+---
+{sections.filter(section => !ids || ids.includes(section.id)).map(section => (
+  <a href={`/${section.id}/`} aria-current={current === section.id ? "page" : undefined}>{section.label}</a>
+))}

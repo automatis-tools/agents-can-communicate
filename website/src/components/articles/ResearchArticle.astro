@@ -1,0 +1,15 @@
+---
+import ArticleHeading from "../ArticleHeading.astro";
+import ArticleMeta from "../ArticleMeta.astro";
+import ArticleIllustration from "../ArticleIllustration.astro";
+import ExpandableContents from "../ExpandableContents.astro";
+import Manuscript from "../Manuscript.astro";
+import { method } from "../../data/site";
+import type { Article } from "../../lib/types";
+interface Props { article: Article; articles: Article[]; }
+const { article } = Astro.props;
+---
+<header class="essay-heading"><ArticleHeading article={article}/></header>
+<div class="essay-workspace"><aside class="essay-margin"><div class="article-review"><ArticleMeta article={article}/></div>
+  <p class="method-note">{method(article)}</p><ExpandableContents article={article} label="In this essay"/><ArticleIllustration article={article} class="article-illustration research-art"/>
+</aside><div class="essay-manuscript"><Manuscript article={article}/></div></div>

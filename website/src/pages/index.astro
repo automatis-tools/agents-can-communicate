@@ -1,0 +1,8 @@
+---
+import SiteLayout from "../layouts/SiteLayout.astro";
+import HomePage from "../components/home/HomePage.astro";
+import type { SitePage } from "../lib/types";
+const page: SitePage = { route: "/", kind: "home", title: "ACC — Connect your AI coding agents",
+  description: "Connect Claude Code, Codex, and other AI coding sessions with ACC. Exchange questions, reviews, and handoffs locally, without relaying every message yourself." };
+---
+<SiteLayout page={page}><HomePage/></SiteLayout>

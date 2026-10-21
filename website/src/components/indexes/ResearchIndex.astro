@@ -1,0 +1,11 @@
+---
+import CollectionHeading from "../CollectionHeading.astro";
+import Illustration from "../Illustration.astro";
+import type { Article, SiteSection } from "../../lib/types";
+interface Props { section: SiteSection; articles: Article[]; }
+const { section, articles } = Astro.props;
+---
+<CollectionHeading title={section.label} description="Understand what your agents share, remember, and receive." class="research-heading"><a href="/feed.xml">Article feed</a></CollectionHeading>
+<div class="research-collection-body"><Illustration kind="research"/><div class="research-notes">
+  {articles.map(article => <article class="research-note"><div><span class="read-time">{article.minutes} min read</span></div><h2><a href={article.route}>{article.title}</a></h2><p>{article.description}</p></article>)}
+</div></div><p class="research-colophon">Sources, assumptions, and the limits of each claim are included in the notes.</p>

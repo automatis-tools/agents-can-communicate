@@ -1,0 +1,21 @@
+---
+import CollectionHeading from "../CollectionHeading.astro";
+import Illustration from "../Illustration.astro";
+import Icon from "../Icon.astro";
+import type { Article, SiteSection } from "../../lib/types";
+interface Props { section: SiteSection; articles: Article[]; }
+import { guideDetails } from "../../data/editorial";
+const { section, articles } = Astro.props;
+const first = articles.find(article => article.id === "connect-independent-ai-coding-sessions") ?? articles[0];
+if (!first) throw new Error("collection needs reviewed content: guides");
+---
+<CollectionHeading title={section.label} description="Turn separate coding sessions into useful conversations." class="guides-heading"/>
+<div class="guide-workbench"><section class="guide-start"><h2><a href={first.route}>Connect your first two sessions</a></h2>
+  <p>Go from two open clients to a question and a useful answer.</p><Illustration kind="guides"/>
+  <ol class="guide-steps"><li>Open two clients on related work.</li><li>Ask the session with the missing context.</li><li>Bring its answer back into your work.</li></ol>
+  <div class="guide-start-bottom"><a class="text-link" href={first.route}>Follow the connection guide</a><span class="read-time">{first.minutes} min read</span></div>
+</section><section class="guide-tasks" aria-labelledby="guide-tasks-title"><h2 id="guide-tasks-title">What are you working on?</h2>
+  {articles.filter(article => article !== first).map(article => { const [task, description] = guideDetails[article.id] ?? [article.title, article.description]; return (
+    <article class="guide-task"><div><h3><a href={article.route}>{task}</a></h3><p>{description}</p></div><div class="guide-task-tail"><span class="read-time">{article.minutes} min read</span><Icon name="arrow"/></div></article>
+  );})}
+</section></div><aside class="guide-footnote"><p>Looking for a particular client?</p><a href="/integrations/">Go to the integration catalogue<Icon name="arrow"/></a></aside>

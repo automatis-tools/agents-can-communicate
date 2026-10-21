@@ -1,0 +1,22 @@
+---
+import { ORIGIN } from "../data/site";
+import { structuredData } from "../lib/seo";
+import type { SitePage } from "../lib/types";
+interface Props { page: SitePage; }
+const { page } = Astro.props;
+const canonical = ORIGIN + page.route;
+---
+<meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+<meta name="color-scheme" content="light"/><meta name="theme-color" content="#ffffff"/>
+<title>{page.title}</title><meta name="description" content={page.description}/>
+<meta name="robots" content={page.noindex ? "noindex,follow" : "index,follow"}/>
+<link rel="canonical" href={canonical}/>
+<meta property="og:type" content={page.article ? "article" : "website"}/><meta property="og:site_name" content="Agents Can Communicate"/>
+<meta property="og:title" content={page.title}/><meta property="og:description" content={page.description}/><meta property="og:url" content={canonical}/>
+<meta property="og:image" content={`${ORIGIN}/assets/social-card.png`}/><meta property="og:image:width" content="1200"/><meta property="og:image:height" content="630"/>
+<meta property="og:image:alt" content="ACC connects independent AI coding sessions."/>
+<meta name="twitter:card" content="summary_large_image"/><meta name="twitter:title" content={page.title}/><meta name="twitter:description" content={page.description}/><meta name="twitter:image" content={`${ORIGIN}/assets/social-card.png`}/>
+<link rel="icon" href="/assets/favicon.svg" type="image/svg+xml"/>
+<link rel="alternate" type="application/atom+xml" title="ACC articles" href="/feed.xml"/>
+<link rel="preload" href="/assets/fonts/public-sans-latin.woff2" as="font" type="font/woff2" crossorigin/>
+<script type="application/ld+json" set:html={structuredData(page)}></script>

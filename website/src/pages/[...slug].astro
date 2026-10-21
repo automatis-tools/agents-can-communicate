@@ -1,0 +1,13 @@
+---
+import ArticlePage from "../components/articles/ArticlePage.astro";
+import { getArticles } from "../lib/content";
+import type { GetStaticPaths } from "astro";
+import type { Article } from "../lib/types";
+export const getStaticPaths = (async () => {
+  const articles = await getArticles();
+  return articles.map(article => ({ params: { slug: article.route.slice(1,-1) }, props: { article, articles } }));
+}) satisfies GetStaticPaths;
+interface Props { article: Article; articles: Article[]; }
+const { article, articles } = Astro.props;
+---
+<ArticlePage article={article} articles={articles}/>

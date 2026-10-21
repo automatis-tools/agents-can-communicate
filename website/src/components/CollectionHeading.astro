@@ -1,0 +1,5 @@
+---
+interface Props { title: string; description: string; class: string; introClass?: string; supporting?: string; }
+const { title, description, class: className, introClass, supporting } = Astro.props;
+---
+<header class={className}>{supporting ? <div><h1>{title}</h1><p>{supporting}</p></div> : <h1>{title}</h1>}<p class={introClass}>{description}</p><slot/></header>

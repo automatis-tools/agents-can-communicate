@@ -20,4 +20,5 @@ jobs:
         with:
           node-version: '24'
       - run: npm ci
+      - run: npm ci --prefix website
       - run: npm run site:build

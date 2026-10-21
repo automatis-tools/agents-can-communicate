@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
-import { spawnSync } from "node:child_process";
-import { mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
+import { siteArtifact } from "./website-helpers.mjs";
+import { cp, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { test } from "node:test";
@@ -20,12 +20,7 @@ async function htmlFiles(directory) {
 }
 
 test("the built website supplies real, linked, indexable HTML content", async t => {
-  const out = await mkdtemp(path.join(tmpdir(), "acc-website-test-"));
-  t.after(() => rm(out, { recursive: true, force: true }));
-  const result = spawnSync(process.execPath, [path.join(site, "build.mjs"), "--out", out],
-    { cwd: repo, encoding: "utf8" });
-  assert.equal(result.status, 0, result.stderr || result.stdout);
-
+  const out = await siteArtifact();
   const files = await htmlFiles(out);
   assert.ok(files.length >= 28, "all collections and substantive manuscripts must be built");
   const titles = new Set();
@@ -104,12 +99,11 @@ test("article sections respect Markdown block boundaries and shared heading iden
 
 test("every article layout keeps its complete manuscript once in the initial HTML", async () => {
   const { loadContent } = await import("../website/lib/content.mjs");
-  const { articlePage } = await import("../website/lib/pages.mjs");
   const { plainText } = await import("../website/lib/config.mjs");
   const articles = await loadContent(path.join(site, "content"));
   assert.equal(new Set(articles.map(article => article.type)).size, 8);
   for (const article of articles) {
-    const html = articlePage(article, articles);
+    const html = await readFile(path.join(await siteArtifact(), article.route, "index.html"), "utf8");
     const parts = html.split("<!-- manuscript:start -->");
     assert.equal(parts.length, 2, article.route + " needs one complete manuscript");
     const [body, rest] = parts[1].split("<!-- manuscript:end -->");
@@ -133,13 +127,18 @@ test("content metadata rejects collisions and unsafe publication routes", async 
   await assert.rejects(loadContent(directory), /duplicate content route/);
 });
 
-test("article metadata remains text in the rendered review note", async () => {
-  const { parseManuscript } = await import("../website/lib/content.mjs");
-  const { articlePage } = await import("../website/lib/pages.mjs");
-  const source = await readFile(path.join(site, "content/docs/install.md"), "utf8");
-  const article = parseManuscript(source.replace('accVersion: "0.11.1"',
-    'accVersion: "<img src=x onerror=alert(1)>"'), "metadata.md");
-  const html = articlePage(article, [article]);
+test("article metadata remains text in the rendered review note", async t => {
+  const { buildSite } = await import("../website/build.mjs");
+  const fixture = await mkdtemp(path.join(tmpdir(), "acc-website-metadata-"));
+  t.after(() => rm(fixture, { recursive: true, force: true }));
+  const contentDir = path.join(fixture, "content");
+  await cp(path.join(site, "content"), contentDir, { recursive: true });
+  const file = path.join(contentDir, "docs/install.md");
+  await writeFile(file, (await readFile(file, "utf8")).replace('accVersion: "0.11.1"',
+    'accVersion: "<img src=x onerror=alert(1)>"'));
+  const outDir = path.join(fixture, "output");
+  await buildSite({ contentDir, outDir });
+  const html = await readFile(path.join(outDir, "docs/install/index.html"), "utf8");
   assert.doesNotMatch(html, /<img src=x onerror=alert\(1\)>/);
   assert.match(html, /ACC &lt;img src=x onerror=alert\(1\)&gt;\./);
 });
@@ -209,11 +208,8 @@ test("hosting redirects preserve paths and queries and preview HTML is noindex",
 });
 
 test("the local preview serves built routes and real 404s without exposing source", async t => {
-  const { buildSite } = await import("../website/build.mjs");
   const { createPreviewServer } = await import("../website/serve.mjs");
-  const directory = await mkdtemp(path.join(tmpdir(), "acc-website-http-"));
-  t.after(() => rm(directory, { recursive: true, force: true }));
-  await buildSite({ outDir: directory });
+  const directory = await siteArtifact();
   const server = createPreviewServer({ directory });
   await new Promise(resolve => server.listen(0, "127.0.0.1", resolve));
   t.after(() => new Promise(resolve => { server.closeAllConnections(); server.close(resolve); }));

@@ -1,0 +1,9 @@
+---
+import NavigationLinks from "./NavigationLinks.astro";
+import { REPOSITORY } from "../data/site";
+---
+<footer class="site-footer shell">
+  <nav class="footer-links" aria-label="Footer"><NavigationLinks/><a href="/compatibility/">Compatibility</a><a href="/feed.xml">Feed</a></nav>
+  <div class="footer-note"><span>ACC is open source, MIT licensed. By Mykola Maksymenko.</span>
+    <span><a href={REPOSITORY}>Source</a> · <a href={`${REPOSITORY}/issues`}>Issues</a> · <a href={`${REPOSITORY}/blob/main/SECURITY.md`}>Security</a></span></div>
+</footer>

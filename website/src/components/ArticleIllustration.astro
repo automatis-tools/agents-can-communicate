@@ -1,0 +1,9 @@
+---
+import Illustration from "./Illustration.astro";
+import { illustrationFor } from "../data/site";
+import type { Article } from "../lib/types";
+interface Props { article: Article; class: string; }
+const { article, class: className } = Astro.props;
+const kind = illustrationFor(article);
+---
+{kind && <Illustration kind={kind} class={className}/>}

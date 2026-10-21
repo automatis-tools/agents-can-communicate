@@ -1,0 +1,22 @@
+{
+  "name": "@agents-can-communicate/website",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "check": "node astro-cli.mjs check",
+    "build": "node build.mjs",
+    "dev": "node astro-cli.mjs dev --host 127.0.0.1",
+    "preview": "node serve.mjs"
+  },
+  "devDependencies": {
+    "@astrojs/check": "0.9.12",
+    "@types/node": "24.19.2",
+    "astro": "7.4.2",
+    "marked": "18.1.1",
+    "typescript": "6.0.3"
+  }
+}

@@ -1,0 +1,23 @@
+---
+import GuidesIndex from "./GuidesIndex.astro";
+import IntegrationsIndex from "./IntegrationsIndex.astro";
+import ComparisonsIndex from "./ComparisonsIndex.astro";
+import ResearchIndex from "./ResearchIndex.astro";
+import ReportsIndex from "./ReportsIndex.astro";
+import DocsIndex from "./DocsIndex.astro";
+import SiteLayout from "../../layouts/SiteLayout.astro";
+import Breadcrumbs from "../Breadcrumbs.astro";
+import { ordered } from "../../data/site";
+import type { Article, SectionId, SitePage, SiteSection } from "../../lib/types";
+interface Props { section: SiteSection; articles: Article[]; }
+const { section, articles } = Astro.props;
+const sorted = ordered(articles.filter(article => article.section === section.id));
+if (!sorted.length) throw new Error("collection needs reviewed content: " + section.id);
+const components = { guides: GuidesIndex, integrations: IntegrationsIndex, compare: ComparisonsIndex,
+  research: ResearchIndex, reports: ReportsIndex, docs: DocsIndex } satisfies Record<SectionId,typeof GuidesIndex>;
+const Component = components[section.id];
+const crumbs = [{ label: section.label }];
+const page: SitePage = { route: `/${section.id}/`, kind: "collection", section: section.id,
+  title: section.label + " for AI coding sessions | ACC", description: section.description, breadcrumbs: crumbs };
+---
+<SiteLayout page={page}><Breadcrumbs items={crumbs}/><div class:list={["collection-page",`collection-${section.id}`]}><Component section={section} articles={sorted}/></div></SiteLayout>

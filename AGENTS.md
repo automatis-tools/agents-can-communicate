@@ -19,6 +19,7 @@ release-evidence records retain their original source, artifact, and capture pro
 
 ```bash
 npm ci
+npm ci --prefix website  # isolated static-site build tools
 npm run check      # syntax-check every tracked .mjs
 npm test           # the whole suite; refuses to pass on an empty file list
 npm pack && node scripts/verify-package.mjs   # what a user actually receives

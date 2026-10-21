@@ -1,0 +1,26 @@
+---
+import CollectionHeading from "../CollectionHeading.astro";
+import Illustration from "../Illustration.astro";
+import Icon from "../Icon.astro";
+import type { Article, SiteSection } from "../../lib/types";
+interface Props { section: SiteSection; articles: Article[]; }
+import InstallCommand from "../InstallCommand.astro";
+import { referenceLinks } from "../../data/editorial";
+import { REPOSITORY } from "../../data/site";
+const { section, articles } = Astro.props;
+const install = articles.find(article => article.id === "install") ?? articles[0];
+if (!install) throw new Error("collection needs reviewed content: docs");
+const compatibility = articles.find(article => article.route === "/compatibility/");
+---
+<div class="docs-workspace"><aside class="docs-sidebar"><nav aria-label="Documentation"><p>Getting started</p><a href="#quickstart">Quick start</a><a href={install.route}>{install.title}</a><a href="#client-compatibility">Client compatibility</a>
+  <p>Reference</p>{referenceLinks.map(([title,file]) => <a href={`${REPOSITORY}/blob/main/docs/${file}`}>{title}</a>)}</nav>
+  <a class="docs-search" href="/search/"><Icon name="search"/>Search the library</a></aside>
+<div class="docs-content"><CollectionHeading title={section.label} description="Connect your first sessions. Keep the reference close." class="docs-heading"/>
+  <section class="docs-quickstart" id="quickstart"><div><h2>Your first connection</h2><p>Node.js 24 or newer. macOS, Linux, or Windows 10/11.</p></div><Illustration kind="docs"/><InstallCommand language="bash" trailingNewline/>
+    <p>Follow the installer’s client-specific activation steps, then open two sessions on related work.</p><a class="text-link" href={install.route}>Read the full installation guide</a></section>
+  <section class="docs-client-reference" id="client-compatibility"><div><h2>Which client are you using?</h2><p>Receiving a message, waking a session, and explicit inbox access are different capabilities.</p></div>
+    {compatibility ? <a class="text-link" href={compatibility.route}>Client compatibility</a> : <a href="/integrations/">Integration guides</a>}</section>
+  <section class="docs-reference" id="reference"><h2>Technical reference</h2><p class="docs-reference-intro">The complete reference lives with the source. These links open the repository documentation.</p>
+    <div class="docs-reference-grid">{referenceLinks.map(([title,file,description]) => <article><h3><a href={`${REPOSITORY}/blob/main/docs/${file}`}>{title}</a></h3><p>{description}</p></article>)}</div></section>
+  {articles.filter(article => article !== install && article !== compatibility).map(article => <article class="docs-extra"><h2><a href={article.route}>{article.title}</a></h2><p>{article.description}</p></article>)}
+</div></div>

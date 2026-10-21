@@ -47,6 +47,7 @@ test("rendered component contracts reject a missing frame or metadata", async t 
     ["header", /<header\b[^>]*>[\s\S]*?<\/header>/, /shared header/],
     ["footer", /<footer\b[^>]*>[\s\S]*?<\/footer>/, /shared footer/],
     ["navigation", /<a href="\/reports\/"[^>]*>[\s\S]*?<\/a>/, /shared navigation/],
+    ["home section", /<section\b[^>]*aria-labelledby="local-title"[^>]*>[\s\S]*?<\/section>/, /homepage section/],
     ["H1", /<h1\b[^>]*>[\s\S]*?<\/h1>/, /one H1/],
     ["canonical", /<link rel="canonical"[^>]*>/, /canonical/],
     ["structured data", /<script type="application\/ld\+json">[\s\S]*?<\/script>/, /structured data/],
@@ -77,4 +78,18 @@ test("rendered manuscript contracts reject source text loss and duplication", as
       } finally { await writeFile(file, original); }
     });
   }
+});
+
+
+test("collection coverage rejects a published client lost from its index", async () => {
+  const fixture = await artifact();
+  const file = path.join(fixture.outDir, "integrations/index.html");
+  const original = await readFile(file, "utf8");
+  const entry = [...original.matchAll(/<article class="client-entry">[\s\S]*?<\/article>/g)]
+    .map(match => match[0]).find(html => html.includes('href="/integrations/claude-code/"'));
+  assert.ok(entry, "the control must target the real published client entry");
+  try {
+    await writeFile(file, original.replace(entry, ""));
+    await assert.rejects(validateBuiltSite(fixture), /collection coverage/);
+  } finally { await writeFile(file, original); }
 });

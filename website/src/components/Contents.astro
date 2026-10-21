@@ -1,0 +1,6 @@
+---
+import type { Article } from "../lib/types";
+interface Props { article: Article; label?: string; }
+const { article, label = "On this page" } = Astro.props;
+---
+<nav class="reading-outline" aria-label={label}><h2>{label}</h2><ol>{article.sections.map(section => <li><a href={`#${section.id}`}>{section.text}</a></li>)}</ol></nav>

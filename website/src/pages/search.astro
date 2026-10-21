@@ -1,0 +1,23 @@
+---
+import SiteLayout from "../layouts/SiteLayout.astro";
+import Breadcrumbs from "../components/Breadcrumbs.astro";
+import ArticleLink from "../components/ArticleLink.astro";
+import { getArticles } from "../lib/content";
+import type { SitePage } from "../lib/types";
+const articles = await getArticles();
+const page: SitePage = { kind: "search", route: "/search/", title: "Search ACC guides and documentation | ACC",
+  description: "Find ACC guides, integration details, comparisons, research notes, and engineering reports.", noindex: true };
+---
+<SiteLayout page={page}><Breadcrumbs items={[{ label: "Search" }]}/>
+  <header class="search-header"><h1>Find your next answer.</h1>
+    <form action="/search/" method="get" role="search" data-search-form>
+      <label for="search-query">Search the ACC library</label><div class="search-field">
+        <input id="search-query" name="q" type="search" placeholder="Try handoff, Codex, or delivery" autocomplete="off"/>
+        <button type="submit" class="button">Search</button></div></form>
+    <p class="search-status" role="status" aria-live="polite" data-search-status>Browse all {articles.length} articles below.</p>
+    <noscript><p>All articles are listed below. You can also use your browser’s Find command.</p></noscript>
+  </header><section class="search-results" aria-label="Search results">
+    {articles.map(article => <div data-search-result={article.route}><ArticleLink article={article}/></div>)}
+    <p class="search-empty" data-search-empty hidden>No articles match that search. Try a client name, “review”, or “handoff”.</p>
+  </section>
+</SiteLayout>
