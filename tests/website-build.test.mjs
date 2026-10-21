@@ -29,13 +29,23 @@ test("a broken published link fails the build without replacing its last good ou
   const { root, outDir } = await artifact();
   const contentDir = path.join(root, "content");
   const before = await readFile(path.join(outDir, "index.html"), "utf8");
+  const articleBefore = await readFile(path.join(outDir, "docs/install/index.html"), "utf8");
   await cp(path.join(site, "content"), contentDir, { recursive: true });
   const file = path.join(contentDir, "docs/install.md");
-  await writeFile(file, await readFile(file, "utf8")
-    + "\n\n[Broken reference](/missing-page-for-contract/)\n");
-  await assert.rejects(buildSite({ outDir, contentDir }), /unresolved internal link/i);
-  assert.equal(await readFile(path.join(outDir, "index.html"), "utf8"), before,
-    "a failed candidate must leave the last complete site available");
+  const source = await readFile(file, "utf8");
+  for (const href of ["/missing-page-for-contract/", "./never-existed/", "https://getacc.dev/never-existed/"]) {
+    await t.test(href, async () => {
+      await writeFile(file, source + "\n\n[Broken reference](" + href + ")\n");
+      await assert.rejects(buildSite({ outDir, contentDir }), /unresolved internal link/i);
+      assert.equal(await readFile(path.join(outDir, "index.html"), "utf8"), before,
+        "a failed candidate must leave the last complete site available");
+      assert.equal(await readFile(path.join(outDir, "docs/install/index.html"), "utf8"), articleBefore);
+    });
+  }
+  await writeFile(file, source + "\n\n[Same page](../) "
+    + "[Full URL](https://getacc.dev/guides/)\n");
+  // Existing relative/absolute references must remain valid.
+  await buildSite({ outDir: path.join(root, "valid-links"), contentDir });
 });
 
 

@@ -79,10 +79,10 @@ export async function validateBuiltSite({ outDir, expectedRoutes, articles = [] 
   for (const [route, html] of pages) {
     requireFrame(route, html);
     for (const [, encoded] of html.matchAll(/(?:href|src)="([^"]+)"/g)) {
-      const href = encoded.replaceAll("&amp;", "&");
-      if (!href.startsWith("/") && !href.startsWith("#")) continue;
+      const href = encoded.replaceAll("&quot;", '"').replaceAll("&#39;", "'")
+        .replaceAll("&lt;", "<").replaceAll("&gt;", ">").replaceAll("&amp;", "&");
       const target = new URL(href, ORIGIN + route);
-      if (target.origin !== ORIGIN) throw new Error("unsafe internal reference: " + href);
+      if (target.origin !== ORIGIN) continue;
       const page = pages.get(target.pathname);
       if (page !== undefined) {
         if (target.hash && !page.includes('id="' + decodeURIComponent(target.hash.slice(1)) + '"')) {

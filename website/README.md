@@ -21,6 +21,22 @@ Generated files live in website/dist and are ignored. A custom --out directory
 must be empty or contain this builder's ownership marker; the build refuses to
 erase unrelated work.
 
+## Components and build safety
+
+src/layouts/SiteLayout.astro owns the shared frame and SEO head. Components under
+src/components own navigation, commands, metadata, contents and manuscript blocks.
+Home sections, six collection indexes and six article families compose those
+primitives. Edit the shared component once to update every applicable page.
+
+The builder snapshots source and reviewed data, typechecks native Astro components,
+and compiles into an isolated cache/output stage. Contracts check every route,
+shared frame, required homepage section, complete manuscript, heading anchor and
+internal link before replacing the last good owned output. Failed builds retain it.
+
+[Architecture](ARCHITECTURE.md), [brand](BRAND.md) and [search research](SEO.md)
+record the boundaries and primary sources. Optional index.md mirrors and llms.txt
+help direct readers; canonical HTML remains the search target.
+
 ## Add content
 
 Add a Markdown file under content/guides, integrations, compare, research, reports,
@@ -103,7 +119,7 @@ does not create hosting, change DNS, or publish any page.
 ## Checks
 
 ~~~bash
-node --test tests/website.test.mjs
+node --test tests/website.test.mjs tests/website-build.test.mjs
 npm run check
 npm test
 npm pack
