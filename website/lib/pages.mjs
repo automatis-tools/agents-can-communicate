@@ -47,7 +47,7 @@ export function searchPage(articles) {
 export function notFoundPage() {
   return layout({ route: "/404.html", title: "Page not found | ACC",
     description: "This page is not in the ACC library. Find a guide, search the documentation, or return home.",
-    noindex: true }, '<section class="not-found"><p class="error-code">404</p><h1>Page not found.</h1>'
+    noindex: true }, '<section class="not-found"><h1>404: Page not found.</h1>'
     + '<p>This page may have moved. Search the library or return to the homepage.</p>'
     + '<div class="actions"><a class="button" href="/search/">Search the site</a>'
     + '<a class="text-link" href="/">Return home' + icon("arrow") + "</a></div></section>");

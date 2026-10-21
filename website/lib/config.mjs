@@ -9,7 +9,7 @@ export const sections = [
     intro: "Start with one question and one useful answer. Build a working routine from there." },
   { id: "integrations", label: "Integrations", title: "Keep the clients you like.",
     description: "ACC integration guides for Claude Code, Codex, Antigravity, Kimi Code, Gemini CLI, and Grok Build.",
-    intro: "Each client has its own permissions, hooks, and way of receiving a message. Find the details for yours." },
+    intro: "Bring ACC to the coding clients you already use. Choose yours to connect its sessions and understand how messages arrive." },
   { id: "compare", label: "Comparisons", title: "Find the right kind of connection.",
     description: "Documentation-based comparisons of ACC, agent mailboxes, terminal tools, native messaging, and delegation plugins.",
     intro: "Start with the workflow you want to keep. These source-based comparisons explain the trade-offs, without a synthetic score." },

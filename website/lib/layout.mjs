@@ -17,10 +17,10 @@ function navLinks(current, ids) {
     + (current === section.id ? ' aria-current="page"' : "") + ">" + section.label + "</a>").join("");
 }
 
-function header(section, route) {
+function header(section) {
   return '<a class="skip-link" href="#main">Skip to content</a><header class="site-header shell">'
     + '<a class="brand" href="/" title="ACC home">'
-    + (route === "/" ? '<img class="brand-symbol" src="/assets/acc-mark.svg" alt="" width="52" height="34">' : "")
+    + '<img class="brand-symbol" src="/assets/acc-mark.svg" alt="" width="52" height="34">'
     + '<span class="wordmark">ACC</span>'
     + '<span class="brand-name">Agents Can Communicate</span></a>'
     + '<nav class="desktop-nav" aria-label="Main">' + navLinks(section, ["guides", "integrations", "docs"])
@@ -97,6 +97,6 @@ export function layout(page, body) {
     + (page.article ? '<link rel="stylesheet" href="/assets/articles.css">' : "")
     + '<script type="application/ld+json">' + schema + "</script>"
     + '<script type="module" src="/assets/site.mjs"></script></head><body>'
-    + header(page.section, page.route) + '<main id="main" class="' + (page.route === "/" ? "home" : "shell reading-main")
+    + header(page.section) + '<main id="main" class="' + (page.route === "/" ? "home" : "shell reading-main")
     + '" tabindex="-1">' + body + "</main>" + footer() + "</body></html>\n";
 }

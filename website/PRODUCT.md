@@ -29,3 +29,7 @@ headlines such as “The missing link between your coding agents.” Do not lead
 “small”, “little”, or other words that make the tool sound dispensable. Technical
 references and evidence retain their precision; promotional introductions explain
 why the reader should care.
+
+The current homepage direction carries across every route: one cobalt/white
+interface, the paired blue/yellow C mark, shared navigation and controls. Different
+reading formats retain their own layouts and type measures inside this identity.

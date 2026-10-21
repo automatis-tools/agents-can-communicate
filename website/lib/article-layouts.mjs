@@ -1,4 +1,5 @@
 import { escapeHtml as e, readableDate } from "./config.mjs";
+import { articleIllustration } from "./illustrations.mjs";
 import { clientDetails } from "./collection-details.mjs";
 
 function contents(article, label = "On this page") {
@@ -40,15 +41,15 @@ function guide(article) {
   return '<header class="guide-article-heading">' + heading(article)
     + '<div class="article-review">' + review(article) + '</div></header><div class="guide-reading-workspace">'
     + '<aside class="guide-reading-rail">' + contents(article, "In this guide")
-    + '<p class="method-note">' + e(method(article)) + '</p><a href="/guides/">All guides</a></aside>'
+    + '<p class="method-note">' + e(method(article)) + '</p><a href="/guides/">All guides</a>' + articleIllustration(article, "article-illustration guide-rail-art") + '</aside>'
     + '<div class="guide-manuscript"><div class="guide-mobile-contents">' + expandableContents(article, "In this guide") + '</div>'
-    + manuscript(article) + '<p class="guide-mobile-method method-note">' + e(method(article)) + '</p></div></div>';
+    + manuscript(article) + articleIllustration(article, "article-illustration guide-mobile-art") + '<p class="guide-mobile-method method-note">' + e(method(article)) + '</p></div></div>';
 }
 
 function integration(article) {
   const client = clientDetails[article.id] ?? { name: "Coding client", surface: "ACC integration" };
   return '<header class="setup-heading"><div class="setup-identity"><strong>'
-    + e(client.name) + '</strong><span>' + e(client.surface) + '</span></div><div class="setup-title">' + heading(article)
+    + e(client.name) + '</strong><span>' + e(client.surface) + '</span>' + articleIllustration(article, "article-illustration integration-art") + '</div><div class="setup-title">' + heading(article)
     + '<div class="article-review">' + review(article) + '</div></div></header><div class="setup-toolbar">'
     + expandableContents(article, "Setup and usage") + '<a href="/compatibility/">Delivery and compatibility</a></div>'
     + '<div class="setup-manuscript">' + manuscript(article) + '</div><p class="setup-method method-note">'
@@ -58,7 +59,7 @@ function integration(article) {
 function comparison(article) {
   return '<header class="decision-heading"><div>' + heading(article)
     + '<div class="article-review">' + review(article) + '</div></div></header>'
-    + '<div class="decision-method"><span>Method</span><p>' + e(method(article)) + '</p></div>'
+    + '<div class="decision-method">' + articleIllustration(article, "article-illustration comparison-art") + '<span>Method</span><p>' + e(method(article)) + '</p></div>'
     + expandableContents(article, "Questions in this comparison") + '<div class="decision-manuscript">' + manuscript(article) + '</div>';
 }
 
@@ -66,13 +67,13 @@ function research(article) {
   return '<header class="essay-heading">' + heading(article) + '</header>'
     + '<div class="essay-workspace"><aside class="essay-margin"><div class="article-review">' + review(article)
     + '</div><p class="method-note">' + e(method(article)) + '</p>' + expandableContents(article, "In this essay")
-    + '</aside><div class="essay-manuscript">' + manuscript(article) + '</div></div>';
+    + articleIllustration(article, "article-illustration research-art") + '</aside><div class="essay-manuscript">' + manuscript(article) + '</div></div>';
 }
 
 function report(article) {
   return '<div class="report-reading-workspace"><div class="report-paper"><header class="report-paper-heading">'
     + heading(article)
-    + '</header>' + manuscript(article) + '</div><aside class="report-record"><h2>Record</h2><dl><dt>Author</dt><dd>'
+    + '</header>' + manuscript(article) + '</div><aside class="report-record"><h2>Record</h2>' + articleIllustration(article, "article-illustration report-art") + '<dl><dt>Author</dt><dd>'
     + e(article.author) + '</dd><dt>Sources reviewed</dt><dd><time datetime="' + article.lastVerified + '">'
     + readableDate(article.lastVerified) + '</time></dd><dt>ACC version</dt><dd>' + e(article.accVersion)
     + '</dd><dt>Reading time</dt><dd>' + article.minutes + ' minutes</dd></dl>' + contents(article, "Report contents")
@@ -85,10 +86,10 @@ function documentation(article, articles) {
     + '<nav aria-label="Documentation pages">' + neighbours.map(item => '<a href="' + e(item.route) + '"'
       + (item.route === article.route ? ' aria-current="page"' : "") + '>'
       + e(item.id === "supported-clients-and-delivery" ? "Clients and delivery" : item.title) + '</a>').join("") + '</nav>'
-    + contents(article) + '<a class="reference-search" href="/search/">Search the library</a></aside>'
+    + contents(article) + '<a class="reference-search" href="/search/">Search the library</a>' + articleIllustration(article, "article-illustration docs-rail-art") + '</aside>'
     + '<div class="reference-manuscript"><header class="reference-heading">' + heading(article) + '</header>'
     + '<div class="reference-mobile-contents">' + expandableContents(article, "On this page") + '</div>'
-    + manuscript(article) + '<footer class="reference-revision"><div class="article-review">' + review(article)
+    + manuscript(article) + articleIllustration(article, "article-illustration docs-mobile-art") + '<footer class="reference-revision"><div class="article-review">' + review(article)
     + '</div><p class="method-note">' + e(method(article)) + '</p></footer></div></div>';
 }
 

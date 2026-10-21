@@ -1,4 +1,5 @@
 import { breadcrumbs, icon, layout } from "./layout.mjs";
+import { sectionIllustration } from "./illustrations.mjs";
 import { escapeHtml as e, readableDate, REPOSITORY } from "./config.mjs";
 import { clientDetails, comparisonDetails, guideDetails, referenceLinks, reportDetails } from "./collection-details.mjs";
 
@@ -11,9 +12,9 @@ const intro = section => '<p class="section-intro">' + e(section.intro) + "</p>"
 
 function guides(section, articles) {
   const first = articles.find(article => article.id === "connect-independent-ai-coding-sessions") ?? articles[0];
-  return '<header class="guides-heading"><h1>Guides</h1><p>Practical workflows across coding clients.</p></header>'
+  return '<header class="guides-heading"><h1>Guides</h1><p>Turn separate coding sessions into useful conversations.</p>' + '</header>'
     + '<div class="guide-workbench"><section class="guide-start">'
-    + '<h2>' + link(first, "Connect your first two sessions") + '</h2><p>Go from two open clients to a question and a useful answer.</p>'
+    + '<h2>' + link(first, "Connect your first two sessions") + '</h2><p>Go from two open clients to a question and a useful answer.</p>' + sectionIllustration("guides")
     + '<ol class="guide-steps"><li>Open two clients on related work.</li><li>Ask the session with the missing context.</li>'
     + '<li>Bring its answer back into your work.</li></ol><div class="guide-start-bottom">'
     + link(first, "Follow the connection guide", "text-link") + minutes(first) + '</div></section>'
@@ -34,7 +35,7 @@ function integrations(section, articles) {
       return '<article class="client-entry"><p class="client-surface">' + e(client.surface) + '</p><h2>'
         + link(article, client.name) + '</h2><p>' + e(client.note) + '</p><a class="client-setup" href="'
         + e(article.route) + '">Set up ' + e(client.name) + icon("arrow") + "</a></article>";
-    }).join("") + '</section><aside class="integration-notes"><h2>Receiving messages</h2>'
+    }).join("") + '</section><aside class="integration-notes">' + sectionIllustration("integrations") + '<h2>Receiving messages</h2>'
     + '<p>A client’s hooks, permissions, and current state determine when a message arrives.</p>'
     + '<dl><dt>Next turn</dt><dd>Messages join a normal client turn.</dd><dt>Inbox</dt>'
     + '<dd>The session explicitly checks for messages.</dd><dt>Experimental live delivery</dt>'
@@ -45,8 +46,8 @@ function integrations(section, articles) {
 
 function comparisons(section, articles) {
   const overview = articles.find(article => article.type === "comparison-hub") ?? articles[0];
-  return '<header class="compare-heading"><h1>Comparisons</h1><p>Workflows and product boundaries.</p></header>'
-    + '<section class="compare-overview"><div><h2>' + link(overview, "What kind of connection do you need?")
+  return '<header class="compare-heading"><h1>Comparisons</h1><p>Choose the connection that fits how you work.</p>' + '</header>'
+    + '<section class="compare-overview">' + sectionIllustration("compare") + '<div><h2>' + link(overview, "What kind of connection do you need?")
     + '</h2><p>Peer conversation, delegation, a mailbox, and terminal automation solve different problems. '
     + 'Start with the work you want to keep.</p></div><a class="button" href="' + e(overview.route)
     + '">Read the workflow overview' + icon("arrow") + '</a></section>'
@@ -62,16 +63,16 @@ function comparisons(section, articles) {
 }
 
 function research(section, articles) {
-  return '<header class="research-heading"><h1>Research</h1><p>Notes on independent sessions, context, and communication.</p>'
-    + '<a href="/feed.xml">Article feed</a></header><div class="research-notes">'
+  return '<header class="research-heading"><h1>Research</h1><p>Understand what your agents share, remember, and receive.</p>'
+    + '<a href="/feed.xml">Article feed</a>' + '</header><div class="research-collection-body">' + sectionIllustration("research") + '<div class="research-notes">'
     + articles.map(article => '<article class="research-note"><div>' + minutes(article) + '</div><h2>' + link(article)
       + '</h2><p>' + e(article.description) + '</p></article>').join("")
-    + '</div><p class="research-colophon">Sources, assumptions, and the limits of each claim are included in the notes.</p>';
+    + '</div></div><p class="research-colophon">Sources, assumptions, and the limits of each claim are included in the notes.</p>';
 }
 
 function reports(section, articles) {
-  return '<header class="reports-heading"><div><h1>Reports</h1><p>Engineering methods and evidence.</p></div>'
-    + '<p class="reports-intro">Procedures, results, and their limits.</p></header>'
+  return '<header class="reports-heading"><div><h1>Reports</h1><p>See the evidence behind the software you run.</p></div>'
+    + '<p class="reports-intro">Inspect the methods and the limits of their conclusions.</p>' + '</header>'
     + '<div class="report-register-heading"><h2>Engineering register</h2><span>Methods and verification</span></div>'
     + '<div class="report-register">' + articles.map(article => {
       const report = reportDetails[article.id] ?? { topic: "Engineering", question: article.description,
@@ -81,7 +82,7 @@ function reports(section, articles) {
         + '<h2>' + link(article) + '</h2><p>' + e(report.question) + '</p></div><dl><dt>Procedure</dt><dd>' + e(report.method)
         + '</dd><dt>What this does not establish</dt><dd>' + e(report.boundary) + '</dd></dl></div><footer><span>Sources reviewed '
         + reviewed(article) + '</span>' + minutes(article) + link(article, "Open the report") + '</footer></article>';
-    }).join("") + '</div><aside class="reports-note"><h2>Reading the evidence</h2><p>A method is not a new benchmark result. '
+    }).join("") + '</div><aside class="reports-note">' + sectionIllustration("reports") + '<h2>Reading the evidence</h2><p>A method is not a new benchmark result. '
     + 'Recorded measurements and client captures keep their original version, environment, and provenance.</p></aside>';
 }
 
@@ -92,9 +93,9 @@ function docs(section, articles) {
     + '<a href="#quickstart">Quick start</a>' + link(install) + '<a href="#client-compatibility">Client compatibility</a>'
     + '<p>Reference</p>' + referenceLinks.map(([title, file]) => '<a href="' + REPOSITORY + '/blob/main/docs/' + file + '">'
       + e(title) + '</a>').join("") + '</nav><a class="docs-search" href="/search/">' + icon("search") + 'Search the library</a></aside>'
-    + '<div class="docs-content"><header class="docs-heading"><h1>Docs</h1><p>Installation and technical reference.</p></header>'
-    + '<section class="docs-quickstart" id="quickstart"><div><h2>A first connection</h2><p>Node.js 24 or newer. '
-    + 'macOS, Linux, or Windows 10/11.</p></div><pre><code class="language-bash">npm install -g agents-can-communicate\nacc install\n</code></pre>'
+    + '<div class="docs-content"><header class="docs-heading"><h1>Docs</h1><p>Connect your first sessions. Keep the reference close.</p>' + '</header>'
+    + '<section class="docs-quickstart" id="quickstart"><div><h2>Your first connection</h2><p>Node.js 24 or newer. '
+    + 'macOS, Linux, or Windows 10/11.</p></div>' + sectionIllustration("docs") + '<pre><code class="language-bash">npm install -g agents-can-communicate\nacc install\n</code></pre>'
     + '<p>Follow the installer’s client-specific activation steps, then open two sessions on related work.</p>'
     + link(install, "Read the full installation guide", "text-link") + '</section>'
     + '<section class="docs-client-reference" id="client-compatibility"><div><h2>Which client are you using?</h2>'
