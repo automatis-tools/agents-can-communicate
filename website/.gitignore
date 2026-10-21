@@ -6,3 +6,6 @@ dist/
 .astro/
 
 .acc-website-stage-*/
+
+!src/pages/reports/
+!src/pages/reports/*.astro
