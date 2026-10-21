@@ -18,10 +18,6 @@ sources: ["acc-fit", "acc-capabilities", "acc-security", "codex-plugin-readme", 
 
 Use the official Codex plugin when you want to invoke Codex from a Claude Code workflow. Consider ACC when you want separately opened coding sessions to communicate, including sessions in clients beyond that pair.
 
-The plugin is a substantial option, not just a single one-shot model call. The right distinction is the relationship between the sessions you want to use.
-
-This comparison is written by the ACC project from documentation checked on 21 October 2026. It does not report a comparative benchmark.
-
 ## What the official plugin documents
 
 OpenAI's [Codex plugin for Claude Code](https://github.com/openai/codex-plugin-cc) documents ordinary and adversarial reviews, task delegation, session transfer, and background-job controls. It operates from within Claude Code and uses Codex provider access.
@@ -36,7 +32,7 @@ ACC gives an independently opened recipient an address in a local peer workspace
 | Let an Antigravity or Kimi session participate too | ACC's client-specific integrations and receiving modes. |
 | Connect only your Claude Code sessions | Claude Code's native messaging first. |
 
-ACC does not claim to reproduce the plugin's session-transfer mechanism. An ACC handoff is an explicit work summary with artifact references.
+Plugin transfer imports a Claude Code conversation into a persistent Codex thread. An ACC handoff carries an explicit work summary and artifact references.
 
 ## Consider the receiver you intend to keep
 

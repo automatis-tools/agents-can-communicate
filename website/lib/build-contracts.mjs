@@ -1,4 +1,5 @@
 import { readFile, readdir, stat } from "node:fs/promises";
+import { validateRecording } from "./recording.mjs";
 import path from "node:path";
 import { referenceLinks } from "./collection-details.mjs";
 import { ORIGIN, REPOSITORY, plainText, sections } from "./config.mjs";
@@ -116,6 +117,13 @@ export async function validateBuiltSite({ outDir, expectedRoutes, articles = [] 
         }
       }
     }
+  }
+  const recording = JSON.parse(await readFile(path.join(outDir, "assets/demo/exchange.json"), "utf8"));
+  validateRecording(recording);
+  const home = pages.get("/");
+  if (!home.includes('id="recorded-exchange"') || recording.messages.some(message =>
+    !plainText(home).includes(message.text.replace(/\s+/g, " ").trim()))) {
+    throw new Error("recording content contract failed");
   }
   requireDocumentationNavigation(pages, articles);
   for (const article of articles) requireManuscript(article, pages.get(article.route));

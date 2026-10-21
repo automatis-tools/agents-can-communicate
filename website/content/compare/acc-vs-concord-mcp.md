@@ -18,15 +18,11 @@ sources: ["acc-fit", "acc-concepts", "acc-architecture", "concord-readme"]
 
 Consider ACC for peer conversation and coordination facts around sessions you manage yourself. Consider Concord MCP when the shared layer should also represent explicit task ownership, acceptance, and review state.
 
-Both describe local communication among coding clients. Neither “local-first” nor “no lead agent” establishes a unique ACC advantage here.
-
-This documentation comparison is written by the ACC project. Primary sources were checked on 21 October 2026; no head-to-head product test is reported.
-
 ## Decide what the shared layer should know
 
 ACC has presence, intent, claims, conversations, receipts, and handoffs. It deliberately has no task or workstream subsystem. Your existing issue tracker and your instructions remain responsible for deciding the work.
 
-The [Concord documentation](https://github.com/Get-Concord-AI/concord-mcp) describes task context, assignment and acceptance, versioned ownership changes, review state, messaging, and supported client adapters. It documents repository-local and global storage modes. “Concord always stores state inside your repository” would therefore be inaccurate.
+Concord combines messaging with task context, assignment, acceptance, versioned ownership changes, and review state. A configured repository uses `.concord/`; global mode keeps work for repositories without local setup in `~/.concord/global.db`. See the [Concord documentation](https://github.com/Get-Concord-AI/concord-mcp).
 
 | Question | ACC model | Concord concept to examine |
 |---|---|---|
@@ -44,8 +40,6 @@ Have one session stop after defining an API contract. Ask the next session to co
 With ACC, the source records the handoff. The receiver verifies the artifacts and replies with the work it accepts and its first step. An acknowledgement establishes receipt, not a machine-enforced task ownership transition.
 
 For the alternative, evaluate its documented acceptance workflow against the same situation. Record what happens if the receiver declines or both sessions act on an old view.
-
-This is a proposed evaluation scenario, not a claim that either product passed it during this research.
 
 ## Keep delivery separate from work state
 

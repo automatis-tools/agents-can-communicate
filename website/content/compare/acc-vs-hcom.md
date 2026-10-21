@@ -20,22 +20,18 @@ Consider ACC when you want your independently opened local coding sessions to di
 
 Both belong on a shortlist for communication between coding agents. A useful comparison asks which surrounding responsibilities you want.
 
-This article is written by the ACC project and compares documentation checked on 21 October 2026. It does not report a head-to-head installed-client test.
-
 ## Where the documented workflows differ
 
-hcom's [project documentation](https://github.com/aannoo/hcom) presents a launcher-prefixed quickstart, alongside messaging, activity observation, event subscriptions, agent controls, and cross-device relay. It also documents resuming sessions started outside hcom; “existing sessions are impossible” would be an inaccurate claim.
+hcom connects agents launched with its prefix and can resume a session started outside hcom with `hcom r <session_id>`. It also provides activity observation, event subscriptions, agent controls, and cross-device relay. See the [hcom reference](https://github.com/aannoo/hcom#reference) for supported clients and commands.
 
 ACC installs integrations into supported clients and asks you to start them normally. Its product boundary excludes launching agents, assigning tasks, choosing models, or supervising execution. Generic MCP participation adds explicit inbox access.
 
-| Question | ACC's boundary | What to examine in hcom |
+| Workflow | ACC | hcom |
 |---|---|---|
-| How do I keep my sessions? | Ordinary client launch with an active integration. | Launcher and documented resume paths. |
+| Keep an existing session | Start the client normally with its ACC integration active. | Resume a session started outside hcom with `hcom r`. |
 | What context is shared? | Explicit coordination data; raw transcripts are excluded. | The activity and transcript observation features you enable. |
 | What if I need to create more agents? | You create and control sessions outside ACC. | Documented agent controls. |
 | What if sessions are on another machine? | Outside ACC's current local boundary. | Documented cross-device path. |
-
-The table describes scope. It does not establish relative performance or reliability.
 
 ## Apply the choice to an API question
 
@@ -55,7 +51,7 @@ ACC's narrow boundary is helpful when your goal is explicit peer conversation wh
 
 Try one question, one reply, and one temporary recipient outage in your intended clients. Keep launch mode and approvals representative of daily work.
 
-For ACC, begin with [Connect independent sessions](/guides/connect-ai-coding-sessions/). Use [the delivery guide](/guides/message-delivery/) to distinguish a durable message from an actual answer.
+For an ACC example, watch the [recorded Codex–Antigravity exchange](/#recorded-exchange). To try it, begin with [Connect independent sessions](/guides/connect-ai-coding-sessions/). Use [the delivery guide](/guides/message-delivery/) to distinguish a durable message from an actual answer.
 
 ## Sources
 

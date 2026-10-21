@@ -1,6 +1,7 @@
 import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { validateRecording } from "./lib/recording.mjs";
 import { loadContent } from "./lib/content.mjs";
 import { withOutputStage } from "./lib/build-output.mjs";
 import { validateBuiltSite } from "./lib/build-contracts.mjs";
@@ -35,6 +36,7 @@ export async function buildSite({ outDir = path.join(siteRoot, "dist"),
   outDir = path.resolve(outDir);
   contentDir = path.resolve(contentDir);
   const articles = await loadContent(contentDir);
+  validateRecording(JSON.parse(await readFile(path.join(siteRoot, "src/data/recording.json"), "utf8")));
   if (!articles.length) throw new Error("refusing to build an empty content library");
   const pages = new Map(["/", ...sections.map(section => "/" + section.id + "/"),
     ...articles.map(article => article.route), "/search/", "/404.html"].map(route => [route, null]));

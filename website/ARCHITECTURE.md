@@ -27,3 +27,9 @@ navigation come from the same reviewed data rather than a parallel content copy.
 Deployment and domain changes are separate operations. The Pages worker keeps
 getacc.dev canonical and redirects mirror/www aliases while preserving paths and
 queries. Local/preview hosts stay noindex.
+
+The homepage recording is curated from matching native sender/receiver receipts.
+src/data/recording.json supplies both the static transcript component and a
+prerendered JSON download. Its public schema rejects native owner context and
+credentials before output promotion. Raw capture evidence stays private; this
+record demonstrates one explicit-inbox exchange, not a comparative benchmark.

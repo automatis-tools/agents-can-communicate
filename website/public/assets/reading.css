@@ -27,6 +27,7 @@
 .prose hr { border: 0; border-top: 1px solid var(--line); margin-block: 2em; }
 .heading-anchor { margin-left: .4em; font: 400 .6em/1 var(--sans); text-decoration: none; opacity: 0; }
 h2:hover .heading-anchor, h3:hover .heading-anchor, .heading-anchor:focus-visible { opacity: 1; }
+.table-scroll-hint { width: fit-content; font: 500 13px/1.6 var(--sans); color: var(--amber); background: var(--yellow-paper); border-left: 3px solid var(--brand-yellow); border-radius: 3px; padding: 7px 12px; margin: 20px 0 -10px; }
 .table-scroll { overflow-x: auto; margin-block: 1.5em; scrollbar-width: thin; scrollbar-color: var(--scrollbar) var(--paper); }
 .prose table { border-collapse: collapse; width: 100%; font-size: 14px; line-height: 1.65; }
 .prose table:has(th:nth-child(3)) { min-width: 650px; }

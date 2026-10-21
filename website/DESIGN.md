@@ -224,8 +224,9 @@ the recorded system monospace stack.
 
 Shared shells reach 1120px, with 32px side gutters and 20px gutters at up to
 700px. The home opening uses a 1.15fr/1fr copy/object grid, then 1.2fr/1fr at
-1000px and a single column at 700px. Its mobile object is 245px wide and appears
-above the copy.
+1000px and a single column at 700px. Its mobile object is 120px wide and appears
+after the copy and installation action. The full product name and compact links
+to reviewed client integrations remain visible beside the opening explanation.
 
 Below the opening, the homepage uses the full shared shell with separate
 content-led compositions. An asymmetric .82fr/1.18fr introduction and labelled
@@ -297,9 +298,11 @@ Search is a dedicated page with a light bordered field and progressive results.
 
 ### Homepage story sections
 
-The example is real static HTML, explicitly labelled illustrative: two definition
-list turns use blue and yellow left rules, role labels, generous speech type and
-a delivery link in the caption. It carries no live messaging state.
+The conversation uses a captured Codex CLI–Antigravity CLI exchange. Both messages,
+client versions, delivery mode and receipt timeline are static HTML. An optional
+32-second replay follows the captured timestamps; its stop action restores the
+complete exchange. The caption identifies the sample API and omitted setup.
+The record is a build-time data source, with private native context excluded.
 
 Review reuses the research magnifier beside the copy at 210px (170px tablet),
 while handoff reuses the reports paper at 112px on the opposite side of a yellow

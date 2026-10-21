@@ -1,0 +1,87 @@
+{
+  "version": 1,
+  "capturedAt": "2026-10-21T23:20:01.435Z",
+  "accVersion": "0.11.1",
+  "delivery": "Explicit inbox",
+  "clients": [
+    {
+      "id": "codex",
+      "name": "Codex CLI",
+      "version": "0.163.0"
+    },
+    {
+      "id": "antigravity",
+      "name": "Antigravity CLI",
+      "version": "1.4.4"
+    }
+  ],
+  "messages": [
+    {
+      "id": "message_qq3tbkiGoYbi4cXw-uBtLA",
+      "client": "codex",
+      "label": "Question",
+      "text": "What request does POST /accounts expect, and how are validation errors returned?",
+      "sentAt": "2026-10-21T23:20:01.435Z"
+    },
+    {
+      "id": "message_FC4QNKHFmcj4MoRZQAIX7g",
+      "client": "antigravity",
+      "label": "Reply",
+      "text": "POST /accounts accepts JSON email and password; success is 201 with accountId; validation errors are 422 with an errors object keyed by email/password.",
+      "sentAt": "2026-10-21T23:20:22.886Z",
+      "inReplyTo": "message_qq3tbkiGoYbi4cXw-uBtLA"
+    }
+  ],
+  "events": [
+    {
+      "kind": "recorded",
+      "client": "codex",
+      "messageId": "message_qq3tbkiGoYbi4cXw-uBtLA",
+      "at": "2026-10-21T23:20:01.435Z",
+      "label": "Codex records the question"
+    },
+    {
+      "kind": "retrieved",
+      "client": "antigravity",
+      "messageId": "message_qq3tbkiGoYbi4cXw-uBtLA",
+      "at": "2026-10-21T23:20:14.859Z",
+      "label": "Antigravity retrieves it"
+    },
+    {
+      "kind": "recorded",
+      "client": "antigravity",
+      "messageId": "message_FC4QNKHFmcj4MoRZQAIX7g",
+      "at": "2026-10-21T23:20:22.886Z",
+      "label": "Antigravity records the reply"
+    },
+    {
+      "kind": "retrieved",
+      "client": "codex",
+      "messageId": "message_FC4QNKHFmcj4MoRZQAIX7g",
+      "at": "2026-10-21T23:20:32.540Z",
+      "label": "Codex retrieves the answer"
+    }
+  ],
+  "source": {
+    "kind": "native-client-capture",
+    "artifacts": [
+      {
+        "name": "service.jsonl",
+        "sha256": "2813f4b21ebaa92564dd6583c1bb48e550701bde3c3360b515d6b6f351051119"
+      },
+      {
+        "name": "requester.jsonl",
+        "sha256": "ea977e0d1f28a0fdad7a46ceb478872af7ffda738aa03c175a6f0e2d30d43487"
+      },
+      {
+        "name": "requester-question.json",
+        "sha256": "019144470e4ad78fa8c59a7635cbd6de3c6c521fc00f5be699191be1f78379c5"
+      },
+      {
+        "name": "requester-answer.json",
+        "sha256": "7c9e0a8fca23a2f1c6871db767bf51620972ecbf87b84ad5774302e6385b69d2"
+      }
+    ]
+  },
+  "note": "A sample registration API, two real CLI sessions. The receiver is prompted to check its inbox. This excerpt omits client setup."
+}

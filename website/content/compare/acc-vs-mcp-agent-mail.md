@@ -16,15 +16,13 @@ sources: ["acc-fit", "acc-capabilities", "acc-concepts", "agent-mail-readme"]
 
 # ACC vs MCP Agent Mail: Session Conversation or Shared Mailbox?
 
-ACC is a candidate when your main goal is communication between the independent local sessions you already run. MCP Agent Mail deserves consideration when a searchable mailbox and its operator workflow are central to how agents coordinate.
-
-This comparison refers to the Rust MCP Agent Mail implementation. It is written by the ACC project from primary documentation checked on 21 October 2026, without a new installed-product comparison.
+ACC connects independent local sessions you already run. The Rust MCP Agent Mail implementation organizes collaboration around persistent identities, searchable threads, and an archive.
 
 ## Begin with the shared problem
 
 An implementation session has a question for another session. The answer should remain attributable and recoverable after the immediate exchange.
 
-Both tools address this problem. “Other agents cannot communicate without ACC” is therefore not a useful reason to choose it.
+Both tools keep messages available after the immediate exchange. ACC addresses participating client sessions; Agent Mail supplies persistent mail-style identities and archived threads.
 
 ## Compare the surrounding record
 
@@ -32,7 +30,7 @@ The [Agent Mail documentation](https://github.com/Dicklesworthstone/mcp_agent_ma
 
 ACC records participants, sessions, messages, receipts, intent, claims, and handoffs. It keeps runtime state outside repositories and does not require Git.
 
-Agent Mail's use of Git for an archive should not be confused with requiring your application to be a Git project.
+Agent Mail keeps its archive in per-project Git repositories under its storage root.
 
 | Need | ACC approach | Agent Mail feature to evaluate |
 |---|---|---|

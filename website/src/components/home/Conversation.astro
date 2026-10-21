@@ -1,4 +1,5 @@
 ---
+import RecordedExchange from "../RecordedExchange.astro";
 import Icon from "../Icon.astro";
 ---
 <section class="home-story home-conversation" aria-labelledby="conversation-title">
@@ -6,11 +7,5 @@ import Icon from "../Icon.astro";
       <p>Your frontend session needs an API detail. The session building the backend already knows it. Give them a way to ask each other.</p>
       <a class="text-link" href="/guides/connect-ai-coding-sessions/">Make your first connection <Icon name="arrow"/></a>
       </div>
-    <figure class="conversation-example"><dl>
-      <div class="example-turn"><dt>Claude Code <span>Building the form</span></dt>
-        <dd>What should the registration form send to the API?</dd></div>
-      <div class="example-turn example-reply"><dt>Codex <span>Building the API</span></dt>
-        <dd>Email and password. I’ll return validation errors by field.</dd></div>
-    </dl><figcaption>Illustrative exchange. Each session keeps its own context and permissions.
-      <a href="/guides/message-delivery/">How delivery works</a>.</figcaption></figure>
+    <RecordedExchange/>
   </section>

@@ -1,0 +1,27 @@
+---
+import { validateRecording } from "../../lib/recording.mjs";
+import capture from "../data/recording.json";
+import { readableDate } from "../data/site";
+validateRecording(capture);
+const start = Date.parse(capture.capturedAt);
+const offset = (at: string) => Date.parse(at) - start;
+const clock = (at: string) => {
+  const seconds = Math.floor(offset(at) / 1000);
+  return `${Math.floor(seconds / 60).toString().padStart(2,"0")}:${(seconds % 60).toString().padStart(2,"0")}`;
+};
+const duration = Math.ceil(offset(capture.events.at(-1)!.at) / 1000);
+---
+<figure class="recorded-exchange" id="recorded-exchange" data-recorded-exchange aria-label="Recorded ACC exchange">
+  <div class="recording-heading"><strong>Recorded exchange</strong><span>{duration} s excerpt</span></div>
+  {capture.messages.map(message => {
+    const client = capture.clients.find(client => client.id === message.client)!;
+    return <div class:list={["recorded-message", `recorded-${message.client}`]}><div><strong>{client.name} {client.version}</strong><span>{message.label}</span></div>
+      <pre data-recording-output data-recording-client={message.client}>{message.text}</pre></div>;
+  })}
+  <ol class="recording-timeline" aria-label="Captured delivery events">{capture.events.map(event => <li data-recording-at={offset(event.at)} data-recording-label={event.label} data-recording-kind={event.kind} data-recording-client={event.client}>
+    <span class="recording-time" title={event.at}>{clock(event.at)}</span><span>{event.label}</span></li>)}</ol>
+  <div class="recording-controls"><button type="button" class="recording-replay" data-recording-replay hidden>Replay exchange</button><p class="sr-only" role="status" data-recording-status>Full recorded exchange.</p></div>
+  <figcaption><p>ACC {capture.accVersion} · {capture.delivery} · {readableDate(capture.capturedAt.slice(0,10))}</p>
+    <details><summary>About this capture</summary><p>{capture.note}</p><a href="/assets/demo/exchange.json">Capture data</a> · <a href="/guides/message-delivery/">How delivery works</a></details>
+  </figcaption>
+</figure>

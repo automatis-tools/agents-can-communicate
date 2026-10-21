@@ -20,8 +20,6 @@ The right communication tool depends on which sessions you want to connect and h
 
 A mailbox, a terminal workflow, an in-client delegation plugin, and a native messaging feature can all move text. They need not preserve the same session ownership, store the same context, or reach the same receivers.
 
-This guide is written by the ACC project. External product descriptions below come from their primary documentation checked on 21 October 2026. They are not results from a comparative product test.
-
 ## Begin with a concrete question
 
 For independent local sessions, try this question:
@@ -44,7 +42,7 @@ Choose the requirement before comparing features.
 | Claude Code native messaging | Messaging among a user's Claude Code sessions, including documented remote scenarios. | Your participating sessions all use Claude Code. |
 | Agent Relay | Messaging infrastructure with channels, DMs, threads, and hosted or self-hosted engine options. | Deployment scope and communication infrastructure are part of the requirement. |
 
-These are shortlist criteria, not a ranking. The broader feature lists do not establish which product will complete your specific exchange with the least friction.
+Start with the row that matches the work you want your sessions to share. Then try that workflow in your own clients.
 
 ## Compare the same receiving conditions
 
@@ -54,7 +52,7 @@ For each condition, establish what happened: recorded, accepted by a transport, 
 
 ACC keeps queued, offered, retrieved, and acknowledged distinct. Its live paths are experimental, require recipient opt-in, and depend on the particular client surface. See [compatibility](/compatibility/).
 
-Do not treat a CLI capture as proof for a desktop app bearing the same name.
+ACC reports CLI and desktop delivery capabilities separately. Check the surface you actually use.
 
 ## Inspect the data boundary
 
@@ -70,7 +68,7 @@ Count the client activation and trust steps, not just installation of the connec
 
 A documented capability is evidence about a product contract. A successful exchange from your installed setup establishes that the current path works.
 
-For ACC, the first task is [connect two sessions and obtain one useful answer](/guides/connect-ai-coding-sessions/).
+Watch a [recorded Codex–Antigravity exchange](/#recorded-exchange) for an ACC example with client versions and delivery events. Then [connect two sessions and obtain one useful answer](/guides/connect-ai-coding-sessions/) in your own setup.
 
 ## Read the focused comparisons
 
@@ -78,8 +76,6 @@ For ACC, the first task is [connect two sessions and obtain one useful answer](/
 - [ACC and MCP Agent Mail](/compare/acc-vs-mcp-agent-mail/)
 - [ACC and Concord MCP](/compare/acc-vs-concord-mcp/)
 - [ACC and the official Codex plugin](/compare/acc-vs-codex-plugin/)
-
-There are no traffic forecasts, speed scores, or token-saving claims in this shortlist. Those conclusions need their own measurements.
 
 ## Sources
 
