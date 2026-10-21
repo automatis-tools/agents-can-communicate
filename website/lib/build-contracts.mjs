@@ -1,6 +1,7 @@
 import { readFile, readdir, stat } from "node:fs/promises";
 import path from "node:path";
-import { ORIGIN, plainText, sections } from "./config.mjs";
+import { referenceLinks } from "./collection-details.mjs";
+import { ORIGIN, REPOSITORY, plainText, sections } from "./config.mjs";
 
 const attribute = (tag, name) => tag.match(new RegExp('(?:^|\\s)' + name + '="([^"]*)"'))?.[1];
 
@@ -54,6 +55,25 @@ function requireManuscript(article, html) {
   }
 }
 
+function requireDocumentationNavigation(pages, articles) {
+  const menus = html => [...(html ?? "").matchAll(/<nav\b[^>]*aria-label="Documentation"[^>]*>([\s\S]*?)<\/nav>/g)]
+    .map(([, body]) => ({ text: plainText(body), links: [...body.matchAll(/<a\b([^>]*)>/g)]
+      .map(([, tag]) => attribute(tag, "href")) }));
+  const documentation = articles.filter(article => article.section === "docs");
+  const baseline = menus(pages.get("/docs/"));
+  const required = ["/docs/", "/docs/#quickstart", ...documentation.map(article => article.route),
+    ...referenceLinks.map(([, file]) => REPOSITORY + "/blob/main/docs/" + file), "/search/"];
+  for (const route of ["/docs/", ...documentation.map(article => article.route)]) {
+    const actual = menus(pages.get(route));
+    // Both responsive surfaces must be complete, even when every page shares
+    // the same omission. Equality alone cannot establish completeness.
+    if (actual.length !== 2 || actual.some(menu => JSON.stringify(menu) !== JSON.stringify(baseline[0])
+      || required.some(href => !menu.links.includes(href)))) {
+      throw new Error("documentation navigation contract failed: " + route);
+    }
+  }
+}
+
 export async function renderedPages(directory) {
   const pages = new Map();
   async function visit(current) {
@@ -97,6 +117,7 @@ export async function validateBuiltSite({ outDir, expectedRoutes, articles = [] 
       }
     }
   }
+  requireDocumentationNavigation(pages, articles);
   for (const article of articles) requireManuscript(article, pages.get(article.route));
   for (const article of articles) {
     const index = pages.get("/" + article.section + "/");

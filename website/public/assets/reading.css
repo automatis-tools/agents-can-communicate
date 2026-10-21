@@ -36,7 +36,7 @@ h2:hover .heading-anchor, h3:hover .heading-anchor, .heading-anchor:focus-visibl
 .related-reading > h2 { font-size: 25px; margin-bottom: 30px; }
 .related-reading > div { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 35px; }
 .related-reading .article-link { border-top: 0; padding-top: 0; }
-.related-reading .article-link h2 { font-size: 25px; }
+.related-reading .article-link .article-link-heading { font-size: 25px; }
 .related-reading .article-link p { font-size: 14px; }
 .search-header { max-width: 850px; padding-block: 8px 35px; }
 .search-header h1 { font-size: 34px; }
@@ -58,7 +58,7 @@ h2:hover .heading-anchor, h3:hover .heading-anchor, .heading-anchor:focus-visibl
   .breadcrumbs { margin-bottom: 24px; font-size: 14px; }
   .breadcrumbs li:last-child { max-width: 55ch; }
   .search-results { grid-template-columns: 1fr; }
-  .article-link h2 { font-size: 28px; }
+  .article-link .article-link-heading { font-size: 28px; }
   .article-link p { font-size: 14px; }
   .article-deck { font-size: 17px; margin-top: 22px; }
   .method-note { font-size: 14px; }

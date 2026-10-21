@@ -85,15 +85,7 @@
 .reports-note { display: grid; grid-template-columns: 1fr 1.2fr; gap: 60px; border-top: 1px solid var(--line); padding-top: 23px; margin-top: 20px; }
 .reports-note h2 { font-size: 20px; }
 .reports-note p { font-size: 14px; color: var(--muted); max-width: 65ch; }
-.docs-workspace { display: grid; grid-template-columns: 190px minmax(0, 1fr); gap: 50px; align-items: start; }
 .docs-content { min-width: 0; }
-.docs-sidebar { position: sticky; top: 25px; padding-right: 22px; border-right: 1px solid var(--line); font-size: 14px; }
-.docs-sidebar nav { display: flex; flex-direction: column; align-items: start; gap: 11px; }
-.docs-sidebar nav p { font-weight: 600; margin: 0 0 3px; }
-.docs-sidebar nav p:not(:first-child) { margin-top: 18px; }
-.docs-sidebar nav a { text-decoration: none; }
-.docs-search { display: inline-flex; gap: 9px; align-items: center; font-size: 14px; margin-top: 25px; }
-.docs-search .icon { width: 16px; }
 .docs-heading { padding-bottom: 25px; }
 .docs-heading > p { color: var(--muted); font-size: 16px; margin-top: 13px; }
 .docs-content h2 { font-size: 22px; }
@@ -118,11 +110,10 @@
  .client-catalogue { gap: 22px 25px; }
  .comparison-columns, .comparison-row { gap: 25px; grid-template-columns: 1fr 1.3fr 100px; }
  .report-dossier-body, .reports-note { gap: 35px; }
- .docs-workspace { grid-template-columns: 170px minmax(0, 1fr); gap: 35px; }
 }
 @media (max-width: 700px) {
+ .guide-workbench, .integration-directory { grid-template-columns: minmax(0, 1fr); gap: 30px; }
  .collection-page h1 { font-size: 30px; }
- .guide-workbench, .integration-directory, .docs-workspace { grid-template-columns: minmax(0, 1fr); gap: 30px; }
  .guide-start { padding: 0; }
  .guide-task-tail { max-width: 70px; }
  .client-catalogue { grid-template-columns: 1fr; gap: 10px; }
@@ -139,10 +130,6 @@
  .research-note h2 { font-size: 24px; }
  .report-dossier-body, .reports-note { grid-template-columns: 1fr; gap: 20px; }
  .report-dossier footer > span:first-child { width: 100%; }
- .docs-sidebar { position: static; padding: 0 0 20px; border-right: 0; border-bottom: 1px solid var(--line); }
- .docs-sidebar nav { flex-direction: row; flex-wrap: wrap; gap: 10px 20px; }
- .docs-sidebar nav p { flex-basis: 100%; }
- .docs-sidebar nav p:not(:first-child), .docs-sidebar nav p:not(:first-child) ~ a { display: none; }
  .docs-client-reference { display: block; }
  .docs-client-reference .text-link { margin-top: 15px; }
  .docs-reference-grid { gap: 22px; }
@@ -151,7 +138,6 @@
 
 .guide-steps li::marker { color: var(--amber); font-weight: 600; }
 .report-tab { color: var(--amber); background: var(--yellow-paper); padding: 3px 8px; border-radius: 3px; }
-.docs-sidebar nav p:first-child { color: var(--amber); }
 .docs-quickstart pre { border-left: 3px solid var(--brand-yellow); }
 
 .section-illustration { margin: 0; }

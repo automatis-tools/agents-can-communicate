@@ -11,5 +11,6 @@ const { page } = Astro.props;
   <link rel="stylesheet" href={page.kind === "home" ? "/assets/home.css" : "/assets/reading.css"}/>
   {page.kind === "collection" && <link rel="stylesheet" href="/assets/collections.css"/>}
   {page.kind === "article" && <link rel="stylesheet" href="/assets/articles.css"/>}
+  {page.section === "docs" && <link rel="stylesheet" href="/assets/docs.css"/>}
   <script type="module" is:inline src="/assets/site.mjs"></script>
 </head><body><Header current={page.section}/><main id="main" class={page.kind === "home" ? "home" : "shell reading-main"}><slot/></main><Footer/></body></html>

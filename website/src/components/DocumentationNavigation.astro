@@ -1,0 +1,24 @@
+---
+import Icon from "./Icon.astro";
+import { referenceLinks } from "../data/editorial";
+import { ordered, REPOSITORY } from "../data/site";
+import type { Article } from "../lib/types";
+interface Props { articles: Article[]; current: string; }
+const { articles, current } = Astro.props;
+const pages = ordered(articles.filter(article => article.section === "docs"));
+const gettingStarted = [
+  { label: "Overview", href: "/docs/" },
+  { label: "Quick start", href: "/docs/#quickstart" },
+  ...pages.map(article => ({ href: article.route,
+    label: article.route === "/compatibility/" ? "Client compatibility" : article.title })),
+];
+---
+<nav class="documentation-navigation" aria-label="Documentation">
+  <div class="documentation-group"><p>Getting started</p>
+    {gettingStarted.map(link => <a href={link.href} aria-current={link.href === current ? "page" : undefined}>{link.label}</a>)}
+  </div>
+  <div class="documentation-group"><p>Reference</p>
+    {referenceLinks.map(([label,file]) => <a href={`${REPOSITORY}/blob/main/docs/${file}`}>{label}</a>)}
+  </div>
+  <a class="documentation-search" href="/search/"><Icon name="search"/>Search the library</a>
+</nav>

@@ -1,6 +1,7 @@
 ---
 import ArticleHeading from "../ArticleHeading.astro";
 import ArticleIllustration from "../ArticleIllustration.astro";
+import ExpandableContents from "../ExpandableContents.astro";
 import Contents from "../Contents.astro";
 import Manuscript from "../Manuscript.astro";
 import { method, readableDate } from "../../data/site";
@@ -8,7 +9,7 @@ import type { Article } from "../../lib/types";
 interface Props { article: Article; articles: Article[]; }
 const { article } = Astro.props;
 ---
-<div class="report-reading-workspace"><div class="report-paper"><header class="report-paper-heading"><ArticleHeading article={article}/></header><Manuscript article={article}/></div>
+<div class="report-reading-workspace"><div class="report-paper"><header class="report-paper-heading"><ArticleHeading article={article}/></header><div class="report-mobile-contents"><ExpandableContents article={article} label="Report contents"/></div><Manuscript article={article}/></div>
   <aside class="report-record"><h2>Record</h2><ArticleIllustration article={article} class="article-illustration report-art"/>
     <dl><dt>Author</dt><dd>{article.author}</dd><dt>Sources reviewed</dt><dd><time datetime={article.lastVerified}>{readableDate(article.lastVerified)}</time></dd>
       <dt>ACC version</dt><dd>{article.accVersion}</dd><dt>Reading time</dt><dd>{article.minutes} minutes</dd></dl>

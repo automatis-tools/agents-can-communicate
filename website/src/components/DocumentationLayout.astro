@@ -1,0 +1,7 @@
+---
+import DocumentationSidebar from "./DocumentationSidebar.astro";
+import type { Article } from "../lib/types";
+interface Props { articles: Article[]; current: string; }
+const { articles, current } = Astro.props;
+---
+<div class="documentation-workspace"><DocumentationSidebar articles={articles} current={current}><slot name="sidebar"/></DocumentationSidebar><div class="documentation-content"><slot/></div></div>

@@ -9,7 +9,7 @@
   --sans: "Public Sans", sans-serif; --serif: Georgia, serif;
 }
 * { box-sizing: border-box; }
-html { scroll-behavior: smooth; scroll-padding-top: 24px; background: var(--white); }
+html { scrollbar-gutter: stable; scroll-behavior: smooth; scroll-padding-top: 24px; background: var(--white); }
 body { margin: 0; background: var(--white); color: var(--ink); font: 400 16px/1.7 var(--sans); font-synthesis: none; -webkit-font-smoothing: antialiased; caret-color: var(--accent); }
 ::selection { color: var(--ink); background: var(--selection); }
 a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 3px; }
@@ -62,9 +62,9 @@ h3 { font-size: 17px; font-weight: 600; line-height: 1.45; }
 .footer-note { margin-top: 15px; display: flex; flex-wrap: wrap; justify-content: space-between; gap: 10px 25px; font-size: 13px; }
 .article-link { border-top: 1px solid var(--line); padding-block: 23px; }
 .article-link-meta { display: flex; gap: 20px; font-size: 13px; color: var(--muted); margin-bottom: 10px; }
-.article-link h2 { font-size: 22px; line-height: 1.35; max-width: 36ch; }
-.article-link h2 a { color: var(--ink); text-decoration: none; }
-.article-link h2 a:hover { color: var(--accent); text-decoration: underline; }
+.article-link .article-link-heading { font-size: 22px; line-height: 1.35; max-width: 36ch; }
+.article-link .article-link-heading a { color: var(--ink); text-decoration: none; }
+.article-link .article-link-heading a:hover { color: var(--accent); text-decoration: underline; }
 .article-link p { margin-top: 12px; color: var(--muted); font-size: 15px; max-width: 70ch; }
 .article-link .text-link { margin-top: 15px; font-size: 14px; }
 pre { position: relative; margin: 18px 0; padding: 20px; overflow-x: auto; color: var(--ink); background: var(--paper); border-radius: 5px; font-size: 13px; line-height: 1.75; tab-size: 2; scrollbar-width: thin; scrollbar-color: var(--scrollbar) var(--paper); }

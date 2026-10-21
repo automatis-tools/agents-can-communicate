@@ -1,0 +1,10 @@
+---
+import DocumentationNavigation from "./DocumentationNavigation.astro";
+import type { Article } from "../lib/types";
+interface Props { articles: Article[]; current: string; }
+const { articles, current } = Astro.props;
+---
+<aside class="documentation-sidebar">
+  <div class="documentation-desktop"><DocumentationNavigation articles={articles} current={current}/><slot/></div>
+  <details class="documentation-mobile"><summary>Documentation</summary><DocumentationNavigation articles={articles} current={current}/></details>
+</aside>

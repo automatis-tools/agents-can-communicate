@@ -26,5 +26,5 @@ const page: SitePage = { route: article.route, kind: "article", section: article
   title: article.title + " | ACC", description: article.description, article, breadcrumbs: crumbs };
 ---
 <SiteLayout page={page}><Breadcrumbs items={crumbs}/><article class:list={["article-page",classNames[article.type]]}><Component article={article} articles={articles}/></article>
-  {related.length > 0 && <section class="related-reading"><h2>Keep reading.</h2><div>{related.map(item => <ArticleLink article={item}/>)}</div></section>}
+  {related.length > 0 && <section class="related-reading"><h2>Keep reading.</h2><div>{related.map(item => <ArticleLink article={item} headingLevel={3}/>)}</div></section>}
 </SiteLayout>

@@ -2,11 +2,12 @@
 import Icon from "./Icon.astro";
 import { getSection } from "../data/site";
 import type { Article } from "../lib/types";
-interface Props { article: Article; }
-const { article } = Astro.props;
+interface Props { article: Article; headingLevel?: 2 | 3; }
+const { article, headingLevel = 2 } = Astro.props;
+const Heading = headingLevel === 3 ? "h3" : "h2";
 const section = getSection(article.section);
 ---
 <article class="article-link"><div class="article-link-meta"><span>{section.label}</span><span>{article.minutes} min read</span></div>
-  <h2><a href={article.route}>{article.title}</a></h2><p>{article.description}</p>
+  <Heading class="article-link-heading"><a href={article.route}>{article.title}</a></Heading><p>{article.description}</p>
   <a class="text-link" href={article.route} aria-label={`Read the article: ${article.title}`}>Read the article<Icon name="arrow"/></a>
 </article>
