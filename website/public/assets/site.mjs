@@ -1,12 +1,14 @@
-const mobileMenu = document.querySelector(".mobile-nav");
+const menus = [...document.querySelectorAll(".site-header details")];
 document.addEventListener("keydown", event => {
-  if (event.key === "Escape" && mobileMenu?.open) {
-    mobileMenu.open = false;
-    mobileMenu.querySelector("summary").focus();
+  if (event.key === "Escape") {
+    for (const menu of menus) if (menu.open) {
+      menu.open = false;
+      menu.querySelector("summary").focus();
+    }
   }
 });
-mobileMenu?.addEventListener("click", event => {
-  if (event.target.closest("a")) mobileMenu.open = false;
+for (const menu of menus) menu.addEventListener("click", event => {
+  if (event.target.closest("a")) menu.open = false;
 });
 
 for (const pre of document.querySelectorAll("pre")) {

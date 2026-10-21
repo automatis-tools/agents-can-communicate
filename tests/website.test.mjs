@@ -221,7 +221,7 @@ test("the local preview serves built routes and real 404s without exposing sourc
   const home = await fetch(origin);
   assert.equal(home.status, 200);
   assert.match(home.headers.get("x-robots-tag"), /noindex/);
-  assert.match(await home.text(), /Let your agents/);
+  assert.match(await home.text(), /<title>ACC/);
   const article = await fetch(origin + "/guides/connect-ai-coding-sessions/");
   assert.equal(article.status, 200);
   assert.match(await article.text(), /Choose the sessions you actually use/);
@@ -231,7 +231,7 @@ test("the local preview serves built routes and real 404s without exposing sourc
   for (const route of ["/missing/", "/.acc-website-build", "/%2e%2e%2fpackage.json", "/%00"]) {
     const response = await fetch(origin + route);
     assert.equal(response.status, 404, route);
-    assert.match(await response.text(), /The line ends here/);
+    assert.match(await response.text(), /Page not found/);
   }
   const asset = await fetch(origin + "/assets/base.css");
   assert.match(asset.headers.get("content-type"), /text\/css/);

@@ -11,8 +11,8 @@ const intro = section => '<p class="section-intro">' + e(section.intro) + "</p>"
 
 function guides(section, articles) {
   const first = articles.find(article => article.id === "connect-independent-ai-coding-sessions") ?? articles[0];
-  return '<header class="guides-heading"><h1>Guides</h1><p>One useful exchange.<br>Then the next.</p></header>'
-    + '<div class="guide-workbench"><section class="guide-start"><span class="section-caption">Start here</span>'
+  return '<header class="guides-heading"><h1>Guides</h1><p>Practical workflows across coding clients.</p></header>'
+    + '<div class="guide-workbench"><section class="guide-start">'
     + '<h2>' + link(first, "Connect your first two sessions") + '</h2><p>Go from two open clients to a question and a useful answer.</p>'
     + '<ol class="guide-steps"><li>Open two clients on related work.</li><li>Ask the session with the missing context.</li>'
     + '<li>Bring its answer back into your work.</li></ol><div class="guide-start-bottom">'
@@ -27,17 +27,14 @@ function guides(section, articles) {
 }
 
 function integrations(section, articles) {
-  return '<header class="integrations-heading"><div><h1>Integrations</h1><p class="section-deck">Keep the clients you like.</p>'
-    + intro(section) + '</div><div class="connection-key" aria-label="ACC connects your client to another independent session">'
-    + '<span>Your client</span><span class="connection-line"></span><strong>ACC</strong>'
-    + '<span class="connection-line"></span><span>Another session</span></div></header>'
+  return '<header class="integrations-heading"><h1>Integrations</h1>' + intro(section) + '</header>'
     + '<div class="integration-directory"><section class="client-catalogue" aria-label="Coding clients">'
     + articles.map(article => {
       const client = clientDetails[article.id] ?? { name: article.title, surface: "Coding client", note: article.description };
       return '<article class="client-entry"><p class="client-surface">' + e(client.surface) + '</p><h2>'
         + link(article, client.name) + '</h2><p>' + e(client.note) + '</p><a class="client-setup" href="'
         + e(article.route) + '">Set up ' + e(client.name) + icon("arrow") + "</a></article>";
-    }).join("") + '</section><aside class="integration-notes"><h2>Same conversation.<br>Different delivery.</h2>'
+    }).join("") + '</section><aside class="integration-notes"><h2>Receiving messages</h2>'
     + '<p>A client’s hooks, permissions, and current state determine when a message arrives.</p>'
     + '<dl><dt>Next turn</dt><dd>Messages join a normal client turn.</dd><dt>Inbox</dt>'
     + '<dd>The session explicitly checks for messages.</dd><dt>Experimental live delivery</dt>'
@@ -48,13 +45,13 @@ function integrations(section, articles) {
 
 function comparisons(section, articles) {
   const overview = articles.find(article => article.type === "comparison-hub") ?? articles[0];
-  return '<header class="compare-heading"><h1>Comparisons</h1><p>Choose the workflow<br>before the tool.</p></header>'
+  return '<header class="compare-heading"><h1>Comparisons</h1><p>Workflows and product boundaries.</p></header>'
     + '<section class="compare-overview"><div><h2>' + link(overview, "What kind of connection do you need?")
     + '</h2><p>Peer conversation, delegation, a mailbox, and terminal automation solve different problems. '
     + 'Start with the work you want to keep.</p></div><a class="button" href="' + e(overview.route)
     + '">Read the workflow overview' + icon("arrow") + '</a></section>'
     + '<section class="comparison-index" aria-labelledby="comparison-index-title"><div class="comparison-index-heading">'
-    + '<h2 id="comparison-index-title">Take a closer look.</h2><p>Primary documentation. Explicit trade-offs. No scorecards.</p></div>'
+    + '<h2 id="comparison-index-title">Individual comparisons</h2><p>Based on primary documentation.</p></div>'
     + '<div class="comparison-columns" aria-hidden="true"><span>ACC compared with</span><span>The question to settle</span><span>Focus</span></div>'
     + articles.filter(article => article !== overview).map(article => {
       const [name, question, focus] = comparisonDetails[article.id] ?? [article.title, article.description, "Workflow"];
@@ -65,24 +62,16 @@ function comparisons(section, articles) {
 }
 
 function research(section, articles) {
-  const [lead, ...remaining] = articles;
-  return '<header class="research-heading"><h1>Research</h1><p>Notes on how independent<br>sessions work together.</p>'
-    + '<a href="/feed.xml">Follow the reading feed</a></header><section class="research-lead" aria-label="Featured research">'
-    + '<div class="research-lead-copy"><p class="research-subject">Session independence</p><h2>' + link(lead)
-    + '</h2><p class="research-abstract">' + e(lead.description) + '</p><div class="research-byline">'
-    + '<span>ACC project</span>' + minutes(lead) + '</div></div><figure class="research-figure">'
-    + '<div class="context-model"><div><span>Session A</span><strong>Its own context</strong></div>'
-    + '<p>A question<br><span>↓</span><br>An answer</p><div><span>Session B</span><strong>Its own context</strong></div></div>'
-    + '<figcaption>Messages cross the boundary.<br>Each session keeps its own context.</figcaption></figure></section>'
-    + '<div class="research-notes">' + remaining.map(article => '<article class="research-note"><div><span class="section-caption">A closer look</span>'
-      + minutes(article) + '</div><h2>' + link(article) + '</h2><p>' + e(article.description) + '</p></article>').join("")
-    + '</div><aside class="research-colophon"><h2>Questions before conclusions.</h2><p>These notes describe the model behind ACC. '
-    + 'Sources, assumptions, and the boundary of each claim stay with the text.</p></aside>';
+  return '<header class="research-heading"><h1>Research</h1><p>Notes on independent sessions, context, and communication.</p>'
+    + '<a href="/feed.xml">Article feed</a></header><div class="research-notes">'
+    + articles.map(article => '<article class="research-note"><div>' + minutes(article) + '</div><h2>' + link(article)
+      + '</h2><p>' + e(article.description) + '</p></article>').join("")
+    + '</div><p class="research-colophon">Sources, assumptions, and the limits of each claim are included in the notes.</p>';
 }
 
 function reports(section, articles) {
-  return '<header class="reports-heading"><div><h1>Reports</h1><p>Show the working.</p></div>'
-    + '<p class="reports-intro">Engineering methods you can inspect.<br>The question, the procedure, and what it can establish.</p></header>'
+  return '<header class="reports-heading"><div><h1>Reports</h1><p>Engineering methods and evidence.</p></div>'
+    + '<p class="reports-intro">Procedures, results, and their limits.</p></header>'
     + '<div class="report-register-heading"><h2>Engineering register</h2><span>Methods and verification</span></div>'
     + '<div class="report-register">' + articles.map(article => {
       const report = reportDetails[article.id] ?? { topic: "Engineering", question: article.description,
@@ -92,7 +81,7 @@ function reports(section, articles) {
         + '<h2>' + link(article) + '</h2><p>' + e(report.question) + '</p></div><dl><dt>Procedure</dt><dd>' + e(report.method)
         + '</dd><dt>What this does not establish</dt><dd>' + e(report.boundary) + '</dd></dl></div><footer><span>Sources reviewed '
         + reviewed(article) + '</span>' + minutes(article) + link(article, "Open the report") + '</footer></article>';
-    }).join("") + '</div><aside class="reports-note"><h2>Evidence travels with the claim.</h2><p>A method is not a new benchmark result. '
+    }).join("") + '</div><aside class="reports-note"><h2>Reading the evidence</h2><p>A method is not a new benchmark result. '
     + 'Recorded measurements and client captures keep their original version, environment, and provenance.</p></aside>';
 }
 
@@ -103,7 +92,7 @@ function docs(section, articles) {
     + '<a href="#quickstart">Quick start</a>' + link(install) + '<a href="#client-compatibility">Client compatibility</a>'
     + '<p>Reference</p>' + referenceLinks.map(([title, file]) => '<a href="' + REPOSITORY + '/blob/main/docs/' + file + '">'
       + e(title) + '</a>').join("") + '</nav><a class="docs-search" href="/search/">' + icon("search") + 'Search the library</a></aside>'
-    + '<div class="docs-content"><header class="docs-heading"><h1>Docs</h1><p>Get connected.<br>Keep the reference close.</p></header>'
+    + '<div class="docs-content"><header class="docs-heading"><h1>Docs</h1><p>Installation and technical reference.</p></header>'
     + '<section class="docs-quickstart" id="quickstart"><div><h2>A first connection</h2><p>Node.js 24 or newer. '
     + 'macOS, Linux, or Windows 10/11.</p></div><pre><code class="language-bash">npm install -g agents-can-communicate\nacc install\n</code></pre>'
     + '<p>Follow the installer’s client-specific activation steps, then open two sessions on related work.</p>'

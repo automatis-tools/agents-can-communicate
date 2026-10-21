@@ -1,6 +1,6 @@
 # Agents Can Communicate
 
-ACC is a local-first communication layer for independently opened AI coding
+ACC is a small helper for programmers: a local-first communication layer for independently opened AI coding
 sessions. The reader already uses coding clients from different vendors and
 wants related work to proceed without carrying every message between windows.
 
@@ -17,3 +17,7 @@ traction, savings, certifications, customer endorsements, or test results.
 
 The user delegates implementation decisions. Review happens on the working
 browser surface. Light theme is mandatory everywhere, with no theme switch.
+
+ACC is not a SaaS product. Its website should feel like a useful small open-source
+utility: short explanation, install command, practical example, then documentation.
+No enterprise marketing story, invented dashboard, sales funnel, or visual spectacle.

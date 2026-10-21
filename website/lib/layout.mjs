@@ -12,36 +12,30 @@ export function icon(name) {
     + 'aria-hidden="true">' + paths[name] + "</svg>";
 }
 
-function navLinks(current) {
-  return sections.map(section => '<a href="/' + section.id + '/"'
+function navLinks(current, ids) {
+  return sections.filter(section => !ids || ids.includes(section.id)).map(section => '<a href="/' + section.id + '/"'
     + (current === section.id ? ' aria-current="page"' : "") + ">" + section.label + "</a>").join("");
 }
 
 function header(section) {
   return '<a class="skip-link" href="#main">Skip to content</a><header class="site-header shell">'
     + '<a class="brand" href="/" title="ACC home"><span class="wordmark">ACC</span>'
-    + '<span class="brand-name">Agents Can<br>Communicate</span></a>'
-    + '<nav class="desktop-nav" aria-label="Main">' + navLinks(section) + "</nav>"
+    + '<span class="brand-name">Agents Can Communicate</span></a>'
+    + '<nav class="desktop-nav" aria-label="Main">' + navLinks(section, ["guides", "integrations", "docs"])
+    + '<details class="reading-menu"><summary>Reading</summary><nav aria-label="Reading">'
+    + navLinks(section, ["compare", "research", "reports"]) + '</nav></details></nav>'
     + '<div class="header-actions"><a class="search-link" href="/search/" aria-label="Search the site">'
-    + icon("search") + '</a><a class="button button-small" href="/docs/install/">Install ACC</a>'
+    + icon("search") + '</a><a class="github-link" href="' + REPOSITORY + '">GitHub</a>'
     + '<details class="mobile-nav"><summary>Menu</summary><nav aria-label="Mobile">'
     + navLinks(section) + '<a href="' + REPOSITORY + '">GitHub</a></nav></details></div></header>';
 }
 
 function footer() {
-  return '<footer class="site-footer"><div class="shell footer-grid"><div class="footer-about">'
-    + '<a class="wordmark" href="/" aria-label="ACC home">ACC</a>'
-    + '<p>Independent sessions.<br>A shared conversation.</p><p class="fine-print">Open source. MIT licensed.</p></div>'
-    + '<nav aria-label="Explore"><h2>Explore</h2><a href="/guides/">Guides</a>'
-    + '<a href="/integrations/">Integrations</a><a href="/compatibility/">Compatibility</a>'
-    + '<a href="/compare/">Comparisons</a></nav><nav aria-label="Read"><h2>Read</h2>'
-    + '<a href="/docs/">Documentation</a><a href="/research/">Research</a>'
-    + '<a href="/reports/">Reports</a><a href="/feed.xml">Article feed</a></nav>'
-    + '<nav aria-label="Project"><h2>Project</h2><a href="' + REPOSITORY + '">GitHub</a>'
-    + '<a href="' + REPOSITORY + '/issues">Report an issue</a><a href="' + REPOSITORY
-    + '/releases">Releases</a><a href="' + REPOSITORY + '/blob/main/SECURITY.md">Security</a></nav>'
-    + '</div><div class="shell footer-bottom"><span>Made by Mykola Maksymenko.</span>'
-    + '<span>For the tools you choose.</span></div></footer>';
+  return '<footer class="site-footer shell"><nav class="footer-links" aria-label="Footer">' + navLinks()
+    + '<a href="/compatibility/">Compatibility</a><a href="/feed.xml">Feed</a></nav>'
+    + '<div class="footer-note"><span>ACC is open source, MIT licensed. By Mykola Maksymenko.</span>'
+    + '<span><a href="' + REPOSITORY + '">Source</a> · <a href="' + REPOSITORY + '/issues">Issues</a> · <a href="'
+    + REPOSITORY + '/blob/main/SECURITY.md">Security</a></span></div></footer>';
 }
 
 export function breadcrumbs(items) {

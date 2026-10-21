@@ -1,49 +1,46 @@
 # ACC visual system
 
-## Direction
+## Purpose
 
-An open line between independent clients. Let the subject's actual conversation
-be the homepage artifact, with deliberate typography and quiet surrounding space.
-The homepage persuades; collections and articles support reading.
+A small helper for programmers, not a SaaS brand. The user rejected the earlier
+serif-and-pastel marketing presentation. The replacement is a compact, readable
+project website: installation first, a labelled example, and ordinary links.
 
 ## Tokens
 
-- White #FFFFFF; paper #F4F7F5; ink #192C29; secondary #53645F.
-- Blue #284BCC for actions and the initiating participant.
-- Reply paper #F2F5DC for the answering participant's example.
-- Newsreader display; Public Sans body and controls; system monospace for code.
-- Reading body 18px, approximately 68ch; display up to 6rem, tracking above -0.04em.
-- 1184px wide page shell; narrow articles with contextual navigation.
+- White #FFFFFF; neutral paper #F5F6F5; ink #252925; secondary #596159.
+- Accent #20623A for links, focus, selection, and the main setup action.
+- Border #DCE1DC for actual data divisions and navigation boundaries.
+- Self-hosted Public Sans for interface and headings; Georgia only for essay body.
+- Default body 16px, article prose 15-23px by format; headings 21-40px;
+  supporting information 13-14px. Code uses monospace.
+- A 760px home column; up to 1120px for documentation, tables, and indexes.
+- Spacing follows 8px groups, 16-24px internal separation, 32-40px between sections.
 
 ## Composition
 
-Left-aligned two-column hero, one authored conversation on the right. Quiet
-typographic client roster. Use-case rows rather than repeated feature cards.
-The six section indexes have different structures, based on how they are used:
+The homepage is a short project introduction with a copyable install command. A
+plain two-entry exchange explains what the helper does; it is explicitly illustrative.
+There are no floating chat cards, laptop pictures, connector art, coloured hero
+panels, decorative labels, metric strips, or oversized advertising headlines.
 
-- Guides: a first-exchange route beside a task-oriented reading list.
-- Integrations: a client catalogue with a separate delivery reference column.
-- Comparisons: a workflow overview followed by questions in a comparison table.
-- Research: a large editorial lead, a context model and a separate essay index.
-- Reports: an engineering register with procedure and evidence boundaries.
-- Docs: a reference sidebar, copyable quick start and a compact technical index.
+The header prioritizes Guides, Integrations, and Docs. Reading exposes Comparisons,
+Research, and Reports through a native disclosure. Every section remains linked
+in the initial HTML and the compact footer. Search stays a dedicated page.
 
-The visual distinctions come from composition and information hierarchy, within
-one light palette and type system. Article layouts also follow their content:
+Indexes keep distinct structures: a start guide with task list; a client catalogue;
+a comparison matrix; an essay list; an engineering register; and a docs workspace.
+Articles retain their functional families: guide outline, setup sections, wide
+comparison tables, serif essay reading, report provenance, and reference navigation.
+The differences serve reading, rather than staging six miniature landing pages.
 
-- Guides use a reading rail, an opening brief and a continuous walkthrough.
-- Integrations use a client identity and a setup desk with independent sections.
-- Comparisons use a decision paper: wide tables and question/answer rows.
-- Research uses a centred essay title, a margin note and a serif reading column.
-- Reports use a technical folio with a separate provenance record.
-- Docs use a persistent reference menu and compact command documentation.
-  Compatibility references have a wider table area; comparison overviews retain
-  their broader workflow framing.
+## Boundaries
 
-Every manuscript is rendered once, in its original order, with stable heading
-anchors and complete initial HTML. Typography and content structure distinguish
-the formats; metadata is never a claim of additional verification or publication.
+Light only, with no theme control. Native details, ordinary links, visible focus,
+progressive copy/search, and keyboard-scrollable tables. Never claim a receipt
+proves model attention, invent live states, or present an illustration as a capture.
+All 22 manuscripts, anchors, metadata and canonical URLs remain intact.
 
-Only light surfaces, including examples, code blocks, tables, footer and mobile
-navigation. Meaningful copy and ordinary links are present in the initial HTML.
-No automatic animation sequence, theme selector, decorative gradients or stock art.
+This is a code-led redesign. No generated raster comp or borrowed product imagery
+sets the layout. Browser captures, source contracts, the detector and independent
+visual review verify the result at their stated scopes.

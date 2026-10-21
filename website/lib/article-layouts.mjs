@@ -1,5 +1,5 @@
 import { escapeHtml as e, readableDate } from "./config.mjs";
-import { clientDetails, comparisonDetails, reportDetails } from "./collection-details.mjs";
+import { clientDetails } from "./collection-details.mjs";
 
 function contents(article, label = "On this page") {
   return '<nav class="reading-outline" aria-label="' + e(label) + '"><h2>' + e(label) + '</h2><ol>'
@@ -37,7 +37,7 @@ function manuscript(article) {
 }
 
 function guide(article) {
-  return '<header class="guide-article-heading"><div class="article-kind">Practical guide</div>' + heading(article)
+  return '<header class="guide-article-heading">' + heading(article)
     + '<div class="article-review">' + review(article) + '</div></header><div class="guide-reading-workspace">'
     + '<aside class="guide-reading-rail">' + contents(article, "In this guide")
     + '<p class="method-note">' + e(method(article)) + '</p><a href="/guides/">All guides</a></aside>'
@@ -47,7 +47,7 @@ function guide(article) {
 
 function integration(article) {
   const client = clientDetails[article.id] ?? { name: "Coding client", surface: "ACC integration" };
-  return '<header class="setup-heading"><div class="setup-identity"><span>ACC integration</span><strong>'
+  return '<header class="setup-heading"><div class="setup-identity"><strong>'
     + e(client.name) + '</strong><span>' + e(client.surface) + '</span></div><div class="setup-title">' + heading(article)
     + '<div class="article-review">' + review(article) + '</div></div></header><div class="setup-toolbar">'
     + expandableContents(article, "Setup and usage") + '<a href="/compatibility/">Delivery and compatibility</a></div>'
@@ -56,27 +56,22 @@ function integration(article) {
 }
 
 function comparison(article) {
-  const peer = comparisonDetails[article.id]?.[0];
-  const parties = peer ? '<div class="comparison-parties"><span>ACC</span><span>compared with</span><strong>' + e(peer) + '</strong></div>'
-    : '<div class="comparison-parties"><span>Conversation</span><span>Delegation</span><span>Mailbox</span></div>';
-  return '<header class="decision-heading"><div><p class="article-kind">Documentation-based comparison</p>' + heading(article)
-    + '<div class="article-review">' + review(article) + '</div></div>' + parties + '</header>'
+  return '<header class="decision-heading"><div>' + heading(article)
+    + '<div class="article-review">' + review(article) + '</div></div></header>'
     + '<div class="decision-method"><span>Method</span><p>' + e(method(article)) + '</p></div>'
     + expandableContents(article, "Questions in this comparison") + '<div class="decision-manuscript">' + manuscript(article) + '</div>';
 }
 
 function research(article) {
-  return '<header class="essay-heading"><p class="article-kind">Research note</p>' + heading(article) + '</header>'
+  return '<header class="essay-heading">' + heading(article) + '</header>'
     + '<div class="essay-workspace"><aside class="essay-margin"><div class="article-review">' + review(article)
     + '</div><p class="method-note">' + e(method(article)) + '</p>' + expandableContents(article, "In this essay")
     + '</aside><div class="essay-manuscript">' + manuscript(article) + '</div></div>';
 }
 
 function report(article) {
-  const topic = reportDetails[article.id]?.topic ?? "Engineering";
-  const kind = article.evidenceLevel.endsWith("-method") ? "Method report" : "Engineering report";
   return '<div class="report-reading-workspace"><div class="report-paper"><header class="report-paper-heading">'
-    + '<div class="report-paper-tab"><span>' + e(topic) + '</span><span>' + kind + '</span></div>' + heading(article)
+    + heading(article)
     + '</header>' + manuscript(article) + '</div><aside class="report-record"><h2>Record</h2><dl><dt>Author</dt><dd>'
     + e(article.author) + '</dd><dt>Sources reviewed</dt><dd><time datetime="' + article.lastVerified + '">'
     + readableDate(article.lastVerified) + '</time></dd><dt>ACC version</dt><dd>' + e(article.accVersion)
