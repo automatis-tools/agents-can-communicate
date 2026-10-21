@@ -29,8 +29,20 @@ The six section indexes have different structures, based on how they are used:
 - Docs: a reference sidebar, copyable quick start and a compact technical index.
 
 The visual distinctions come from composition and information hierarchy, within
-one light palette and type system. Articles have
-breadcrumbs, visible method/review metadata, an on-page contents list and sources.
+one light palette and type system. Article layouts also follow their content:
+
+- Guides use a reading rail, an opening brief and a continuous walkthrough.
+- Integrations use a client identity and a setup desk with independent sections.
+- Comparisons use a decision paper: wide tables and question/answer rows.
+- Research uses a centred essay title, a margin note and a serif reading column.
+- Reports use a technical folio with a separate provenance record.
+- Docs use a persistent reference menu and compact command documentation.
+  Compatibility references have a wider table area; comparison overviews retain
+  their broader workflow framing.
+
+Every manuscript is rendered once, in its original order, with stable heading
+anchors and complete initial HTML. Typography and content structure distinguish
+the formats; metadata is never a claim of additional verification or publication.
 
 Only light surfaces, including examples, code blocks, tables, footer and mobile
 navigation. Meaningful copy and ordinary links are present in the initial HTML.

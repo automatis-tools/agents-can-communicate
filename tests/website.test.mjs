@@ -90,6 +90,37 @@ test("Markdown content cannot introduce scripts or executable link protocols", a
   }
 });
 
+test("article sections respect Markdown block boundaries and shared heading identifiers", async () => {
+  const { renderMarkdown } = await import("../website/lib/markdown.mjs");
+  const result = renderMarkdown('# Title\n\nAn [intro link][source].\n\n> ## Inside a quote\n> Keep this block intact.\n\n'
+    + '## Repeated\n\nFirst body.\n\n### A child\n\n~~~text\n## This is code\n~~~\n\n'
+    + '## Repeated\n\nSecond [body link][source].\n\n[source]: https://example.com/reference');
+  assert.match(result.introHtml, /<blockquote>[\s\S]*Inside a quote[\s\S]*<\/blockquote>/);
+  assert.deepEqual(result.sections.map(section => section.id), ["repeated", "repeated-2"]);
+  assert.match(result.sections[0].html, /id="a-child"/);
+  assert.match(result.sections[0].html, /<code class="language-text">## This is code/);
+  assert.match(result.sections[1].html, /href="https:\/\/example.com\/reference"/);
+});
+
+test("every article layout keeps its complete manuscript once in the initial HTML", async () => {
+  const { loadContent } = await import("../website/lib/content.mjs");
+  const { articlePage } = await import("../website/lib/pages.mjs");
+  const { plainText } = await import("../website/lib/config.mjs");
+  const articles = await loadContent(path.join(site, "content"));
+  assert.equal(new Set(articles.map(article => article.type)).size, 8);
+  for (const article of articles) {
+    const html = articlePage(article, articles);
+    const parts = html.split("<!-- manuscript:start -->");
+    assert.equal(parts.length, 2, article.route + " needs one complete manuscript");
+    const [body, rest] = parts[1].split("<!-- manuscript:end -->");
+    assert.ok(rest, article.route + " needs its manuscript boundary");
+    assert.equal(plainText(body), article.text, article.route + " lost, duplicated, or reordered source text");
+    for (const heading of article.headings) {
+      assert.equal(html.split('id="' + heading.id + '"').length - 1, 1, article.route + " duplicated an anchor");
+    }
+  }
+});
+
 test("content metadata rejects collisions and unsafe publication routes", async t => {
   const { loadContent, parseManuscript } = await import("../website/lib/content.mjs");
   const directory = await mkdtemp(path.join(tmpdir(), "acc-website-content-"));

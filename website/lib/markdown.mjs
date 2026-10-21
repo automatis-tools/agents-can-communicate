@@ -46,5 +46,30 @@ export function renderMarkdown(markdown) {
       },
     },
   });
-  return { html: parser.parse(markdown, { async: false }), headings };
+  const tokens = parser.lexer(markdown);
+  // Keep the complete single-pass rendering as an independent content baseline.
+  // Typed layouts use the top-level blocks; preservation checks compare both.
+  const html = parser.parser(tokens);
+  const allHeadings = [...headings];
+  headings.length = 0;
+  slugs.clear();
+  const introduction = [];
+  const groups = [];
+  let current = introduction;
+  for (const token of tokens) {
+    if (token.type === "heading" && token.depth === 2) {
+      current = [];
+      groups.push(current);
+    }
+    current.push(token);
+  }
+  const introHtml = parser.parser(introduction);
+  const sections = groups.map(([heading, ...body]) => {
+    const position = headings.length;
+    const headingHtml = parser.parser([heading]);
+    const bodyHtml = parser.parser(body);
+    return { ...headings[position], headingHtml, bodyHtml,
+      html: headingHtml + bodyHtml, hasTable: bodyHtml.includes("<table>") };
+  });
+  return { html, introHtml, sections, headings: allHeadings };
 }

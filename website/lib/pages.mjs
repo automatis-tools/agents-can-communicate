@@ -1,5 +1,6 @@
 import { breadcrumbs, icon, layout } from "./layout.mjs";
-import { escapeHtml as e, readableDate, sectionFor } from "./config.mjs";
+import { escapeHtml as e, sectionFor } from "./config.mjs";
+import { renderArticle } from "./article-layouts.mjs";
 export { collectionPage } from "./collections.mjs";
 
 export function articleLink(article) {
@@ -16,24 +17,10 @@ export function articlePage(article, articles) {
   const section = sectionFor(article.section);
   const crumbs = [{ label: section.label, route: "/" + section.id + "/" }, { label: article.title }];
   const related = articles.filter(item => item.route !== article.route && item.section === article.section).slice(0, 3);
-  const method = article.evidenceLevel === "documentation-comparison"
-    ? "A comparison of primary documentation, without a head-to-head client test."
-    : article.evidenceLevel.endsWith("-method")
-      ? "An engineering method, with its scope and evidence sources stated below."
-      : "Reviewed against the documentation and recorded evidence for ACC " + article.accVersion + ".";
-  const toc = article.headings.filter(heading => heading.depth === 2).map(heading =>
-    '<li><a href="#' + heading.id + '">' + e(heading.text) + "</a></li>").join("");
+  const rendered = renderArticle(article, articles);
   return layout({ route: article.route, section: article.section, title: article.title + " | ACC",
     description: article.description, article, breadcrumbs: crumbs },
-  breadcrumbs(crumbs) + '<article class="article-page"><header class="article-header"><h1>'
-    + e(article.title) + '</h1><p class="article-deck">' + e(article.description) + "</p>"
-    + '<p class="article-byline">By ' + e(article.author) + '. Sources reviewed <time datetime="'
-    + article.lastVerified + '">' + readableDate(article.lastVerified) + "</time>.</p>"
-    + '<p class="method-note">' + e(method) + "</p></header>"
-    + '<div class="article-grid"><div class="prose">' + article.html + "</div>"
-    + '<aside class="article-toc"><nav aria-label="On this page"><h2>On this page</h2><ol>'
-    + toc + '</ol></nav><a class="toc-install" href="/docs/install/">Install ACC' + icon("arrow")
-    + '</a></aside></div></article>'
+  breadcrumbs(crumbs) + '<article class="article-page ' + rendered.className + '">' + rendered.html + '</article>'
     + (related.length ? '<section class="related-reading"><h2>Keep reading.</h2><div>'
       + related.map(item => articleLink(item)).join("") + "</div></section>" : ""));
 }
