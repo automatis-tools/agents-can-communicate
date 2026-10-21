@@ -43,6 +43,7 @@ body:has(.tool-page) .code-copy:hover { background: #eaf0ff; }
 .tool-details details { margin-block: 10px; }
 .tool-details summary { cursor: pointer; font-size: 15px; width: fit-content; }
 .tool-details details p { font-size: 14px; margin: 12px 0 18px 18px; color: var(--muted); }
+.tool-details .closing-action { margin-top: 24px; }
 .tool-details .issue-link { font-size: 14px; color: var(--muted); margin-top: 22px; }
 @media (max-width: 1000px) {
  .tool-page h1 { font-size: 39px; }

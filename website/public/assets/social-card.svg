@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <rect width="1200" height="630" fill="#fff"/>
+  <g transform="translate(80 63) scale(.85)" fill="none" stroke-width="12" stroke-linecap="round">
+    <path d="M31 13a17 17 0 1 0 0 22" stroke="#0755ef"/>
+    <path d="M45 13a17 17 0 1 1 0 22" stroke="#ffd330"/>
+  </g>
+  <g font-family="Arial, Helvetica, sans-serif" fill="#152032">
+    <text x="160" y="101" font-size="42" font-weight="700">ACC</text>
+    <text x="80" y="252" font-size="64" font-weight="700">The missing link</text>
+    <text x="80" y="328" font-size="64" font-weight="700">between your coding agents.</text>
+    <text x="80" y="430" font-size="26" fill="#5d6575">Questions, reviews, and handoffs across coding clients.</text>
+    <text x="80" y="554" font-size="28" fill="#0755ef">getacc.dev</text>
+  </g>
+</svg>
