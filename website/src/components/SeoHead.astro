@@ -17,6 +17,7 @@ const canonical = ORIGIN + page.route;
 <meta property="og:image:alt" content="ACC connects independent AI coding sessions."/>
 <meta name="twitter:card" content="summary_large_image"/><meta name="twitter:title" content={page.title}/><meta name="twitter:description" content={page.description}/><meta name="twitter:image" content={`${ORIGIN}/assets/social-card.png`}/>
 <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml"/>
+{page.article && <link rel="alternate" type="text/markdown" title="Markdown version" href={`${page.route}index.md`}/>}
 <link rel="alternate" type="application/atom+xml" title="ACC articles" href="/feed.xml"/>
 <link rel="preload" href="/assets/fonts/public-sans-latin.woff2" as="font" type="font/woff2" crossorigin/>
 <script type="application/ld+json" set:html={structuredData(page)}></script>

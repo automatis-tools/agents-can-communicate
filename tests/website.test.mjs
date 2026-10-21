@@ -232,6 +232,9 @@ test("the local preview serves built routes and real 404s without exposing sourc
   const asset = await fetch(origin + "/assets/base.css");
   assert.match(asset.headers.get("content-type"), /text\/css/);
   await asset.text();
+  const illustration = await fetch(origin + "/assets/acc-helper-v1.webp");
+  assert.equal(illustration.headers.get("content-type"), "image/webp");
+  await illustration.arrayBuffer();
   const post = await fetch(origin, { method: "POST" });
   assert.equal(post.status, 405);
   await post.text();
@@ -241,4 +244,38 @@ test("the local preview serves built routes and real 404s without exposing sourc
   const audit = await fetch("http://127.0.0.1:" + auditServer.address().port);
   assert.equal(audit.headers.get("x-robots-tag"), null, "explicit artifact audits can inspect indexable headers");
   await audit.text();
+});
+
+
+test("reviewed manuscripts have honest canonical discovery and Markdown variants", async () => {
+  const { loadContent } = await import("../website/lib/content.mjs");
+  const { default: worker } = await import("../website/worker.mjs");
+  const out = await siteArtifact();
+  const articles = await loadContent(path.join(site, "content"));
+  const llms = await readFile(path.join(out, "llms.txt"), "utf8");
+  const sitemap = await readFile(path.join(out, "sitemap.xml"), "utf8");
+  assert.doesNotMatch(sitemap, /<lastmod>/, "review timestamps must not pretend to be modification dates");
+  for (const article of articles) {
+    const markdownRoute = article.route + "index.md";
+    const markdown = await readFile(path.join(out, markdownRoute), "utf8");
+    const source = await readFile(article.filename, "utf8");
+    const body = source.split("\n---\n")[1].trim();
+    assert.ok(markdown.endsWith(body + "\n"), article.route + " needs complete reviewed source");
+    assert.ok(llms.includes("https://getacc.dev" + markdownRoute));
+    const html = await readFile(path.join(out, article.route, "index.html"), "utf8");
+    const graph = JSON.parse(html.match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/)[1])["@graph"];
+    assert.equal(graph.find(item => item["@type"] === "WebPage").lastReviewed, article.lastVerified);
+    assert.equal(graph.find(item => item["@type"] === "TechArticle").dateModified, undefined);
+    const response = await worker.fetch(new Request("https://getacc.dev" + markdownRoute + "?reader=1"), {
+      ASSETS: { fetch: async () => new Response(markdown, { headers: { "content-type": "text/plain" } }) },
+    });
+    assert.equal(response.headers.get("content-type"), "text/markdown; charset=utf-8");
+    assert.match(response.headers.get("x-robots-tag"), /noindex/);
+    assert.equal(response.headers.get("link"), "<https://getacc.dev" + article.route + '>; rel="canonical"');
+    assert.equal(await response.text(), markdown);
+  }
+  const missing = await worker.fetch(new Request("https://getacc.dev/missing/index.md"), {
+    ASSETS: { fetch: async () => new Response("missing", { status: 404 }) },
+  });
+  assert.equal(missing.headers.get("link"), null);
 });

@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import { loadContent } from "./lib/content.mjs";
 import { withOutputStage } from "./lib/build-output.mjs";
 import { validateBuiltSite } from "./lib/build-contracts.mjs";
+import { writeAgentDiscovery } from "./lib/discovery.mjs";
 import { compileAstro } from "./lib/astro-build.mjs";
 import { ORIGIN, REVIEW_DATE, escapeHtml as xml, sections } from "./lib/config.mjs";
 
@@ -13,7 +14,7 @@ function sitemap(pages) {
   return '<?xml version="1.0" encoding="UTF-8"?>\n'
     + '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
     + [...pages.keys()].filter(route => !["/404.html", "/search/"].includes(route))
-      .map(route => "<url><loc>" + ORIGIN + route + "</loc><lastmod>" + REVIEW_DATE + "</lastmod></url>").join("\n")
+      .map(route => "<url><loc>" + ORIGIN + route + "</loc></url>").join("\n")
     + "\n</urlset>\n";
 }
 
@@ -39,6 +40,7 @@ export async function buildSite({ outDir = path.join(siteRoot, "dist"),
     ...articles.map(article => article.route), "/search/", "/404.html"].map(route => [route, null]));
   await withOutputStage({ outDir, siteRoot, contentDir }, async stage => {
     await compileAstro(stage, articles);
+    await writeAgentDiscovery(stage, articles);
     await writeFile(path.join(stage, "sitemap.xml"), sitemap(pages));
     await writeFile(path.join(stage, "feed.xml"), feed(articles));
     await writeFile(path.join(stage, "robots.txt"), "User-agent: *\nAllow: /\n\nSitemap: " + ORIGIN + "/sitemap.xml\n");

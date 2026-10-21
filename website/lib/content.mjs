@@ -33,7 +33,7 @@ export function parseManuscript(source, filename) {
   if ((body.match(/^# /gm) ?? []).length !== 1) throw new Error(filename + ": expected one source H1");
   if (metadata.title !== body.match(/^# (.+)$/m)[1]) throw new Error(filename + ": title and source H1 differ");
   const rendered = renderMarkdown(body);
-  return { ...metadata, ...rendered, section: sectionForType(metadata.type), filename,
+  return { ...metadata, ...rendered, markdown: body, section: sectionForType(metadata.type), filename,
     text: plainText(rendered.html), minutes: Math.max(1, Math.ceil(plainText(rendered.html).split(" ").length / 220)) };
 }
 

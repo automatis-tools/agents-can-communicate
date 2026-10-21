@@ -6,7 +6,8 @@ export function structuredData(page: SitePage): string {
   const graph: Record<string, unknown>[] = [
     { "@type": "WebSite", "@id": ORIGIN + "/#website", url: ORIGIN + "/", name: "Agents Can Communicate", alternateName: "ACC" },
     { "@type": "WebPage", "@id": canonical, url: canonical, name: page.title, description: page.description,
-      isPartOf: { "@id": ORIGIN + "/#website" }, inLanguage: "en" },
+      isPartOf: { "@id": ORIGIN + "/#website" }, inLanguage: "en",
+      ...(page.article ? { lastReviewed: page.article.lastVerified } : {}) },
   ];
   if (page.kind === "home") graph.push({
     "@type": ["SoftwareApplication", "SoftwareSourceCode"], name: "Agents Can Communicate", alternateName: "ACC",
@@ -15,8 +16,8 @@ export function structuredData(page: SitePage): string {
   });
   if (page.article) graph.push({
     "@type": "TechArticle", headline: page.article.title, description: page.description,
-    mainEntityOfPage: canonical, dateModified: page.article.lastVerified,
-    author: { "@type": "Organization", name: "ACC project", url: ORIGIN + "/" },
+    mainEntityOfPage: canonical,
+    author: { "@type": "Organization", name: page.article.author, url: ORIGIN + "/" },
   });
   if (page.breadcrumbs?.length) graph.push({
     "@type": "BreadcrumbList", itemListElement: [{ label: "Home", route: "/" }, ...page.breadcrumbs]
