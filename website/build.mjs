@@ -1,32 +1,14 @@
-import { cp, mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
+import { cp, mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { loadContent } from "./lib/content.mjs";
+import { withOutputStage } from "./lib/build-output.mjs";
+import { validateBuiltSite } from "./lib/build-contracts.mjs";
 import { homePage } from "./lib/home.mjs";
 import { articlePage, collectionPage, notFoundPage, searchPage } from "./lib/pages.mjs";
 import { ORIGIN, REVIEW_DATE, escapeHtml as xml, sections } from "./lib/config.mjs";
 
 const siteRoot = import.meta.dirname;
-const marker = ".acc-website-build";
-
-async function prepareOutput(outDir, contentDir) {
-  for (const source of [siteRoot, contentDir]) {
-    if (source === outDir || source.startsWith(outDir + path.sep) || outDir === path.parse(outDir).root) {
-      throw new Error("output must not replace a source directory");
-    }
-  }
-  const existing = await readdir(outDir).catch(error => {
-    if (error.code === "ENOENT") return [];
-    throw error;
-  });
-  if (existing.length) {
-    const owned = await readFile(path.join(outDir, marker), "utf8").catch(() => "");
-    if (owned !== "ACC website output\n") throw new Error("refusing to replace an unowned output directory");
-    await rm(outDir, { recursive: true });
-  }
-  await mkdir(outDir, { recursive: true });
-  await writeFile(path.join(outDir, marker), "ACC website output\n");
-}
 
 function sitemap(pages) {
   return '<?xml version="1.0" encoding="UTF-8"?>\n'
@@ -64,25 +46,27 @@ export async function buildSite({ outDir = path.join(siteRoot, "dist"),
   for (const article of articles) add(article.route, articlePage(article, articles));
   add("/search/", searchPage(articles));
   add("/404.html", notFoundPage());
-  await prepareOutput(outDir, contentDir);
-  await cp(path.join(siteRoot, "public"), outDir, { recursive: true });
-  for (const [route, html] of pages) {
-    const file = path.join(outDir, route === "/404.html" ? "404.html" : route.slice(1), route.endsWith("/") ? "index.html" : "");
-    await mkdir(path.dirname(file), { recursive: true });
-    await writeFile(file, html);
-  }
-  await writeFile(path.join(outDir, "sitemap.xml"), sitemap(pages));
-  await writeFile(path.join(outDir, "feed.xml"), feed(articles));
-  await writeFile(path.join(outDir, "robots.txt"), "User-agent: *\nAllow: /\n\nSitemap: " + ORIGIN + "/sitemap.xml\n");
-  await writeFile(path.join(outDir, "search-index.json"), JSON.stringify(articles.map(article => ({
-    route: article.route, title: article.title, description: article.description, section: article.section, text: article.text,
-  }))));
-  const worker = path.join(siteRoot, "worker.mjs");
-  const workerSource = await readFile(worker, "utf8").catch(error => {
-    if (error.code === "ENOENT") return null;
-    throw error;
+  await withOutputStage({ outDir, siteRoot, contentDir }, async stage => {
+    await cp(path.join(siteRoot, "public"), stage, { recursive: true });
+    for (const [route, html] of pages) {
+      const file = path.join(stage, route === "/404.html" ? "404.html" : route.slice(1), route.endsWith("/") ? "index.html" : "");
+      await mkdir(path.dirname(file), { recursive: true });
+      await writeFile(file, html);
+    }
+    await writeFile(path.join(stage, "sitemap.xml"), sitemap(pages));
+    await writeFile(path.join(stage, "feed.xml"), feed(articles));
+    await writeFile(path.join(stage, "robots.txt"), "User-agent: *\nAllow: /\n\nSitemap: " + ORIGIN + "/sitemap.xml\n");
+    await writeFile(path.join(stage, "search-index.json"), JSON.stringify(articles.map(article => ({
+      route: article.route, title: article.title, description: article.description, section: article.section, text: article.text,
+    }))));
+    const worker = path.join(siteRoot, "worker.mjs");
+    const workerSource = await readFile(worker, "utf8").catch(error => {
+      if (error.code === "ENOENT") return null;
+      throw error;
+    });
+    if (workerSource) await writeFile(path.join(stage, "_worker.js"), workerSource);
+    await validateBuiltSite({ outDir: stage, articles, expectedRoutes: [...pages.keys()] });
   });
-  if (workerSource) await writeFile(path.join(outDir, "_worker.js"), workerSource);
   return { outDir, pages: pages.size, articles: articles.length };
 }
 
