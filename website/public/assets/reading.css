@@ -6,20 +6,6 @@
 .breadcrumbs li:last-child { overflow-wrap: anywhere; }
 .breadcrumbs a { text-decoration: none; }
 .breadcrumbs a:hover { text-decoration: underline; }
-.collection-header { display: grid; grid-template-columns: .8fr 1.2fr; gap: 90px; align-items: start; padding-block: 15px 65px; }
-.collection-header h1 { font-size: clamp(60px, 7vw, 90px); }
-.collection-statement { font: 450 35px/1.16 var(--serif); letter-spacing: -.015em; max-width: 26ch; }
-.collection-intro { color: var(--muted); font-size: 15px; max-width: 53ch; margin-top: 20px; }
-.collection-list { display: grid; grid-template-columns: 1fr 1fr; gap: 0 65px; }
-.article-featured { grid-column: 1 / -1; display: grid; grid-template-columns: 1.1fr 1fr; gap: 0 100px; padding-block: 35px 44px; }
-.article-featured .article-link-meta { grid-column: 1; }
-.article-featured h2 { grid-column: 1; grid-row: 2 / 4; font-size: 43px; max-width: 25ch; }
-.article-featured p { grid-column: 2; grid-row: 2; margin-top: 0; font-size: 16px; max-width: 50ch; }
-.article-featured .text-link { grid-column: 2; grid-row: 3; align-self: start; margin-top: 20px; width: fit-content; }
-.reference-links { background: var(--paper); margin-top: 40px; padding: 35px 40px; border-radius: 10px; }
-.reference-links h2 { font-size: 35px; }
-.reference-links p { margin-top: 15px; color: var(--muted); max-width: 65ch; font-size: 15px; }
-.reference-links > div { display: flex; flex-wrap: wrap; gap: 15px 30px; margin-top: 20px; font-size: 14px; }
 .article-header { padding-block: 4px 46px; max-width: 980px; }
 .article-header h1 { font-size: clamp(40px, 5.5vw, 66px); max-width: 25ch; line-height: 1.06; }
 .article-deck { font-size: 20px; line-height: 1.55; margin-top: 26px; color: var(--muted); max-width: 65ch; }
@@ -80,22 +66,13 @@ h2:hover .heading-anchor, h3:hover .heading-anchor, .heading-anchor:focus-visibl
 .not-found .actions { margin-top: 30px; }
 @media (max-width: 1050px) {
   .article-grid { grid-template-columns: minmax(0, 1fr) 175px; gap: 50px; }
-  .article-featured { gap: 0 50px; }
-  .collection-header { gap: 50px; }
   .article-toc { font-size: 11px; }
 }
 @media (max-width: 700px) {
   .reading-main { padding-top: 23px; }
   .breadcrumbs { margin-bottom: 32px; font-size: 10px; }
   .breadcrumbs li:last-child { max-width: 55ch; }
-  .collection-header { grid-template-columns: 1fr; gap: 23px; padding-block: 0 35px; }
-  .collection-header h1 { font-size: 58px; }
-  .collection-statement { font-size: 29px; max-width: 23ch; }
-  .collection-intro { font-size: 14px; margin-top: 15px; }
-  .collection-list, .search-results { grid-template-columns: 1fr; }
-  .article-featured { display: block; padding-block: 26px 30px; }
-  .article-featured h2 { font-size: 33px; max-width: 27ch; }
-  .article-featured p { margin-top: 17px; font-size: 14px; }
+  .search-results { grid-template-columns: 1fr; }
   .article-link h2 { font-size: 28px; }
   .article-link p { font-size: 14px; }
   .article-header { padding-block: 0 30px; }
@@ -118,9 +95,6 @@ h2:hover .heading-anchor, h3:hover .heading-anchor, .heading-anchor:focus-visibl
   .related-reading { margin-top: 55px; padding-top: 32px; }
   .related-reading > div { grid-template-columns: 1fr; gap: 0; }
   .related-reading > h2 { font-size: 35px; }
-  .reference-links { padding: 27px 24px; }
-  .reference-links h2 { font-size: 30px; }
-  .reference-links p { font-size: 14px; }
   .search-field { gap: 9px; }
   .search-field input { padding: 11px 12px; font-size: 14px; }
   .search-field .button { padding-inline: 14px; }

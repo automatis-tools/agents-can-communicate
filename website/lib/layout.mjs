@@ -97,6 +97,7 @@ export function layout(page, body) {
     + '<link rel="preload" href="/assets/fonts/public-sans-latin.woff2" as="font" type="font/woff2" crossorigin>'
     + '<link rel="stylesheet" href="/assets/base.css"><link rel="stylesheet" href="/assets/'
     + (page.route === "/" ? "home" : "reading") + '.css">'
+    + (page.collection ? '<link rel="stylesheet" href="/assets/collections.css">' : "")
     + '<script type="application/ld+json">' + schema + "</script>"
     + '<script type="module" src="/assets/site.mjs"></script></head><body>'
     + header(page.section) + '<main id="main" class="' + (page.route === "/" ? "home" : "shell reading-main")

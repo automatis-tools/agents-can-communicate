@@ -19,7 +19,17 @@ The homepage persuades; collections and articles support reading.
 
 Left-aligned two-column hero, one authored conversation on the right. Quiet
 typographic client roster. Use-case rows rather than repeated feature cards.
-Content collections use a lead article and a readable index. Articles have
+The six section indexes have different structures, based on how they are used:
+
+- Guides: a first-exchange route beside a task-oriented reading list.
+- Integrations: a client catalogue with a separate delivery reference column.
+- Comparisons: a workflow overview followed by questions in a comparison table.
+- Research: a large editorial lead, a context model and a separate essay index.
+- Reports: an engineering register with procedure and evidence boundaries.
+- Docs: a reference sidebar, copyable quick start and a compact technical index.
+
+The visual distinctions come from composition and information hierarchy, within
+one light palette and type system. Articles have
 breadcrumbs, visible method/review metadata, an on-page contents list and sources.
 
 Only light surfaces, including examples, code blocks, tables, footer and mobile

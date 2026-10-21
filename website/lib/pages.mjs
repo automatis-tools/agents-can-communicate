@@ -1,34 +1,15 @@
 import { breadcrumbs, icon, layout } from "./layout.mjs";
-import { escapeHtml as e, readableDate, REPOSITORY, sectionFor } from "./config.mjs";
+import { escapeHtml as e, readableDate, sectionFor } from "./config.mjs";
+export { collectionPage } from "./collections.mjs";
 
-export function articleLink(article, featured = false) {
+export function articleLink(article) {
   const section = sectionFor(article.section);
-  return '<article class="article-link' + (featured ? " article-featured" : "") + '">'
+  return '<article class="article-link">'
     + '<div class="article-link-meta"><span>' + section.label + "</span><span>"
     + article.minutes + ' min read</span></div><h2><a href="' + e(article.route) + '">'
     + e(article.title) + '</a></h2><p>' + e(article.description) + "</p>"
     + '<a class="text-link" href="' + e(article.route) + '" aria-label="Read the article: '
     + e(article.title) + '">Read the article' + icon("arrow") + "</a></article>";
-}
-
-export function collectionPage(section, articles) {
-  const sorted = articles.filter(article => article.section === section.id)
-    .sort((a, b) => (a.order ?? 99) - (b.order ?? 99) || a.title.localeCompare(b.title));
-  const extra = section.id !== "docs" ? "" : '<section class="reference-links"><h2>Keep the reference close.</h2>'
-    + '<p>The complete technical documentation lives with the source. These links open the current repository reference.</p>'
-    + '<div><a href="' + REPOSITORY + '/blob/main/docs/CLI.md">CLI commands</a><a href="'
-    + REPOSITORY + '/blob/main/docs/CONFIGURATION.md">Configuration</a><a href="' + REPOSITORY
-    + '/blob/main/docs/PROTOCOL.md">Protocol</a><a href="' + REPOSITORY
-    + '/blob/main/docs/ARCHITECTURE.md">Architecture</a><a href="' + REPOSITORY
-    + '/blob/main/docs/TROUBLESHOOTING.md">Troubleshooting</a></div></section>';
-  return layout({ route: "/" + section.id + "/", section: section.id,
-    title: section.label + " for AI coding sessions | ACC", description: section.description,
-    breadcrumbs: [{ label: section.label }] },
-  breadcrumbs([{ label: section.label }]) + '<header class="collection-header"><h1>'
-    + section.label + '</h1><div><p class="collection-statement">' + section.title
-    + '</p><p class="collection-intro">' + section.intro + '</p></div></header>'
-    + '<section class="collection-list" aria-label="' + section.label + '">'
-    + sorted.map((article, index) => articleLink(article, index === 0)).join("") + "</section>" + extra);
 }
 
 export function articlePage(article, articles) {
