@@ -2,13 +2,12 @@ import { layout } from "./layout.mjs";
 import { REPOSITORY } from "./config.mjs";
 
 export function homePage() {
-  const introduction = '<section class="tool-intro"><h1>ACC <span>Agents Can Communicate</span></h1>'
-    + '<p class="tool-description">A small, local helper that lets your coding agents talk to each other.</p>'
-    + '<p>Keep using Claude Code, Codex, Antigravity, or another supported client. ACC lets independent sessions '
-    + 'ask questions, exchange reviews, and leave handoffs.</p>'
+  const introduction = '<section class="tool-intro"><div class="helper-copy"><h1>A small helper<br>for your coding agents.</h1>'
+    + '<p class="tool-description">ACC lets the coding sessions you already run ask each other questions, exchange reviews, and leave handoffs.</p>'
     + '<div class="tool-install" id="install"><pre><code>npm install -g agents-can-communicate\nacc install</code></pre>'
     + '<div class="install-links"><a class="button" href="/docs/install/">Setup instructions</a><a href="'
-    + REPOSITORY + '">Source on GitHub</a></div><p>Node.js 24+. macOS, Linux, Windows 10/11.</p></div></section>';
+    + REPOSITORY + '">GitHub</a></div><p>Node.js 24+ · Local · Open source</p></div></div>'
+    + '<div class="helper-object" aria-hidden="true"><img src="/assets/acc-helper-v1.webp" width="900" height="600" alt="" fetchpriority="high" decoding="async"></div></section>';
   const example = '<section class="tool-example"><h2>A small example</h2><p>Two sessions are building the same feature.</p>'
     + '<dl class="exchange"><div><dt>Claude Code <span>working on the form</span></dt>'
     + '<dd>What should the registration form send to the API?</dd></div><div><dt>Codex <span>working on the API</span></dt>'
@@ -16,9 +15,9 @@ export function homePage() {
     + '<p class="example-caption">Illustrative exchange. Each session keeps its own context and permissions. '
     + '<a href="/guides/connect-ai-coding-sessions/">Try a first exchange</a>.</p></section>';
   const uses = '<section class="tool-uses"><h2>Useful for</h2><ul>'
-    + '<li><a href="/guides/ai-agents-git-worktrees/">Working on both sides of a feature</a> — agree on the interface before the code drifts apart.</li>'
-    + '<li><a href="/guides/code-review-between-ai-clients/">Getting another model’s review</a> — send a specific change and bring the findings back.</li>'
-    + '<li><a href="/guides/handoff-after-rate-limit/">Continuing in another client</a> — leave the decisions, unfinished work, and checks.</li></ul></section>';
+    + '<li><a href="/guides/ai-agents-git-worktrees/">Working on both sides of a feature</a>Agree on the interface before the code drifts apart.</li>'
+    + '<li><a href="/guides/code-review-between-ai-clients/">Getting another model’s review</a>Send a specific change and bring the findings back.</li>'
+    + '<li><a href="/guides/handoff-after-rate-limit/">Continuing in another client</a>Leave the decisions, unfinished work, and checks.</li></ul></section>';
   const clients = '<section class="tool-clients"><h2>Client integrations</h2><div>'
     + '<a href="/integrations/claude-code/">Claude Code</a><a href="/integrations/codex/">Codex</a>'
     + '<a href="/integrations/antigravity/">Antigravity</a><a href="/integrations/gemini-cli/">Gemini CLI</a>'
@@ -45,5 +44,5 @@ export function homePage() {
     + 'with your clients, expected behavior, and what happened.</p></section>';
   return layout({ route: "/", title: "ACC — Connect your independent AI coding sessions",
     description: "Agents Can Communicate is a small local helper for questions, reviews, and handoffs between independent AI coding sessions." },
-    '<div class="tool-page">' + introduction + example + uses + clients + local + reading + details + '</div>');
+    '<div class="tool-page">' + introduction + uses + example + clients + local + reading + details + '</div>');
 }
