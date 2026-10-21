@@ -49,6 +49,7 @@ if (form) {
   const status = document.querySelector("[data-search-status]");
   const empty = document.querySelector("[data-search-empty]");
   const results = [...document.querySelectorAll("[data-search-result]")];
+  const unavailable = "Search is unavailable. All articles are listed below.";
   const normalize = value => value.toLowerCase().normalize("NFKD").replace(/[\u0300-\u036f]/g, "");
   let index;
   let timer;
@@ -59,13 +60,13 @@ if (form) {
       index = new Map(data.map(article => [article.route,
         normalize(article.title + " " + article.description + " " + article.text)]));
     }).catch(() => {
-      status.textContent = "Search is unavailable. All articles are listed below.";
+      status.textContent = unavailable;
     });
   async function search() {
     const query = field.value.trim().slice(0, 200);
     if (query) status.textContent = "Searching…";
     await loaded;
-    if (!index) return;
+    if (!index) { status.textContent = unavailable; return; }
     const terms = normalize(query).split(/\s+/).filter(Boolean);
     let count = 0;
     for (const result of results) {

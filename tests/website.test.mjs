@@ -4,6 +4,7 @@ import { mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { test } from "node:test";
+import { runInNewContext } from "node:vm";
 
 const repo = path.resolve(import.meta.dirname, "..");
 const site = path.join(repo, "website");
@@ -99,6 +100,41 @@ test("content metadata rejects collisions and unsafe publication routes", async 
   await writeFile(path.join(directory, "one.md"), manuscript);
   await writeFile(path.join(directory, "two.md"), manuscript);
   await assert.rejects(loadContent(directory), /duplicate content route/);
+});
+
+test("article metadata remains text in the rendered review note", async () => {
+  const { parseManuscript } = await import("../website/lib/content.mjs");
+  const { articlePage } = await import("../website/lib/pages.mjs");
+  const source = await readFile(path.join(site, "content/docs/install.md"), "utf8");
+  const article = parseManuscript(source.replace('accVersion: "0.11.1"',
+    'accVersion: "<img src=x onerror=alert(1)>"'), "metadata.md");
+  const html = articlePage(article, [article]);
+  assert.doesNotMatch(html, /<img src=x onerror=alert\(1\)>/);
+  assert.match(html, /ACC &lt;img src=x onerror=alert\(1\)&gt;\./);
+});
+
+test("a query after a failed search index keeps the useful error and article list", async () => {
+  const source = await readFile(path.join(site, "public/assets/site.mjs"), "utf8");
+  const status = { textContent: "" };
+  const field = { value: "", addEventListener() {} };
+  const results = [{ hidden: false }];
+  let submit;
+  const form = { querySelector: () => field, addEventListener: (_, callback) => { submit = callback; } };
+  const document = {
+    addEventListener() {},
+    querySelector: selector => ({ "[data-search-form]": form, "[data-search-status]": status,
+      "[data-search-empty]": { hidden: true } })[selector] ?? null,
+    querySelectorAll: selector => selector === "[data-search-result]" ? results : [],
+  };
+  runInNewContext(source, { document, fetch: async () => { throw new Error("offline"); },
+    AbortSignal, URLSearchParams, location: { search: "" }, clearTimeout, setTimeout });
+  await new Promise(resolve => setImmediate(resolve));
+  assert.match(status.textContent, /Search is unavailable/);
+  field.value = "handoff";
+  submit({ preventDefault() {} });
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(status.textContent, "Search is unavailable. All articles are listed below.");
+  assert.equal(results[0].hidden, false);
 });
 
 test("a build cannot erase an existing directory it does not own", async t => {

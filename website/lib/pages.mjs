@@ -48,7 +48,7 @@ export function articlePage(article, articles) {
     + e(article.title) + '</h1><p class="article-deck">' + e(article.description) + "</p>"
     + '<p class="article-byline">By ' + e(article.author) + '. Sources reviewed <time datetime="'
     + article.lastVerified + '">' + readableDate(article.lastVerified) + "</time>.</p>"
-    + '<p class="method-note">' + method + "</p></header>"
+    + '<p class="method-note">' + e(method) + "</p></header>"
     + '<div class="article-grid"><div class="prose">' + article.html + "</div>"
     + '<aside class="article-toc"><nav aria-label="On this page"><h2>On this page</h2><ol>'
     + toc + '</ol></nav><a class="toc-install" href="/docs/install/">Install ACC' + icon("arrow")
