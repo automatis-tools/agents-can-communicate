@@ -92,7 +92,7 @@ upper-right stamp. Preserve each reading family's own type measure and tables.
 ## Voice and editorial boundaries
 
 Lead introductions with concrete reader value: stop carrying messages between
-tabs, ask another model for a review, or continue work in another session. Use
+windows, ask another model for a review, or continue work in another session. Use
 confident, plain language and a clear action. Avoid opening with “small” or
 “little,” enterprise sales language and invented dashboards.
 

@@ -23,7 +23,7 @@ utility: short explanation, install command, practical example, then documentati
 No enterprise marketing story, invented dashboard, sales funnel, or visual spectacle.
 
 Marketing copy should make the value felt: the developer stops carrying messages
-between tabs, can request another model’s review, and can continue work in a new
+between windows, can request another model’s review, and can continue work in a new
 session. Lead with that relief and a clear action. Use confident, concrete benefit
 headlines such as “The missing link between your coding agents.” Do not lead with
 “small”, “little”, or other words that make the tool sound dispensable. Technical
