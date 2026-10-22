@@ -335,8 +335,8 @@ copy and disclosure behavior remains unchanged.
 ### Navigation and reading
 
 Every route shares the paired-C mark, ACC wordmark with its full product name
-beneath, navigation and footer. A standard light GitHub Star widget shows the live
-repository count in the desktop header and mobile menu.
+beneath, navigation and footer. A standard light GitHub widget uses the GitHub
+icon and label, with the live star count in the desktop header and mobile menu.
 Guides, Integrations and Docs are direct links; native Reading exposes
 Comparisons, Research and Reports. Current reading sections also mark the
 Reading summary. At 900px, native Menu replaces desktop navigation. Every

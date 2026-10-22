@@ -4,5 +4,5 @@ interface Props { mobile?: boolean; }
 const { mobile = false } = Astro.props;
 ---
 <span class:list={["github-star", mobile ? "github-star-mobile" : "github-star-desktop"]}>
-  <a class="github-button" href={REPOSITORY} data-color-scheme="light" data-icon="octicon-star" data-size="large" data-show-count="true" aria-label="Star Agents Can Communicate on GitHub">Star</a>
+  <a class="github-button" href={REPOSITORY} data-color-scheme="light" data-icon="octicon-mark-github" data-size="large" data-show-count="true" aria-label="Agents Can Communicate on GitHub">GitHub</a>
 </span>
