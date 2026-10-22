@@ -6,6 +6,17 @@
   filesystem calls, so a stalled mount does not consume its discovery budget.
   Linux discovery flags are unchanged.
 
+| Development artifact | Value |
+|---|---|
+| Built from | `03c1d2d6ef72b948a5b42f7ab122341fa71d774b` |
+| Tarball | `agents-can-communicate-0.11.1.tgz`, 611,046 bytes, 376 files |
+| sha256 | `9ad04e874ba98886e76ab9e6ddfed5ffac6d0b3f86302d21f331d1c16371e8c0` |
+
+The exact archive passed package verification. See
+[development evidence](docs/release-evidence/unreleased-antigravity-tcp-discovery.md).
+This is not a published release; the package version remains `0.11.1`.
+The earlier candidate and release records below retain their original provenance.
+
 ## 0.11.1 — release candidate
 
 - A hook's cost no longer grows with everything its workspace ever held: each stored
