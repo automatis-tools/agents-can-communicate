@@ -9,8 +9,10 @@ const { page } = Astro.props;
 <!doctype html><html lang="en"><head><SeoHead page={page}/>
   <link rel="stylesheet" href="/assets/base.css"/>
   <link rel="stylesheet" href={page.kind === "home" ? "/assets/home.css" : "/assets/reading.css"}/>
+  {page.kind === "home" && <link rel="stylesheet" href="/assets/exchange.css"/>}
   {page.kind === "collection" && <link rel="stylesheet" href="/assets/collections.css"/>}
   {page.kind === "article" && <link rel="stylesheet" href="/assets/articles.css"/>}
   {page.section === "docs" && <link rel="stylesheet" href="/assets/docs.css"/>}
   <script type="module" is:inline src="/assets/site.mjs"></script>
+  <script is:inline defer src="/assets/vendor/github-buttons-2.33.1.min.js"></script>
 </head><body><Header current={page.section}/><main id="main" class={page.kind === "home" ? "home" : "shell reading-main"}><slot/></main><Footer/></body></html>

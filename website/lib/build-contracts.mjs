@@ -120,7 +120,7 @@ export async function validateBuiltSite({ outDir, expectedRoutes, articles = [] 
   }
   const recording = JSON.parse(await readFile(path.join(outDir, "assets/demo/exchange.json"), "utf8"));
   validateRecording(recording);
-  const home = pages.get("/");
+  const home = pages.get("/").replace(/<script\b[^>]*>[\s\S]*?<\/script>/g, "");
   if (!home.includes('id="recorded-exchange"') || recording.messages.some(message =>
     !plainText(home).includes(message.text.replace(/\s+/g, " ").trim()))) {
     throw new Error("recording content contract failed");

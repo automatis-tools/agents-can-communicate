@@ -298,11 +298,26 @@ Search is a dedicated page with a light bordered field and progressive results.
 
 ### Homepage story sections
 
-The conversation uses a captured Codex CLI–Antigravity CLI exchange. Both messages,
-client versions, delivery mode and receipt timeline are static HTML. An optional
-32-second replay follows the captured timestamps; its stop action restores the
-complete exchange. The caption identifies the sample API and omitted setup.
-The record is a build-time data source, with private native context excluded.
+The conversation starts at a random example, then shows all ten in shuffled
+order before reshuffling, with no immediate repeat at a round boundary. Another
+example advances that same queue. Each new story replaces both terminal skins. Nine are editorial examples drawn from the existing
+question, review, claim/release, intent, decision and handoff workflows. One uses the unchanged real
+Codex–Antigravity messages. Captions distinguish real messages from workflow
+examples; every terminal skin is an illustration, not a client screen recording.
+
+Each load chooses two different macOS/Windows/Linux chrome styles and two distinct
+light terminal palettes. Large client wordmarks identify Codex,
+Claude Code, Antigravity, Kimi Code, Grok Build and Gemini CLI. Window controls are
+decorative. Each pane keeps only its agent name, one short action/message and the
+ACC command. Capsules carry the actual command family, including claim, release,
+work and finish. Each side follows the same sequence: the terminal activates, a cursor streams
+the message progressively, the finished text receives a completion highlight,
+and its ACC command immediately travels to the peer. Typing duration follows
+message length (3–7.2 seconds). The outcome stays for three seconds. The loop pauses/resumes while in view, suspends when hidden,
+and respects explicit pause, manual steps and reduced motion. Mobile stacks
+compact terminal windows with vertical message motion. Versions and receipt logs
+stay out of the visual scene. The native messages remain readable in initial HTML;
+the private provenance and public capture source remain unchanged.
 
 Review reuses the research magnifier beside the copy at 210px (170px tablet),
 while handoff reuses the reports paper at 112px on the opposite side of a yellow
@@ -319,10 +334,12 @@ copy and disclosure behavior remains unchanged.
 
 ### Navigation and reading
 
-Every route shares the paired-C mark, ACC wordmark, navigation and footer.
+Every route shares the paired-C mark, ACC wordmark with its full product name
+beneath, navigation and footer. A standard light GitHub Star widget shows the live
+repository count in the desktop header and mobile menu.
 Guides, Integrations and Docs are direct links; native Reading exposes
 Comparisons, Research and Reports. Current reading sections also mark the
-Reading summary. At 700px, native Menu replaces desktop navigation. Every
+Reading summary. At 900px, native Menu replaces desktop navigation. Every
 section remains linked in initial HTML and the footer. Wide tables remain
 keyboard-scrollable; disclosures and ordinary links keep native behavior.
 

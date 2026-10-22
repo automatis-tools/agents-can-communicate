@@ -19,29 +19,11 @@
 .home-story h2 { font-size: 30px; line-height: 1.22; max-width: 22ch; margin-bottom: 18px; }
 .home-story p { max-width: 64ch; }
 .home-story .text-link { margin-top: 20px; }
-.home-conversation { display: grid; grid-template-columns: .82fr 1.18fr; gap: 72px; margin-top: 0; border-top: 1px solid var(--line); padding-top: 48px; }
-.conversation-lead h2 { max-width: 18ch; }
-.conversation-lead > p { color: var(--muted); }
-.recorded-exchange { min-width: 0; margin: 0; padding: 22px; border: 1px solid var(--line); border-radius: 6px; background: var(--paper); }
-.recording-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 15px; padding-bottom: 15px; border-bottom: 1px solid var(--line); font-size: 14px; }
-.recording-heading > span { color: var(--muted); font-size: 12px; }
-.recorded-message { margin-top: 21px; border-left: 3px solid var(--brand-blue); padding-left: 16px; }
-.recorded-antigravity { border-left-color: var(--brand-yellow); }
-.recorded-message > div { display: flex; flex-wrap: wrap; gap: 5px 14px; font-size: 12px; }
-.recorded-message > div > span { color: var(--muted); }
-.recorded-message pre { margin: 10px 0 0; padding: 0; border: 0; background: transparent; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 13px; line-height: 1.65; }
-.recording-timeline { list-style: none; margin: 21px 0 0; padding: 15px 0 0; border-top: 1px solid var(--line); }
-.tool-page .recording-timeline li { display: grid; grid-template-columns: 42px 1fr; gap: 10px; font-size: 12px; line-height: 1.6; margin-top: 6px; color: var(--muted); }
-.tool-page .recording-timeline li[data-current] { color: var(--ink); font-weight: 600; }
-.recording-time { color: var(--amber); font-variant-numeric: tabular-nums; }
-.recording-controls { margin-top: 16px; }
-.recording-replay { color: var(--accent); background: #fff; border: 1px solid var(--accent); border-radius: 4px; padding: 7px 12px; font-size: 13px; }
-.recording-replay:hover { background: var(--control-hover); }
-.recorded-exchange figcaption { border-top: 1px solid var(--line); padding-top: 14px; margin-top: 17px; color: var(--muted); font-size: 12px; }
-.tool-page .recorded-exchange figcaption p { font-size: 12px; line-height: 1.7; }
-.recorded-exchange details { margin-top: 7px; }
-.recorded-exchange summary { cursor: pointer; width: fit-content; color: var(--accent); }
-.recorded-exchange details p { margin-block: 9px; }
+.home-conversation { margin-top: 0; border-top: 1px solid var(--line); padding-top: 48px; }
+.conversation-lead { display: grid; grid-template-columns: .9fr 1.1fr; gap: 80px; align-items: start; margin-bottom: 32px; }
+.conversation-lead h2 { max-width: 21ch; }
+.conversation-lead p { color: var(--muted); }
+.conversation-lead .text-link { margin-top: 14px; }
 .home-review { display: grid; grid-template-columns: 210px minmax(0,1fr); gap: 72px; align-items: center; padding-block: 5px; }
 .home-review > div { max-width: 670px; }
 .home-review-art { width: 210px; margin: 0; }
@@ -106,8 +88,9 @@
  .tool-page p, .tool-page li { font-size: 15px; }
  .home-story { margin-top: 44px; }
  .home-story h2 { font-size: 26px; }
- .home-conversation { grid-template-columns: 1fr; gap: 28px; padding-top: 30px; margin-top: 0; }
- .recorded-exchange { padding: 18px; }
+ .home-conversation { padding-top: 30px; margin-top: 0; }
+ .conversation-lead { display: block; margin-bottom: 24px; }
+ .conversation-lead h2 { max-width: 23ch; }
  .home-review { display: flow-root; }
  .home-review-art { float: left; width: 84px; margin: 4px 20px 12px 0; }
  .home-review .review-detail { font-size: 14px; }

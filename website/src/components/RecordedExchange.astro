@@ -1,27 +1,68 @@
 ---
 import { validateRecording } from "../../lib/recording.mjs";
 import capture from "../data/recording.json";
-import { readableDate } from "../data/site";
+import scenarios from "../data/exchanges.json";
+import { getArticles } from "../lib/content";
 validateRecording(capture);
-const start = Date.parse(capture.capturedAt);
-const offset = (at: string) => Date.parse(at) - start;
-const clock = (at: string) => {
-  const seconds = Math.floor(offset(at) / 1000);
-  return `${Math.floor(seconds / 60).toString().padStart(2,"0")}:${(seconds % 60).toString().padStart(2,"0")}`;
-};
-const duration = Math.ceil(offset(capture.events.at(-1)!.at) / 1000);
+const [question, answer] = capture.messages;
+const examples = [{
+  id: "api-contract", title: "Ask the session that already knows",
+  from: "Codex", fromRole: "Frontend session", fromIntent: "Needs an API detail",
+  to: "Antigravity", toRole: "Backend session", toIntent: "Already has the context",
+  question: question.text, answer: answer.text, contextKey: "POST /accounts", contextValue: "email + password",
+  guide: "/guides/message-delivery/", evidence: "captured",
+  kind: "question", outboundCommand: "acc message", returnCommand: "acc reply", outcome: "The answer is back in Codex.",
+  stepOne: "Ask", stepTwo: "Reply", stepThree: "Continue",
+}, ...scenarios];
+const routes = new Set((await getArticles()).map(article => article.route));
+const fields = Object.keys(examples[0]);
+if (examples.length !== 10 || new Set(examples.map(example => example.id)).size !== examples.length
+  || examples.some(example => Object.keys(example).some(key => !fields.includes(key))
+    || fields.some(key => typeof example[key as keyof typeof example] !== "string" || !example[key as keyof typeof example])
+    || !routes.has(example.guide))) throw new Error("exchange example data contract failed");
+const initial = examples[0];
+const serialized = JSON.stringify(examples).replaceAll("<", "\\u003c");
 ---
-<figure class="recorded-exchange" id="recorded-exchange" data-recorded-exchange aria-label="Recorded ACC exchange">
-  <div class="recording-heading"><strong>Recorded exchange</strong><span>{duration} s excerpt</span></div>
-  {capture.messages.map(message => {
-    const client = capture.clients.find(client => client.id === message.client)!;
-    return <div class:list={["recorded-message", `recorded-${message.client}`]}><div><strong>{client.name} {client.version}</strong><span>{message.label}</span></div>
-      <pre data-recording-output data-recording-client={message.client}>{message.text}</pre></div>;
-  })}
-  <ol class="recording-timeline" aria-label="Captured delivery events">{capture.events.map(event => <li data-recording-at={offset(event.at)} data-recording-label={event.label} data-recording-kind={event.kind} data-recording-client={event.client}>
-    <span class="recording-time" title={event.at}>{clock(event.at)}</span><span>{event.label}</span></li>)}</ol>
-  <div class="recording-controls"><button type="button" class="recording-replay" data-recording-replay hidden>Replay exchange</button><p class="sr-only" role="status" data-recording-status>Full recorded exchange.</p></div>
-  <figcaption><p>ACC {capture.accVersion} · {capture.delivery} · {readableDate(capture.capturedAt.slice(0,10))}</p>
-    <details><summary>About this capture</summary><p>{capture.note}</p><a href="/assets/demo/exchange.json">Capture data</a> · <a href="/guides/message-delivery/">How delivery works</a></details>
-  </figcaption>
+<figure class="recorded-exchange" id="recorded-exchange" data-recorded-exchange data-phase="complete" data-stage="complete" aria-label="An API question between Codex and Antigravity">
+  <script type="application/json" is:inline data-exchange-scenarios set:html={serialized}/>
+  <div class="exchange-example-heading"><strong data-exchange-field="title">{initial.title}</strong><button type="button" data-exchange-next hidden>Another example <span aria-hidden="true">↻</span></button></div>
+  <div class="exchange-sessions">
+    <div class="exchange-window exchange-requester" data-exchange-terminal="from" data-platform="macos" data-palette="ice" data-agent="codex">
+      <div class="exchange-window-bar"><span class="window-dots" aria-hidden="true"><i></i><i></i><i></i></span><span class="terminal-shell" data-exchange-field="fromShell">Terminal — zsh</span><span class="window-controls" aria-hidden="true"><i>−</i><i>□</i><i>×</i></span></div>
+      <div class="exchange-window-content">
+        <div class="terminal-command" hidden><span data-exchange-field="fromPrompt">~/project %</span> <b data-exchange-field="fromCommand">codex</b></div>
+        <div class="terminal-agent"><span class="agent-glyph" data-exchange-field="fromGlyph" aria-hidden="true">›_</span><strong data-exchange-field="from">{initial.from}</strong><span class="terminal-ai">AI agent</span><span data-exchange-field="fromRole" hidden>{initial.fromRole}</span></div>
+        <span class="exchange-eyebrow" data-exchange-field="fromIntent" hidden>{initial.fromIntent}</span>
+        <blockquote class="exchange-question"><div class="exchange-message-byline"><span class="agent-writing" data-exchange-field="fromWriting">Codex writing…</span><span class="agent-authored" data-exchange-field="fromAuthor">Codex</span><code class="exchange-message-label" data-exchange-field="questionLabel">{initial.outboundCommand}</code></div><p data-exchange-field="question">{initial.question}</p></blockquote>
+        <div class="exchange-received"><svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="m5 10 3 3 7-7"/></svg><span data-exchange-field="outcome">{initial.outcome}</span></div>
+      </div>
+    </div>
+    <div class="exchange-bridge" aria-hidden="true">
+      <img src="/assets/acc-mark.svg" alt="" width="78" height="51"/>
+      <span class="exchange-bridge-name">ACC</span>
+      <div class="exchange-wire"><span class="exchange-packet packet-question"><b data-exchange-field="outboundCommand">{initial.outboundCommand}</b><span>→</span></span><span class="exchange-packet packet-answer"><span>←</span><b data-exchange-field="returnCommand">{initial.returnCommand}</b></span></div>
+    </div>
+    <div class="exchange-window exchange-responder" data-exchange-terminal="to" data-platform="windows" data-palette="cream" data-agent="antigravity">
+      <div class="exchange-window-bar"><span class="window-dots" aria-hidden="true"><i></i><i></i><i></i></span><span class="terminal-shell" data-exchange-field="toShell">PowerShell</span><span class="window-controls" aria-hidden="true"><i>−</i><i>□</i><i>×</i></span></div>
+      <div class="exchange-window-content">
+        <div class="terminal-command" hidden><span data-exchange-field="toPrompt">PS C:\work\project&gt;</span> <b data-exchange-field="toCommand">agy</b></div>
+        <div class="terminal-agent"><span class="agent-glyph" data-exchange-field="toGlyph" aria-hidden="true">∧</span><strong data-exchange-field="to">{initial.to}</strong><span class="terminal-ai">AI agent</span><span data-exchange-field="toRole" hidden>{initial.toRole}</span></div>
+        <span class="exchange-eyebrow" data-exchange-field="toIntent" hidden>{initial.toIntent}</span>
+        <div class="exchange-contract" hidden><code data-exchange-field="contextKey">{initial.contextKey}</code><span data-exchange-field="contextValue">{initial.contextValue}</span></div>
+        <blockquote class="exchange-answer"><div class="exchange-message-byline"><span class="agent-writing" data-exchange-field="toWriting">Antigravity writing…</span><span class="agent-authored" data-exchange-field="toAuthor">Antigravity</span><code class="exchange-message-label" data-exchange-field="answerLabel">{initial.returnCommand}</code></div><p data-exchange-field="answer">{initial.answer}</p></blockquote>
+      </div>
+    </div>
+  </div>
+  <div class="exchange-controls" data-exchange-controls hidden>
+    <div class="exchange-steps" aria-label="Exchange steps">
+      <button type="button" data-exchange-step="question"><span>01</span><b data-exchange-field="stepOne">{initial.stepOne}</b></button>
+      <span class="exchange-step-line" aria-hidden="true"></span>
+      <button type="button" data-exchange-step="reply"><span>02</span><b data-exchange-field="stepTwo">{initial.stepTwo}</b></button>
+      <span class="exchange-step-line" aria-hidden="true"></span>
+      <button type="button" data-exchange-step="complete" aria-current="step"><span>03</span><b data-exchange-field="stepThree">{initial.stepThree}</b></button>
+    </div>
+    <button class="exchange-play" type="button" data-exchange-play>Play</button>
+  </div>
+  <p class="sr-only" data-exchange-status>Answer received.</p>
+  <figcaption><span><span data-exchange-field="evidence">Real messages. Illustrated demo.</span><span class="human-relay-note"> · No manual relay</span></span><a data-exchange-field="guide" href={initial.guide}>Explore this workflow <span aria-hidden="true">↗</span></a></figcaption>
 </figure>

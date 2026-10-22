@@ -33,3 +33,30 @@ src/data/recording.json supplies both the static transcript component and a
 prerendered JSON download. Its public schema rejects native owner context and
 credentials before output promotion. Raw capture evidence stays private; this
 record demonstrates one explicit-inbox exchange, not a comparative benchmark.
+
+The scene animates selected delivery facts with explicitly shortened timing; the
+source timestamps remain unchanged. Its single-timer loop suspends with remaining time when leaving view or
+backgrounding, respects a user pause, and cancels playback on manual steps or
+reduced-motion changes. The shared header
+uses the pinned, licensed GitHub Buttons script from local assets. The widget
+loads its public count from GitHub and retains an ordinary repository link as its
+progressive fallback. No ACC runtime dependency is added.
+
+Nine curated workflow examples join the captured-message example as a safely
+serialized inline JSON collection. Initial HTML retains the captured transcript;
+progressive script chooses one coherent scenario and two distinct terminal styles
+per page load. Another example changes the selected conversation without mixing
+participants or messages. Guide destinations are checked against reviewed routes
+at build time. The visible-transcript guard excludes script data, so a JSON copy
+cannot conceal a missing no-JavaScript answer.
+
+The ten examples cover message/reply, review requests, claim/release, shared intent,
+decision acknowledgement and handoff. Each defines command labels, step names and
+an outcome. Nine beats separate terminal focus, streamed text, completion emphasis and
+command flight on both sides before the outcome pause. One cancellable timer
+handles both typing ticks and phase transitions; duration follows message length.
+
+A shuffled deck covers all ten stories before any repeat, including across
+automatic cycles and manual advances. A new story redraws both OS and palette
+pairs without reusing either terminal's previous skin. Story replacement occurs
+only after the reading/emphasis/flights/outcome sequence has completed.

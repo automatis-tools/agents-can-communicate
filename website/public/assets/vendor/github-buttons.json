@@ -1,0 +1,9 @@
+{
+  "package": "github-buttons",
+  "version": "2.33.1",
+  "source": "https://github.com/buttons/github-buttons",
+  "registry": "https://registry.npmjs.org/github-buttons/-/github-buttons-2.33.1.tgz",
+  "integrity": "sha512-T0yhQKV/qicsr4IH1Cwa7Oy0L9Q/nsG5m2OftH88+Sq9Ub+1chjnhl4D8bFN2RlB3s63IJv4zEqcF2vgO5TJiw==",
+  "sha256": "65885e88344a243132d0a5c62d9d69f74ce31364226e72cf5dfa8af665021d47",
+  "license": "BSD-2-Clause"
+}

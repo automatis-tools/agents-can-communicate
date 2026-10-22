@@ -35,7 +35,8 @@ h3 { font-size: 17px; font-weight: 600; line-height: 1.45; }
 .site-header { display: flex; align-items: center; gap: 28px; min-height: 73px; border-bottom: 1px solid var(--line); }
 .brand { display: flex; align-items: center; gap: 12px; color: var(--ink); text-decoration: none; white-space: nowrap; }
 .wordmark { font: 650 27px/1 var(--sans); letter-spacing: -.035em; color: var(--ink); text-decoration: none; }
-.brand-name { display: none; }
+.brand-type { display: flex; flex-direction: column; gap: 6px; padding-block: 12px; }
+.brand-name { font-size: 11px; line-height: 1.3; letter-spacing: .005em; color: var(--muted); }
 .brand-symbol { width: 52px; height: 34px; }
 .desktop-nav { display: flex; align-items: center; gap: 24px; margin-left: auto; font-size: 14px; }
 .desktop-nav > a { color: var(--ink); text-decoration: none; padding-block: 20px; }
@@ -46,7 +47,10 @@ h3 { font-size: 17px; font-weight: 600; line-height: 1.45; }
 .reading-menu nav { position: absolute; z-index: 20; top: 55px; right: 0; width: 190px; background: #fff; border: 1px solid var(--line); border-radius: 5px; padding: 8px 15px; }
 .reading-menu nav a { display: block; padding-block: 8px; }
 .header-actions { display: flex; align-items: center; gap: 24px; font-size: 14px; }
-.header-actions .github-link { color: var(--ink); text-decoration: none; }
+.github-star { display: inline-flex; align-items: center; min-width: 106px; min-height: 28px; line-height: 1; }
+.github-star > span { display: inline-flex !important; }
+.github-star > .github-button { display: inline-flex; align-items: center; min-height: 28px; padding: 4px 12px; border: 1px solid #d1d9e0; border-radius: 6px; color: var(--ink); font-size: 12px; font-weight: 600; text-decoration: none; background: #f6f8fa; }
+.github-star-mobile { display: none; }
 .search-link { display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 36px; color: var(--ink); }
 .button { display: inline-flex; align-items: center; justify-content: center; gap: 10px; min-height: 44px; padding: 7px 20px; border: 1px solid var(--brand-blue); border-radius: 7px; color: #fff; background: var(--brand-blue); font-size: 14px; font-weight: 500; text-decoration: none; }
 .button:hover { background: var(--accent-hover); border-color: var(--accent-hover); color: #fff; }
@@ -55,7 +59,7 @@ h3 { font-size: 17px; font-weight: 600; line-height: 1.45; }
 .quiet-link { color: var(--muted); font-size: 14px; }
 .mobile-nav { display: none; }
 .mobile-nav summary { cursor: pointer; font-size: 14px; padding-block: 12px; }
-.mobile-nav nav { position: absolute; z-index: 20; right: 20px; top: 65px; width: min(310px, calc(100% - 40px)); padding: 14px 20px; border: 1px solid var(--line); border-radius: 5px; background: #fff; }
+.mobile-nav nav { position: absolute; z-index: 20; right: 20px; top: 74px; width: min(310px, calc(100% - 40px)); padding: 14px 20px; border: 1px solid var(--line); border-radius: 5px; background: #fff; }
 .mobile-nav nav a { display: block; padding-block: 9px; }
 .site-footer { margin-top: 55px; padding-block: 25px; font-size: 13px; color: var(--muted); }
 .footer-links { display: flex; flex-wrap: wrap; gap: 8px 20px; border-top: 1px solid var(--line); padding-top: 20px; }
@@ -75,19 +79,30 @@ pre:has(.code-copy) { padding-top: 46px; }
 .code-copy:hover { color: var(--accent); background: var(--control-hover); }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
 @media (max-width: 1000px) {
-  .brand-name { display: none; }
   .site-header { gap: 20px; }
-  .desktop-nav { gap: 20px; }
+  .desktop-nav { gap: 16px; }
+  .header-actions { gap: 16px; }
+}
+@media (max-width: 900px) {
+  .desktop-nav, .github-star-desktop { display: none; }
+  .header-actions { margin-left: auto; }
+  .mobile-nav { display: block; }
+  .mobile-nav nav .github-star-mobile { display: flex; margin-block: 12px 4px; }
+  .mobile-nav nav .github-button { padding-block: 4px; }
 }
 @media (max-width: 700px) {
   .shell { width: calc(100% - 40px); }
-  .site-header { min-height: 65px; }
-  .desktop-nav, .header-actions .github-link { display: none; }
-  .header-actions { margin-left: auto; gap: 20px; }
-  .mobile-nav { display: block; }
+  .site-header { min-height: 74px; gap: 12px; }
+  .brand { gap: 9px; }
+  .brand-symbol { width: 42px; height: auto; }
+  .wordmark { font-size: 25px; }
+  .brand-type { gap: 4px; }
+  .brand-name { font-size: 10px; }
+  .header-actions { gap: 12px; }
   .site-footer { margin-top: 37px; padding-top: 0; }
   .footer-note { font-size: 13px; }
 }
+@media (max-width: 350px) { .header-actions > .search-link { display: none; } }
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
   *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }

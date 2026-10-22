@@ -57,38 +57,145 @@ for (const table of document.querySelectorAll(".table-scroll")) {
 
 const recording = document.querySelector("[data-recorded-exchange]");
 if (recording) {
-  const button = recording.querySelector("[data-recording-replay]");
-  const status = recording.querySelector("[data-recording-status]");
-  const outputs = [...recording.querySelectorAll("[data-recording-output]")];
-  const steps = [...recording.querySelectorAll("[data-recording-at]")];
-  const original = new Map(outputs.map(output => [output.dataset.recordingClient, output.textContent]));
-  let timers = [], playing = false;
-  const showFull = () => {
-    timers.forEach(clearTimeout); timers = []; playing = false;
-    outputs.forEach(output => { output.textContent = original.get(output.dataset.recordingClient); output.style.minHeight = ""; });
-    steps.forEach(step => step.toggleAttribute("data-current", false));
-    button.textContent = "Replay exchange";
-    status.textContent = "Full recorded exchange.";
+  const button = recording.querySelector("[data-exchange-play]");
+  const controls = recording.querySelector("[data-exchange-controls]");
+  const status = recording.querySelector("[data-exchange-status]");
+  const steps = [...recording.querySelectorAll("[data-exchange-step]")];
+  const motion = window.matchMedia("(prefers-reduced-motion: reduce)");
+  const phases = ["question-focus", "question-type", "question-done", "question-send", "reply-focus", "reply-type", "reply-done", "reply-send", "complete"];
+  const durations = [700, 3000, 600, 1800, 700, 3000, 600, 1800, 3000];
+  const stages = ["question", "question", "question", "question", "reply", "reply", "reply", "reply", "complete"];
+  let actors = ["Codex", "Antigravity"], examples = [], selected = -1, deck = [], previousPlatforms = [], previousColors = [];
+  const source = recording.querySelector("[data-exchange-scenarios]");
+  try { examples = JSON.parse(source?.textContent ?? "[]"); } catch { /* Static example remains available. */ }
+  const field = key => recording.querySelector('[data-exchange-field="' + key + '"]');
+  let messages = { question: Array.from(field("question").textContent), answer: Array.from(field("answer").textContent) };
+  const rememberMessages = () => {
+    for (const key of ["question", "answer"]) {
+      const element = field(key); messages[key] = Array.from(element.textContent);
+      element.style.minHeight = "";
+      element.style.minHeight = (element.scrollHeight || element.getBoundingClientRect().height) + "px";
+    }
+    durations[1] = Math.max(3000, Math.min(7200, messages.question.length * 32));
+    durations[5] = Math.max(3000, Math.min(7200, messages.answer.length * 32));
+    recording.style.setProperty("--question-duration", durations.slice(0,4).reduce((a,b) => a+b,0) + "ms");
+    recording.style.setProperty("--reply-duration", durations.slice(4,8).reduce((a,b) => a+b,0) + "ms");
   };
-  button.hidden = false;
-  button.addEventListener("click", () => {
-    if (playing || window.matchMedia("(prefers-reduced-motion: reduce)").matches) { showFull(); return; }
-    showFull(); playing = true; button.textContent = "Show full exchange";
-    status.textContent = "Replaying captured delivery events.";
-    outputs.forEach(output => { output.style.minHeight = output.getBoundingClientRect().height + "px"; output.textContent = ""; });
-    steps.forEach((step, index) => timers.push(setTimeout(() => {
-      steps.forEach(item => item.toggleAttribute("data-current", item === step));
-      if (step.dataset.recordingKind === "recorded") {
-        const output = outputs.find(item => item.dataset.recordingClient === step.dataset.recordingClient);
-        output.textContent = original.get(step.dataset.recordingClient);
+  const platforms = ["macos", "windows", "linux"], palettes = ["ice", "cream", "mint", "rose"];
+  const shells = { macos: ["Terminal — zsh", "~/project %"], windows: ["PowerShell", "PS C:\\work\\project>"], linux: ["Terminal — bash", "dev@local:~/project$"] };
+  const agents = { "Codex": ["codex", "›_"], "Claude Code": ["claude", "✳"], "Antigravity": ["agy", "∧", "antigravity"], "Kimi Code": ["kimi", "K"], "Grok Build": ["grok", "G"], "Gemini CLI": ["gemini", "✦"] };
+  const pair = (values, previous) => {
+    const options = values.flatMap(left => values.filter(right => left !== right && left !== previous[0] && right !== previous[1]).map(right => [left, right]));
+    return options[Math.floor(Math.random() * options.length)];
+  };
+  const showExample = choice => {
+    selected = choice;
+    const example = examples[choice]; actors = [example.from, example.to];
+    for (const key of ["title", "from", "fromRole", "fromIntent", "to", "toRole", "toIntent", "question", "answer", "contextKey", "contextValue", "outboundCommand", "returnCommand", "outcome", "stepOne", "stepTwo", "stepThree"]) field(key).textContent = example[key];
+    rememberMessages();
+    field("questionLabel").textContent = example.outboundCommand;
+    field("answerLabel").textContent = example.returnCommand;
+    field("evidence").textContent = example.evidence === "captured" ? "Real messages. Illustrated demo." : "Workflow example. Illustrated demo.";
+    field("guide").href = example.guide;
+    recording.dataset.example = example.id; recording.dataset.kind = example.kind;
+    recording.setAttribute("aria-label", example.title + ": " + example.from + " and " + example.to);
+    const operatingSystems = pair(platforms, previousPlatforms), colors = pair(palettes, previousColors);
+    previousPlatforms = operatingSystems; previousColors = colors;
+    for (const [index, side] of ["from", "to"].entries()) {
+      const terminal = recording.querySelector('[data-exchange-terminal="' + side + '"]');
+      terminal.dataset.platform = operatingSystems[index]; terminal.dataset.palette = colors[index];
+      const [command, glyph, identity = command] = agents[actors[index]];
+      const author = actors[index].replace(/ (Code|CLI|Build)$/, "");
+      field(side + "Writing").textContent = author + " writing…";
+      field(side + "Author").textContent = author;
+      terminal.dataset.agent = identity;
+      field(side + "Shell").textContent = shells[operatingSystems[index]][0];
+      field(side + "Prompt").textContent = shells[operatingSystems[index]][1];
+      field(side + "Command").textContent = command; field(side + "Glyph").textContent = glyph;
+    }
+  };
+  const nextExample = () => {
+    if (!deck.length) deck = examples.map((_, index) => index);
+    let draw = Math.floor(Math.random() * deck.length);
+    if (deck.length > 1 && deck[draw] === selected) draw = (draw + 1 + Math.floor(Math.random() * (deck.length - 1))) % deck.length;
+    showExample(deck.splice(draw, 1)[0]);
+  };
+  let timer, index = 0, remaining = 0, started = 0, running = false, userPaused = false, inView = false;
+  const phase = (value, readable = false) => {
+    recording.dataset.phase = phases[value]; recording.dataset.stage = stages[value];
+    for (const step of steps) {
+      if (step.dataset.exchangeStep === stages[value]) step.setAttribute("aria-current", "step");
+      else step.removeAttribute("aria-current");
+    }
+    for (const key of ["question", "answer"]) {
+      const side = key === "question" ? "question" : "reply";
+      const starting = phases[value] === side + "-focus" || phases[value] === side + "-type";
+      const waiting = key === "answer" && stages[value] === "question";
+      const empty = !readable && stages[value] !== "complete" && (waiting || starting);
+      field(key).textContent = empty ? "" : messages[key].join("");
+    }
+    const example = examples[selected];
+    status.textContent = example ? (stages[value] === "complete" ? example.outcome : actors[stages[value] === "question" ? 0 : 1] + " · " + (stages[value] === "question" ? example.outboundCommand : example.returnCommand)) : "Answer received.";
+  };
+  const typing = () => phases[index].endsWith("-type");
+  const queue = () => {
+    started = performance.now();
+    timer = setTimeout(() => {
+      remaining = Math.max(0, remaining - (performance.now() - started));
+      if (typing()) {
+        const key = stages[index] === "question" ? "question" : "answer";
+        const count = Math.floor(messages[key].length * (1 - remaining / durations[index]));
+        field(key).textContent = messages[key].slice(0,count).join("");
       }
-      status.textContent = step.dataset.recordingLabel;
-      if (index === steps.length - 1) {
-        playing = false; button.textContent = "Replay exchange";
-        status.textContent = "Replay complete. Full recorded exchange.";
+      if (!remaining) {
+        if (index === phases.length - 1 && examples.length > 1) nextExample();
+        index = (index + 1) % phases.length; remaining = durations[index]; phase(index);
       }
-    }, Number(step.dataset.recordingAt))));
+      queue();
+    }, typing() ? Math.min(50, remaining) : remaining);
+  };
+  const pause = () => {
+    if (!running) return;
+    clearTimeout(timer); remaining = Math.max(0, remaining - (performance.now() - started));
+    running = false; recording.dataset.playback = "paused"; button.textContent = "Play";
+  };
+  const play = () => {
+    if (motion.matches || document.hidden) return;
+    if (recording.dataset.playback !== "paused") { index = 0; remaining = durations[0]; phase(0); }
+    running = true; recording.dataset.playback = "playing"; button.textContent = "Pause"; queue();
+  };
+  if (examples.length) nextExample(); else rememberMessages();
+  const another = recording.querySelector("[data-exchange-next]");
+  another.hidden = examples.length < 2;
+  another.addEventListener("click", () => {
+    pause(); nextExample();
+    recording.dataset.playback = "step"; userPaused = false;
+    if (motion.matches) phase(phases.length - 1); else play();
   });
+  recording.dataset.playback = "step";
+  controls.hidden = false; button.hidden = motion.matches;
+  button.addEventListener("click", () => {
+    userPaused = running;
+    if (running) pause(); else play();
+  });
+  for (const step of steps) step.addEventListener("click", () => {
+    userPaused = true; pause(); index = { question: 0, reply: 4, complete: 8 }[step.dataset.exchangeStep]; remaining = durations[index];
+    phase(index, true); recording.dataset.playback = "step"; button.textContent = "Play";
+  });
+  motion.addEventListener("change", () => {
+    userPaused = true; pause(); phase(phases.length - 1); recording.dataset.playback = "step"; button.hidden = motion.matches;
+  });
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) pause(); else if (inView && !userPaused && !running) play();
+  });
+  if (typeof IntersectionObserver !== "undefined") {
+    new IntersectionObserver(entries => {
+      for (const entry of entries) {
+        inView = entry.isIntersecting && entry.intersectionRatio >= .45;
+        if (!inView) pause(); else if (!userPaused && !running) play();
+      }
+    }, { threshold: [0, .45] }).observe(recording);
+  }
 }
 
 function normalizeSearch(value) {
