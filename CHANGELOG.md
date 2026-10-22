@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- On macOS, Antigravity desktop TCP discovery asks `lsof` to avoid blocking
+  filesystem calls, so a stalled mount does not consume its discovery budget.
+  Linux discovery flags are unchanged.
+
 ## 0.11.1 — release candidate
 
 - A hook's cost no longer grows with everything its workspace ever held: each stored
