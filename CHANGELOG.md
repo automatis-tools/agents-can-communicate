@@ -1,5 +1,44 @@
 # Changelog
 
+## 0.12.1 — release candidate
+
+- New Codex chats no longer open in ACC's permission profile `acc-workspace`, which Codex
+  Desktop showed as a selected approval mode. From Codex 0.164.0, a command that ACC's rules
+  file allows runs outside the sandbox without the model asking, so ACC's commands do not
+  need the profile. ACC keeps it defined for a chat that selects it and selects
+  `default_permissions = ":workspace"`, Codex's own workspace mode, inside its block. An
+  update moves a config 0.12.0 set to the profile back. ACC still selects its profile on
+  Windows, with a foreign or edited rules file, and with Codex older than 0.164.0 (#329,
+  #330).
+- ACC recognises its own Codex entries after another program rewrote `config.toml` and
+  removed their comment markers. On the maintainer's machine that failed the 0.12.0 update,
+  and every ACC command answered `runtime unavailable` until it was resolved. Only entries
+  that hold exactly what ACC writes are adopted; anything else is refused or preserved as
+  before (#329, #330).
+- The Codex skill tells the agent to put ACC's wrapper first and alone in every ACC command,
+  reads and claims included (#330).
+- A mode line that was the last line of `config.toml`, with no newline, no longer blocks a
+  migration or an uninstall after Codex appended its hook trust entries (#330).
+- ACC verifies the daemon that Codex 0.164.0 starts with `--analytics-default-enabled`.
+  Before, a fresh-home `acc install` exited 4, status-time discovery found no Codex chats,
+  and doctor could not verify the service while no chat was loaded (#331, #332).
+
+| Candidate artifact | Value |
+|---|---|
+| Built from | `1b808989fc083b874dfd0223571e4098df34d2c6` |
+| Tarball | `agents-can-communicate-0.12.1.tgz`, 618,877 bytes, 379 files |
+| sha256 | `83de5dbb0c0b8ce8f8648a2cf012a2e5032d3188a21ccbb386198cce11bd25d7` |
+
+The exact archive passed package verification and an upgrade from published 0.12.0 in two
+setups. With detection shims, its own updater activated this archive while the old MCP
+process stayed alive, the held question was answered afterwards, and all 379 archive files
+were installed with the same bytes. With real Codex 0.164.0, the update moved a config
+0.12.0 had set to `acc-workspace` to `:workspace`, and a sandboxed Codex chat sent and
+claimed through the rules file before and after. Separately packed source passed 24
+managed-update checks, and two real-client model-stub checks with Claude Code 2.1.310 and
+Codex 0.164.0. See [release evidence](docs/release-evidence/v0.12.1.md). This candidate is
+not published.
+
 ## Unreleased — ACC's Codex profile is available, not the default
 
 - New Codex chats no longer open in ACC's permission profile `acc-workspace`. Codex Desktop
