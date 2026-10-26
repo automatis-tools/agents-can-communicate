@@ -1,5 +1,20 @@
 # Changelog
 
+## Unreleased — Awesome Claude Code badge
+
+- The README shows the Awesome Claude Code badge, since ACC is listed there (#289).
+
+| Development artifact | Value |
+|---|---|
+| Built from | `359cda0ca0cfabe5dc4d741104dbf2c0860cf4d9` |
+| Tarball | `agents-can-communicate-0.11.1.tgz`, 610,989 bytes, 376 files |
+| sha256 | `0426c47836dde9174c9270025dbaf71a86b203d29d005a6597ad75fba4a8f7e1` |
+
+The exact archive passed package verification. See
+[development evidence](docs/release-evidence/unreleased-awesome-badge.md).
+This is not a published release; the package version remains `0.11.1`.
+The earlier candidate and release records below retain their original provenance.
+
 ## 0.11.1 — release candidate
 
 - A hook's cost no longer grows with everything its workspace ever held: each stored
