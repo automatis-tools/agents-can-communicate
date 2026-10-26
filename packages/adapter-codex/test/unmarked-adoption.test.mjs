@@ -266,3 +266,24 @@ test("an unmarked profile without all of ACC's grant tables stays the user's", a
     assert.ok((await f.read()).includes(profile), `uninstall removed the user's profile:\n${profile}`);
   }
 });
+
+// A receiver socket is one ACC grants, but ACC never wrote a profile without
+// Codex's own control socket.
+test("an unmarked profile without Codex's control socket stays the user's", async t => {
+  const f = await fixture(t);
+  f.context.receiverSockets = ["/private/tmp/acc-test-receiver.sock"];
+  const rewritten = await rewrittenInstall(f);
+  assert.match(rewritten, /^"\/private\/tmp\/acc-test-receiver\.sock" = "allow"$/m);
+  const changed = rewritten.replace(/^"[^"\n]*app-server-control\.sock" = "allow"\n/m, "");
+  assert.notEqual(changed, rewritten);
+  await f.write(changed);
+  const profile = changed.slice(changed.indexOf("[permissions.acc-workspace]"))
+    .split(/\n(?=\[(?!permissions\.acc-workspace))/)[0];
+
+  const result = await f.adapter.install(f.context);
+  assert.ok((await f.read()).includes(profile), `the user's profile changed:\n${profile}`);
+  assert.ok(result.diagnostics.some(line => /custom permission policy was preserved/.test(line)),
+    result.diagnostics.join("\n"));
+  await f.adapter.uninstall(f.context);
+  assert.ok((await f.read()).includes(profile), `uninstall removed the user's profile:\n${profile}`);
+});

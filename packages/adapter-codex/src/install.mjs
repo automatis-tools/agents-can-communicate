@@ -12,7 +12,8 @@ import { AccError, EXIT } from "@agents-can-communicate/protocol";
 import { inspectAllowRule, removeAllowRule, ruleAllowsCommands, ruleApplies, rulesPath, writeAllowRule }
   from "./allow-rule.mjs";
 import { inspectConfig, readConfig, sandboxOwnership, writeTomlBlock } from "./config-block.mjs";
-import { outgoingStatus, prepareLivePermissions, removeLivePermissions, sockets } from "./live-permissions.mjs";
+import { controlSocket, grantPath, outgoingStatus, prepareLivePermissions, removeLivePermissions, sockets }
+  from "./live-permissions.mjs";
 import { adoptUnmarked } from "./unmarked-adoption.mjs";
 
 // Kept cohesive above 300 lines because Codex plugin install, cache, config,
@@ -171,6 +172,10 @@ const sandboxReview = (config, file, stateRoot) =>
       + "your existing sandbox configuration was preserved"]
     : [];
 
+// The sockets an unmarked profile may grant to be ACC's, and the one it must.
+const adoptionGrants = context => ({ sockets: sockets(context),
+  controlSocket: grantPath(controlSocket(context)) });
+
 export async function installCodexPlugin({ home, agentsHome = home,
   codexHome = path.join(home, ".codex"), dataHome, stateRoot, runner, node, cli, keepPreviousVersion = null,
   requestedLivePolicy, livePolicy, clientVersion, platform, receiverSockets,
@@ -186,7 +191,7 @@ export async function installCodexPlugin({ home, agentsHome = home,
   // never forms, and the plugin sat there listed and not installed.
   const config = configPath(codexHome);
   const before = adoptUnmarked(await readConfig(config), { marketplaceRoot: marketplaceRoot(agentsHome),
-    stateRoot, sockets: sockets({ home, codexHome, receiverSockets }) }).source;
+    stateRoot, ...adoptionGrants({ home, codexHome, receiverSockets }) }).source;
   const foreign = inspectConfig(before, config);
   // Preflight before touching installed files: a duplicate table makes Codex
   // refuse the config, and ambiguous ownership must never delete client state.
@@ -290,7 +295,7 @@ export async function preflightCodexUninstall({ home, agentsHome = home,
   });
   // ACC's own entries whose markers a rewrite removed go with the rest (#329).
   const adopted = adoptUnmarked(before, { marketplaceRoot: marketplaceRoot(agentsHome), stateRoot,
-    sockets: sockets({ home, codexHome, receiverSockets }) }).source;
+    ...adoptionGrants({ home, codexHome, receiverSockets }) }).source;
   const permissions = removeLivePermissions(inspectConfig(adopted, configPath(codexHome)).source);
   return { existing, before, withoutOurs: permissions.source, permissionState: permissions.state };
 }

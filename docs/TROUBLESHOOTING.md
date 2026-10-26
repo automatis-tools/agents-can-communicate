@@ -301,7 +301,7 @@ marks them again on the next install or update:
   `[plugins."agents-can-communicate@acc-local"]` holding only `enabled = true`; neither is
   taken without the other;
 - the `acc-workspace` profile with all of ACC's grants and nothing else: the state directory,
-  network access, and sockets ACC delivers to now. Its selection, `default_permissions = "acc-workspace"`
+  network access, and sockets ACC delivers to now, Codex's own control socket among them. Its selection, `default_permissions = "acc-workspace"`
   or `":workspace"`, goes with it.
 
 A comment you added among those entries stays. If the message stays, one of those entries

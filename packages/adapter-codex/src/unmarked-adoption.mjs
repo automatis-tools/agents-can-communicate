@@ -39,7 +39,7 @@ export function adoptUnmarked(source, context) {
 // An ACC marker ends a table's span, so adoption never takes a marked block apart.
 const MARKER = /^# (>>> agents-can-communicate|<<< agents-can-communicate|ACC native permissions )/;
 
-function adopt(source, { marketplaceRoot, stateRoot, sockets = [] }) {
+function adopt(source, { marketplaceRoot, stateRoot, sockets = [], controlSocket = null }) {
   const entries = scanConfig(source);
   const spans = [];
   // A headed table and everything up to the next header or ACC marker. Its
@@ -93,11 +93,13 @@ function adopt(source, { marketplaceRoot, stateRoot, sockets = [] }) {
     // Another setting that names the profile would be left naming none.
     const named = entries.some(entry => entry.code && !entry.header && entry !== selection
       && literal(entry.value) === PROFILE);
-    // Every ACC that wrote the profile wrote all four tables, with at least
-    // Codex's own socket; a profile of that name without them is the user's.
+    // Every ACC that wrote the profile wrote all four tables, Codex's own
+    // control socket among its sockets; a profile of that name without them is
+    // the user's, even when the sockets it does grant are ACC's receivers.
     const ours = !named && within(["permissions", PROFILE], tables) && exactly(root, { extends: ":workspace" })
       && exactly(filesystem, { [stateRoot]: "write" }) && exactly(network, { enabled: true })
-      && socketTable !== null && socketTable.body.length > 0 && socketTable.body.every(entry =>
+      && socketTable !== null && socketTable.body.some(entry => entry.keys.at(-1) === controlSocket)
+      && socketTable.body.every(entry =>
         direct(socketTable, entry) && granted.has(entry.keys.at(-1)) && literal(entry.value) === "allow");
     if (ours) {
       spans.push(...tables.filter(found => found !== null).flatMap(found => found.spans));
