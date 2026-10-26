@@ -31,9 +31,9 @@
 
 | Development artifact | Value |
 |---|---|
-| Built from | `91ffa77648b5fd85d5003a0d29b8f22ff57bdac1` |
-| Tarball | `agents-can-communicate-0.12.0.tgz`, 618,745 bytes, 379 files |
-| sha256 | `1dd4345c36061eead55235c7f71150953b68e8563a86cf6b0ee6f1e9c4afea44` |
+| Built from | `2a0ede89301a9c8bee51e85147ac5da6005eb612` |
+| Tarball | `agents-can-communicate-0.12.0.tgz`, 618,878 bytes, 379 files |
+| sha256 | `979b83cf35ab4936d50ef5bae104e01b700d00880c4f7aec07cc473e4e9c1070` |
 
 The exact archive passed package verification. See
 [development evidence](docs/release-evidence/unreleased-codex-profile-not-default.md).
