@@ -47,6 +47,12 @@ test("windows: the daemon is the managed codex.exe that started when its record 
   const { paths, command } = await daemonHome(t);
   const snapshot = { pid: 3592, processStartTime: STARTED };
   await verifyMaintenanceProcess(snapshot, paths, null, { system: seeing({ cmd: command }) });
+  // 0.164.0 adds a launch option before `--managed-daemon` (#331, measured on macOS).
+  await verifyMaintenanceProcess(snapshot, paths, null, { system: seeing({
+    cmd: command.replace(" --managed-daemon", " --analytics-default-enabled --managed-daemon") }) });
+  await assert.rejects(verifyMaintenanceProcess(snapshot, paths, null,
+    { system: seeing({ cmd: command.replace(" --managed-daemon", " extra --managed-daemon") }) }),
+  { reasonCode: "daemon_identity_unavailable" });
   await assert.rejects(verifyMaintenanceProcess(snapshot, paths, null,
     { system: seeing({ cmd: command, start: "134353058576369150" }) }), { reasonCode: "daemon_identity_unavailable" });
   await assert.rejects(verifyMaintenanceProcess(snapshot, paths, null,
