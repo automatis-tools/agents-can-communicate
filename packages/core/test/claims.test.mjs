@@ -90,6 +90,40 @@ test("renewal requires the exact owner generation", async () => {
   error => error.code === EXIT.CONFLICT);
 });
 
+test("a lapsed claim cannot be renewed once another session holds the resource", async () => {
+  const { service, clock } = makeService();
+  const { first, second } = await twoSessions(service);
+  const lapsed = await service.acquireClaim(claiming(first, { leaseSeconds: 1 }));
+  clock.advance(2_000);
+  const taken = await service.acquireClaim(claiming(second));
+
+  await assert.rejects(service.renewClaim({ claimId: lapsed.claimId,
+    sessionId: first.sessionId, generation: first.generation, leaseSeconds: 600 }),
+  error => error.code === EXIT.CONFLICT
+    && error.message === `claim ${lapsed.claimId} has lapsed; acquire the resource again`
+    && error.details.resource === RESOURCE && error.details.expiresAt === lapsed.expiresAt);
+
+  const live = (await service.collectStatus({ workspaceId: WORKSPACE })).claims
+    .filter(claim => claim.resource === RESOURCE
+      && Date.parse(claim.expiresAt) > Date.parse(clock.now()));
+  assert.deepEqual(live.map(claim => claim.claimId), [taken.claimId]);
+});
+
+test("a claim is refused renewal at its exact expiry and taken back by acquiring it", async () => {
+  const { service, clock } = makeService();
+  const { first } = await twoSessions(service);
+  const claim = await service.acquireClaim(claiming(first, { leaseSeconds: 1 }));
+  clock.advance(1_000);
+
+  await assert.rejects(service.renewClaim({ claimId: claim.claimId,
+    sessionId: first.sessionId, generation: first.generation, leaseSeconds: 600 }),
+  error => error.code === EXIT.CONFLICT);
+
+  const again = await service.acquireClaim(claiming(first));
+  assert.equal(again.claimId, claim.claimId);
+  assert.equal(again.expiresAt, "2026-08-16T01:30:01.000Z");
+});
+
 test("a stale owner still blocks, and the conflict reports the staleness", async () => {
   const { service, clock } = makeService();
   const { first, second } = await twoSessions(service);
