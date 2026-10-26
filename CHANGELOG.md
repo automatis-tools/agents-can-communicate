@@ -1,5 +1,27 @@
 # Changelog
 
+## Unreleased — messages left for a session that ended
+
+- A message whose recipient has no session left is now reported to the other sessions in
+  the room. Before, nothing read it: a new session of the same client is another
+  participant and inherits no inbox, and the sender was told only while the message had an
+  obligation, which an answer never has (#320, from discussion #180). The new attention kind
+  `left_for_ended_session` names the message and the history read that shows it without a
+  change to its receipt. Each participant is told once, the sender never, for messages sent
+  in the last 7 days, 5 at most. A recipient whose session is only paused does not count.
+- Every agent skill and the protocol describe the new kind.
+
+| Development artifact | Value |
+|---|---|
+| Built from | `a7cf5cd935b4da8edcc5c546812a8d3b1181ec36` |
+| Tarball | `agents-can-communicate-0.11.1.tgz`, 612,694 bytes, 376 files |
+| sha256 | `184babc87c406585ac908fbd6f7330c29cb90191de6ca5d7678fec88a56bd8ed` |
+
+The exact archive passed package verification. See
+[development evidence](docs/release-evidence/unreleased-messages-for-ended-sessions.md).
+This is not a published release; the package version remains `0.11.1`.
+The earlier candidate and release records below retain their original provenance.
+
 ## 0.11.1 — release candidate
 
 - A hook's cost no longer grows with everything its workspace ever held: each stored
