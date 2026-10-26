@@ -31,6 +31,20 @@ test("a successful assertion cannot hold its file process open beyond the file d
   assert.match(result.stdout + result.stderr, /leaked-handle\.test\.mjs.*100 ms|100 ms.*leaked-handle\.test\.mjs/);
 });
 
+test("the file deadline names the resources that kept the file alive", async t => {
+  const root = await mkdtemp(path.join(tmpdir(), "acc-file-holders-"));
+  t.after(() => removeFixture(root));
+  const file = path.join(root, "held-by-server.test.mjs");
+  await writeFile(file, 'import net from "node:net";\nimport test from "node:test";\n'
+    + 'test("assertion passed", () => {});\nnet.createServer().listen(0, "127.0.0.1");\n');
+  const args = nodeTestArguments([file]).filter(argument => argument !== "--test-force-exit");
+  const result = await run(process.execPath, args, {
+    cwd: repo, env: environment({ ACC_TEST_FILE_TIMEOUT_MS: "300", ACC_TEST_FORCE_EXIT: "0" }), timeout: 10_000,
+  }).then(value => ({ ...value, code: 0 }), error => error);
+  assert.equal(result.code, 1);
+  assert.match(result.stdout + result.stderr, /kept alive by: .*TCPServerWrap/);
+});
+
 test("completed files exit naturally and do not wait for the watchdog", async t => {
   const root = await mkdtemp(path.join(tmpdir(), "acc-file-complete-"));
   t.after(() => removeFixture(root));
@@ -94,6 +108,34 @@ test("the parent deadline closes descendant-held pipes and terminates its test p
   while (await alive() && Date.now() < end) await new Promise(resolve => setTimeout(resolve, 20));
   assert.equal(await alive(), false, "deadline left its descendant running");
   descendant = 0;
+});
+
+// The spec reporter prints a failure's message only in its closing summary, and
+// the parent deadline kills the runner before that summary. A failed test whose
+// cleanup then holds the file open lost its reason (#318's ubuntu job, run
+// 39718605689). The fixture is not named *.test.mjs, so the in-file watchdog
+// cannot end it first and let the summary through: only the parent deadline acts.
+test("a failure stays visible when its file is terminated at the parent deadline", async t => {
+  const root = await mkdtemp(path.join(tmpdir(), "acc-failure-deadline-"));
+  t.after(() => removeFixture(root));
+  const file = path.join(root, "held-open-after-failure.mjs");
+  await writeFile(file, `import assert from "node:assert/strict";
+    import test from "node:test";
+    test("fails, then leaves a handle", () => {
+      setInterval(() => {}, 1000);
+      assert.equal(1, 2, "fixture assertion text");
+    });
+  `);
+  let output = "";
+  const result = await runTestBatch([file], { cwd: repo,
+    env: environment({ ACC_TEST_FILE_TIMEOUT_MS: "3000", ACC_TEST_FORCE_EXIT: "0" }),
+    report: path.join(root, "timings.jsonl"),
+    output: { write: chunk => { output += chunk; } }, errorOutput: { write: chunk => { output += chunk; } },
+  });
+  assert.equal(result.code, 1);
+  assert.match(output, /terminating test process tree/, "the parent deadline never acted");
+  assert.match(output, /fails, then leaves a handle/);
+  assert.match(output, /fixture assertion text/);
 });
 
 test("a batch applies its own per-test deadline instead of the parent's environment", async t => {

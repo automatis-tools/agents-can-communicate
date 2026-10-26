@@ -33,8 +33,12 @@ test("installed MCP routes with consent from its nondefault data home",
   const receiver = await service.openSession({ workspaceId: descriptor.id,
     participantId: "receiver", harness: "codex", heartbeatCadenceMs: 30_000 });
   const daemon = await controlledCodexDaemon(t, { cwd: packed.project });
+  // The hook's 750 ms bind budget is not under test here, and a loaded CI runner
+  // exceeded it against this in-process daemon: the bind came back unsupported
+  // and the test failed at this line (#323).
   const native = await bindNativeSession({ event: { sessionId: THREAD, cwd: packed.project },
-    clientPid: process.pid, clientVersion: "0.152.1", runtimeDir: paths.root, env: daemon.env });
+    clientPid: process.pid, clientVersion: "0.152.1", runtimeDir: paths.root, env: daemon.env,
+    timeoutMs: 10_000 });
   assert.equal(native.supported, true);
   await service.publishDeliveryBinding({ sessionId: receiver.sessionId, generation: receiver.generation,
     adapterId: "codex", clientVersion: "0.152.1", availableModes: ["livePush"], livePolicy: "all",
