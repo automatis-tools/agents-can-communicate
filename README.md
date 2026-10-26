@@ -2,6 +2,8 @@
 
 # Agents Can Communicate (ACC)
 
+[![Mentioned in Awesome Claude Code](https://awesome.re/mentioned-badge.svg)](https://github.com/hesreallyhim/awesome-claude-code)
+
 **The message your clients can’t send each other.**
 
 Claude Code can message your other Claude Code sessions, and Codex can queue a message for

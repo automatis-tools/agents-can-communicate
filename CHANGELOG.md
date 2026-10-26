@@ -20,6 +20,21 @@ The exact archive passed package verification. See
 This is not a published release; the package version remains `0.11.1`.
 The earlier candidate and release records below retain their original provenance.
 
+## Unreleased — Awesome Claude Code badge
+
+- The README shows the Awesome Claude Code badge, since ACC is listed there (#289).
+
+| Development artifact | Value |
+|---|---|
+| Built from | `c2dddad5a5c9d487d0f7a2f5fa02ad8732e49121` |
+| Tarball | `agents-can-communicate-0.11.1.tgz`, 611,323 bytes, 376 files |
+| sha256 | `e222d53d3bd81b012918c05e37ec6546b4e17e05bb24bc2e1dda9e8ccd4bc208` |
+
+The exact archive passed package verification. See
+[development evidence](docs/release-evidence/unreleased-awesome-badge.md).
+This is not a published release; the package version remains `0.11.1`.
+The earlier candidate and release records below retain their original provenance.
+
 ## Unreleased — a lapsed claim is acquired again
 
 - Renewing a claim whose lease has lapsed is refused with a conflict. Another session
