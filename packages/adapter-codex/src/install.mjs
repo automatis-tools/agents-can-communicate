@@ -375,9 +375,14 @@ export async function detectCodex({ home, agentsHome = home,
   const allowRule = published
     ? await inspectAllowRule({ codexHome, cliShim: path.join(pluginPath(agentsHome), "acc-cli.sh"), hostPlatform })
     : { state: "none", diagnostic: null };
-  const outgoingDelivery = outgoingStatus(config, { home, codexHome, stateRoot,
-    file: configPath(codexHome), clientVersion, platform, receiverSockets,
-    ruleAllowsCommands: allowRule.state === "allowed" });
+  const statusContext = { home, codexHome, stateRoot, file: configPath(codexHome), clientVersion,
+    platform, receiverSockets };
+  // The present state is judged by the rule that exists now; the setup note
+  // describes what an install would do, which writes the rule where it can.
+  const outgoingDelivery = { ...outgoingStatus(config,
+    { ...statusContext, ruleAllowsCommands: allowRule.state === "allowed" }),
+    setup: outgoingStatus(config, { ...statusContext, ruleAllowsCommands: await ruleAllowsCommands({ codexHome,
+      cliShim: path.join(pluginPath(agentsHome), "acc-cli.sh"), hostPlatform }) }).setup };
   // Saved trust is not readiness. Codex compares every current definition's
   // hash and can disable a trusted hook. Even a commented or stale single record
   // previously suppressed this check. Leave verification to Codex's /hooks;

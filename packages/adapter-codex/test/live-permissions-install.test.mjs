@@ -200,3 +200,11 @@ test("a rules file ACC cannot use keeps ACC's profile selected", async t => {
 
   assert.match(await f.read(), /^default_permissions = "acc-workspace"$/m);
 });
+
+test("the install preview describes what a rule-capable install will do", async t => {
+  const f = await fixture(t, 'model = "user-model"\n');
+  const detected = await f.adapter.detect({ ...f.context, clientVersion: "0.164.0" });
+
+  assert.match(detected.outgoingDelivery.setup, /rules file runs its commands outside the Codex sandbox/);
+  assert.doesNotMatch(detected.outgoingDelivery.setup, /default workspace settings gain/);
+});
