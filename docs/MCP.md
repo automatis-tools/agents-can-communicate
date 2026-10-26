@@ -128,6 +128,8 @@ normalization are rejected. A conflict changes no claims, including existing lea
 Batch error `details.conflicts` identifies each blocked requested resource and its holders.
 Repeating acquisition renews this session's existing claims on those resources.
 `action: "renew"` still accepts only one `claimId` and its optional lease.
+Renewing a lapsed claim is refused with a conflict; acquire the resource again, which
+reuses the lapsed record when the resource is still free.
 
 Release uses one mutually exclusive selector: `claimId`, a nonempty `claimIds` array,
 `resource`, a nonempty `resources` array, or `all: true`. For example,
