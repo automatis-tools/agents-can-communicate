@@ -1,5 +1,39 @@
 # Changelog
 
+## 0.12.0 — release candidate
+
+- A message left for a session that ended now reaches the rest of the room. A new
+  session of the same client is another participant and inherits no inbox, so an answer
+  to a session that had exited stayed queued, and nothing told anyone (#320, from
+  discussion #180). Every other participant, except the sender, is now told once with the
+  new attention kind `left_for_ended_session`. The notice names the message and the history
+  read that shows it without changing its receipt. It covers messages sent in the last
+  7 days, the 5 newest (#324).
+- Renewing a lapsed claim is refused with a conflict that names the claim's resource and
+  expiry. Before, renewal could leave two live exclusive claims on one file. Acquiring the
+  resource again reuses the lapsed record when the resource is still free (#295, #319).
+- On macOS, Antigravity desktop TCP discovery asks `lsof` to avoid blocking filesystem
+  calls, so a stalled mount does not consume its discovery budget (#318).
+- The README opens with ACC's linked mark, and the Codex plugin declares a logo, a
+  composer icon and the brand blue (#326). The README also shows the Awesome Claude Code
+  badge (#289, #321).
+- Development only, not in the package: test diagnostics that print a hanging file's
+  failure and the resources holding it, and the cleanup order that made one test hang on
+  CI (#322, #323, #327).
+
+| Candidate artifact | Value |
+|---|---|
+| Built from | `ef89cc06d6edc5cdfe50475706dff4ece0f5fdf9` |
+| Tarball | `agents-can-communicate-0.12.0.tgz`, 613,912 bytes, 378 files |
+| sha256 | `70b6288152a441ab64d63f407da96d4e92782797672513bef5e075dace9da6a8` |
+
+The exact archive passed package verification and an upgrade from published 0.11.1. Its
+own updater activated this archive while the old MCP process stayed alive. The question
+that process held was answered afterwards, and all 378 archive files were installed with
+the same bytes. Separately packed source passed 24 managed-update checks, and two
+real-client model-stub checks with Claude Code 2.1.310 and Codex 0.164.0.
+See [release evidence](docs/release-evidence/v0.12.0.md). This candidate is not published.
+
 ## Unreleased — Antigravity TCP discovery avoids blocking filesystem calls
 
 - On macOS, Antigravity desktop TCP discovery asks `lsof` to avoid blocking
