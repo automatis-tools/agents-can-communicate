@@ -1,5 +1,25 @@
 # Changelog
 
+## Unreleased — the linked ACC mark
+
+- The README opens with ACC's new mark: two open rings hooked into each other, the
+  same file getacc.dev serves, so GitHub and npm show one mark.
+- ACC's Codex plugin now declares a logo, a composer icon and the brand blue
+  `#3158C3`. Codex CLI 0.164.0 reports all three for the installed plugin, and both
+  icon paths resolve to the files the plugin carries. Before, the plugin declared
+  none of them.
+
+| Development artifact | Value |
+|---|---|
+| Built from | `f705f76f8a6782825d12be22971e18f44fee1321` |
+| Tarball | `agents-can-communicate-0.11.1.tgz`, 611,721 bytes, 378 files |
+| sha256 | `754a5dfedefb9a3296902520f3bfee74f97e4d571f65334c70ae7bb79a8ebdbf` |
+
+The exact archive passed package verification. See
+[development evidence](docs/release-evidence/unreleased-linked-mark.md).
+This is not a published release; the package version remains `0.11.1`.
+The earlier candidate and release records below retain their original provenance.
+
 ## Unreleased — a lapsed claim is acquired again
 
 - Renewing a claim whose lease has lapsed is refused with a conflict. Another session
