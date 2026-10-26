@@ -1,3 +1,4 @@
+import { inspectConfig } from "./config-block.mjs";
 import { inspectPermissions } from "./permission-ownership.mjs";
 import { scanConfig } from "./toml-scan.mjs";
 
@@ -19,15 +20,25 @@ const same = (keys, expected) => JSON.stringify(keys) === JSON.stringify(expecte
  * before. The adopted entries are removed, and install writes them again
  * under markers.
  */
-export function adoptUnmarked(source, { marketplaceRoot, stateRoot }) {
+export function adoptUnmarked(source, context) {
+  // Ambiguous TOML is reported by the ownership checks that follow, with the
+  // file it came from; adoption only ever acts on a config it can read.
+  try { return adopt(source, context); } catch { return { source, adopted: 0 }; }
+}
+
+// An ACC marker ends a table's span, so adoption never takes a marked block apart.
+const MARKER = /^# (>>> agents-can-communicate|<<< agents-can-communicate|ACC native permissions )/;
+
+function adopt(source, { marketplaceRoot, stateRoot }) {
   const entries = scanConfig(source);
   const spans = [];
-  // A headed table and everything up to the next header.
+  // A headed table and everything up to the next header or ACC marker.
   const table = keys => {
     const headers = entries.filter(entry => entry.header && same(entry.keys, keys));
     if (headers.length !== 1 || headers[0].array) return null;
     const start = headers[0].start;
-    const end = entries.find(entry => entry.header && entry.start > start)?.start ?? source.length;
+    const end = entries.find(entry => entry.start > start
+      && (entry.header || (!entry.code && MARKER.test(entry.raw.trim()))))?.start ?? source.length;
     const body = entries.filter(entry => entry.code && !entry.header && entry.start > start && entry.end <= end);
     return { keys, start, end, body };
   };
@@ -38,10 +49,13 @@ export function adoptUnmarked(source, { marketplaceRoot, stateRoot }) {
     && found.body.every(entry => direct(found, entry)
       && Object.hasOwn(expected, entry.keys.at(-1)) && literal(entry.value) === expected[entry.keys.at(-1)]);
 
-  const marketplace = table(["marketplaces", "acc-local"]);
-  if (exactly(marketplace, { source_type: "local", source: marketplaceRoot })) spans.push(marketplace);
-  const plugin = table(["plugins", "agents-can-communicate@acc-local"]);
-  if (exactly(plugin, { enabled: true })) spans.push(plugin);
+  // Only a registration the managed block does not hold: a marked one is ACC's already.
+  if (inspectConfig(source).registration) {
+    const marketplace = table(["marketplaces", "acc-local"]);
+    if (exactly(marketplace, { source_type: "local", source: marketplaceRoot })) spans.push(marketplace);
+    const plugin = table(["plugins", "agents-can-communicate@acc-local"]);
+    if (exactly(plugin, { enabled: true })) spans.push(plugin);
+  }
 
   if (inspectPermissions(source).state === "absent") {
     const tables = [["permissions", PROFILE], ["permissions", PROFILE, "filesystem"],
