@@ -131,9 +131,6 @@ export function createClaimService(ports, sessions) {
 
   async function renewClaim(input) {
     const session = await requireOwner(input, "renew");
-    const now = clock.now();
-    const expiresAt = new Date(Date.parse(now) + (input.leaseSeconds ?? 1800) * 1000)
-      .toISOString();
     let record = null;
     await store.transaction(async tx => {
       await requireOwner(input, "renew", tx);
@@ -142,6 +139,17 @@ export function createClaimService(ports, sessions) {
         throw new AccError(EXIT.CONFLICT, "only the owning session generation may renew a claim",
           { claimId: input.claimId });
       }
+      // A lapsed claim no longer holds its resource, so another session may
+      // have taken it since. Acquire repeats the conflict check and reuses
+      // the lapsed record when the resource is still free (#295). The clock
+      // is read inside the transaction, where the check and the write agree.
+      const now = clock.now();
+      if (!isLive(existing, now)) {
+        throw new AccError(EXIT.CONFLICT,
+          `claim ${input.claimId} has lapsed; acquire the resource again`, { claimId: input.claimId });
+      }
+      const expiresAt = new Date(Date.parse(now) + (input.leaseSeconds ?? 1800) * 1000)
+        .toISOString();
       record = { ...existing, expiresAt, generation: ids.next("generation") };
       tx.put("claim", input.claimId, record, tx.generationOf("claim", input.claimId));
       tx.append({ schemaVersion: SCHEMA_VERSION, eventId: ids.next("event"),

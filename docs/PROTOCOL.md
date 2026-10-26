@@ -50,6 +50,9 @@ after normalization are rejected. Mode, enforcement, reason, and lease apply to 
 batch. If any requested resource conflicts, no claim is created or renewed. Batch error
 `details.conflicts` lists the blocked requested resources and their blocking claims.
 A successful repeated acquisition renews the owner's existing claims on those resources.
+Renewal by claim id applies only to a live claim. A lapsed claim is refused with a conflict,
+because another session may hold its resource by then; acquiring the resource again
+repeats the conflict check and reuses the lapsed record when the resource is still free.
 
 Batch release selects claims by IDs, canonical resources, or the calling session's whole
 owned set. Exactly one selector family is accepted. Explicit selectors must be nonempty
