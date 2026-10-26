@@ -13,7 +13,8 @@ const READS = new Set(["lstat", "stat", "fstat", "realpath", "readdir", "scandir
   "readlink", "access"]);
 const accessOf = syscall => WRITES.has(syscall) ? "write" : READS.has(syscall) ? "read" : "access";
 // Windows refuses a rename or removal of a directory something still holds
-// open with EPERM: contention the lock retries, not a sandbox.
+// open with EPERM: contention the lock retries, not a sandbox. EACCES and EROFS
+// there are refusals like anywhere else.
 const WINDOWS_CONTENTION = new Set(["rename", "unlink", "rmdir", "rm"]);
 // What the launcher prints is ACC's own path, never a control record's bytes.
 const printable = value => typeof value === "string" && !/[\u0000-\u001f\u007f-\u009f]/.test(value);
@@ -33,7 +34,7 @@ export const DENIED_GUIDANCE = Object.freeze({
 export function admissionFailure(error, root = null, platform = process.platform) {
   if (!error || !DENIED.has(error.code)) return null;
   const syscall = typeof error.syscall === "string" ? error.syscall : null;
-  if (platform === "win32" && WINDOWS_CONTENTION.has(syscall)) return null;
+  if (platform === "win32" && error.code === "EPERM" && WINDOWS_CONTENTION.has(syscall)) return null;
   const known = typeof root === "string";
   if (typeof error.path === "string" && known && !within(error.path, root)) return null;
   const path = printable(error.path) ? error.path : known && printable(root) ? root : null;

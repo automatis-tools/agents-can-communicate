@@ -25,7 +25,8 @@ test("an admission the filesystem refuses is a denied state access, named by its
       { reasonCode: "state_access_denied", access: "write", code, syscall: "fchmod", path: "/data/acc/runtime" });
   }
   // The refused operation decides what the text calls it: a read is never a refused write.
-  const kind = syscall => admissionFailure(Object.assign(new Error("EACCES"), { code: "EACCES", syscall })).access;
+  // Linux, so the runner's own platform cannot change what a syscall is called.
+  const kind = syscall => admissionFailure(Object.assign(new Error("EACCES"), { code: "EACCES", syscall }), null, "linux").access;
   for (const syscall of ["mkdir", "fchmod", "rename", "unlink", "rmdir", "write", "fsync"]) assert.equal(kind(syscall), "write", syscall);
   for (const syscall of ["lstat", "stat", "realpath", "readdir", "read", "access"]) assert.equal(kind(syscall), "read", syscall);
   for (const syscall of ["open", undefined]) assert.equal(kind(syscall), "access", String(syscall));
@@ -54,6 +55,11 @@ test("an admission the filesystem refuses is a denied state access, named by its
   }
   assert.equal(admissionFailure(Object.assign(new Error("EPERM"), { code: "EPERM", syscall: "mkdir", path: "C:\\d\\acc\\runtime\\x" }),
     "C:\\d\\acc\\runtime", "win32")?.access, "write");
+  // Only EPERM is contention there: a removal refused with EACCES or EROFS is still a denial.
+  for (const code of ["EACCES", "EROFS"]) {
+    assert.equal(admissionFailure(Object.assign(new Error(code), { code, syscall: "unlink", path: "C:\\d\\acc\\runtime\\x" }),
+      "C:\\d\\acc\\runtime", "win32")?.access, "write", code);
+  }
   for (const error of [new Error("managed runtime activation in progress"),
     Object.assign(new Error("gone"), { code: "ENOENT", syscall: "open", path: "/x" }), null]) {
     assert.equal(admissionFailure(error), null);
