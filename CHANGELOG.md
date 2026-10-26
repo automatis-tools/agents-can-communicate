@@ -8,14 +8,16 @@
   obligation, which an answer never has (#320, from discussion #180). The new attention kind
   `left_for_ended_session` names the message and the history read that shows it without a
   change to its receipt. Each participant is told once, the sender never, for messages sent
-  in the last 7 days, 5 at most. A recipient whose session is only paused does not count.
+  in the last 7 days, the 5 newest. A co-recipient is not told, and a recipient whose
+  session is only paused does not count. The notice carries ids only, never the
+  peer-written subject, and reads the receipts in one pass.
 - Every agent skill and the protocol describe the new kind.
 
 | Development artifact | Value |
 |---|---|
-| Built from | `a7cf5cd935b4da8edcc5c546812a8d3b1181ec36` |
-| Tarball | `agents-can-communicate-0.11.1.tgz`, 612,694 bytes, 376 files |
-| sha256 | `184babc87c406585ac908fbd6f7330c29cb90191de6ca5d7678fec88a56bd8ed` |
+| Built from | `40224537801e063cb6b1bc21b4a59803c214f7f3` |
+| Tarball | `agents-can-communicate-0.11.1.tgz`, 613,015 bytes, 376 files |
+| sha256 | `4be10a9c6745f0887e4dabd7646e862620800c1dd73feb8643bfb9609a0d060d` |
 
 The exact archive passed package verification. See
 [development evidence](docs/release-evidence/unreleased-messages-for-ended-sessions.md).

@@ -1,15 +1,15 @@
 # Development artifact: messages left for a session that ended
 
 Captured on October 25, 2026 with Node 26.5.1 and Claude Code 2.1.310 on macOS. This is an
-unpublished development artifact, built from `a7cf5cd935b4da8edcc5c546812a8d3b1181ec36`.
+unpublished development artifact, built from `40224537801e063cb6b1bc21b4a59803c214f7f3`.
 The package version remains `0.11.1`; existing release records are unchanged.
 
 | Artifact | Value |
 |---|---|
 | Filename | `agents-can-communicate-0.11.1.tgz` |
-| Packed size | 612,694 bytes |
+| Packed size | 613,015 bytes |
 | Files | 376 |
-| sha256 | `184babc87c406585ac908fbd6f7330c29cb90191de6ca5d7678fec88a56bd8ed` |
+| sha256 | `4be10a9c6745f0887e4dabd7646e862620800c1dd73feb8643bfb9609a0d060d` |
 
 `npm pack --json` created the archive. `node scripts/verify-package.mjs` verified
 that exact archive and reported PASS, including installed entry points, runtime
@@ -42,4 +42,17 @@ sentences what you found."
 
 The first capture used a once-per-session rule and showed the notice again to the resumed
 conversation, which opens another ACC session of the same participant. The rule is now once
-per participant, with a core test for that case.
+per participant, with a core test for that case. The capture above was repeated on this
+archive, after the review fixes below, with the same results; the notice line now reads
+``answer``/``note from e2e-driver waiting for <participant>, whose sessions have ended; read it
+with `acc sync --scope history --message <id>` ``.
+
+## Review fixes
+
+A whole-branch review found three defects, each fixed with a test that failed first:
+
+| Finding | Test | Measured |
+|---|---|---|
+| The peer-written subject appeared in ACC's own voice, outside the quoted peer block | `a message left for an ended session keeps its peer-written subject out of ACC's voice` (security suite) | — |
+| More than 64 qualifying messages cycled through the noticed list, 5 notices on every prompt | `notices stop once told, even when more than sixty-four messages qualify` | per-turn counts `5,0,0,…` |
+| Every recent message scanned every receipt | — (one pass builds a map) | 20,000 messages and 40,000 receipts: 2,253 ms before, 9.4 ms after; base attention 3.5 ms |
