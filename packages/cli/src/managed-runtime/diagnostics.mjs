@@ -1,7 +1,7 @@
 import { activationBlockerNotice, listActivationBlockers } from "./activation.mjs";
 import { MAINTENANCE_ACTIVE, maintenanceNotice, maintenanceReport, readMaintenance } from "./maintenance-state.mjs";
 import { readControl } from "./state.mjs";
-import { DENIED_GUIDANCE, deniedStateText } from "./admission.mjs";
+import { deniedGuidance, deniedStateText } from "./admission.mjs";
 
 /** Available when workspace admission is fenced, and from a newer management
  * implementation before activation. Never opens a workspace or probes clients.
@@ -15,9 +15,9 @@ export async function runManagementDoctor({ runtime }) {
   if (runtime.admission?.reasonCode === "state_access_denied") {
     const finish = manager.pending ? [`then run acc update there to finish ACC ${manager.pending.version}`] : [];
     return { data: { scope: "runtime", workspaceInspection: "state_access_denied", admission: runtime.admission,
-      update, remediation: [DENIED_GUIDANCE, ...finish] },
-    text: ["Runtime diagnostics only; ACC could not write its state, so the workspace was not inspected.",
-      `${deniedStateText(runtime.admission, manager)}.`, `${DENIED_GUIDANCE}.`, ...finish].join("\n") };
+      update, remediation: [deniedGuidance(runtime.admission), ...finish] },
+    text: ["Runtime diagnostics only; ACC could not use its state, so the workspace was not inspected.",
+      `${deniedStateText(runtime.admission, manager)}.`, `${deniedGuidance(runtime.admission)}.`, ...finish].join("\n") };
   }
   return { data: { scope: "update", workspaceInspection: "unavailable_during_update", update,
     remediation: ["acc update"] },

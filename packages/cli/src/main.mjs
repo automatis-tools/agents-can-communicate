@@ -16,7 +16,7 @@ import { loadAdapters } from "./adapter-catalog.mjs";
 import { createGitProbe } from "./git-probe.mjs";
 import { platformDataHome, runtimePaths } from "./runtime-paths.mjs";
 import { resolveOwner } from "./session-owner.mjs";
-import { DENIED_GUIDANCE, deniedStateText } from "./managed-runtime/admission.mjs";
+import { deniedGuidance, deniedStateText } from "./managed-runtime/admission.mjs";
 import { readControl } from "./managed-runtime/state.mjs";
 
 const DEFAULT_CADENCE_MS = 30_000;
@@ -460,7 +460,7 @@ export async function main(argv, runtime) {
       // A refused write is the process's own access, not an update to wait for (#316).
       if (runtime.admission?.reasonCode === "state_access_denied") {
         const control = await readControl(runtime.managerRoot).catch(() => null);
-        throw new AccError(EXIT.DATA, `${deniedStateText(runtime.admission, control)}. ${DENIED_GUIDANCE}`,
+        throw new AccError(EXIT.DATA, `${deniedStateText(runtime.admission, control)}. ${deniedGuidance(runtime.admission)}`,
           { reasonCode: "state_access_denied" });
       }
       throw new AccError(EXIT.DATA, "runtime unavailable; retry after the update or run acc update to recover");

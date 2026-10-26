@@ -8,7 +8,7 @@ import test from "node:test";
 import { promisify } from "node:util";
 import { EXIT } from "@agents-can-communicate/protocol";
 import { main } from "../src/main.mjs";
-import { admissionFailure } from "../src/managed-runtime/admission.mjs";
+import { admissionFailure, DENIED_GUIDANCE, deniedStateText } from "../src/managed-runtime/admission.mjs";
 import { writeControl } from "../src/managed-runtime/state.mjs";
 import { removeFixture } from "../../../tests/helpers/fixture-cleanup.mjs";
 
@@ -18,12 +18,23 @@ import { removeFixture } from "../../../tests/helpers/fixture-cleanup.mjs";
 // was ready and no update was pending. ChatGPT Work Mode refused an fchmod
 // there; a Codex chat without ACC's rules file refused the lock's mkdir.
 
-test("an admission refused by the filesystem is a denied state write, anything else is not", () => {
+test("an admission the filesystem refuses is a denied state access, named by its operation", () => {
   for (const code of ["EPERM", "EACCES", "EROFS"]) {
     const error = Object.assign(new Error(code), { code, syscall: "fchmod", path: "/data/acc/runtime" });
     assert.deepEqual(admissionFailure(error),
-      { reasonCode: "state_access_denied", code, syscall: "fchmod", path: "/data/acc/runtime" });
+      { reasonCode: "state_access_denied", access: "write", code, syscall: "fchmod", path: "/data/acc/runtime" });
   }
+  // The refused operation decides what the text calls it: a read is never a refused write.
+  const kind = syscall => admissionFailure(Object.assign(new Error("EACCES"), { code: "EACCES", syscall })).access;
+  for (const syscall of ["mkdir", "fchmod", "rename", "unlink", "rmdir", "write", "fsync"]) assert.equal(kind(syscall), "write", syscall);
+  for (const syscall of ["lstat", "stat", "realpath", "readdir", "read", "access"]) assert.equal(kind(syscall), "read", syscall);
+  for (const syscall of ["open", undefined]) assert.equal(kind(syscall), "access", String(syscall));
+  assert.match(deniedStateText({ reasonCode: "state_access_denied", access: "read", code: "EACCES",
+    syscall: "lstat", path: "/data/acc/runtime" }), /^cannot read ACC's state: lstat \/data\/acc\/runtime was refused \(EACCES\)$/);
+  assert.match(deniedStateText({ reasonCode: "state_access_denied", access: "access", code: "EPERM",
+    syscall: "open", path: "/data/acc/runtime/control.json" }), /^cannot access ACC's state: open /);
+  assert.match(DENIED_GUIDANCE.read, /readable/);
+  assert.doesNotMatch(DENIED_GUIDANCE.read, /writable/);
   // fchmod on a handle reports no path; the runtime directory admission was writing names it.
   assert.equal(admissionFailure(Object.assign(new Error("EPERM"), { code: "EPERM", syscall: "fchmod" }),
     "/data/acc/runtime").path, "/data/acc/runtime");
@@ -47,7 +58,7 @@ async function fixture(t, { pending = false } = {}) {
   await writeControl(manager, { schemaVersion: 1, active: { root: generation, version: "0.12.1" },
     pending: pending ? { root: next, version: "0.12.2" } : null, phase: pending ? "activating" : "ready",
     auto: false, pin: null, checkedAt: null, home, targets: [], notice: null });
-  const admission = { reasonCode: "state_access_denied", code: "EPERM", syscall: "mkdir", path: manager };
+  const admission = { reasonCode: "state_access_denied", access: "write", code: "EPERM", syscall: "mkdir", path: manager };
   const run = async args => {
     let stdout = "";
     const output = name => ({ write(text, done) { if (name === "stdout") stdout += text; done(); } });

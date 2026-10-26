@@ -69,9 +69,10 @@ installation. Hook warnings deliberately omit arbitrary paths and error details.
 ## A command says ACC cannot write its state
 
 An `acc` command exits with code `4` and prints
-`cannot write ACC's state: <operation> <path> was refused (EPERM)`. `acc doctor` reports
-`workspaceInspection: state_access_denied`, and hooks warn
-`coordination unavailable: cannot write ACC's state`. The process that ran ACC may not write
+`cannot write ACC's state: <operation> <path> was refused (EPERM)`. A refused read says
+`cannot read`, and an `open` whose purpose the error does not give says `cannot access`.
+`acc doctor` reports `workspaceInspection: state_access_denied`, and hooks warn
+`coordination unavailable: cannot write ACC's state`. The process that ran ACC may not use
 ACC's data home. The message also states the update state; an update is the cause only when
 the message names a pending version.
 
@@ -79,8 +80,9 @@ The usual cause is a client sandbox around the command:
 - In Codex, run each ACC command as ACC's wrapper, first and alone in the command. ACC's
   rules file then runs it outside the sandbox. See
   [Codex command approval](CONFIGURATION.md#codex-command-approval).
-- Some desktop hosts deny writes outside the session's folders. ChatGPT Work Mode did this
-  with 0.11.1 (#316). Run ACC from a session or terminal that can write the data home.
+- Some desktop hosts deny access outside the session's folders. ChatGPT Work Mode did this
+  with 0.11.1 (#316). Run ACC from a session or terminal that can read and write the data
+  home.
 
 If the data home's files belong to another user, for example after a run with `sudo`, give
 them back to your user. To keep ACC's state elsewhere, set `ACC_DATA_HOME` for every

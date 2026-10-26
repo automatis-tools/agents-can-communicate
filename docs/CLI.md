@@ -482,10 +482,10 @@ Failed downloads keep the working runtime. A failed integration refresh exits wi
 Fix the reported configuration problem, then run `acc update` to finish it. `acc doctor`
 reports the update policy and pending notice. During blocked activation, a current launcher
 returns `scope: update` and `workspaceInspection: unavailable_during_update` without opening
-workspace state; `doctor --repair` remains blocked. When the process may not write ACC's state,
+workspace state; `doctor --repair` remains blocked. When the process may not use ACC's state,
 because a client sandbox or host policy denies its data home, admission fails for that reason
 alone. Commands then exit with code `4` and `reasonCode: state_access_denied`, naming the
-refused write and the real update state. `acc doctor` returns `scope: runtime`,
+refused operation, whether it was a read or a write, and the real update state. `acc doctor` returns `scope: runtime`,
 `workspaceInspection: state_access_denied`, the refused `admission` and the update state. See
 [Troubleshooting](TROUBLESHOOTING.md#a-command-says-acc-cannot-write-its-state). Native clients may still require hook trust
 or activation review. See [Upgrading](UPGRADING.md) for the initial 0.3.1 transition and

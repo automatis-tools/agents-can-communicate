@@ -5,7 +5,7 @@ import { scheduleWorker } from "./schedule.mjs";
 import { acquireRuntime } from "./leases.mjs";
 import { canonicalManagerRoot, readControl, readManagedJson } from "./state.mjs";
 import { commandPrefix } from "./command-prefix.mjs";
-import { admissionFailure, DENIED_GUIDANCE, deniedStateText } from "./admission.mjs";
+import { admissionFailure, deniedGuidance, deniedStateText } from "./admission.mjs";
 
 export const ENTRY_KINDS = Object.freeze([
   "acc", "acc-hook", "acc-mcp", "acc-antigravity-relay",
@@ -56,11 +56,11 @@ function unavailable(kind, denied = null) {
   // Never reflect control file content or payloads into a client diagnostic.
   if (kind === "acc-hook" || kind === "acc-antigravity-relay") {
     // Hook warnings carry no paths or error details beyond the code.
-    process.stderr.write(denied ? `acc: coordination unavailable: cannot write ACC's state (${denied.code}); session may continue\n`
+    process.stderr.write(denied ? `acc: coordination unavailable: cannot ${denied.access} ACC's state (${denied.code}); session may continue\n`
       : "acc: coordination unavailable during runtime update; session may continue\n");
     process.exitCode = 0;
   } else {
-    process.stderr.write(denied ? `acc: ${deniedStateText(denied)}. ${DENIED_GUIDANCE}\n`
+    process.stderr.write(denied ? `acc: ${deniedStateText(denied)}. ${deniedGuidance(denied)}\n`
       : "acc: runtime unavailable; retry after the update or run acc update to recover\n");
     process.exitCode = 4;
   }
