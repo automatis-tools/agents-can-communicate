@@ -1,15 +1,15 @@
 # Development artifact: a lapsed claim is acquired again
 
 Captured on October 25, 2026 with Node 26.5.1 on macOS. This is an unpublished
-development artifact, built from `0602db2516cef4e4250687e6a53541f683ec6689`.
+development artifact, built from `58d9b81d0df465a087973d37b9ec6912e1453a04`.
 The package version remains `0.11.1`; existing release records are unchanged.
 
 | Artifact | Value |
 |---|---|
 | Filename | `agents-can-communicate-0.11.1.tgz` |
-| Packed size | 611,255 bytes |
+| Packed size | 611,263 bytes |
 | Files | 376 |
-| sha256 | `5f2cd01290c24dd414ec4c58c6583e6092460981cea865d5ebe7be278ef6a36b` |
+| sha256 | `a5124ecb26bfca9eb9cfd8040d5229d5932d51ce0a1c5ac1b9bba490e278d6f5` |
 
 `npm pack --json` created the archive. `node scripts/verify-package.mjs` verified
 that exact archive and reported PASS, including installed entry points, runtime

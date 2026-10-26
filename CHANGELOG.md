@@ -8,13 +8,14 @@
   the rightful holder could no longer renew its own (#295, reported with an exact
   reproduction by @vishalhabib99). Acquiring the resource again repeats the conflict
   check and reuses the lapsed record when the resource is still free; the expiry is
-  read inside the same transaction as the write.
+  read inside the same transaction as the write. The refusal names the claim's resource
+  and expiry, so the caller knows what to acquire again.
 
 | Development artifact | Value |
 |---|---|
-| Built from | `0602db2516cef4e4250687e6a53541f683ec6689` |
-| Tarball | `agents-can-communicate-0.11.1.tgz`, 611,255 bytes, 376 files |
-| sha256 | `5f2cd01290c24dd414ec4c58c6583e6092460981cea865d5ebe7be278ef6a36b` |
+| Built from | `58d9b81d0df465a087973d37b9ec6912e1453a04` |
+| Tarball | `agents-can-communicate-0.11.1.tgz`, 611,263 bytes, 376 files |
+| sha256 | `a5124ecb26bfca9eb9cfd8040d5229d5932d51ce0a1c5ac1b9bba490e278d6f5` |
 
 The exact archive passed package verification. See
 [development evidence](docs/release-evidence/unreleased-renew-lapsed-claim.md).
