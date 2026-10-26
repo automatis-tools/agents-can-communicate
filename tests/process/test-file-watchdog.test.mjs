@@ -173,10 +173,14 @@ test("output that arrives after the deadline message is still read before the ba
   const child = Object.assign(new EventEmitter(), { stdout: new PassThrough(),
     stderr: new PassThrough(), pid: undefined, connected: false, kill() {}, disconnect() {} });
   let errors = "";
+  let spawned;
+  const started = new Promise(resolve => { spawned = resolve; });
   const finished = runTestBatch([file], { cwd: repo,
     env: environment({ ACC_TEST_FILE_TIMEOUT_MS: "3000" }), report: path.join(root, "timings.jsonl"),
     output: { write: () => {} }, errorOutput: { write: chunk => { errors += chunk; } },
-    spawnChild: () => child });
+    spawnChild: () => { setImmediate(spawned); return child; } });
+  // The batch resolves the file's real path before it starts the child.
+  await started;
   child.emit("message", { type: "acc-test-file-deadline", file: await realpath(file), timeoutMs: 3000 });
   await new Promise(resolve => setImmediate(resolve));
   child.stderr.end("failed before the file deadline: fixture\n");
