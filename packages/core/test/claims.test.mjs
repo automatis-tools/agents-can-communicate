@@ -100,7 +100,8 @@ test("a lapsed claim cannot be renewed once another session holds the resource",
   await assert.rejects(service.renewClaim({ claimId: lapsed.claimId,
     sessionId: first.sessionId, generation: first.generation, leaseSeconds: 600 }),
   error => error.code === EXIT.CONFLICT
-    && error.message === `claim ${lapsed.claimId} has lapsed; acquire the resource again`);
+    && error.message === `claim ${lapsed.claimId} has lapsed; acquire the resource again`
+    && error.details.resource === RESOURCE && error.details.expiresAt === lapsed.expiresAt);
 
   const live = (await service.collectStatus({ workspaceId: WORKSPACE })).claims
     .filter(claim => claim.resource === RESOURCE

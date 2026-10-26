@@ -146,7 +146,8 @@ export function createClaimService(ports, sessions) {
       const now = clock.now();
       if (!isLive(existing, now)) {
         throw new AccError(EXIT.CONFLICT,
-          `claim ${input.claimId} has lapsed; acquire the resource again`, { claimId: input.claimId });
+          `claim ${input.claimId} has lapsed; acquire the resource again`,
+          { claimId: input.claimId, resource: existing.resource, expiresAt: existing.expiresAt });
       }
       const expiresAt = new Date(Date.parse(now) + (input.leaseSeconds ?? 1800) * 1000)
         .toISOString();
