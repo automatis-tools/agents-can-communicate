@@ -64,11 +64,28 @@ test("install places the plugin and registers it in the marketplace", async t =>
 
   assert.equal(result.ok, true);
   assert.deepEqual((await readdir(plugin)).sort(),
-    [".codex-plugin", "acc-cli.sh", "acc-hook.sh", "hooks.json", "skills"].sort());
+    [".codex-plugin", "acc-cli.sh", "acc-hook.sh", "assets", "hooks.json", "skills"].sort());
   const manifest = JSON.parse(await readFile(
     path.join(plugin, ".codex-plugin", "plugin.json"), "utf8"));
   assert.equal(manifest.hooks, "./hooks.json");
   assert.equal(named(await read(), "agents-can-communicate") !== undefined, true);
+});
+
+// The two arcs of ACC's linked mark, as getacc.dev/assets/acc-mark.svg draws them.
+const MARK_ARCS = ['d="M5.989 3.882A15 15 0 1 1 -17.104 -12.287" stroke="#3158c3"',
+  'd="M-5.989 -3.882A15 15 0 1 1 17.104 12.287" stroke="#f2c94c"'];
+
+test("the installed plugin carries the mark Codex shows for it", async t => {
+  const { context, plugin } = await fixture(t);
+  await createCodexAdapter().install(context);
+  const { interface: face } = JSON.parse(await readFile(
+    path.join(plugin, ".codex-plugin", "plugin.json"), "utf8"));
+  assert.equal(face.brandColor, "#3158C3");
+  for (const field of ["logo", "composerIcon"]) {
+    assert.match(face[field] ?? "", /^\.\/assets\/[\w-]+\.svg$/, `${field} names a file inside the plugin`);
+    const svg = await readFile(path.join(plugin, face[field]), "utf8");
+    for (const arc of MARK_ARCS) assert.equal(svg.includes(arc), true, `${field} draws the linked mark`);
+  }
 });
 
 test("install is idempotent and leaves the user's own plugin alone", async t => {
@@ -437,7 +454,7 @@ test("install finishes the job the client's own command would have done", async 
   const cached = path.join(context.codexHome, "plugins", "cache", "acc-local",
     "agents-can-communicate", await pluginVersion(CODEX_PLUGIN));
   assert.deepEqual((await readdir(cached)).sort(),
-    [".codex-plugin", "acc-cli.sh", "acc-hook.sh", "hooks.json", "skills"].sort());
+    [".codex-plugin", "acc-cli.sh", "acc-hook.sh", "assets", "hooks.json", "skills"].sort());
 });
 
 test("the cached copy carries the same absolute hook command", async t => {

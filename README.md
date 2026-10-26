@@ -1,3 +1,5 @@
+<p align="center"><img src="https://getacc.dev/assets/acc-mark.svg" alt="ACC logo: two linked rings" width="112"></p>
+
 # Agents Can Communicate (ACC)
 
 [![Mentioned in Awesome Claude Code](https://awesome.re/mentioned-badge.svg)](https://github.com/hesreallyhim/awesome-claude-code)

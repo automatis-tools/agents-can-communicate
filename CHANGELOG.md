@@ -17,6 +17,50 @@ The exact archive passed package verification. See
 This is not a published release; the package version remains `0.11.1`.
 The earlier candidate and release records below retain their original provenance.
 
+## Unreleased — the linked ACC mark
+
+- The README opens with ACC's new mark: two open rings hooked into each other, the
+  same file getacc.dev serves, so GitHub and npm show one mark.
+- ACC's Codex plugin now declares a logo, a composer icon and the brand blue
+  `#3158C3`. Codex CLI 0.164.0 reports all three for the installed plugin, and both
+  icon paths resolve to the files the plugin carries. Before, the plugin declared
+  none of them.
+
+| Development artifact | Value |
+|---|---|
+| Built from | `a04c5be741d2f285f457a31b2aab615c9ba8ac30` |
+| Tarball | `agents-can-communicate-0.11.1.tgz`, 613,815 bytes, 378 files |
+| sha256 | `016da2cd4d57b21f3e5d14b8d088a1d0ad27150634e928417fcc0f81ca6798bb` |
+
+The exact archive passed package verification. See
+[development evidence](docs/release-evidence/unreleased-linked-mark.md).
+This is not a published release; the package version remains `0.11.1`.
+The earlier candidate and release records below retain their original provenance.
+
+## Unreleased — messages left for a session that ended
+
+- A message whose recipient has no session left is now reported to the other sessions in
+  the room. Before, nothing read it: a new session of the same client is another
+  participant and inherits no inbox, and the sender was told only while the message had an
+  obligation, which an answer never has (#320, from discussion #180). The new attention kind
+  `left_for_ended_session` names the message and the history read that shows it without a
+  change to its receipt. Each participant is told once, the sender never, for messages sent
+  in the last 7 days, the 5 newest. A co-recipient is not told, and a recipient whose
+  session is only paused does not count. The notice carries ids only, never the
+  peer-written subject, and reads the receipts in one pass.
+- Every agent skill and the protocol describe the new kind.
+
+| Development artifact | Value |
+|---|---|
+| Built from | `6f81fd83911dd69b84ed2f99640dcd29ca047f0f` |
+| Tarball | `agents-can-communicate-0.11.1.tgz`, 613,373 bytes, 376 files |
+| sha256 | `5c55b8b608b31b53fdd0014884c096bf5dad6e1f8d68b0b70e1743b3677667ad` |
+
+The exact archive passed package verification. See
+[development evidence](docs/release-evidence/unreleased-messages-for-ended-sessions.md).
+This is not a published release; the package version remains `0.11.1`.
+The earlier candidate and release records below retain their original provenance.
+
 ## Unreleased — Awesome Claude Code badge
 
 - The README shows the Awesome Claude Code badge, since ACC is listed there (#289).
