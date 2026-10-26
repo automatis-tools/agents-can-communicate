@@ -174,3 +174,47 @@ test("install allows, and detection requires, every socket ACC delivers to", asy
   assert.ok(wider.needsAction.some(line => line.includes("other-receiver")
     && line.includes("run acc install --adapter codex")), wider.needsAction.join("\n"));
 });
+
+// Codex 0.164.0 runs what ACC's rules file allows outside the sandbox, so new
+// chats keep their usual mode and ACC's profile is only available (#329).
+const NO_RULE = process.platform === "win32" && "ACC writes no Codex rules file on Windows";
+
+test("install on a rule-capable Codex leaves new chats in Codex's own mode", { skip: NO_RULE }, async t => {
+  const f = await fixture(t, 'model = "user-model"\n');
+  const context = { ...f.context, clientVersion: "0.164.0" };
+  await f.adapter.install(context);
+  const source = await f.read();
+
+  assert.match(source, /^default_permissions = ":workspace"$/m);
+  assert.doesNotMatch(source, /^default_permissions = "acc-workspace"$/m);
+  assert.match(source, /^\[permissions\.acc-workspace\]$/m);
+  const detected = await f.adapter.detect(context);
+  assert.equal(detected.outgoingDelivery.state, "configured");
+  assert.match(detected.outgoingDelivery.diagnostic, /rules file/);
+});
+
+test("a rules file ACC cannot use keeps ACC's profile selected", async t => {
+  const f = await fixture(t, 'model = "user-model"\n');
+  const rules = path.join(f.context.codexHome, "rules", "agents-can-communicate.rules");
+  await mkdir(path.dirname(rules), { recursive: true });
+  await writeFile(rules, "# someone else's rules\n");
+  await f.adapter.install({ ...f.context, clientVersion: "0.164.0" });
+
+  assert.match(await f.read(), /^default_permissions = "acc-workspace"$/m);
+});
+
+test("the install preview describes what a rule-capable install will do", { skip: NO_RULE }, async t => {
+  const f = await fixture(t, 'model = "user-model"\n');
+  const detected = await f.adapter.detect({ ...f.context, clientVersion: "0.164.0" });
+
+  assert.match(detected.outgoingDelivery.setup, /rules file runs its commands outside the Codex sandbox/);
+  assert.doesNotMatch(detected.outgoingDelivery.setup, /default workspace settings gain/);
+});
+
+test("on Windows, where ACC writes no rules file, new chats still open in ACC's profile",
+  { skip: process.platform !== "win32" && "runs on a Windows host only" }, async t => {
+  const f = await fixture(t, 'model = "user-model"\n');
+  await f.adapter.install({ ...f.context, clientVersion: "0.164.0" });
+
+  assert.match(await f.read(), /^default_permissions = "acc-workspace"$/m);
+});

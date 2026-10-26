@@ -7,19 +7,32 @@ import { scanConfig } from "./toml-scan.mjs";
 
 const PROFILE = "acc-workspace";
 const MINIMUM = "0.153.4";
+// Codex 0.164.0 on macOS (2026-10-26): a command a `prefix_rule` allows runs
+// outside the sandbox without the model asking, so ACC's rules file carries
+// its commands and ACC's profile need not be every chat's default. The capture
+// applies forward on every platform that has the rule; Windows has none.
+const RULE_SANDBOX_BYPASS = "0.164.0";
 const equal = (keys, expected) => JSON.stringify(keys) === JSON.stringify(expected);
 const literal = value => { try { return JSON.parse(value); } catch { return null; } };
 // Captured on darwin-arm64 with 0.153.4; the capture's minimum applies on
 // every platform, and a prerelease is judged by its release triple.
 const supported = context => compareVersions(context.clientVersion, MINIMUM) >= 0;
+// Whether new chats must run in ACC's profile for ACC's commands to work.
+export const selectsProfile = context => !(context.ruleAllowsCommands === true
+  && compareVersions(context.clientVersion, RULE_SANDBOX_BYPASS) >= 0);
+// The selection ACC's own unit holds: its profile, or Codex's workspace mode,
+// which a config that defines a profile needs as soon as it selects nothing.
+const selection = context => selectsProfile(context) ? PROFILE : ":workspace";
 const hasPermissions = entries => entries.some(entry =>
   ["permissions", "default_permissions", "profile", "profiles"].includes(entry.keys[0]));
 const configured = (source, context) => {
   const entries = scanConfig(source);
   if (entries.some(entry => ["profile", "profiles"].includes(entry.keys[0]))) return false;
   const value = keys => entries.find(entry => !entry.header && equal(entry.keys, keys))?.value;
-  const profile = literal(value(["default_permissions"]));
-  if (!profile || value(["sandbox_mode"]) || entries.some(entry => entry.keys[0] === "sandbox_workspace_write")) return false;
+  const selected = literal(value(["default_permissions"]));
+  if (entries.some(entry => entry.keys[0] === "sandbox_workspace_write")) return false;
+  if (selected !== selection(context) || value(["sandbox_mode"])) return false;
+  const profile = PROFILE;
   return literal(value(["permissions", profile, "extends"])) === ":workspace"
     && value(["features", "network_proxy"]) === "true"
     && value(["permissions", profile, "network", "enabled"]) === "true"
@@ -82,8 +95,15 @@ export function grantPath(target, realpath = realpathSync.native) {
 // Every socket ACC delivers to - Codex's own and each receiving adapter's
 // declaration, composed by the installer as `receiverSockets` - and nothing
 // else: grants cover ACC's local receivers, never arbitrary Unix sockets.
-const sockets = context => [...new Set([controlSocket(context), ...(context.receiverSockets ?? [])]
+export const sockets = context => [...new Set([controlSocket(context), ...(context.receiverSockets ?? [])]
   .map(socket => grantPath(socket, context.realpath)))].sort();
+
+// Whether the user's own config, without ACC's units, selects a mode.
+const selectsMode = source => {
+  const ownership = inspectPermissions(source);
+  return scanConfig(ownership.state === "owned" ? ownership.source : source).some(entry => !entry.header
+    && (equal(entry.keys, ["sandbox_mode"]) || equal(entry.keys, ["default_permissions"])));
+};
 
 export function outgoingStatus(source, context) {
   const state = inspectPermissions(source).state;
@@ -93,14 +113,25 @@ export function outgoingStatus(source, context) {
     : !supported(context) ? "permission_configuration_uncaptured"
       : ready ? null : "sender_permissions_unverified";
   return { state: reasonCode === null ? "configured" : "unverified", reasonCode,
-    setup: supported(context)
+    setup: !supported(context) ? null : selectsProfile(context)
       ? "Codex outgoing setup: default workspace settings gain ACC state write access and an allowlist of the "
         + "local sockets ACC delivers to - ACC's own channel, the Codex control socket and other clients' session "
         + "inboxes - through the network proxy (external network stays denied); custom policies are preserved. "
         + "Start a new session after installation."
-      : null,
+      : `Codex outgoing setup: ACC's rules file runs its commands outside the Codex sandbox, so ACC defines a `
+        + `permission profile named ${PROFILE} and selects it for no chat. `
+        + (selectsMode(source)
+          ? `ACC keeps your workspace mode, written as default_permissions = ":workspace", and restores your own `
+            + "line on removal. "
+          : `Your config selects no mode, so ACC sets default_permissions = ":workspace", Codex's workspace mode: `
+            + "a defined profile needs a selection. ")
+        + "The profile grants ACC state and the local sockets ACC delivers to, external network denied, for a "
+        + "chat that selects it; custom policies are preserved. Start a new session after installation.",
     diagnostic: reasonCode === null
-      ? "outgoing live delivery: local socket permissions configured for new sessions; active session overrides remain unverified"
+      ? selectsProfile(context)
+        ? "outgoing live delivery: local socket permissions configured for new sessions; active session overrides remain unverified"
+        : `outgoing live delivery: ACC's rules file runs its commands outside the Codex sandbox; the ${PROFILE} `
+          + "profile is available for a chat that selects it"
       : `outgoing live delivery: sender permissions unverified in ${context.file}; `
         + (reasonCode === "permission_configuration_uncaptured"
           ? `automatic setup requires Codex ${MINIMUM} or newer`
@@ -117,8 +148,7 @@ export function outgoingStatus(source, context) {
 // Code inbox grant - or for another state root. Reinstalling rewrites it.
 function incomplete(source, context) {
   const entries = scanConfig(source);
-  const profile = literal(entries.find(entry => !entry.header && equal(entry.keys, ["default_permissions"]))?.value);
-  const missing = typeof profile === "string" ? missingSockets(entries, profile, context) : [];
+  const missing = missingSockets(entries, PROFILE, context);
   return missing.length > 0
     ? `ACC outgoing grants do not cover every socket ACC delivers to; missing ${missing.join(", ")}`
     : "ACC outgoing grants are out of date";
@@ -157,7 +187,13 @@ export function prepareLivePermissions(source, context) {
   const proxies = find(["features", "network_proxy"]);
   const customized = hasCustomPolicy(source, context);
   if (customized) return { source, skipLegacy: hasPermissions(entries), status: outgoingStatus(source, context) };
-  const edits = [{ id: "selection", start: 0, end: 0, body: `default_permissions = "${PROFILE}"\n` }];
+  // The selection unit always carries the restore metadata: an older ACC
+  // accepts it nowhere else. It selects ACC's profile, or, where ACC's rules
+  // file carries its commands, Codex's workspace mode. The user's own
+  // selection - only workspace-write and `:workspace` are not custom - moves
+  // into ACC's units and comes back on removal: a selection line outside ACC's
+  // blocks would make the profile the user's policy.
+  const edits = [{ id: "selection", start: 0, end: 0, body: `default_permissions = "${selection(context)}"\n` }];
   for (const [id, values] of [["mode", modes], ["default", defaults]]) {
     if (values.length) edits.push({ id, start: values[0].start, end: values[0].end, body: "" });
   }

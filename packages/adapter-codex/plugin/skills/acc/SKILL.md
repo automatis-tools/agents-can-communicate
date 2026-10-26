@@ -33,7 +33,10 @@ Choose a distinct `--client-message-id` for each new send. If delivery reports
 `transport_permission_denied`, retry the same command through approved execution
 with the same key and content. The CLI prints the original key when it generated
 one. A retry uses the recorded message and offers it again only while queued.
-Use normal sandboxed execution for local reads and claims.
+Put the `{{ACC}}` wrapper first and alone in every other ACC command too,
+reads and claims included. ACC's prefix rule runs that command outside the
+sandbox, where ACC's state is. A chat that has not selected the ACC profile
+cannot write that state from inside the sandbox.
 
 ## Use your own CLI credentials
 

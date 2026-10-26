@@ -166,10 +166,30 @@ On Codex 0.153.4 or newer, live opt-in also configures outgoing access
 for default workspace permissions. This happens even when the daemon is not yet available.
 Installation, its preview, and the interactive consent question disclose this change.
 
-ACC selects a permission profile named `acc-workspace`, extending `:workspace`. It grants
-write access to the ACC state directory and allows only the Unix sockets ACC delivers to.
-Each receiving adapter declares its own, and the profile lists all of them even when an
-install names Codex alone:
+On macOS and Linux with Codex 0.164.0 or newer, ACC's [rules file](#codex-command-approval) carries
+ACC's commands: Codex runs a command that a `prefix_rule` allows outside the sandbox, without
+the model asking for it. ACC therefore defines a permission profile named `acc-workspace` for a
+chat that selects it, and does not make it the default. Codex refuses a config that defines a
+permission profile without selecting one, so ACC selects `default_permissions = ":workspace"`,
+Codex's own workspace-write mode, inside its own block. A workspace mode of your own,
+`sandbox_mode = "workspace-write"` or `default_permissions = ":workspace"`, selects that same
+mode: ACC moves your line into its block and puts it back on uninstall. Any other selection is a
+custom policy, which ACC preserves and does not configure.
+
+ACC still selects `acc-workspace` for every chat, as releases before 0.12.1 did, where the rule
+cannot carry its commands:
+- on Windows, which gets no rules file;
+- with a rules file that is not ACC's or was edited;
+- with Codex older than 0.164.0.
+
+An update moves a config that ACC set to its own profile back to the mode it held before, held
+in ACC's block as above. A program that rewrites `config.toml` without comments also removes
+the record of that mode; see
+[the rewritten-config case](TROUBLESHOOTING.md#an-update-says-the-codex-marketplace-is-already-registered).
+
+The profile extends `:workspace`. It grants write access to the ACC state directory and allows
+only the Unix sockets ACC delivers to. Each receiving adapter declares its own, and the profile
+lists all of them even when an install names Codex alone:
 
 | Receiver | Allowed path |
 |---|---|

@@ -287,6 +287,32 @@ your own legacy sandbox configuration, doctor also names the ACC state directory
 access you should check in `sandbox_workspace_write.writable_roots`. Live delivery requires
 local socket permissions as well; a writable state directory alone is insufficient.
 
+## An update says the Codex marketplace is already registered
+
+`acc update` or `acc install` reports
+`codex: marketplace acc-local or its plugin is already registered in this config`, and ACC
+commands answer `runtime unavailable` until the update finishes.
+
+ACC marks the entries it writes in `~/.codex/config.toml` with comments. A program that
+rewrites that file without comments removes the marks, and ACC can no longer tell its
+entries from yours. From 0.12.1, ACC recognises entries that hold exactly what it writes, and
+marks them again on the next install or update:
+- `[marketplaces.acc-local]` at ACC's own marketplace root, together with
+  `[plugins."agents-can-communicate@acc-local"]` holding only `enabled = true`; neither is
+  taken without the other;
+- the `acc-workspace` profile with all of ACC's grants and nothing else: the state directory,
+  network access, and sockets ACC delivers to now, Codex's own control socket among them. Its selection, `default_permissions = "acc-workspace"`
+  or `":workspace"`, goes with it.
+
+A comment you added among those entries stays. If the message stays, one of those entries
+differs from what ACC writes. Back up the file, remove the `acc-local` marketplace and plugin
+tables, and run `acc update`.
+
+The removed comments also held what ACC had moved aside when it installed: your own mode
+line and your `network_proxy` setting. ACC cannot bring those back. After such a rewrite,
+`acc uninstall` leaves no mode selected, which is Codex's read-only default, and leaves
+`network_proxy = true` in `[features]`. Set your mode again if you had one.
+
 ## Gemini does not guard a write
 
 Default and `plan` modes expose no write tool to the model. `auto_edit` exposes edit tools;

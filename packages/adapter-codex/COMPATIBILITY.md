@@ -1,5 +1,26 @@
 # Codex compatibility
 
+## Rule-allowed commands leave the sandbox, 2026-10-26
+
+Codex 0.164.0 on macOS arm64, isolated `CODEX_HOME`. The command was a stand-in for
+`acc-cli.sh` that writes under `~/Library/Caches`, with the same `prefix_rule` shape ACC
+installs (#329):
+
+| Run | Result |
+|---|---|
+| `codex exec -s workspace-write` (approval `never`), command allowed by the rule | ran outside the sandbox; the write succeeded |
+| `codex exec --approve-for-me` (approval `on-request`), allowed by the rule | ran outside the sandbox; the write succeeded |
+| `codex exec -s workspace-write`, no rule | `Operation not permitted` |
+| a `[permissions]` profile without `default_permissions` or `sandbox_mode` | refused: "config defines `[permissions]` profiles but does not set `default_permissions`" |
+| the profile with `default_permissions = ":workspace"` or `sandbox_mode = "workspace-write"` | accepted; the rule-allowed write succeeded |
+| no selection / `default_permissions = ":workspace"` | sandbox `read-only` / `workspace-write` |
+
+The model never requested escalation. From 0.164.0 onward, on every platform that has the rule,
+ACC therefore does not make `acc-workspace` the default. On the maintainer's machine, another
+program rewrote `config.toml` sorted and without comments between 2026-10-07 and 2026-10-25.
+`codex features enable` keeps comments, so the writer was a different path. The Codex desktop
+app or its app-server configuration writes are suspected; this is not confirmed.
+
 ## Daemon launch option, 2026-10-26
 
 Codex 0.164.0 on macOS arm64 (#331). In a fresh isolated home, `codex app-server daemon start`

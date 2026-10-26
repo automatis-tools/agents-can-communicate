@@ -79,10 +79,16 @@ export function inspectPermissions(source) {
     || (!entry.header && generatedTables.includes(JSON.stringify(entry.table)))))) {
     return { source, state: "customized" };
   }
+  // A unit that held the file's last line, written without a newline, is
+  // followed by whatever Codex appended after ACC's blocks - its hook trust
+  // entries. Restored as recorded, that line and the next would run together.
   let restored = source;
+  const restoredBefore = new Map();
   for (const block of blocks.toSorted((a, b) => b.start - a.start)) {
-    restored = restored.slice(0, block.start) + metadata.find(item => item.id === block.id).before
-      + restored.slice(block.end);
+    const { before } = metadata.find(item => item.id === block.id);
+    const text = before !== "" && !before.endsWith("\n") && restored.length > block.end ? `${before}\n` : before;
+    restoredBefore.set(block.id, text);
+    restored = restored.slice(0, block.start) + text + restored.slice(block.end);
   }
   // Inserting restored headers can reparent foreign assignments added after
   // a removal marker. Verify the candidate's scopes before restoring any byte.
@@ -91,7 +97,7 @@ export function inspectPermissions(source) {
   catch { return { source, state: "customized" }; }
   for (const entry of outside.filter(item => item.code)) {
     const delta = blocks.filter(block => block.end <= entry.start).reduce((total, block) =>
-      total + metadata.find(item => item.id === block.id).before.length - (block.end - block.start), 0);
+      total + restoredBefore.get(block.id).length - (block.end - block.start), 0);
     const candidate = restoredEntries.get(entry.start + delta);
     if (!candidate || JSON.stringify(candidate.keys) !== JSON.stringify(entry.keys)) {
       return { source, state: "customized" };
