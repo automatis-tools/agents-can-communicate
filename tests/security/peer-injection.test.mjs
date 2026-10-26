@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { projectContext } from "@agents-can-communicate/adapter-sdk";
+import { computeAttention } from "@agents-can-communicate/core";
 
 /**
  * A peer is an untrusted author.
@@ -149,5 +150,23 @@ test("nothing a peer writes reaches the model outside a labelled block", () => {
   for (const line of outsideBlock(projected)) {
     assert.equal(line.includes(secret), false,
       `peer content escaped its block: ${line}`);
+  }
+});
+
+test("a message left for an ended session keeps its peer-written subject out of ACC's voice", () => {
+  const secret = "PEER-PAYLOAD-5531";
+  const now = "2026-10-25T12:00:00.000Z";
+  const snapshot = {
+    messages: [{ ...message("body", { subject: secret, toParticipantIds: ["participant_gone"] }),
+      sentAt: "2026-10-25T11:00:00.000Z" }],
+    receipts: [{ messageId: "message_peer", recipientParticipantId: "participant_gone", state: "queued" }],
+    sessions: [], claims: [], intents: [],
+  };
+  const attention = computeAttention(snapshot, { session: null, participantId: "participant_reader",
+    now, pidIsAlive: () => false });
+  assert.equal(attention.length, 1, "fixture expected one left-message notice");
+
+  for (const line of outsideBlock(projectContext(sync({ attention })))) {
+    assert.equal(line.includes(secret), false, `peer content escaped its block: ${line}`);
   }
 });

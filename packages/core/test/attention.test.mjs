@@ -124,7 +124,7 @@ test("claim-derived attention remains reachable and the vocabulary is closed", (
     ["claim_conflict", "claim_contended", "claim_expired"]);
   assert.deepEqual(Object.keys(ATTENTION_PRIORITY), ["reply_required",
     "acknowledgement_required", "recipient_unavailable", "claim_conflict",
-    "claim_contended", "claim_expired"]);
+    "claim_contended", "claim_expired", "left_for_ended_session"]);
 });
 
 const contested = intents => ({
