@@ -1,5 +1,26 @@
 # Changelog
 
+## Unreleased — a lapsed claim is acquired again
+
+- Renewing a claim whose lease has lapsed is refused with a conflict. Another session
+  may have acquired the resource exclusively by then, and renewal checked only
+  ownership, so two sessions could each hold a live exclusive claim on one file and
+  the rightful holder could no longer renew its own (#295, reported with an exact
+  reproduction by @vishalhabib99). Acquiring the resource again repeats the conflict
+  check and reuses the lapsed record when the resource is still free; the expiry is
+  read inside the same transaction as the write.
+
+| Development artifact | Value |
+|---|---|
+| Built from | `0602db2516cef4e4250687e6a53541f683ec6689` |
+| Tarball | `agents-can-communicate-0.11.1.tgz`, 611,255 bytes, 376 files |
+| sha256 | `5f2cd01290c24dd414ec4c58c6583e6092460981cea865d5ebe7be278ef6a36b` |
+
+The exact archive passed package verification. See
+[development evidence](docs/release-evidence/unreleased-renew-lapsed-claim.md).
+This is not a published release; the package version remains `0.11.1`.
+The earlier candidate and release records below retain their original provenance.
+
 ## 0.11.1 — release candidate
 
 - A hook's cost no longer grows with everything its workspace ever held: each stored
