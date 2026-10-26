@@ -99,6 +99,18 @@ export async function writeAllowRule({ codexHome, cliShim, hostPlatform }) {
   return { file, diagnostics: [`added ${file}: ACC's coordination commands run without an approval prompt`] };
 }
 
+/**
+ * Whether ACC's rule will carry ACC's commands once this install has run: the
+ * platform has one, the wrapper's path can be written in it, and the file is
+ * absent or still exactly ACC's. An edited or foreign file is left alone, so
+ * it cannot be counted on (#329).
+ */
+export async function ruleAllowsCommands({ codexHome, cliShim, hostPlatform }) {
+  if (!ruleApplies(hostPlatform) || !PLAIN_PATH.test(cliShim)) return false;
+  const existing = await current(rulesPath(codexHome));
+  return existing === null || accGenerated(existing);
+}
+
 /** The rule's state, for doctor. */
 export async function inspectAllowRule({ codexHome, cliShim, hostPlatform }) {
   if (!ruleApplies(hostPlatform) || !PLAIN_PATH.test(cliShim)) return { state: "none", diagnostic: null };

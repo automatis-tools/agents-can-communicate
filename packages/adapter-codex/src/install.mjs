@@ -9,7 +9,7 @@ import { bakeSkillCommand, blankJson, blankText, removeIfEmpty, removeInstalledT
   tomlString, windowsHookCommand, writeCliShim, writeForeignJson, writeHookShim }
   from "@agents-can-communicate/adapter-sdk";
 import { AccError, EXIT } from "@agents-can-communicate/protocol";
-import { inspectAllowRule, removeAllowRule, ruleApplies, rulesPath, writeAllowRule }
+import { inspectAllowRule, removeAllowRule, ruleAllowsCommands, ruleApplies, rulesPath, writeAllowRule }
   from "./allow-rule.mjs";
 import { inspectConfig, readConfig, sandboxOwnership, writeTomlBlock } from "./config-block.mjs";
 import { outgoingStatus, prepareLivePermissions, removeLivePermissions } from "./live-permissions.mjs";
@@ -194,7 +194,9 @@ export async function installCodexPlugin({ home, agentsHome = home,
       + "remove it and install again", { config });
   }
   const permissions = prepareLivePermissions(foreign.source, { home, codexHome, stateRoot,
-    file: config, requestedLivePolicy, livePolicy, clientVersion, platform, receiverSockets });
+    file: config, requestedLivePolicy, livePolicy, clientVersion, platform, receiverSockets,
+    ruleAllowsCommands: await ruleAllowsCommands({ codexHome,
+      cliShim: path.join(pluginPath(agentsHome), "acc-cli.sh"), hostPlatform }) });
   const theirSandbox = permissions.skipLegacy || inspectConfig(permissions.source, config).sandbox;
   const permissionActions = permissions.status?.state === "unverified" ? [permissions.status.diagnostic] : [];
 
@@ -365,11 +367,12 @@ export async function detectCodex({ home, agentsHome = home,
   const pluginEntry = config.includes(`[plugins."${QUALIFIED}"]`);
   const cached = await stat(cachePath(codexHome))
     .then(() => true).catch(() => false);
-  const outgoingDelivery = outgoingStatus(config, { home, codexHome, stateRoot,
-    file: configPath(codexHome), clientVersion, platform, receiverSockets });
   const allowRule = published
     ? await inspectAllowRule({ codexHome, cliShim: path.join(pluginPath(agentsHome), "acc-cli.sh"), hostPlatform })
     : { state: "none", diagnostic: null };
+  const outgoingDelivery = outgoingStatus(config, { home, codexHome, stateRoot,
+    file: configPath(codexHome), clientVersion, platform, receiverSockets,
+    ruleAllowsCommands: allowRule.state === "allowed" });
   // Saved trust is not readiness. Codex compares every current definition's
   // hash and can disable a trusted hook. Even a commented or stale single record
   // previously suppressed this check. Leave verification to Codex's /hooks;
