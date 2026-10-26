@@ -12,7 +12,13 @@ export const ATTENTION_PRIORITY = Object.freeze({
   claim_conflict: 4,
   claim_contended: 5,
   claim_expired: 6,
+  left_for_ended_session: 7,
 });
+
+// A message left for a participant whose sessions have all ended is reported to
+// the other sessions in the room for a week, five at most (#320).
+export const LEFT_MESSAGE_WINDOW_MS = 7 * 24 * 60 * 60_000;
+export const LEFT_MESSAGE_LIMIT = 5;
 
 function obligationItems(snapshot, participantId) {
   const messages = new Map((snapshot.messages ?? []).map(item => [item.messageId, item]));
@@ -54,6 +60,34 @@ function unavailableRecipients(snapshot, participantId, now, pidIsAlive) {
         sourceId: message.messageId,
         summary: `${message.subject} - ${receipt.recipientParticipantId} is unavailable` }));
   });
+}
+
+// Nothing reads a message whose recipient has no session left: a new session of
+// the same client is another participant and inherits no inbox. The other
+// sessions are told, once each; the receipt stays the recipient's (#320).
+function leftForEndedSessions(snapshot, { session, participantId, now, pidIsAlive }) {
+  const present = new Set((snapshot.sessions ?? [])
+    .filter(item => classifySessionPresence(item, now, pidIsAlive) !== "offline")
+    .map(item => item.participantId));
+  const noticed = new Set(session?.extensions?.noticedLeftMessages ?? []);
+  const receipts = snapshot.receipts ?? [];
+  const items = (snapshot.messages ?? []).flatMap(message => {
+    const age = Date.parse(now) - Date.parse(message.sentAt);
+    if (!(message.toParticipantIds?.length > 0) || message.fromParticipantId === participantId
+      || noticed.has(message.messageId) || !(age < LEFT_MESSAGE_WINDOW_MS)) return [];
+    const recipients = receipts.filter(receipt => receipt.messageId === message.messageId
+      && receipt.recipientParticipantId !== participantId
+      && ["queued", "offered"].includes(receipt.state)
+      && !present.has(receipt.recipientParticipantId))
+      .map(receipt => receipt.recipientParticipantId);
+    return recipients.length === 0 ? [] : [{ sentAt: message.sentAt, item: {
+      kind: "left_for_ended_session", priority: ATTENTION_PRIORITY.left_for_ended_session,
+      sourceId: message.messageId,
+      summary: `${message.subject} - waiting for ${recipients.join(", ")}, whose sessions have `
+        + `ended; read it with sync --scope history --message ${message.messageId}` } }];
+  });
+  return items.sort((left, right) => right.sentAt.localeCompare(left.sentAt))
+    .slice(0, LEFT_MESSAGE_LIMIT).map(entry => entry.item);
 }
 
 function expiredClaims(snapshot, session, now) {
@@ -109,6 +143,7 @@ export function computeAttention(snapshot, { session, participantId, now, pidIsA
     ...claimConflicts(snapshot, session, now),
     ...claimContended(snapshot, session, now),
     ...expiredClaims(snapshot, session, now),
+    ...leftForEndedSessions(snapshot, { session, participantId, now, pidIsAlive }),
   ].sort((left, right) => left.priority - right.priority
     || left.sourceId.localeCompare(right.sourceId));
 }

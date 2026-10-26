@@ -9,6 +9,9 @@ import { createSessionOpener } from "./session-opening.mjs";
 // rather than one global constant (docs/ARCHITECTURE.md, presence freshness).
 const STALE_CADENCE_MULTIPLE = 3;
 
+// The left-message ids one session remembers having been told about (#320).
+export const NOTICED_LEFT_LIMIT = 64;
+
 // Two floors, because they answer different questions and neither subsumes the
 // other. UNKNOWN_EXPIRY_MS is the "cannot tell" branch: records written before
 // pids were recorded, platforms with no process table, an ancestry that did not
@@ -109,6 +112,41 @@ export function createSessionService(ports) {
       if (beaten === null) throw new AccError(EXIT.CONFLICT, "session is not open", { sessionId });
       tx.put("session", sessionId, beaten, tx.generationOf("session", sessionId));
       return beaten;
+    }, { kinds: ["session"], exactKinds: ["session"] });
+  }
+
+  /**
+   * Remember the left messages a session's context has carried, so attention
+   * tells it about each one once (#320). The ids live in the record's
+   * extensions, which an older ACC carries through unchanged; the newest
+   * NOTICED_LEFT_LIMIT are kept. Same writer path as a heartbeat.
+   */
+  async function recordNotices({ sessionId, workspaceId, generation, messageIds }) {
+    if (!Array.isArray(messageIds) || messageIds.some(id => typeof id !== "string" || id === "")) {
+      throw new AccError(EXIT.USAGE, "recordNotices requires message ids", { sessionId });
+    }
+    const note = current => {
+      if (current === null) return null;
+      assertGeneration({ record: current }, generation, "record notices", workspaceId ?? store.workspaceId);
+      if (current.state !== "open") {
+        throw new AccError(EXIT.CONFLICT, "session is not open", { sessionId });
+      }
+      const prior = current.extensions?.noticedLeftMessages ?? [];
+      const noticedLeftMessages = [...prior.filter(id => !messageIds.includes(id)), ...messageIds]
+        .slice(-NOTICED_LEFT_LIMIT);
+      return { ...current, extensions: { ...(current.extensions ?? {}), noticedLeftMessages } };
+    };
+    const seen = await store.ephemeral.get("session", sessionId);
+    const ephemeral = seen === null || await isMaterialised(store, seen.workspaceId) ? null
+      : await store.ephemeral.update("session", sessionId, async current =>
+        current !== null && !await isMaterialised(store, current.workspaceId) ? note(current) : null);
+    if (ephemeral !== null) return ephemeral;
+    return store.transaction(async tx => {
+      await tx.load("session", sessionId);
+      const noted = note(tx.get("session", sessionId));
+      if (noted === null) throw new AccError(EXIT.CONFLICT, "session is not open", { sessionId });
+      tx.put("session", sessionId, noted, tx.generationOf("session", sessionId));
+      return noted;
     }, { kinds: ["session"], exactKinds: ["session"] });
   }
 
@@ -228,6 +266,7 @@ export function createSessionService(ports) {
     openSession: createSessionOpener(ports, locate),
     resumeSession,
     heartbeatSession,
+    recordNotices,
     closeSession,
     lastSessionOf,
     listLiveSessions,
