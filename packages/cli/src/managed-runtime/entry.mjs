@@ -5,6 +5,7 @@ import { scheduleWorker } from "./schedule.mjs";
 import { acquireRuntime } from "./leases.mjs";
 import { canonicalManagerRoot, readControl, readManagedJson } from "./state.mjs";
 import { commandPrefix } from "./command-prefix.mjs";
+import { admissionFailure, DENIED_GUIDANCE, deniedStateText } from "./admission.mjs";
 
 export const ENTRY_KINDS = Object.freeze([
   "acc", "acc-hook", "acc-mcp", "acc-antigravity-relay",
@@ -51,13 +52,15 @@ export async function runIndicatorEntry({ managerRoot }) {
   }
 }
 
-function unavailable(kind) {
+function unavailable(kind, denied = null) {
   // Never reflect control file content or payloads into a client diagnostic.
   if (kind === "acc-hook" || kind === "acc-antigravity-relay") {
-    process.stderr.write("acc: coordination unavailable during runtime update; session may continue\n");
+    process.stderr.write(denied ? `acc: coordination unavailable: ${deniedStateText(denied)}; session may continue\n`
+      : "acc: coordination unavailable during runtime update; session may continue\n");
     process.exitCode = 0;
   } else {
-    process.stderr.write("acc: runtime unavailable; retry after the update or run acc update to recover\n");
+    process.stderr.write(denied ? `acc: ${deniedStateText(denied)}. ${DENIED_GUIDANCE}\n`
+      : "acc: runtime unavailable; retry after the update or run acc update to recover\n");
     process.exitCode = 4;
   }
 }
@@ -114,7 +117,10 @@ export async function runEntry({ kind, packageRoot, managerRoot, managedRequired
         if (!quiet) await scheduleWorker(root, control);
       }
     } else if (managedRequired) throw new Error("managed runtime is not initialized");
-  } catch {
+  } catch (error) {
+    // A write the filesystem refused is named as such (#316): an unfinished
+    // update is the advice for every other admission failure.
+    const denied = admissionFailure(error, root);
     // Help and update recovery must remain reachable when state cannot admit a
     // workspace command. The CLI parser enforces this restricted path; merely
     // putting --help in a message value cannot bypass runtime admission.
@@ -125,11 +131,12 @@ export async function runEntry({ kind, packageRoot, managerRoot, managedRequired
     if (kind === "acc" && selected) {
       try {
         const runtime = await import(pathToFileURL(path.join(selected, "bin", "entrypoints", "acc.mjs")).href);
-        await runtime.main({ managerRoot: root ?? null, packageRoot: selected, managementOnly: true });
+        await runtime.main({ managerRoot: root ?? null, packageRoot: selected, managementOnly: true,
+          ...(denied ? { admission: denied } : {}) });
         return;
       } catch { /* Fall through to the same graceful unavailability below. */ }
     }
-    unavailable(kind);
+    unavailable(kind, denied);
     return;
   }
   const runtime = await import(pathToFileURL(path.join(selected, "bin", "entrypoints", `${kind}.mjs`)).href);
