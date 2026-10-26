@@ -130,3 +130,113 @@ test("the sorted, comment-free shape of the maintainer's config is adopted", asy
   assert.match(after, /^\[marketplaces\.other\]$/m);
   assert.match(after, /^\[hooks\.state\."agents-can-communicate@acc-local:hooks\.json:stop:0:0"\]$/m);
 });
+
+test("an adopted install that selected Codex's workspace mode uninstalls to a config that selects nothing", async t => {
+  const f = await fixture(t);
+  const rewritten = await rewrittenInstall(f, "0.164.0");
+  assert.match(rewritten, /^default_permissions = /m);
+
+  await f.adapter.install(f.context);
+  assert.equal(count(await f.read(), /^default_permissions = /gm), 1);
+  await f.adapter.uninstall(f.context);
+  const after = await f.read();
+
+  assert.equal(count(after, /^default_permissions = /gm), 0, after);
+  assert.match(after, /^model = "user-model"$/m);
+});
+
+test("an unmarked profile that grants a socket ACC never grants stays the user's policy", async t => {
+  const f = await fixture(t);
+  const changed = (await rewrittenInstall(f)).replace(/^(\[permissions\.acc-workspace\.network\.unix_sockets\]\n)/m,
+    '$1"/private/tmp/someone-else.sock" = "allow"\n');
+  await f.write(changed);
+
+  const result = await f.adapter.install(f.context);
+  const after = await f.read();
+
+  assert.match(after, /^"\/private\/tmp\/someone-else\.sock" = "allow"$/m);
+  assert.equal(count(after, /^\[permissions\.acc-workspace\]$/gm), 1);
+  assert.ok(result.diagnostics.some(line => /custom permission policy was preserved/.test(line)),
+    result.diagnostics.join("\n"));
+});
+
+test("comments a user added among ACC's unmarked tables stay", async t => {
+  const f = await fixture(t);
+  const changed = (await rewrittenInstall(f))
+    .replace(/^(\[marketplaces\.acc-local\]\n)/m, "$1# inside the marketplace\n")
+    .replace(/^(\[plugins\."agents-can-communicate@acc-local"\]\nenabled = true\n)/m, "$1# after the plugin\n")
+    .replace(/^(\[permissions\.acc-workspace\]\n)/m, "$1# inside the profile\n");
+  await f.write(changed);
+
+  await f.adapter.install(f.context);
+  const installed = await f.read();
+  await f.adapter.uninstall(f.context);
+  const removed = await f.read();
+
+  for (const text of [installed, removed]) {
+    for (const comment of ["# inside the marketplace", "# after the plugin", "# inside the profile"]) {
+      assert.ok(text.includes(`${comment}\n`), `${comment} was removed:\n${text}`);
+    }
+  }
+});
+
+test("a registration with a part ACC never writes is left whole", async t => {
+  for (const change of [
+    text => text.replace(/^(\[plugins\."agents-can-communicate@acc-local"\])/m,
+      '[marketplaces.acc-local.extra]\nnote = "mine"\n\n$1'),
+    text => text.replace(/^source = ".*acc-local"$/m, 'source = "/somewhere/else"'),
+    text => text.replace(/^source_type = "local"\n(source = .*\n)/m, "$1$1"),
+  ]) {
+    const f = await fixture(t);
+    const changed = change(await rewrittenInstall(f));
+    await f.write(changed);
+
+    await assert.rejects(f.adapter.install(f.context), /already registered/);
+    await f.adapter.uninstall(f.context);
+    const after = await f.read();
+
+    assert.equal(count(after, /^\[marketplaces\.acc-local\]$/gm), 1, after);
+    assert.equal(count(after, /^\[plugins\."agents-can-communicate@acc-local"\]$/gm), 1, after);
+  }
+});
+
+test("ACC's unmarked entries written as TOML literal strings are adopted", async t => {
+  const f = await fixture(t);
+  const changed = (await rewrittenInstall(f)).replace(/^(\S+) = "([^"\\]*)"$/gm, "$1 = '$2'")
+    .replace(/^"([^"\\]*)" = /gm, "'$1' = ");
+  assert.match(changed, /^source = '/m);
+  await f.write(changed);
+
+  await f.adapter.install(f.context);
+  const after = await f.read();
+
+  assert.equal(count(after, /^\[marketplaces\.acc-local\]$/gm), 1);
+  assert.equal(count(after, /^\[permissions\.acc-workspace\]$/gm), 1);
+  assert.match(after, /^# ACC native permissions begin profile$/m);
+});
+
+test("an unmarked profile that another setting still names is kept", async t => {
+  const f = await fixture(t);
+  const changed = `${await rewrittenInstall(f)}\n[profiles.review]\ndefault_permissions = "acc-workspace"\n`;
+  await f.write(changed);
+
+  await f.adapter.install(f.context);
+  const after = await f.read();
+
+  assert.equal(count(after, /^\[permissions\.acc-workspace\]$/gm), 1);
+  assert.match(after, /^\[profiles\.review\]\ndefault_permissions = "acc-workspace"$/m);
+});
+
+test("an empty permissions table a rewrite left above ACC's profile goes with it", async t => {
+  const f = await fixture(t);
+  const changed = (await rewrittenInstall(f)).replace(/^(\[permissions\.acc-workspace\]\n)/m, "[permissions]\n\n$1");
+  await f.write(changed);
+
+  await f.adapter.install(f.context);
+  const installed = await f.read();
+  assert.doesNotMatch(installed, /^\[permissions\]$/m);
+  assert.equal((await f.adapter.detect(f.context)).outgoingDelivery.state, "configured");
+
+  await f.adapter.uninstall(f.context);
+  assert.doesNotMatch(await f.read(), /^\[permissions/m);
+});
