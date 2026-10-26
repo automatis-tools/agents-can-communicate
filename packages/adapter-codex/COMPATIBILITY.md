@@ -10,9 +10,10 @@ standalone daemon ran with the same options. `daemon version` reported the expec
 path, socket and versions.
 
 ACC accepted only `--managed-daemon` after the listener, so it reported
-`daemon_identity_unavailable`, and a fresh-home `acc install` exited 4. ACC now accepts any
-valueless option after `--listen unix://`. The executable, its start time and its listening
-socket still prove the identity.
+`daemon_identity_unavailable`: a fresh-home `acc install` exited 4, and discovery listed no
+chats of the maintainer's running service. ACC now accepts any option-shaped word after
+`--listen unix://`. The executable, its start time and its listening socket still prove the
+identity.
 
 ## Sender socket permissions and approved recovery, 2026-10-08
 

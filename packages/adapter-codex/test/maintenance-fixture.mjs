@@ -30,7 +30,7 @@ export async function maintenanceFixture(t, { binLayout = false } = {}) {
     cliVersion: "0.154.0", managedVersion: "0.154.0", serverVersion: "0.153.4",
     threads: [{ id: "private-thread", status: { type: "idle" } }], queued: [],
     processUnknown: false, processCommand: null, socketOwned: true, backend: "pid",
-    // What a self-installed daemon's command line carries after `--listen unix://`.
+    // What a 0.157.1+ daemon's command line carries after `--listen unix://`.
     daemonOptions: "--managed-daemon" };
   let socket;
   const writePid = () => writeFile(layoutPid(), JSON.stringify({ pid: state.pid,
@@ -69,7 +69,7 @@ export async function maintenanceFixture(t, { binLayout = false } = {}) {
     await symlink(releases, path.join(standalone, "current"));
     state.listenPath = path.join(root, "tmp/codex-daemon-501/220dda598ee8");
     await mkdir(path.dirname(state.listenPath), { recursive: true, mode: 0o700 });
-    state.processCommand = `${await realpath(managedPath)} app-server --listen unix:// --managed-daemon`;
+    state.processCommand = `${await realpath(managedPath)} app-server --listen unix:// ${state.daemonOptions}`;
     await start();
   }
   // A home that never had the standalone package, on a CLI that installs

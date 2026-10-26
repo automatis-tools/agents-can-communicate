@@ -89,6 +89,32 @@ test("a 0.164.0 daemon with its analytics option is the managed daemon", async t
   assert.equal(snapshot.state, "ready", snapshot.reasonCode);
 });
 
+// Discovery checks the same identity before it lists chats, and an unverified
+// daemon lists none: on 0.164.0, chats that had not fired a hook stayed unseen.
+test("discovery lists the chats of a 0.164.0 daemon with its analytics option", async t => {
+  const f = await maintenanceFixture(t, { binLayout: true });
+  f.state.daemonOptions = "--analytics-default-enabled --managed-daemon";
+  await f.selfInstalledLayout();
+  const project = path.join(f.root, "project");
+  await mkdir(project);
+  f.state.threads = [{ id: "thread-idle", cwd: project, parentThreadId: null, ephemeral: false,
+    status: { type: "idle" } }];
+  f.state.hooks = { [project]: ["sessionStart", "sessionEnd", "userPromptSubmit"].map(eventName =>
+    ({ eventName, pluginId: "agents-can-communicate@acc-local", enabled: true, trustStatus: "trusted" })) };
+  const found = await createCodexDiscovery({ run: f.run, open: f.open })
+    .discoverNativeSessions({ env: f.context.env, home: f.context.home });
+  assert.deepEqual(found.map(item => item.sessionId), ["thread-idle"]);
+});
+
+// The maintainer's own service: the standalone package, the same options.
+test("a standalone 0.164.0 daemon with its analytics option is inspected as ready", async t => {
+  const f = await maintenanceFixture(t);
+  f.state.daemonOptions = "--analytics-default-enabled --managed-daemon";
+  await f.daemonLayout157();
+  const snapshot = await f.inspectMaintenance(f.context);
+  assert.equal(snapshot?.state, "ready", snapshot?.reasonCode);
+});
+
 test("a daemon command line with a word that is no option is still refused", async t => {
   const f = await maintenanceFixture(t, { binLayout: true });
   for (const options of ["--analytics-default-enabled extra --managed-daemon", "--managed-daemon; other",
