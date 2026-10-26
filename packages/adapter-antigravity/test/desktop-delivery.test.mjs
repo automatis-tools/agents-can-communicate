@@ -212,8 +212,15 @@ test("the server is read from ps: start time, executable, version and token", as
 
 test("the listening ports are the server's loopback ones", async () => {
   const stdout = "p77034\nf7\nn127.0.0.1:55329\nf8\nn127.0.0.1:55330\nf9\nn*:9000\nf10\nn10.0.0.4:7000\n";
-  assert.deepEqual(await listeningPorts(77034, { run: async () => ({ ok: true, stdout }),
+  assert.deepEqual(await listeningPorts(77034, { platform: "darwin", run: async (_file, args) => {
+    assert.ok(args.includes("-b"), "TCP discovery must not block on filesystem stat/readlink");
+    return { ok: true, stdout };
+  },
     lsof: async () => "/usr/sbin/lsof" }), [55329, 55330]);
+  assert.deepEqual(await listeningPorts(77034, { platform: "linux", run: async (_file, args) => {
+    assert.ok(!args.includes("-b"), "the unmeasured Linux path keeps its existing flags");
+    return { ok: true, stdout };
+  }, lsof: async () => "/usr/bin/lsof" }), [55329, 55330]);
   assert.deepEqual(await listeningPorts(77034, { run: async () => ({ ok: true, stdout }),
     lsof: async () => null }), []);
 });
