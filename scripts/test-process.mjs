@@ -6,10 +6,10 @@ import { nodeTestArguments, testFileTimeout } from "./test-runner-plan.mjs";
 // The outer process owns the pipes and process group. Exiting just a test
 // worker cannot close stdout/stderr inherited by its surviving descendants.
 export async function runTestBatch(files, { cwd, env, report, output = process.stdout,
-  errorOutput = process.stderr }) {
+  errorOutput = process.stderr, spawnChild = spawn }) {
   const selected = new Set(await Promise.all(files.map(file => realpath(path.resolve(cwd, file)))));
   const timeoutMs = testFileTimeout(env);
-  const child = spawn(process.execPath, nodeTestArguments(files, { timings: report, env }), {
+  const child = spawnChild(process.execPath, nodeTestArguments(files, { timings: report, env }), {
     cwd, env, detached: process.platform !== "win32", stdio: ["inherit", "pipe", "pipe", "ipc"],
   });
   return new Promise(resolve => {
@@ -38,6 +38,15 @@ export async function runTestBatch(files, { cwd, env, report, output = process.s
     };
     child.stdout.on("data", chunk => output.write(chunk));
     child.stderr.on("data", chunk => errorOutput.write(chunk));
+    // A killed tree can still have output in its pipes: the reporter writes a
+    // failure and then sends the deadline message, and on Linux the message was
+    // read first and the failure lost (#318). Read until both pipes end, bounded
+    // for a descendant outside the process group that still holds one.
+    const drained = () => Promise.race([
+      Promise.all([child.stdout, child.stderr].map(stream => stream.readableEnded ? null
+        : new Promise(done => { stream.once("end", done); stream.once("close", done); }))),
+      new Promise(done => { closeTimer = setTimeout(done, 2_000); }),
+    ]);
     child.on("message", async message => {
       if (settled || expiring || message?.type !== "acc-test-file-deadline"
         || !selected.has(message.file) || message.timeoutMs !== timeoutMs) return;
@@ -45,6 +54,7 @@ export async function runTestBatch(files, { cwd, env, report, output = process.s
       timeoutRecord = { file: message.file, durationMs: timeoutMs, success: false };
       errorOutput.write(`test file ${message.file} exceeded ${timeoutMs} ms; terminating test process tree\n`);
       await terminate();
+      await drained();
       finish(1);
     });
     child.once("error", error => { errorOutput.write(`${error.message}\n`); finish(1); });

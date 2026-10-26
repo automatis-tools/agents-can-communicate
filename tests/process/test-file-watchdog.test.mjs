@@ -1,8 +1,10 @@
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
-import { mkdtemp, readFile, writeFile } from "node:fs/promises";
+import { EventEmitter } from "node:events";
+import { mkdtemp, readFile, realpath, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import { PassThrough } from "node:stream";
 import test from "node:test";
 import { promisify } from "node:util";
 import { nodeTestArguments } from "../../scripts/test-runner-plan.mjs";
@@ -157,4 +159,31 @@ test("a batch applies its own per-test deadline instead of the parent's environm
   });
   assert.equal(result.code, 1, "the batch ignored its explicit per-test deadline");
   assert.match(output, /test timed out after 50ms/);
+});
+
+// The reporter writes a failure to stderr and then sends the deadline message
+// over IPC. On Linux the parent read the IPC message first, destroyed stderr
+// at once and lost the failure (#318, run 40266451682). The fake child delivers
+// the two in that order.
+test("output that arrives after the deadline message is still read before the batch ends", async t => {
+  const root = await mkdtemp(path.join(tmpdir(), "acc-deadline-drain-"));
+  t.after(() => removeFixture(root));
+  const file = path.join(root, "late-output.test.mjs");
+  await writeFile(file, "");
+  const child = Object.assign(new EventEmitter(), { stdout: new PassThrough(),
+    stderr: new PassThrough(), pid: undefined, connected: false, kill() {}, disconnect() {} });
+  let errors = "";
+  const finished = runTestBatch([file], { cwd: repo,
+    env: environment({ ACC_TEST_FILE_TIMEOUT_MS: "3000" }), report: path.join(root, "timings.jsonl"),
+    output: { write: () => {} }, errorOutput: { write: chunk => { errors += chunk; } },
+    spawnChild: () => child });
+  child.emit("message", { type: "acc-test-file-deadline", file: await realpath(file), timeoutMs: 3000 });
+  await new Promise(resolve => setImmediate(resolve));
+  child.stderr.end("failed before the file deadline: fixture\n");
+  child.stdout.end();
+
+  const result = await finished;
+
+  assert.equal(result.code, 1);
+  assert.match(errors, /failed before the file deadline: fixture/);
 });
