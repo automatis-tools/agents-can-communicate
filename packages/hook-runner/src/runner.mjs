@@ -396,9 +396,17 @@ async function projectTurn({ binding, context, adapter, adapterId, render = null
   // callback proves that the bytes crossed.
   const outcome = { stdout: "", ...renderText(projected) };
   const writableOffers = outcome.stdout === "" ? [] : offerInputs;
+  // A message left for an ended session is told to each session once (#320).
+  // Like an offer, the notice is remembered only after stdout carried it.
+  const left = new Set((sync.attention ?? [])
+    .filter(item => item.kind === "left_for_ended_session").map(item => item.sourceId));
+  const noticed = outcome.stdout === "" ? []
+    : (projection.includedAttentionIds ?? []).filter(id => left.has(id));
+  const noticeInputs = noticed.length === 0 ? [] : [{ sessionId: binding.accSessionId,
+    generation: binding.generation, workspaceId: context.descriptor.id, messageIds: noticed }];
   return withHint({ ...outcome,
     stderr: [outcome.stderr, ownerWarning, degradation].filter(Boolean).join("\n"),
-    offerInputs: writableOffers }, hintFits && ownerFits);
+    offerInputs: writableOffers, noticeInputs }, hintFits && ownerFits);
 }
 
 // The adapter may already have reserved an ask. That reservation is an ask
@@ -895,6 +903,7 @@ export async function runHook({ adapterId, payload, adapters, dataHome, env,
     const result = { ...fallback, ...await work };
     assertHookBudget(deadline);
     const offerInputs = result.offerInputs ?? [];
+    const noticeInputs = result.noticeInputs ?? [];
     let commitPromise = null;
     result.commitOffers = () => {
       if (commitPromise !== null) return commitPromise;
@@ -903,10 +912,20 @@ export async function runHook({ adapterId, payload, adapters, dataHome, env,
           assertHookBudget(deadline, "hook budget exhausted before offer commit");
           await context.service.recordOfferSucceeded({ ...input, deadlineAt: deadline });
         }
+        // A notice that cannot be recorded (the session closed meanwhile, or
+        // the budget ran out) is shown again next turn. That must not report
+        // the offers above, already committed, as failed.
+        for (const input of noticeInputs) {
+          try {
+            assertHookBudget(deadline, "hook budget exhausted before notice commit");
+            await context.service.recordNotices(input);
+          } catch { /* shown again next turn */ }
+        }
       })();
       return commitPromise;
     };
     delete result.offerInputs;
+    delete result.noticeInputs;
 
     // Who is present, for a caller that asks; the hook entry point never does.
     // Reading it took the whole store a second time on every hook, 0.4 s to 4 s

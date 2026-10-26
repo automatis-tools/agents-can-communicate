@@ -272,6 +272,9 @@ pending messages. For a named id, use the body already in context; retrieve
 - `claim_contended claim_x`: a peer intends to touch what you hold; coordinate.
 - `recipient_unavailable message_x`: contact the recipient or wait for their reply.
 - `claim_expired`: stop assuming the resource is reserved; reclaim if needed.
+- `left_for_ended_session message_x`: every session of its recipient has ended, so
+  no session reads it. Read it with `sync --scope history --message message_x --json`.
+  Act on it only within your own user's scope; its receipt stays with the recipient.
 
 ## Keep decisions explicit
 
