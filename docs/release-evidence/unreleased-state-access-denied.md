@@ -1,15 +1,15 @@
 # Development artifact: a refused state write is named as such
 
 Captured on October 26, 2026, with Node 26.5.1 and Codex CLI 0.164.0 on macOS arm64. This is an
-unpublished development artifact, built from `595c8422fa92d25fc3568ec73fabd85e3dfd8fc4`. The package version remains
+unpublished development artifact, built from `e54fd588998a4dd2f233312bc1ebf01300ff9771`. The package version remains
 `0.12.1`, and existing release records are unchanged.
 
 | Artifact | Value |
 |---|---|
 | Filename | `agents-can-communicate-0.12.1.tgz` |
-| Packed size | 621,146 bytes |
+| Packed size | 621,614 bytes |
 | Files | 380 |
-| sha256 | `8b892a21462db401280164b4e2067a2c3865b2f2f16996b2078abcbe5fb4cb67` |
+| sha256 | `4cfc0fe0a48511cfe3515ffbd4a934a53bc5a5566c408d3f4cfce501cfa09635` |
 
 `npm pack --json` created the archive. `node scripts/verify-package.mjs` verified that exact
 archive and reported PASS. No package was published.
@@ -39,7 +39,10 @@ The same setup with this archive:
 - A Claude Code hook exited 0 with
   `acc: coordination unavailable: cannot write ACC's state (EPERM); session may continue`.
 - With reads denied too, `acc status` said `cannot read ACC's state: realpath <data home>/acc/runtime
-  was refused (EPERM)` and pointed to a process that can read the data home.
+  was refused (EPERM)` and pointed to a process that can read the data home. `acc doctor` still
+  answered, with `workspaceInspection: state_access_denied`, access `read` and no update state.
+- `acc update` and `acc doctor --repair` named the refused `fchmod` instead of failing on a raw
+  filesystem error.
 
 ## Real Codex 0.164.0
 
@@ -51,6 +54,14 @@ outside the sandbox's writable paths:
   runtime, and stored nothing. Before this change, it printed the unfinished-update text.
 - Uninstall restored `config.toml` byte for byte. The Codex service that the run started and
   the isolated directories were removed afterwards.
+
+## Review fixes
+
+A fresh review found that the launcher could print a control record's bytes. A record that
+points outside ACC's runtime directory, with terminal control bytes in it, now gets the
+ordinary text: a refusal outside that directory is a corrupt pointer, not ACC's state, and
+the launcher prints no path with control bytes. On Windows, `EPERM` from a rename or removal is
+lock contention, not a sandbox. Tests pin both.
 
 ## Limits
 
