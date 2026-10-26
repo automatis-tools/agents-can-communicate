@@ -287,6 +287,23 @@ your own legacy sandbox configuration, doctor also names the ACC state directory
 access you should check in `sandbox_workspace_write.writable_roots`. Live delivery requires
 local socket permissions as well; a writable state directory alone is insufficient.
 
+## An update says the Codex marketplace is already registered
+
+`acc update` or `acc install` reports
+`codex: marketplace acc-local or its plugin is already registered in this config`, and ACC
+commands answer `runtime unavailable` until the update finishes.
+
+ACC marks the entries it writes in `~/.codex/config.toml` with comments. A program that
+rewrites that file without comments removes the marks, and ACC can no longer tell its
+entries from yours. From 0.12.1, ACC recognises entries that hold exactly what it writes, and
+marks them again on the next install or update:
+- `[marketplaces.acc-local]` at ACC's own marketplace root;
+- `[plugins."agents-can-communicate@acc-local"]` with only `enabled = true`;
+- the `acc-workspace` profile with only ACC's grants.
+
+If the message stays, one of those entries differs from what ACC writes. Back up the file,
+remove the `acc-local` marketplace and plugin tables, and run `acc update`.
+
 ## Gemini does not guard a write
 
 Default and `plan` modes expose no write tool to the model. `auto_edit` exposes edit tools;
