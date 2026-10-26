@@ -8,9 +8,9 @@
 
 | Development artifact | Value |
 |---|---|
-| Built from | `03c1d2d6ef72b948a5b42f7ab122341fa71d774b` |
-| Tarball | `agents-can-communicate-0.11.1.tgz`, 611,046 bytes, 376 files |
-| sha256 | `9ad04e874ba98886e76ab9e6ddfed5ffac6d0b3f86302d21f331d1c16371e8c0` |
+| Built from | `d11dc24083e30517eafc0bcbd40a5fa286665d3a` |
+| Tarball | `agents-can-communicate-0.11.1.tgz`, 611,430 bytes, 376 files |
+| sha256 | `b94ec6e4acd0a62008738fae5f2026ae1311634dbc42d3feab9357d8f60f5983` |
 
 The exact archive passed package verification. See
 [development evidence](docs/release-evidence/unreleased-antigravity-tcp-discovery.md).
