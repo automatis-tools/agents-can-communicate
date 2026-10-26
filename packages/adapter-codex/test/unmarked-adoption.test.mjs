@@ -271,9 +271,10 @@ test("an unmarked profile without all of ACC's grant tables stays the user's", a
 // Codex's own control socket.
 test("an unmarked profile without Codex's control socket stays the user's", async t => {
   const f = await fixture(t);
-  f.context.receiverSockets = ["/private/tmp/acc-test-receiver.sock"];
+  // Inside the fixture's home, so every platform spells its grant the same way.
+  f.context.receiverSockets = [path.join(f.context.home, "receiver", "inbox.sock")];
   const rewritten = await rewrittenInstall(f);
-  assert.match(rewritten, /^"\/private\/tmp\/acc-test-receiver\.sock" = "allow"$/m);
+  assert.match(rewritten, /^"[^"\n]*inbox\.sock" = "allow"$/m);
   const changed = rewritten.replace(/^"[^"\n]*app-server-control\.sock" = "allow"\n/m, "");
   assert.notEqual(changed, rewritten);
   await f.write(changed);
