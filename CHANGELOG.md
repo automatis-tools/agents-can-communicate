@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## Unreleased — Antigravity TCP discovery avoids blocking filesystem calls
 
 - On macOS, Antigravity desktop TCP discovery asks `lsof` to avoid blocking
   filesystem calls, so a stalled mount does not consume its discovery budget.
@@ -14,6 +14,43 @@
 
 The exact archive passed package verification. See
 [development evidence](docs/release-evidence/unreleased-antigravity-tcp-discovery.md).
+This is not a published release; the package version remains `0.11.1`.
+The earlier candidate and release records below retain their original provenance.
+
+## Unreleased — Awesome Claude Code badge
+
+- The README shows the Awesome Claude Code badge, since ACC is listed there (#289).
+
+| Development artifact | Value |
+|---|---|
+| Built from | `c2dddad5a5c9d487d0f7a2f5fa02ad8732e49121` |
+| Tarball | `agents-can-communicate-0.11.1.tgz`, 611,323 bytes, 376 files |
+| sha256 | `e222d53d3bd81b012918c05e37ec6546b4e17e05bb24bc2e1dda9e8ccd4bc208` |
+
+The exact archive passed package verification. See
+[development evidence](docs/release-evidence/unreleased-awesome-badge.md).
+This is not a published release; the package version remains `0.11.1`.
+The earlier candidate and release records below retain their original provenance.
+
+## Unreleased — a lapsed claim is acquired again
+
+- Renewing a claim whose lease has lapsed is refused with a conflict. Another session
+  may have acquired the resource exclusively by then, and renewal checked only
+  ownership, so two sessions could each hold a live exclusive claim on one file and
+  the rightful holder could no longer renew its own (#295, reported with an exact
+  reproduction by @vishalhabib99). Acquiring the resource again repeats the conflict
+  check and reuses the lapsed record when the resource is still free; the expiry is
+  read inside the same transaction as the write. The refusal names the claim's resource
+  and expiry, so the caller knows what to acquire again.
+
+| Development artifact | Value |
+|---|---|
+| Built from | `58d9b81d0df465a087973d37b9ec6912e1453a04` |
+| Tarball | `agents-can-communicate-0.11.1.tgz`, 611,263 bytes, 376 files |
+| sha256 | `a5124ecb26bfca9eb9cfd8040d5229d5932d51ce0a1c5ac1b9bba490e278d6f5` |
+
+The exact archive passed package verification. See
+[development evidence](docs/release-evidence/unreleased-renew-lapsed-claim.md).
 This is not a published release; the package version remains `0.11.1`.
 The earlier candidate and release records below retain their original provenance.
 
