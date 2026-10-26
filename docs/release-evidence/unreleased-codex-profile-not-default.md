@@ -1,15 +1,15 @@
 # Development artifact: ACC's Codex profile is available, not the default
 
 Captured on October 26, 2026, with Node 26.5.1 and Codex CLI 0.164.0 on macOS arm64. This is an
-unpublished development artifact, built from `21749c351f97e99de36638c4a74ba4f5cf524c3e`. The package version remains
+unpublished development artifact, built from `91ffa77648b5fd85d5003a0d29b8f22ff57bdac1`. The package version remains
 `0.12.0`, and existing release records are unchanged.
 
 | Artifact | Value |
 |---|---|
 | Filename | `agents-can-communicate-0.12.0.tgz` |
-| Packed size | 618,623 bytes |
+| Packed size | 618,745 bytes |
 | Files | 379 |
-| sha256 | `a3ea6ae5e9cc2a83dad384880411b85435091e3b0a35458aa7f64cb0afb96cdf` |
+| sha256 | `1dd4345c36061eead55235c7f71150953b68e8563a86cf6b0ee6f1e9c4afea44` |
 
 `npm pack --json` created the archive. `node scripts/verify-package.mjs` verified that exact
 archive and reported PASS. No package was published.
@@ -55,8 +55,8 @@ afterwards.
 ## The maintainer's config
 
 The maintainer's `config.toml` from before the recovery on 2026-10-26 was sorted and had no
-comments. Run against it with the socket list ACC grants on this machine, `adoptUnmarked`
-removed 17 statements:
+comments. Run against it with the socket list ACC grants on this machine and Codex's control
+socket, `adoptUnmarked` removed 17 statements:
 - `default_permissions = "acc-workspace"`;
 - the marketplace and the plugin tables;
 - the four profile tables, with the state directory and the four sockets ACC grants.
