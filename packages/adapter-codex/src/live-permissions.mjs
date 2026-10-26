@@ -20,6 +20,9 @@ const supported = context => compareVersions(context.clientVersion, MINIMUM) >= 
 // Whether new chats must run in ACC's profile for ACC's commands to work.
 export const selectsProfile = context => !(context.ruleAllowsCommands === true
   && compareVersions(context.clientVersion, RULE_SANDBOX_BYPASS) >= 0);
+// The selection ACC's own unit holds: its profile, or Codex's workspace mode,
+// which a config that defines a profile needs as soon as it selects nothing.
+const selection = context => selectsProfile(context) ? PROFILE : ":workspace";
 const hasPermissions = entries => entries.some(entry =>
   ["permissions", "default_permissions", "profile", "profiles"].includes(entry.keys[0]));
 const configured = (source, context) => {
@@ -28,8 +31,7 @@ const configured = (source, context) => {
   const value = keys => entries.find(entry => !entry.header && equal(entry.keys, keys))?.value;
   const selected = literal(value(["default_permissions"]));
   if (entries.some(entry => entry.keys[0] === "sandbox_workspace_write")) return false;
-  if (selectsProfile(context) ? selected !== PROFILE || value(["sandbox_mode"])
-    : selected === PROFILE || (!selected && !value(["sandbox_mode"]))) return false;
+  if (selected !== selection(context) || value(["sandbox_mode"])) return false;
   const profile = PROFILE;
   return literal(value(["permissions", profile, "extends"])) === ":workspace"
     && value(["features", "network_proxy"]) === "true"
@@ -93,8 +95,15 @@ export function grantPath(target, realpath = realpathSync.native) {
 // Every socket ACC delivers to - Codex's own and each receiving adapter's
 // declaration, composed by the installer as `receiverSockets` - and nothing
 // else: grants cover ACC's local receivers, never arbitrary Unix sockets.
-const sockets = context => [...new Set([controlSocket(context), ...(context.receiverSockets ?? [])]
+export const sockets = context => [...new Set([controlSocket(context), ...(context.receiverSockets ?? [])]
   .map(socket => grantPath(socket, context.realpath)))].sort();
+
+// Whether the user's own config, without ACC's units, selects a mode.
+const selectsMode = source => {
+  const ownership = inspectPermissions(source);
+  return scanConfig(ownership.state === "owned" ? ownership.source : source).some(entry => !entry.header
+    && (equal(entry.keys, ["sandbox_mode"]) || equal(entry.keys, ["default_permissions"])));
+};
 
 export function outgoingStatus(source, context) {
   const state = inspectPermissions(source).state;
@@ -109,10 +118,15 @@ export function outgoingStatus(source, context) {
         + "local sockets ACC delivers to - ACC's own channel, the Codex control socket and other clients' session "
         + "inboxes - through the network proxy (external network stays denied); custom policies are preserved. "
         + "Start a new session after installation."
-      : `Codex outgoing setup: ACC's rules file runs its commands outside the Codex sandbox, so new chats keep `
-        + `their usual mode. A permission profile named ${PROFILE} grants the same access - ACC state and the `
-        + "local sockets ACC delivers to, external network denied - for a chat that selects it; custom policies "
-        + "are preserved. Start a new session after installation.",
+      : `Codex outgoing setup: ACC's rules file runs its commands outside the Codex sandbox, so ACC defines a `
+        + `permission profile named ${PROFILE} and selects it for no chat. `
+        + (selectsMode(source)
+          ? `ACC keeps your workspace mode, written as default_permissions = ":workspace", and restores your own `
+            + "line on removal. "
+          : `Your config selects no mode, so ACC sets default_permissions = ":workspace", Codex's workspace mode: `
+            + "a defined profile needs a selection. ")
+        + "The profile grants ACC state and the local sockets ACC delivers to, external network denied, for a "
+        + "chat that selects it; custom policies are preserved. Start a new session after installation.",
     diagnostic: reasonCode === null
       ? selectsProfile(context)
         ? "outgoing live delivery: local socket permissions configured for new sessions; active session overrides remain unverified"
@@ -174,18 +188,13 @@ export function prepareLivePermissions(source, context) {
   const customized = hasCustomPolicy(source, context);
   if (customized) return { source, skipLegacy: hasPermissions(entries), status: outgoingStatus(source, context) };
   // The selection unit always carries the restore metadata: an older ACC
-  // accepts it nowhere else. Where ACC's rules file carries its commands, it
-  // selects nothing over the user's own mode, and only a config that selects
-  // nothing gets Codex's workspace mode: a defined profile needs a selection.
-  // A user's own `sandbox_mode` stays where it is; a `default_permissions` of
-  // their own (only `:workspace` is not custom) moves into the unit, unchanged,
-  // since a selector outside ACC's blocks would make the profile custom policy.
-  const select = selectsProfile(context);
-  const edits = [{ id: "selection", start: 0, end: 0,
-    body: select ? `default_permissions = "${PROFILE}"\n`
-      : modes.length > 0 ? "" : 'default_permissions = ":workspace"\n' }];
-  for (const [id, values] of select ? [["mode", modes], ["default", defaults]]
-    : modes.length > 0 ? [] : [["default", defaults]]) {
+  // accepts it nowhere else. It selects ACC's profile, or, where ACC's rules
+  // file carries its commands, Codex's workspace mode. The user's own
+  // selection - only workspace-write and `:workspace` are not custom - moves
+  // into ACC's units and comes back on removal: a selection line outside ACC's
+  // blocks would make the profile the user's policy.
+  const edits = [{ id: "selection", start: 0, end: 0, body: `default_permissions = "${selection(context)}"\n` }];
+  for (const [id, values] of [["mode", modes], ["default", defaults]]) {
     if (values.length) edits.push({ id, start: values[0].start, end: values[0].end, body: "" });
   }
   if (legacy.length) {
