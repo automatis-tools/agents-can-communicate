@@ -1,5 +1,35 @@
 # Changelog
 
+## Unreleased — ACC's Codex profile is available, not the default
+
+- New Codex chats no longer open in ACC's permission profile `acc-workspace`. Codex Desktop
+  showed it as a selected approval mode next to "Ask for approval" and "Approve for me". From
+  Codex 0.164.0, a command that ACC's rules file allows runs outside the sandbox without the
+  model asking, so ACC's commands do not need the profile. ACC still defines the profile for
+  a chat that selects it, and keeps the user's own `sandbox_mode`. A config that selects
+  nothing gets `default_permissions = ":workspace"`, Codex's own workspace mode, since Codex
+  refuses a defined profile with no selection. An update moves a config ACC had set to its
+  profile back.
+- ACC still selects its profile where the rule cannot carry its commands: on Windows, with
+  a foreign or edited rules file, and with Codex older than 0.164.0.
+- ACC recognises its own Codex entries when a rewrite of `config.toml` dropped their
+  comment markers (#329). On the maintainer's machine another program sorted the file and
+  removed every comment. The 0.12.0 update then refused the Codex refresh, and until that
+  was resolved, every ACC command answered `runtime unavailable`. Entries that hold
+  exactly what ACC writes are adopted and marked again; anything else is refused or
+  preserved as before.
+
+| Development artifact | Value |
+|---|---|
+| Built from | `d563fce95d7863c08215088e0fd2f68cc9e0d3b5` |
+| Tarball | `agents-can-communicate-0.12.0.tgz`, 617,081 bytes, 379 files |
+| sha256 | `aabda0c2642fcf3889654be51cc1ffc5afe4852bc8c708f3bd3e7a02661383fb` |
+
+The exact archive passed package verification. See
+[development evidence](docs/release-evidence/unreleased-codex-profile-not-default.md).
+This is not a published release; the package version remains `0.12.0`.
+The earlier candidate and release records below retain their original provenance.
+
 ## 0.12.0 — release candidate
 
 - A message left for a session that ended now reaches the rest of the room. A new
