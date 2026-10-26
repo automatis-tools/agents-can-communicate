@@ -50,7 +50,11 @@ test("installed MCP routes with consent from its nondefault data home",
     version: "0.152.1", artifacts: [], deliveryPolicy });
   const mcp = connectMcp({ binary: packed.mcpBin, cwd: packed.project, dataHome: packed.dataHome,
     env: { ...packed.env, ACC_MCP_WORKSPACE: packed.project } });
-  t.after(() => mcp.close());
+  // Closed through the fixture's stack, before its directory is removed: the
+  // server writes into the workspace, and removing the directory under it
+  // failed with ENOTEMPTY. That failure skipped the later after hooks, and the
+  // server's open pipes then held the file until its deadline (#323).
+  packed.defer(() => mcp.close());
   for (const [selected, other, expected] of [["actionable", "off", "offered"], ["off", "all", "queued"]]) {
     await policy(packed.dataHome, selected);
     await policy(otherHome, other);

@@ -1,8 +1,10 @@
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
-import { mkdtemp, readFile, writeFile } from "node:fs/promises";
+import { EventEmitter } from "node:events";
+import { mkdtemp, readFile, realpath, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import { PassThrough } from "node:stream";
 import test from "node:test";
 import { promisify } from "node:util";
 import { nodeTestArguments } from "../../scripts/test-runner-plan.mjs";
@@ -73,7 +75,9 @@ test("the parent deadline closes descendant-held pipes and terminates its test p
     }
     await removeFixture(root);
   });
-  const file = path.join(root, "inherited-pipe.test.mjs");
+  // Not named *.test.mjs: the in-file watchdog would end the file first, and
+  // this case is about what the parent deadline does with a surviving pipe.
+  const file = path.join(root, "inherited-pipe.mjs");
   await writeFile(file, `import { spawn } from "node:child_process";
     import test from "node:test";
     import { writeFileSync } from "node:fs";
@@ -94,7 +98,7 @@ test("the parent deadline closes descendant-held pipes and terminates its test p
   });
   assert.equal(result.code, 1);
   assert.match(output, /descendant holds pipes/, "fixture never reached the inherited-pipe condition");
-  assert.match(errors, /inherited-pipe\.test\.mjs.*3000 ms/);
+  assert.match(errors, /inherited-pipe\.mjs.*3000 ms/);
   assert.ok(performance.now() - started < 9000, "gate waited for the surviving descendant");
   descendant = Number(await readFile(pidFile, "utf8"));
   const alive = async () => {
@@ -157,4 +161,62 @@ test("a batch applies its own per-test deadline instead of the parent's environm
   });
   assert.equal(result.code, 1, "the batch ignored its explicit per-test deadline");
   assert.match(output, /test timed out after 50ms/);
+});
+
+// The reporter writes a failure to stderr and then sends the deadline message
+// over IPC. On Linux the parent read the IPC message first, destroyed stderr
+// at once and lost the failure (#318, run 40266451682). The fake child delivers
+// the two in that order.
+test("output that arrives after the deadline message is still read before the batch ends", async t => {
+  const root = await mkdtemp(path.join(tmpdir(), "acc-deadline-drain-"));
+  t.after(() => removeFixture(root));
+  const file = path.join(root, "late-output.test.mjs");
+  await writeFile(file, "");
+  const child = Object.assign(new EventEmitter(), { stdout: new PassThrough(),
+    stderr: new PassThrough(), pid: undefined, connected: false, kill() {}, disconnect() {} });
+  let errors = "";
+  let spawned;
+  const started = new Promise(resolve => { spawned = resolve; });
+  const finished = runTestBatch([file], { cwd: repo,
+    env: environment({ ACC_TEST_FILE_TIMEOUT_MS: "3000" }), report: path.join(root, "timings.jsonl"),
+    output: { write: () => {} }, errorOutput: { write: chunk => { errors += chunk; } },
+    spawnChild: () => { setImmediate(spawned); return child; } });
+  // The batch resolves the file's real path before it starts the child.
+  await started;
+  child.emit("message", { type: "acc-test-file-deadline", file: await realpath(file), timeoutMs: 3000 });
+  await new Promise(resolve => setImmediate(resolve));
+  child.stderr.end("failed before the file deadline: fixture\n");
+  child.stdout.end();
+
+  const result = await finished;
+
+  assert.equal(result.code, 1);
+  assert.match(errors, /failed before the file deadline: fixture/);
+});
+
+// Node reports a file's tests to reporters when the file ends, so a reporter
+// cannot see a failure in a file that hangs, and a parent kill also loses what
+// the file printed (#327's ubuntu job). The in-file watchdog acts first: the
+// file ends itself, and the run's closing summary names the failure as usual.
+test("a hanging file ends itself before the parent deadline, and its failure is summarised", async t => {
+  const root = await mkdtemp(path.join(tmpdir(), "acc-file-first-"));
+  t.after(() => removeFixture(root));
+  const file = path.join(root, "fails-then-hangs.test.mjs");
+  await writeFile(file, `import assert from "node:assert/strict";
+    import test from "node:test";
+    test("fails, then leaves a handle", () => {
+      setInterval(() => {}, 1000);
+      assert.equal(1, 2, "fixture assertion text");
+    });
+  `);
+  let output = "";
+  const result = await runTestBatch([file], { cwd: repo,
+    env: environment({ ACC_TEST_FILE_TIMEOUT_MS: "3000", ACC_TEST_FORCE_EXIT: "0" }),
+    report: path.join(root, "timings.jsonl"),
+    output: { write: chunk => { output += chunk; } }, errorOutput: { write: chunk => { output += chunk; } },
+  });
+  assert.equal(result.code, 1);
+  assert.doesNotMatch(output, /terminating test process tree/, "the parent deadline had to act");
+  assert.match(output, /kept alive by: .*Timeout/);
+  assert.match(output, /fixture assertion text/);
 });
