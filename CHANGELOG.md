@@ -6,9 +6,9 @@
 
 | Development artifact | Value |
 |---|---|
-| Built from | `359cda0ca0cfabe5dc4d741104dbf2c0860cf4d9` |
-| Tarball | `agents-can-communicate-0.11.1.tgz`, 610,989 bytes, 376 files |
-| sha256 | `0426c47836dde9174c9270025dbaf71a86b203d29d005a6597ad75fba4a8f7e1` |
+| Built from | `c2dddad5a5c9d487d0f7a2f5fa02ad8732e49121` |
+| Tarball | `agents-can-communicate-0.11.1.tgz`, 611,323 bytes, 376 files |
+| sha256 | `e222d53d3bd81b012918c05e37ec6546b4e17e05bb24bc2e1dda9e8ccd4bc208` |
 
 The exact archive passed package verification. See
 [development evidence](docs/release-evidence/unreleased-awesome-badge.md).
