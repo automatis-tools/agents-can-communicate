@@ -72,3 +72,56 @@ test("a new home on a CLI older than the self-installing one still needs the sta
   assert.equal(plan.reasonCode, "managed_install_missing");
   assert.equal(plan.requiresInstall, true);
 });
+
+// #331, measured on Codex 0.164.0 (2026-10-26), in a fresh home and in the
+// maintainer's standalone one: the daemon runs as `<managed codex> app-server
+// --listen unix:// --analytics-default-enabled --managed-daemon`.
+test("a 0.164.0 daemon with its analytics option is the managed daemon", async t => {
+  const f = await serviceFixture(t, { binLayout: true });
+  await f.selfInstalledLayout({ started: false });
+  f.state.cliVersion = f.state.managedVersion = f.state.serverVersion = "0.164.0";
+  f.state.daemonOptions = "--analytics-default-enabled --managed-daemon";
+  const plan = await f.inspectNativeServiceSetup(f.context);
+  const result = await f.prepareNativeServiceSetup({ context: f.context, plan });
+  assert.equal(result.state, "ready", result.reasonCode);
+  assert.equal(result.started, true);
+  const snapshot = await createCodexMaintenance({ run: f.run, open: f.open }).inspectMaintenance(f.context);
+  assert.equal(snapshot.state, "ready", snapshot.reasonCode);
+});
+
+// Discovery checks the same identity before it lists chats, and an unverified
+// daemon lists none: on 0.164.0, chats that had not fired a hook stayed unseen.
+test("discovery lists the chats of a 0.164.0 daemon with its analytics option", async t => {
+  const f = await maintenanceFixture(t, { binLayout: true });
+  f.state.daemonOptions = "--analytics-default-enabled --managed-daemon";
+  await f.selfInstalledLayout();
+  const project = path.join(f.root, "project");
+  await mkdir(project);
+  f.state.threads = [{ id: "thread-idle", cwd: project, parentThreadId: null, ephemeral: false,
+    status: { type: "idle" } }];
+  f.state.hooks = { [project]: ["sessionStart", "sessionEnd", "userPromptSubmit"].map(eventName =>
+    ({ eventName, pluginId: "agents-can-communicate@acc-local", enabled: true, trustStatus: "trusted" })) };
+  const found = await createCodexDiscovery({ run: f.run, open: f.open })
+    .discoverNativeSessions({ env: f.context.env, home: f.context.home });
+  assert.deepEqual(found.map(item => item.sessionId), ["thread-idle"]);
+});
+
+// The maintainer's own service: the standalone package, the same options.
+test("a standalone 0.164.0 daemon with its analytics option is inspected as ready", async t => {
+  const f = await maintenanceFixture(t);
+  f.state.daemonOptions = "--analytics-default-enabled --managed-daemon";
+  await f.daemonLayout157();
+  const snapshot = await f.inspectMaintenance(f.context);
+  assert.equal(snapshot?.state, "ready", snapshot?.reasonCode);
+});
+
+test("a daemon command line with a word that is no option is still refused", async t => {
+  const f = await maintenanceFixture(t, { binLayout: true });
+  for (const options of ["--analytics-default-enabled extra --managed-daemon", "--managed-daemon; other",
+    "--managed-daemon --listen tcp://0.0.0.0:1"]) {
+    f.state.daemonOptions = options;
+    await f.selfInstalledLayout();
+    const snapshot = await createCodexMaintenance({ run: f.run, open: f.open }).inspectMaintenance(f.context);
+    assert.equal(snapshot.reasonCode, "daemon_identity_unavailable", options);
+  }
+});

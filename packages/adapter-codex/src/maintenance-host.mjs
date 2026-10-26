@@ -202,11 +202,15 @@ export function socketListedIn(stdout, socketPaths) {
 
 // The daemon's command line as measured: 0.154.0 ran `<current path> app-server
 // --listen unix://`; 0.157.1 runs the resolved releases path with
-// `--managed-daemon` appended. The executable must live in the package tree of
-// the installed layout and be the managed binary itself, however it is named.
-const DAEMON_COMMAND = /^(\/.+?) app-server --listen unix:\/\/(?: --managed-daemon)?$/;
+// `--managed-daemon` appended, and 0.164.0 puts `--analytics-default-enabled`
+// before it (#331). The executable must live in the package tree of the
+// installed layout and be the managed binary itself, however it is named; that,
+// its start time and its socket are the identity. Words shaped like options
+// after the listener are Codex's own launch settings, so any of them is
+// accepted, and any other word is refused.
+const DAEMON_COMMAND = /^(\/.+?) app-server --listen unix:\/\/(?: --[a-z0-9][a-z0-9-]*)*$/;
 // Windows quotes the path and gives it the \\?\ prefix (measured on 0.159.3).
-const WINDOWS_DAEMON_COMMAND = /^"(?:\\\\\?\\)?([^"]+)" app-server --listen unix:\/\/(?: --managed-daemon)?$/;
+const WINDOWS_DAEMON_COMMAND = /^"(?:\\\\\?\\)?([^"]+)" app-server --listen unix:\/\/(?: --[a-z0-9][a-z0-9-]*)*$/;
 
 export async function verifyMaintenanceProcess(snapshot, paths, run, { lsof = resolveLsof,
   system = WINDOWS_SYSTEM } = {}) {

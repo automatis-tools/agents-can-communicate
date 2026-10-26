@@ -21,6 +21,21 @@ program rewrote `config.toml` sorted and without comments between 2026-10-07 and
 `codex features enable` keeps comments, so the writer was a different path. The Codex desktop
 app or its app-server configuration writes are suspected; this is not confirmed.
 
+## Daemon launch option, 2026-10-26
+
+Codex 0.164.0 on macOS arm64 (#331). In a fresh isolated home, `codex app-server daemon start`
+installed the self-installed layout and ran the daemon as
+`<CODEX_HOME>/packages/app-server-daemon/releases/0.164.0-aarch64-apple-darwin/bin/codex
+app-server --listen unix:// --analytics-default-enabled --managed-daemon`. The maintainer's
+standalone daemon ran with the same options. `daemon version` reported the expected managed
+path, socket and versions.
+
+ACC accepted only `--managed-daemon` after the listener, so it reported
+`daemon_identity_unavailable`: a fresh-home `acc install` exited 4, and discovery listed no
+chats of the maintainer's running service. ACC now accepts any option-shaped word after
+`--listen unix://`. The executable, its start time and its listening socket still prove the
+identity.
+
 ## Sender socket permissions and approved recovery, 2026-10-08
 
 Issue #285, Codex 0.162.0 on macOS arm64. In a sender sandbox, `lstat` of the

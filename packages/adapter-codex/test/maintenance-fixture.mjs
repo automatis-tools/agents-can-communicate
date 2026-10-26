@@ -29,7 +29,9 @@ export async function maintenanceFixture(t, { binLayout = false } = {}) {
   const state = { pid: 45678, processStartTime: "Thu Sep 10 03:15:00 2026", running: false,
     cliVersion: "0.154.0", managedVersion: "0.154.0", serverVersion: "0.153.4",
     threads: [{ id: "private-thread", status: { type: "idle" } }], queued: [],
-    processUnknown: false, processCommand: null, socketOwned: true, backend: "pid" };
+    processUnknown: false, processCommand: null, socketOwned: true, backend: "pid",
+    // What a 0.157.1+ daemon's command line carries after `--listen unix://`.
+    daemonOptions: "--managed-daemon" };
   let socket;
   const writePid = () => writeFile(layoutPid(), JSON.stringify({ pid: state.pid,
     processStartTime: state.processStartTime }));
@@ -47,7 +49,7 @@ export async function maintenanceFixture(t, { binLayout = false } = {}) {
       await symlink(selfRelease, path.join(codexHome, "packages/app-server-daemon/current")).catch(error => {
         if (error.code !== "EEXIST") throw error; });
       await mkdir(path.dirname(selfPidPath), { recursive: true });
-      state.processCommand = `${await realpath(path.join(selfRelease, "bin", "codex"))} app-server --listen unix:// --managed-daemon`;
+      state.processCommand = `${await realpath(path.join(selfRelease, "bin", "codex"))} app-server --listen unix:// ${state.daemonOptions}`;
     }
     socket = net.createServer();
     await new Promise((resolve, reject) => { socket.once("error", reject); socket.listen(listenPath, resolve); });
@@ -67,7 +69,7 @@ export async function maintenanceFixture(t, { binLayout = false } = {}) {
     await symlink(releases, path.join(standalone, "current"));
     state.listenPath = path.join(root, "tmp/codex-daemon-501/220dda598ee8");
     await mkdir(path.dirname(state.listenPath), { recursive: true, mode: 0o700 });
-    state.processCommand = `${await realpath(managedPath)} app-server --listen unix:// --managed-daemon`;
+    state.processCommand = `${await realpath(managedPath)} app-server --listen unix:// ${state.daemonOptions}`;
     await start();
   }
   // A home that never had the standalone package, on a CLI that installs

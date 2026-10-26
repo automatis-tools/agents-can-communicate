@@ -40,6 +40,32 @@ The exact archive passed package verification. See
 This is not a published release; the package version remains `0.12.0`.
 The earlier candidate and release records below retain their original provenance.
 
+## Unreleased — the Codex 0.164.0 daemon is verified
+
+- ACC verifies the daemon that Codex 0.164.0 starts (#331). That daemon runs with a new
+  launch option, `--analytics-default-enabled`, before `--managed-daemon`. ACC accepted
+  only `--managed-daemon` there, so it reported `daemon_identity_unavailable` for a healthy
+  service:
+  - on a Codex home whose service had never run, `acc install` reported "1 failed" and
+    exited 4;
+  - status-time discovery of Codex chats that had not fired a hook yet found none;
+  - while no chat was loaded, install and doctor could not verify the service.
+
+  ACC now accepts any option-shaped word after `--listen unix://`. The managed executable,
+  its start time and its socket still prove the identity, and any other word on the command
+  line is still refused.
+
+| Development artifact | Value |
+|---|---|
+| Built from | `98900b81782e7cebd360084486d0a202d4a7b2af` |
+| Tarball | `agents-can-communicate-0.12.0.tgz`, 614,044 bytes, 378 files |
+| sha256 | `c971a79a4f2648c1fb6161c8a6a8683c1a6596d9bd9b11443eb30748c064f7a1` |
+
+The exact archive passed package verification. See
+[development evidence](docs/release-evidence/unreleased-codex-daemon-launch-option.md).
+This is not a published release; the package version remains `0.12.0`.
+The earlier candidate and release records below retain their original provenance.
+
 ## 0.12.0 — release candidate
 
 - A message left for a session that ended now reaches the rest of the room. A new
