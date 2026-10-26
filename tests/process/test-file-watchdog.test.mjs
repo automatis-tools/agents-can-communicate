@@ -191,3 +191,30 @@ test("output that arrives after the deadline message is still read before the ba
   assert.equal(result.code, 1);
   assert.match(errors, /failed before the file deadline: fixture/);
 });
+
+// Node reports a file's tests to reporters when the file ends, so a reporter
+// cannot see a failure in a file that hangs, and a parent kill also loses what
+// the file printed (#327's ubuntu job). The in-file watchdog acts first: the
+// file ends itself, and the run's closing summary names the failure as usual.
+test("a hanging file ends itself before the parent deadline, and its failure is summarised", async t => {
+  const root = await mkdtemp(path.join(tmpdir(), "acc-file-first-"));
+  t.after(() => removeFixture(root));
+  const file = path.join(root, "fails-then-hangs.test.mjs");
+  await writeFile(file, `import assert from "node:assert/strict";
+    import test from "node:test";
+    test("fails, then leaves a handle", () => {
+      setInterval(() => {}, 1000);
+      assert.equal(1, 2, "fixture assertion text");
+    });
+  `);
+  let output = "";
+  const result = await runTestBatch([file], { cwd: repo,
+    env: environment({ ACC_TEST_FILE_TIMEOUT_MS: "3000", ACC_TEST_FORCE_EXIT: "0" }),
+    report: path.join(root, "timings.jsonl"),
+    output: { write: chunk => { output += chunk; } }, errorOutput: { write: chunk => { output += chunk; } },
+  });
+  assert.equal(result.code, 1);
+  assert.doesNotMatch(output, /terminating test process tree/, "the parent deadline had to act");
+  assert.match(output, /kept alive by: .*Timeout/);
+  assert.match(output, /fixture assertion text/);
+});
