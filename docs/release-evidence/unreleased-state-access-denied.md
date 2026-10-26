@@ -1,15 +1,15 @@
 # Development artifact: a refused state write is named as such
 
 Captured on October 26, 2026, with Node 26.5.1 and Codex CLI 0.164.0 on macOS arm64. This is an
-unpublished development artifact, built from `78f586439316d3a93ae07f6100d55b5eec43ae95`. The package version remains
+unpublished development artifact, built from `595c8422fa92d25fc3568ec73fabd85e3dfd8fc4`. The package version remains
 `0.12.1`, and existing release records are unchanged.
 
 | Artifact | Value |
 |---|---|
 | Filename | `agents-can-communicate-0.12.1.tgz` |
-| Packed size | 620,751 bytes |
+| Packed size | 621,146 bytes |
 | Files | 380 |
-| sha256 | `110aa5a0e93cd44e2cf1438aea47c041c97c014b34dc7fdacdf41f9be3205297` |
+| sha256 | `8b892a21462db401280164b4e2067a2c3865b2f2f16996b2078abcbe5fb4cb67` |
 
 `npm pack --json` created the archive. `node scripts/verify-package.mjs` verified that exact
 archive and reported PASS. No package was published.
@@ -38,6 +38,8 @@ The same setup with this archive:
   the refused `fchmod` and phase `ready`.
 - A Claude Code hook exited 0 with
   `acc: coordination unavailable: cannot write ACC's state (EPERM); session may continue`.
+- With reads denied too, `acc status` said `cannot read ACC's state: realpath <data home>/acc/runtime
+  was refused (EPERM)` and pointed to a process that can read the data home.
 
 ## Real Codex 0.164.0
 

@@ -7,16 +7,17 @@
   after the update or run acc update to recover`. `acc doctor` reported
   `unavailable_during_update` while the runtime was ready and nothing was pending (#316,
   seen in ChatGPT Work Mode and in a Codex chat without ACC's rules file). Commands now exit
-  4 with `reasonCode: state_access_denied`, name the refused write and the real update
-  state, and point to a process that can write the data home. `acc doctor` reports
+  4 with `reasonCode: state_access_denied`, name the refused operation, whether it was a
+  read or a write, and the real update state, and point to a process that can use the data
+  home. `acc doctor` reports
   `scope: runtime` and `workspaceInspection: state_access_denied` with the refusal. Hooks
   still fail open, and name only the refused code.
 
 | Development artifact | Value |
 |---|---|
-| Built from | `78f586439316d3a93ae07f6100d55b5eec43ae95` |
-| Tarball | `agents-can-communicate-0.12.1.tgz`, 620,751 bytes, 380 files |
-| sha256 | `110aa5a0e93cd44e2cf1438aea47c041c97c014b34dc7fdacdf41f9be3205297` |
+| Built from | `595c8422fa92d25fc3568ec73fabd85e3dfd8fc4` |
+| Tarball | `agents-can-communicate-0.12.1.tgz`, 621,146 bytes, 380 files |
+| sha256 | `8b892a21462db401280164b4e2067a2c3865b2f2f16996b2078abcbe5fb4cb67` |
 
 The exact archive passed package verification. See
 [development evidence](docs/release-evidence/unreleased-state-access-denied.md).
