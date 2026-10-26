@@ -23,16 +23,17 @@
   removed every comment. The 0.12.0 update then refused the Codex refresh, and until that
   was resolved, every ACC command answered `runtime unavailable`. Entries that hold
   exactly what ACC writes are adopted and marked again: the marketplace and the plugin
-  together, the profile only with sockets ACC grants now and with nothing else naming it.
+  together, the profile only with all of ACC's grant tables, sockets ACC grants now and
+  nothing else naming it.
   Anything else is refused or preserved as before, and a comment among them stays. The
   mode and `network_proxy` setting ACC had moved aside cannot come back after such a
   rewrite; uninstall then leaves Codex's read-only default, never a wider one.
 
 | Development artifact | Value |
 |---|---|
-| Built from | `e19f5e4942012cdd70933235ff3275bcff0fd752` |
-| Tarball | `agents-can-communicate-0.12.0.tgz`, 618,581 bytes, 379 files |
-| sha256 | `15eb902c338eafc38aeaf68ededf35bd31aabd01fc1719813484dd57421a0c39` |
+| Built from | `21749c351f97e99de36638c4a74ba4f5cf524c3e` |
+| Tarball | `agents-can-communicate-0.12.0.tgz`, 618,623 bytes, 379 files |
+| sha256 | `a3ea6ae5e9cc2a83dad384880411b85435091e3b0a35458aa7f64cb0afb96cdf` |
 
 The exact archive passed package verification. See
 [development evidence](docs/release-evidence/unreleased-codex-profile-not-default.md).

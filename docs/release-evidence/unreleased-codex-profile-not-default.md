@@ -1,15 +1,15 @@
 # Development artifact: ACC's Codex profile is available, not the default
 
 Captured on October 26, 2026, with Node 26.5.1 and Codex CLI 0.164.0 on macOS arm64. This is an
-unpublished development artifact, built from `e19f5e4942012cdd70933235ff3275bcff0fd752`. The package version remains
+unpublished development artifact, built from `21749c351f97e99de36638c4a74ba4f5cf524c3e`. The package version remains
 `0.12.0`, and existing release records are unchanged.
 
 | Artifact | Value |
 |---|---|
 | Filename | `agents-can-communicate-0.12.0.tgz` |
-| Packed size | 618,581 bytes |
+| Packed size | 618,623 bytes |
 | Files | 379 |
-| sha256 | `15eb902c338eafc38aeaf68ededf35bd31aabd01fc1719813484dd57421a0c39` |
+| sha256 | `a3ea6ae5e9cc2a83dad384880411b85435091e3b0a35458aa7f64cb0afb96cdf` |
 
 `npm pack --json` created the archive. `node scripts/verify-package.mjs` verified that exact
 archive and reported PASS. No package was published.
@@ -47,7 +47,7 @@ A config whose last line was `sandbox_mode = "workspace-write"`, with no newline
 On a fresh `CODEX_HOME` whose Codex service had never run, `acc install` exited 4 with
 `Codex service preparation could not verify daemon_identity_unavailable`. Released 0.12.0
 (sha256 `70b62881…9da6a8`) does the same in the same setup, so this branch did not cause it.
-A second install, with the service running, exited 0. This is recorded as a separate defect.
+A second install, with the service running, exited 0. This is #331, fixed separately in #332.
 
 The isolated directories and the Codex services the isolated homes started were removed
 afterwards.
