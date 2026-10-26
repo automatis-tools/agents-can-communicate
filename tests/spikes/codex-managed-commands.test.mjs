@@ -26,7 +26,7 @@ test("native harness verifies managed launchers and their exact installed genera
   const moduleRoot = path.join(packageRoot, "node_modules", "@agents-can-communicate", "cli", "src", "managed-runtime");
   await mkdir(moduleRoot, { recursive: true });
   for (const name of ["entry", "command-prefix", "state", "generation-files", "mutex", "leases", "schedule", "policy",
-    "portable-fs"]) {
+    "portable-fs", "admission"]) {
     await cp(new URL(`../../packages/cli/src/managed-runtime/${name}.mjs`, import.meta.url),
       path.join(moduleRoot, `${name}.mjs`));
   }
