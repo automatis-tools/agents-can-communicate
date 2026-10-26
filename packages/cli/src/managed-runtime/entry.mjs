@@ -98,9 +98,10 @@ export async function runEntry({ kind, packageRoot, managerRoot, managedRequired
   let selected = packageRoot;
   let managed = null;
   let managementOnly = false;
-  let root;
+  let root, location;
   try {
-    root = await canonicalManagerRoot(managerRoot ?? managerLocation());
+    location = managerRoot ?? managerLocation();
+    root = await canonicalManagerRoot(location);
     const control = await readControl(root);
     if (control !== null) {
       selected = control.active.root;
@@ -121,7 +122,8 @@ export async function runEntry({ kind, packageRoot, managerRoot, managedRequired
   } catch (error) {
     // A write the filesystem refused is named as such (#316): an unfinished
     // update is the advice for every other admission failure.
-    const denied = admissionFailure(error, root);
+    // The runtime directory as resolved, or as configured when resolving it was refused.
+    const denied = admissionFailure(error, root ?? location);
     // Help and update recovery must remain reachable when state cannot admit a
     // workspace command. The CLI parser enforces this restricted path; merely
     // putting --help in a message value cannot bypass runtime admission.
@@ -132,7 +134,7 @@ export async function runEntry({ kind, packageRoot, managerRoot, managedRequired
     if (kind === "acc" && selected) {
       try {
         const runtime = await import(pathToFileURL(path.join(selected, "bin", "entrypoints", "acc.mjs")).href);
-        await runtime.main({ managerRoot: root ?? null, packageRoot: selected, managementOnly: true,
+        await runtime.main({ managerRoot: root ?? (denied ? location : null), packageRoot: selected, managementOnly: true,
           ...(denied ? { admission: denied } : {}) });
         return;
       } catch { /* Fall through to the same graceful unavailability below. */ }

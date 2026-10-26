@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { execFile, spawn } from "node:child_process";
 import { once } from "node:events";
-import { mkdir, mkdtemp, realpath, writeFile } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, realpath, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { tmpdir } from "node:os";
 import test from "node:test";
@@ -38,6 +38,22 @@ test("an admission the filesystem refuses is a denied state access, named by its
   // fchmod on a handle reports no path; the runtime directory admission was writing names it.
   assert.equal(admissionFailure(Object.assign(new Error("EPERM"), { code: "EPERM", syscall: "fchmod" }),
     "/data/acc/runtime").path, "/data/acc/runtime");
+  // A refusal outside ACC's runtime directory is a corrupt pointer, not ACC's
+  // state; a path ACC would print is never reflected with control characters.
+  const refused = (syscall, path) => Object.assign(new Error("EACCES"), { code: "EACCES", syscall, path });
+  assert.equal(admissionFailure(refused("realpath", "/var/root/x"), "/data/acc/runtime"), null);
+  assert.equal(admissionFailure(refused("realpath", "/data/acc/runtime-other"), "/data/acc/runtime"), null);
+  assert.equal(admissionFailure(refused("open", "/data/acc/runtime/x\u001b[31m\nfake"), "/data/acc/runtime").path,
+    "/data/acc/runtime");
+  assert.equal(admissionFailure(refused("realpath", "/data/acc/runtime"), "/data/acc/runtime").path, "/data/acc/runtime");
+  // Windows refuses a rename or removal of a directory something holds open with
+  // EPERM; that is contention to retry, not a sandbox.
+  for (const syscall of ["rename", "unlink", "rmdir"]) {
+    assert.equal(admissionFailure(Object.assign(new Error("EPERM"), { code: "EPERM", syscall, path: "C:\\d\\acc\\runtime\\x" }),
+      "C:\\d\\acc\\runtime", "win32"), null, syscall);
+  }
+  assert.equal(admissionFailure(Object.assign(new Error("EPERM"), { code: "EPERM", syscall: "mkdir", path: "C:\\d\\acc\\runtime\\x" }),
+    "C:\\d\\acc\\runtime", "win32")?.access, "write");
   for (const error of [new Error("managed runtime activation in progress"),
     Object.assign(new Error("gone"), { code: "ENOENT", syscall: "open", path: "/x" }), null]) {
     assert.equal(admissionFailure(error), null);
@@ -59,11 +75,11 @@ async function fixture(t, { pending = false } = {}) {
     pending: pending ? { root: next, version: "0.12.2" } : null, phase: pending ? "activating" : "ready",
     auto: false, pin: null, checkedAt: null, home, targets: [], notice: null });
   const admission = { reasonCode: "state_access_denied", access: "write", code: "EPERM", syscall: "mkdir", path: manager };
-  const run = async args => {
+  const run = async (args, refused = admission) => {
     let stdout = "";
     const output = name => ({ write(text, done) { if (name === "stdout") stdout += text; done(); } });
     const code = await main([...args, "--cwd", project, "--json"], { cwd: project, dataHome, managerRoot: manager,
-      managementOnly: true, admission, env: { HOME: home, ACC_DATA_HOME: dataHome, ACC_NO_UPDATE_CHECK: "1" },
+      managementOnly: true, admission: refused, env: { HOME: home, ACC_DATA_HOME: dataHome, ACC_NO_UPDATE_CHECK: "1" },
       gitProbe: async () => null, stdout: output("stdout"), stderr: output("stderr") });
     return { code, body: JSON.parse(stdout) };
   };
@@ -95,6 +111,37 @@ test("doctor reports the denied state write and the ready runtime, with permissi
   assert.equal(body.data.update.pending, null);
   assert.doesNotMatch(JSON.stringify(body.data.remediation), /acc update/);
   assert.match(JSON.stringify(body.data.remediation), /sandbox/);
+});
+
+test("a management command that has to write ACC's state names the denial too", async t => {
+  const f = await fixture(t);
+  for (const args of [["update"], ["doctor", "--repair"], ["doctor", "--migrate-store"]]) {
+    const { code, body } = await f.run(args);
+
+    assert.equal(code, EXIT.DATA, args.join(" "));
+    assert.equal(body.error.details.reasonCode, "state_access_denied", args.join(" "));
+    assert.match(body.error.message, /^cannot write ACC's state: /, args.join(" "));
+  }
+});
+
+const posixOwner = process.platform === "win32" ? "POSIX permission bits" : process.getuid?.() === 0
+  ? "root reads anything" : false;
+
+test("doctor reports a refused read even when ACC's control record cannot be read", { skip: posixOwner }, async t => {
+  const f = await fixture(t);
+  const control = path.join(f.manager, "control.json");
+  await chmod(control, 0o000);
+  let result;
+  try {
+    result = await f.run(["doctor"], { reasonCode: "state_access_denied", access: "read",
+      code: "EACCES", syscall: "open", path: control });
+  } finally { await chmod(control, 0o600); }
+  const { code, body } = result;
+
+  assert.equal(code, EXIT.OK, JSON.stringify(body));
+  assert.equal(body.data.workspaceInspection, "state_access_denied");
+  assert.equal(body.data.update, null);
+  assert.match(JSON.stringify(body.data.remediation), /readable/);
 });
 
 test("a denied state write during a pending update still names the update", async t => {
@@ -145,9 +192,74 @@ import {runEntry} from ${JSON.stringify(entry)}; await runEntry(${JSON.stringify
   assert.match(cli.stderr, /refused \(EPERM\)/);
   assert.doesNotMatch(cli.stderr, /retry after the update/);
 
+  const mcp = await start("acc-mcp");
+  assert.equal(mcp.exitCode, 4);
+  assert.match(mcp.stderr, /^acc: cannot write ACC's state: \S+ \S+ was refused \(EPERM\)\./);
+
   const hook = await start("acc-hook");
   assert.equal(hook.exitCode, 0);
   // Hook warnings carry no paths or error details beyond the code.
   assert.match(hook.stderr, /^acc: coordination unavailable: cannot write ACC's state \(EPERM\); session may continue\n$/);
   assert.doesNotMatch(hook.stderr, /during runtime update/);
+});
+
+// Linux and macOS both refuse a directory without its search bit to its owner:
+// the launcher's first read of the runtime directory is then refused.
+test("an installed entry whose data home cannot be read names a refused read", { skip: posixOwner }, async t => {
+  const root = await realpath(await mkdtemp(path.join(tmpdir(), "acc-entry-unreadable-")));
+  const data = path.join(root, "data"), manager = path.join(data, "acc", "runtime");
+  await mkdir(manager, { recursive: true });
+  await chmod(data, 0o000);
+  t.after(async () => { await chmod(data, 0o700); await removeFixture(root); });
+
+  const entry = new URL("../src/managed-runtime/entry.mjs", import.meta.url).href;
+  const start = kind => {
+    const code = `process.argv = [process.execPath, "fixture", "status"];
+import {runEntry} from ${JSON.stringify(entry)}; await runEntry(${JSON.stringify({
+      kind, managerRoot: manager, packageRoot: path.join(root, "missing-source") })});`;
+    const cp = spawn(process.execPath, ["--input-type=module", "-e", code],
+      { env: { ...process.env, ACC_NO_UPDATE_CHECK: "1" }, stdio: ["ignore", "pipe", "pipe"] });
+    let stderr = "";
+    cp.stderr.on("data", chunk => { stderr += chunk; });
+    return once(cp, "exit").then(([exitCode]) => ({ exitCode, stderr }));
+  };
+
+  for (const kind of ["acc", "acc-mcp"]) {
+    const result = await start(kind);
+    assert.equal(result.exitCode, 4, kind);
+    assert.match(result.stderr, /^acc: cannot read ACC's state: realpath \S+ was refused \(EACCES\)\. Run ACC where its data home is readable/, kind);
+  }
+  const hook = await start("acc-hook");
+  assert.equal(hook.exitCode, 0);
+  assert.equal(hook.stderr, "acc: coordination unavailable: cannot read ACC's state (EACCES); session may continue\n");
+});
+
+// A control record is never echoed by the launcher: one that points outside
+// ACC's runtime directory, with terminal control bytes in it, is a corrupt
+// pointer and gets the ordinary text.
+test("a control record pointing outside ACC's runtime is never echoed", { skip: posixOwner }, async t => {
+  const root = await realpath(await mkdtemp(path.join(tmpdir(), "acc-entry-pointer-")));
+  const manager = path.join(root, "acc", "runtime"), sealed = path.join(root, "sealed");
+  await mkdir(manager, { recursive: true });
+  await mkdir(sealed);
+  await chmod(sealed, 0o000);
+  t.after(async () => { await chmod(sealed, 0o700); await removeFixture(root); });
+  const injected = path.join(sealed, "x\u001b[31mINJECTED\nfake line");
+  await writeFile(path.join(manager, "control.json"), JSON.stringify({ schemaVersion: 1,
+    active: { root: injected, version: "0.12.1" }, pending: null, phase: "ready", auto: false, pin: null,
+    checkedAt: null, home: root, targets: [], notice: null }));
+
+  const entry = new URL("../src/managed-runtime/entry.mjs", import.meta.url).href;
+  const code = `process.argv = [process.execPath, "fixture", "status"];
+import {runEntry} from ${JSON.stringify(entry)}; await runEntry(${JSON.stringify({
+    kind: "acc-mcp", managerRoot: manager, packageRoot: path.join(root, "missing-source") })});`;
+  const cp = spawn(process.execPath, ["--input-type=module", "-e", code],
+    { env: { ...process.env, ACC_NO_UPDATE_CHECK: "1" }, stdio: ["ignore", "pipe", "pipe"] });
+  let stderr = "";
+  cp.stderr.on("data", chunk => { stderr += chunk; });
+  const [exitCode] = await once(cp, "exit");
+
+  assert.equal(exitCode, 4);
+  assert.doesNotMatch(stderr, /INJECTED|\u001b/);
+  assert.doesNotMatch(stderr, /cannot (read|write|access) ACC's state/);
 });

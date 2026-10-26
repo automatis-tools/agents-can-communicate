@@ -7,18 +7,21 @@ import { deniedGuidance, deniedStateText } from "./admission.mjs";
  * implementation before activation. Never opens a workspace or probes clients.
  */
 export async function runManagementDoctor({ runtime }) {
-  const manager = await readControl(runtime.managerRoot);
-  if (!manager) throw new Error("managed update state is unavailable; run acc update to recover");
-  const update = await managedUpdateDiagnostic(runtime.managerRoot, manager, manager.active.version);
-  // Admission failed because this process may not write ACC's state (#316):
-  // the update state is reported as it is, and the remedy is access.
+  // Admission failed because this process may not use ACC's state (#316): the
+  // update state is reported when it can be read, and the remedy is access.
   if (runtime.admission?.reasonCode === "state_access_denied") {
-    const finish = manager.pending ? [`then run acc update there to finish ACC ${manager.pending.version}`] : [];
+    const manager = await readControl(runtime.managerRoot).catch(() => null);
+    const update = manager ? await managedUpdateDiagnostic(runtime.managerRoot, manager, manager.active.version)
+      .catch(() => null) : null;
+    const finish = manager?.pending ? [`then run acc update there to finish ACC ${manager.pending.version}`] : [];
     return { data: { scope: "runtime", workspaceInspection: "state_access_denied", admission: runtime.admission,
       update, remediation: [deniedGuidance(runtime.admission), ...finish] },
     text: ["Runtime diagnostics only; ACC could not use its state, so the workspace was not inspected.",
       `${deniedStateText(runtime.admission, manager)}.`, `${deniedGuidance(runtime.admission)}.`, ...finish].join("\n") };
   }
+  const manager = await readControl(runtime.managerRoot);
+  if (!manager) throw new Error("managed update state is unavailable; run acc update to recover");
+  const update = await managedUpdateDiagnostic(runtime.managerRoot, manager, manager.active.version);
   return { data: { scope: "update", workspaceInspection: "unavailable_during_update", update,
     remediation: ["acc update"] },
   text: ["Update diagnostics only; workspace and integrations were not inspected.",
