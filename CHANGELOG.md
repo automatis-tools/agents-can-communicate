@@ -15,9 +15,9 @@
 
 | Development artifact | Value |
 |---|---|
-| Built from | `e54fd588998a4dd2f233312bc1ebf01300ff9771` |
-| Tarball | `agents-can-communicate-0.12.1.tgz`, 621,614 bytes, 380 files |
-| sha256 | `4cfc0fe0a48511cfe3515ffbd4a934a53bc5a5566c408d3f4cfce501cfa09635` |
+| Built from | `2d0c241d05be2cee6778a95c74ae32c6322302f2` |
+| Tarball | `agents-can-communicate-0.12.1.tgz`, 621,657 bytes, 380 files |
+| sha256 | `460b8c124569c4029fadf08d8aafd0966a4e54288c25f087394b4567fefde578` |
 
 The exact archive passed package verification. See
 [development evidence](docs/release-evidence/unreleased-state-access-denied.md).

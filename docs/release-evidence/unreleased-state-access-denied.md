@@ -1,15 +1,15 @@
 # Development artifact: a refused state write is named as such
 
 Captured on October 26, 2026, with Node 26.5.1 and Codex CLI 0.164.0 on macOS arm64. This is an
-unpublished development artifact, built from `e54fd588998a4dd2f233312bc1ebf01300ff9771`. The package version remains
+unpublished development artifact, built from `2d0c241d05be2cee6778a95c74ae32c6322302f2`. The package version remains
 `0.12.1`, and existing release records are unchanged.
 
 | Artifact | Value |
 |---|---|
 | Filename | `agents-can-communicate-0.12.1.tgz` |
-| Packed size | 621,614 bytes |
+| Packed size | 621,657 bytes |
 | Files | 380 |
-| sha256 | `4cfc0fe0a48511cfe3515ffbd4a934a53bc5a5566c408d3f4cfce501cfa09635` |
+| sha256 | `460b8c124569c4029fadf08d8aafd0966a4e54288c25f087394b4567fefde578` |
 
 `npm pack --json` created the archive. `node scripts/verify-package.mjs` verified that exact
 archive and reported PASS. No package was published.
@@ -61,7 +61,7 @@ A fresh review found that the launcher could print a control record's bytes. A r
 points outside ACC's runtime directory, with terminal control bytes in it, now gets the
 ordinary text: a refusal outside that directory is a corrupt pointer, not ACC's state, and
 the launcher prints no path with control bytes. On Windows, `EPERM` from a rename or removal is
-lock contention, not a sandbox. Tests pin both.
+lock contention, not a sandbox; `EACCES` and `EROFS` there stay refusals. Tests pin both.
 
 ## Limits
 
