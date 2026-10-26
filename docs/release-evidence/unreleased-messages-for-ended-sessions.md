@@ -1,15 +1,17 @@
 # Development artifact: messages left for a session that ended
 
 Captured on October 25, 2026 with Node 26.5.1 and Claude Code 2.1.310 on macOS. This is an
-unpublished development artifact, built from `40224537801e063cb6b1bc21b4a59803c214f7f3`.
-The package version remains `0.11.1`; existing release records are unchanged.
+unpublished development artifact, built from `158ca65c9fd88b44c099497b7d379514fcbde65e`.
+The package version remains `0.11.1`; existing release records are unchanged. The build
+includes `main` after #319; the real-client capture below ran on `40224537`, whose packed code
+differs from it only by #319's claim change.
 
 | Artifact | Value |
 |---|---|
 | Filename | `agents-can-communicate-0.11.1.tgz` |
-| Packed size | 613,015 bytes |
+| Packed size | 613,306 bytes |
 | Files | 376 |
-| sha256 | `4be10a9c6745f0887e4dabd7646e862620800c1dd73feb8643bfb9609a0d060d` |
+| sha256 | `310ee6fc81949c8a341480a4dcdf3daa900e7f95a3fa13699582191dd29317e3` |
 
 `npm pack --json` created the archive. `node scripts/verify-package.mjs` verified
 that exact archive and reported PASS, including installed entry points, runtime

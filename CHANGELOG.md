@@ -15,9 +15,9 @@
 
 | Development artifact | Value |
 |---|---|
-| Built from | `40224537801e063cb6b1bc21b4a59803c214f7f3` |
-| Tarball | `agents-can-communicate-0.11.1.tgz`, 613,015 bytes, 376 files |
-| sha256 | `4be10a9c6745f0887e4dabd7646e862620800c1dd73feb8643bfb9609a0d060d` |
+| Built from | `158ca65c9fd88b44c099497b7d379514fcbde65e` |
+| Tarball | `agents-can-communicate-0.11.1.tgz`, 613,306 bytes, 376 files |
+| sha256 | `310ee6fc81949c8a341480a4dcdf3daa900e7f95a3fa13699582191dd29317e3` |
 
 The exact archive passed package verification. See
 [development evidence](docs/release-evidence/unreleased-messages-for-ended-sessions.md).
