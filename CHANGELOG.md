@@ -6,24 +6,33 @@
   showed it as a selected approval mode next to "Ask for approval" and "Approve for me". From
   Codex 0.164.0, a command that ACC's rules file allows runs outside the sandbox without the
   model asking, so ACC's commands do not need the profile. ACC still defines the profile for
-  a chat that selects it, and keeps the user's own `sandbox_mode`. A config that selects
-  nothing gets `default_permissions = ":workspace"`, Codex's own workspace mode, since Codex
-  refuses a defined profile with no selection. An update moves a config ACC had set to its
-  profile back.
+  a chat that selects it. The config selects `default_permissions = ":workspace"`, Codex's
+  own workspace mode, inside ACC's block, since Codex refuses a defined profile with no
+  selection. A workspace mode of the user's own moves into that block and comes back on
+  uninstall. An update moves a config ACC had set to its profile back.
 - ACC still selects its profile where the rule cannot carry its commands: on Windows, with
   a foreign or edited rules file, and with Codex older than 0.164.0.
+- The Codex skill tells the agent to put ACC's wrapper first and alone in every ACC
+  command, reads and claims included: a chat outside ACC's profile reaches ACC's state only
+  through the rule.
+- A mode line that was the last line of `config.toml`, with no newline, no longer blocks a
+  migration or an uninstall once Codex has appended its hook trust entries after ACC's
+  blocks. ACC restores the line on a line of its own.
 - ACC recognises its own Codex entries when a rewrite of `config.toml` dropped their
   comment markers (#329). On the maintainer's machine another program sorted the file and
   removed every comment. The 0.12.0 update then refused the Codex refresh, and until that
   was resolved, every ACC command answered `runtime unavailable`. Entries that hold
-  exactly what ACC writes are adopted and marked again; anything else is refused or
-  preserved as before.
+  exactly what ACC writes are adopted and marked again: the marketplace and the plugin
+  together, the profile only with sockets ACC grants now and with nothing else naming it.
+  Anything else is refused or preserved as before, and a comment among them stays. The
+  mode and `network_proxy` setting ACC had moved aside cannot come back after such a
+  rewrite; uninstall then leaves Codex's read-only default, never a wider one.
 
 | Development artifact | Value |
 |---|---|
-| Built from | `d563fce95d7863c08215088e0fd2f68cc9e0d3b5` |
-| Tarball | `agents-can-communicate-0.12.0.tgz`, 617,081 bytes, 379 files |
-| sha256 | `aabda0c2642fcf3889654be51cc1ffc5afe4852bc8c708f3bd3e7a02661383fb` |
+| Built from | `e19f5e4942012cdd70933235ff3275bcff0fd752` |
+| Tarball | `agents-can-communicate-0.12.0.tgz`, 618,581 bytes, 379 files |
+| sha256 | `15eb902c338eafc38aeaf68ededf35bd31aabd01fc1719813484dd57421a0c39` |
 
 The exact archive passed package verification. See
 [development evidence](docs/release-evidence/unreleased-codex-profile-not-default.md).
