@@ -6,7 +6,7 @@ import { removeTree, renameEntry, renameReplacing } from "./portable-fs.mjs";
 import { managedDirectory, syncDirectory } from "./state.mjs";
 
 export const MODULES = ["entry.mjs", "command-prefix.mjs", "state.mjs", "generation-files.mjs",
-  "mutex.mjs", "leases.mjs", "schedule.mjs", "policy.mjs", "portable-fs.mjs"];
+  "mutex.mjs", "leases.mjs", "schedule.mjs", "policy.mjs", "portable-fs.mjs", "admission.mjs"];
 async function durableFile(file, bytes, mode = 0o600) {
   const handle = await open(file, "wx", mode);
   try { await handle.writeFile(bytes); await handle.sync(); }

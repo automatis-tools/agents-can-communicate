@@ -16,6 +16,8 @@ import { loadAdapters } from "./adapter-catalog.mjs";
 import { createGitProbe } from "./git-probe.mjs";
 import { platformDataHome, runtimePaths } from "./runtime-paths.mjs";
 import { resolveOwner } from "./session-owner.mjs";
+import { deniedGuidance, deniedStateText } from "./managed-runtime/admission.mjs";
+import { readControl } from "./managed-runtime/state.mjs";
 
 const DEFAULT_CADENCE_MS = 30_000;
 
@@ -453,6 +455,15 @@ export async function main(argv, runtime) {
     const managementMigration = runtime.managementOnly && parsed.command === "doctor" && parsed.options.migrateStore;
     const managementDoctor = runtime.managementOnly && parsed.command === "doctor"
       && !parsed.options.repair && !parsed.options.migrateStore;
+    // A refused access is the process's own, not an update to wait for (#316).
+    // Only help, version and the report doctor need nothing ACC's state refused;
+    // update, repair and migration write it, and say so before they try.
+    if (runtime.managementOnly && runtime.admission?.reasonCode === "state_access_denied"
+      && !managementDoctor && !["help", "version"].includes(parsed.command)) {
+      const control = await readControl(runtime.managerRoot).catch(() => null);
+      throw new AccError(EXIT.DATA, `${deniedStateText(runtime.admission, control)}. ${deniedGuidance(runtime.admission)}`,
+        { reasonCode: "state_access_denied" });
+    }
     if (runtime.managementOnly && !managementDoctor && !managementMigration
       && !["help", "version", "update"].includes(parsed.command)) {
       throw new AccError(EXIT.DATA, "runtime unavailable; retry after the update or run acc update to recover");

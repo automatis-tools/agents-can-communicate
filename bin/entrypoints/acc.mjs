@@ -22,7 +22,7 @@ const lazyRouter = ({ service, clock, dataHome }) => {
   } };
 };
 
-export async function main({ managerRoot = null, packageRoot, managementOnly = false } = {}) {
+export async function main({ managerRoot = null, packageRoot, managementOnly = false, admission = null } = {}) {
 
 // The composition root is the only place allowed to reach for ambient time and
 // randomness; everything below it receives them as ports.
@@ -30,6 +30,9 @@ const runtime = {
   cwd: process.cwd(),
   managerRoot,
   managementOnly,
+  // Why the launcher admitted management commands only: a refused write is
+  // named as such rather than as an unfinished update (#316).
+  ...(admission ? { admission } : {}),
   packageRoot,
   env: process.env,
   platform: process.platform,
