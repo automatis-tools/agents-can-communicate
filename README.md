@@ -1,3 +1,5 @@
+<p align="center"><img src="https://getacc.dev/assets/acc-mark.svg" alt="ACC logo: two linked rings" width="112"></p>
+
 # Agents Can Communicate (ACC)
 
 **The message your clients can’t send each other.**
