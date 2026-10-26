@@ -11,9 +11,9 @@
 
 | Development artifact | Value |
 |---|---|
-| Built from | `ae1914ad9e345c688fab9ddfdffcbb5f4a8a6dc9` |
-| Tarball | `agents-can-communicate-0.11.1.tgz`, 611,783 bytes, 378 files |
-| sha256 | `b8bcacb147317b9ea9a5dfe86cfbf9cc32df852ad22f3da2a2e72fb816e096e7` |
+| Built from | `a04c5be741d2f285f457a31b2aab615c9ba8ac30` |
+| Tarball | `agents-can-communicate-0.11.1.tgz`, 613,815 bytes, 378 files |
+| sha256 | `016da2cd4d57b21f3e5d14b8d088a1d0ad27150634e928417fcc0f81ca6798bb` |
 
 The exact archive passed package verification. See
 [development evidence](docs/release-evidence/unreleased-linked-mark.md).

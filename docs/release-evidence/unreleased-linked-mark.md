@@ -1,16 +1,16 @@
 # Development artifact: the linked ACC mark
 
-Captured on October 25, 2026 with Node 26.5.1 on macOS. This is an unpublished
-development artifact, built from `ae1914ad9e345c688fab9ddfdffcbb5f4a8a6dc9`,
-the merge of `main` after #321.
+Captured on October 26, 2026 with Node 26.5.1 on macOS. This is an unpublished
+development artifact, built from `a04c5be741d2f285f457a31b2aab615c9ba8ac30`,
+the merge of `main` after #322 and #324.
 The package version remains `0.11.1`; existing release records are unchanged.
 
 | Artifact | Value |
 |---|---|
 | Filename | `agents-can-communicate-0.11.1.tgz` |
-| Packed size | 611,783 bytes |
+| Packed size | 613,815 bytes |
 | Files | 378 |
-| sha256 | `b8bcacb147317b9ea9a5dfe86cfbf9cc32df852ad22f3da2a2e72fb816e096e7` |
+| sha256 | `016da2cd4d57b21f3e5d14b8d088a1d0ad27150634e928417fcc0f81ca6798bb` |
 
 `npm pack --json` created the archive. `node scripts/verify-package.mjs` verified
 that exact archive and reported PASS, including installed entry points, runtime
