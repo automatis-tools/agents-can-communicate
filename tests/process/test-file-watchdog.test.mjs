@@ -75,7 +75,9 @@ test("the parent deadline closes descendant-held pipes and terminates its test p
     }
     await removeFixture(root);
   });
-  const file = path.join(root, "inherited-pipe.test.mjs");
+  // Not named *.test.mjs: the in-file watchdog would end the file first, and
+  // this case is about what the parent deadline does with a surviving pipe.
+  const file = path.join(root, "inherited-pipe.mjs");
   await writeFile(file, `import { spawn } from "node:child_process";
     import test from "node:test";
     import { writeFileSync } from "node:fs";
@@ -96,7 +98,7 @@ test("the parent deadline closes descendant-held pipes and terminates its test p
   });
   assert.equal(result.code, 1);
   assert.match(output, /descendant holds pipes/, "fixture never reached the inherited-pipe condition");
-  assert.match(errors, /inherited-pipe\.test\.mjs.*3000 ms/);
+  assert.match(errors, /inherited-pipe\.mjs.*3000 ms/);
   assert.ok(performance.now() - started < 9000, "gate waited for the surviving descendant");
   descendant = Number(await readFile(pidFile, "utf8"));
   const alive = async () => {
