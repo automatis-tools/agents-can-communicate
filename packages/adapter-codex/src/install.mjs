@@ -13,6 +13,7 @@ import { inspectAllowRule, removeAllowRule, ruleAllowsCommands, ruleApplies, rul
   from "./allow-rule.mjs";
 import { inspectConfig, readConfig, sandboxOwnership, writeTomlBlock } from "./config-block.mjs";
 import { outgoingStatus, prepareLivePermissions, removeLivePermissions } from "./live-permissions.mjs";
+import { adoptUnmarked } from "./unmarked-adoption.mjs";
 
 // Kept cohesive above 300 lines because Codex plugin install, cache, config,
 // detection, and ownership share one client topology; splitting would duplicate
@@ -184,7 +185,8 @@ export async function installCodexPlugin({ home, agentsHome = home,
   // whatever its manifest calls itself - the id ACC enabled was one the client
   // never forms, and the plugin sat there listed and not installed.
   const config = configPath(codexHome);
-  const before = await readConfig(config);
+  const before = adoptUnmarked(await readConfig(config),
+    { marketplaceRoot: marketplaceRoot(agentsHome), stateRoot }).source;
   const foreign = inspectConfig(before, config);
   // Preflight before touching installed files: a duplicate table makes Codex
   // refuse the config, and ambiguous ownership must never delete client state.
@@ -280,21 +282,24 @@ async function removeEmptyDirs(directories) {
 
 
 export async function preflightCodexUninstall({ home, agentsHome = home,
-  codexHome = path.join(home, ".codex") }) {
+  codexHome = path.join(home, ".codex"), stateRoot }) {
   const existing = await readJson(marketplacePath(agentsHome), null);
   const before = await readFile(configPath(codexHome), "utf8").catch(error => {
     if (error.code === "ENOENT") return "";
     throw error;
   });
-  const permissions = removeLivePermissions(inspectConfig(before, configPath(codexHome)).source);
+  // ACC's own entries whose markers a rewrite removed go with the rest (#329).
+  const adopted = adoptUnmarked(before, { marketplaceRoot: marketplaceRoot(agentsHome), stateRoot }).source;
+  const permissions = removeLivePermissions(inspectConfig(adopted, configPath(codexHome)).source);
   return { existing, before, withoutOurs: permissions.source, permissionState: permissions.state };
 }
 
 export async function uninstallCodexPlugin({ home, agentsHome = home,
-  codexHome = path.join(home, ".codex"), keep = [] }) {
+  codexHome = path.join(home, ".codex"), stateRoot, keep = [] }) {
   const file = marketplacePath(agentsHome);
   // Direct adapter callers need the same check as the installer boundary.
-  const { existing, before, withoutOurs, permissionState } = await preflightCodexUninstall({ home, agentsHome, codexHome });
+  const { existing, before, withoutOurs, permissionState } = await preflightCodexUninstall({ home, agentsHome,
+    codexHome, stateRoot });
   const changes = [];
   if (existing !== null) {
     const kept = (existing.plugins ?? []).filter(entry => entry.name !== PLUGIN_NAME);
