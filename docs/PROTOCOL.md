@@ -350,7 +350,11 @@ History sync returns read-only message summaries (20 items by default, at most 1
 formatted JSON bytes) and complete-message-id cursors, or one exact full message. Neither
 history mode changes receipts. Full sync adds an unbounded forensic workspace snapshot.
 Message discovery and exact-read contracts are in [CLI](CLI.md) and [MCP](MCP.md). Attention is
-limited to six explicit rules: `reply_required`, `acknowledgement_required`,
-`recipient_unavailable`, `claim_conflict`, `claim_contended`, and `claim_expired`.
+limited to seven explicit rules: `reply_required`, `acknowledgement_required`,
+`recipient_unavailable`, `claim_conflict`, `claim_contended`, `claim_expired`, and
+`left_for_ended_session`. The last reports a message that waits for a participant whose
+sessions have all ended. Each other session in the room is told once, except the sender.
+The receipt stays with the recipient, and `sync --scope history --message <id>` reads the
+message without a change to it.
 
 Next: [CLI](CLI.md) · [MCP](MCP.md) · [Architecture](ARCHITECTURE.md)
