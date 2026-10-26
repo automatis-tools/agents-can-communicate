@@ -297,12 +297,21 @@ ACC marks the entries it writes in `~/.codex/config.toml` with comments. A progr
 rewrites that file without comments removes the marks, and ACC can no longer tell its
 entries from yours. From 0.12.1, ACC recognises entries that hold exactly what it writes, and
 marks them again on the next install or update:
-- `[marketplaces.acc-local]` at ACC's own marketplace root;
-- `[plugins."agents-can-communicate@acc-local"]` with only `enabled = true`;
-- the `acc-workspace` profile with only ACC's grants.
+- `[marketplaces.acc-local]` at ACC's own marketplace root, together with
+  `[plugins."agents-can-communicate@acc-local"]` holding only `enabled = true`; neither is
+  taken without the other;
+- the `acc-workspace` profile with only ACC's grants: the state directory, network access
+  and the sockets ACC delivers to now. Its selection, `default_permissions = "acc-workspace"`
+  or `":workspace"`, goes with it.
 
-If the message stays, one of those entries differs from what ACC writes. Back up the file,
-remove the `acc-local` marketplace and plugin tables, and run `acc update`.
+A comment you added among those entries stays. If the message stays, one of those entries
+differs from what ACC writes. Back up the file, remove the `acc-local` marketplace and plugin
+tables, and run `acc update`.
+
+The removed comments also held what ACC had moved aside when it installed: your own mode
+line and your `network_proxy` setting. ACC cannot bring those back. After such a rewrite,
+`acc uninstall` leaves no mode selected, which is Codex's read-only default, and leaves
+`network_proxy = true` in `[features]`. Set your mode again if you had one.
 
 ## Gemini does not guard a write
 

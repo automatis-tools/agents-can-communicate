@@ -49,11 +49,17 @@ profile to be selected.
 
 **The builder's calls (mine):**
 - **Selection unit.** The `selection` unit stays and keeps carrying the restore metadata,
-  because older ACC versions accept metadata only there. Its body is empty when the user's
-  restored config already selects something (`default_permissions` or `sandbox_mode`). Otherwise
-  its body is `default_permissions = ":workspace"`. ACC no longer removes the user's own
-  `sandbox_mode` or `default_permissions`. ACC's pre-profile `[sandbox_workspace_write]` grant
-  is still removed, as before.
+  because older ACC versions accept metadata only there. Its body is
+  `default_permissions = ":workspace"`. The user's own workspace mode
+  (`sandbox_mode = "workspace-write"` or `default_permissions = ":workspace"`) moves into ACC's
+  `mode` and `default` units unchanged, as it did beside ACC's profile, and comes back on
+  removal. A selection line outside ACC's blocks would make the profile read as the user's
+  policy. Any other selection stays a custom policy. ACC's pre-profile
+  `[sandbox_workspace_write]` grant is still removed, as before.
+- **A unit that held the file's last line without a newline** is restored with one when
+  something follows it. Codex appends its hook trust tables after ACC's blocks, and the
+  recorded line and the next table would otherwise run together; such a 0.12.0 config read
+  as customized and could neither migrate nor uninstall.
 - **Where the rule cannot carry the commands, ACC selects its profile as before.** That
   covers:
   - Windows, which gets no rules file;
@@ -63,16 +69,24 @@ profile to be selected.
 
   The capture applies from 0.164.0 onward on every platform that has the rule.
 - **Recognising ACC's own unmarked entries (#329):**
-  - Marketplace and plugin entries are ACC's when they match what ACC writes: a
-    `[marketplaces.acc-local]` with `source_type = "local"` and `source` equal to ACC's own
-    marketplace root, and a `[plugins."agents-can-communicate@acc-local"]` holding only
-    `enabled`. ACC then removes them and writes its marked block. Anything else is still
-    refused.
+  - Marketplace and plugin entries are ACC's when both match what ACC writes: a
+    `[marketplaces.acc-local]` with exactly `source_type = "local"` and `source` equal to ACC's
+    own marketplace root, and a `[plugins."agents-can-communicate@acc-local"]` holding only
+    `enabled = true`, with nothing declared under either outside those tables. ACC then
+    removes both and writes its marked block. Anything else, one of the two included, is
+    still refused.
   - The profile is ACC's when every key under `permissions.acc-workspace` is one ACC writes:
     `extends = ":workspace"`, the state root set to `"write"`, `network.enabled = true`, and
-    only `"allow"` entries under `unix_sockets`. ACC then removes those tables, and an
-    unmarked `default_permissions = "acc-workspace"` with them. Anything else stays a custom
-    policy, preserved and reported as today.
+    `"allow"` entries under `unix_sockets` for sockets ACC grants now; and when no other
+    setting names the profile. ACC then removes those tables, an unmarked selection of
+    `"acc-workspace"` or `":workspace"`, and an empty `[permissions]` table a rewrite wrote
+    out. Anything else stays a custom policy, preserved and reported as today.
+  - Values are read as TOML basic or literal strings. A comment among the adopted tables was
+    written after the rewrite, so it stays.
+  - **Limit.** The rewrite removed the restore metadata, so what ACC had moved aside at
+    install, the user's own selection and `network_proxy` setting, cannot come back. The
+    adopted selection goes with the profile: uninstall then leaves Codex's read-only default,
+    never a wider mode, and keeps `network_proxy = true`.
 - **A failed refresh for one adapter still keeps the update pending for every client.** An
   activated runtime with one adapter's integration left on the previous version is a state
   ACC cannot describe. The recovery for this case is documented, and #329's fix removes its
@@ -101,12 +115,18 @@ profile to be selected.
 
 - Unit tests in `packages/adapter-codex` cover:
   - a fresh install selecting `:workspace`;
-  - a config with the user's `sandbox_mode` keeping it;
+  - a config with the user's `sandbox_mode`, `default_permissions = ":workspace"` or both
+    selecting `:workspace` in ACC's unit and getting its own lines back on removal;
+  - a newline-less last-line mode surviving Codex's appended trust tables;
   - an owned 0.12.0 config migrating to the new units;
   - a customized config staying untouched;
   - each of the three rule-unavailable cases selecting `acc-workspace`;
   - a sorted, comment-free config being adopted;
-  - a near-miss (different marketplace source, an extra profile key) being refused.
+  - a near-miss being refused or preserved: a different marketplace source, a duplicated
+    key, a table under the marketplace, an extra profile key, a socket ACC never grants, and
+    another setting naming the profile;
+  - an adopted `:workspace` selection uninstalling to no selection, user comments staying,
+    TOML literal strings and an empty `[permissions]` table.
 - An installed-package check with real Codex 0.164.0 in an isolated `CODEX_HOME`. A sandboxed
   `acc message` from a `codex exec` session succeeds while the session runs `:workspace`, not
   ACC's profile.
