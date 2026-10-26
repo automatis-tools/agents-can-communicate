@@ -1,5 +1,22 @@
 # Changelog
 
+## Unreleased — Antigravity TCP discovery avoids blocking filesystem calls
+
+- On macOS, Antigravity desktop TCP discovery asks `lsof` to avoid blocking
+  filesystem calls, so a stalled mount does not consume its discovery budget.
+  Linux discovery flags are unchanged.
+
+| Development artifact | Value |
+|---|---|
+| Built from | `463b4c6f6de0a85ce1c798910615b91f28c96c05` |
+| Tarball | `agents-can-communicate-0.11.1.tgz`, 613,912 bytes, 378 files |
+| sha256 | `e2596970e36b23811f6141d4acdb98d902666b0dbcb9dafbdd881c333f0fbeb6` |
+
+The exact archive passed package verification. See
+[development evidence](docs/release-evidence/unreleased-antigravity-tcp-discovery.md).
+This is not a published release; the package version remains `0.11.1`.
+The earlier candidate and release records below retain their original provenance.
+
 ## Unreleased — the linked ACC mark
 
 - The README opens with ACC's new mark: two open rings hooked into each other, the
