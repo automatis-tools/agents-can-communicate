@@ -66,6 +66,26 @@ For a generic `coordination unavailable` warning, run `acc status --json` from t
 same directory to see the detailed workspace error, and `acc doctor` to check the
 installation. Hook warnings deliberately omit arbitrary paths and error details.
 
+## A command says ACC cannot write its state
+
+An `acc` command exits with code `4` and prints
+`cannot write ACC's state: <operation> <path> was refused (EPERM)`. `acc doctor` reports
+`workspaceInspection: state_access_denied`, and hooks warn
+`coordination unavailable: cannot write ACC's state`. The process that ran ACC may not write
+ACC's data home. The message also states the update state; an update is the cause only when
+the message names a pending version.
+
+The usual cause is a client sandbox around the command:
+- In Codex, run each ACC command as ACC's wrapper, first and alone in the command. ACC's
+  rules file then runs it outside the sandbox. See
+  [Codex command approval](CONFIGURATION.md#codex-command-approval).
+- Some desktop hosts deny writes outside the session's folders. ChatGPT Work Mode did this
+  with 0.11.1 (#316). Run ACC from a session or terminal that can write the data home.
+
+If the data home's files belong to another user, for example after a run with `sudo`, give
+them back to your user. To keep ACC's state elsewhere, set `ACC_DATA_HOME` for every
+participating client.
+
 ## CLI says `caller_identity_unresolved`
 
 ACC cannot prove which session owns this shell command. A hook-created presence record

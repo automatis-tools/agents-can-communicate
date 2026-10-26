@@ -136,6 +136,7 @@ import {runEntry} from ${JSON.stringify(entry)}; await runEntry(${JSON.stringify
 
   const hook = await start("acc-hook");
   assert.equal(hook.exitCode, 0);
-  assert.match(hook.stderr, /cannot write ACC's state.*session may continue/);
+  // Hook warnings carry no paths or error details beyond the code.
+  assert.match(hook.stderr, /^acc: coordination unavailable: cannot write ACC's state \(EPERM\); session may continue\n$/);
   assert.doesNotMatch(hook.stderr, /during runtime update/);
 });

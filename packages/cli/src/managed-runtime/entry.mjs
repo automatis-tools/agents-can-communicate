@@ -55,7 +55,8 @@ export async function runIndicatorEntry({ managerRoot }) {
 function unavailable(kind, denied = null) {
   // Never reflect control file content or payloads into a client diagnostic.
   if (kind === "acc-hook" || kind === "acc-antigravity-relay") {
-    process.stderr.write(denied ? `acc: coordination unavailable: ${deniedStateText(denied)}; session may continue\n`
+    // Hook warnings carry no paths or error details beyond the code.
+    process.stderr.write(denied ? `acc: coordination unavailable: cannot write ACC's state (${denied.code}); session may continue\n`
       : "acc: coordination unavailable during runtime update; session may continue\n");
     process.exitCode = 0;
   } else {
