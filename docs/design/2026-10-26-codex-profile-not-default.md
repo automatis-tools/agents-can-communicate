@@ -75,10 +75,11 @@ profile to be selected.
     `enabled = true`, with nothing declared under either outside those tables. ACC then
     removes both and writes its marked block. Anything else, one of the two included, is
     still refused.
-  - The profile is ACC's when every key under `permissions.acc-workspace` is one ACC writes:
-    `extends = ":workspace"`, the state root set to `"write"`, `network.enabled = true`, and
-    `"allow"` entries under `unix_sockets` for sockets ACC grants now; and when no other
-    setting names the profile. ACC then removes those tables, an unmarked selection of
+  - The profile is ACC's when it has all four tables every ACC version wrote, and every key
+    under `permissions.acc-workspace` is one ACC writes: `extends = ":workspace"`, the state
+    root set to `"write"`, `network.enabled = true`, and at least one `"allow"` entry under
+    `unix_sockets`, each for a socket ACC grants now; and when no other setting names the
+    profile. ACC then removes those tables, an unmarked selection of
     `"acc-workspace"` or `":workspace"`, and an empty `[permissions]` table a rewrite wrote
     out. Anything else stays a custom policy, preserved and reported as today.
   - Values are read as TOML basic or literal strings. A comment among the adopted tables was

@@ -240,3 +240,29 @@ test("an empty permissions table a rewrite left above ACC's profile goes with it
   await f.adapter.uninstall(f.context);
   assert.doesNotMatch(await f.read(), /^\[permissions/m);
 });
+
+// Every ACC that wrote the profile wrote all four of its tables, with at least
+// Codex's own socket. A profile of that name without them is the user's.
+test("an unmarked profile without all of ACC's grant tables stays the user's", async t => {
+  const tables = /^\[permissions\.acc-workspace\.(filesystem|network|network\.unix_sockets)\]\n(?:(?!\[)[^\n]*\n)*/gm;
+  for (const change of [
+    text => text.replace(tables, ""),
+    text => text.replace(/^\[permissions\.acc-workspace\.network\.unix_sockets\]\n(?:(?!\[)[^\n]*\n)*/m, ""),
+    text => text.replace(/^(\[permissions\.acc-workspace\.network\.unix_sockets\]\n)(?:"[^\n]*\n)*/m, "$1"),
+    text => text.replace(/^\[permissions\.acc-workspace\.filesystem\]\n(?:(?!\[)[^\n]*\n)*/m, ""),
+  ]) {
+    const f = await fixture(t);
+    const changed = change(await rewrittenInstall(f));
+    assert.match(changed, /^\[permissions\.acc-workspace\]\nextends = ":workspace"$/m);
+    await f.write(changed);
+    const profile = changed.slice(changed.indexOf("[permissions.acc-workspace]"))
+      .split(/\n(?=\[(?!permissions\.acc-workspace))/)[0];
+
+    const result = await f.adapter.install(f.context);
+    assert.ok((await f.read()).includes(profile), `the user's profile changed:\n${profile}`);
+    assert.ok(result.diagnostics.some(line => /custom permission policy was preserved/.test(line)),
+      result.diagnostics.join("\n"));
+    await f.adapter.uninstall(f.context);
+    assert.ok((await f.read()).includes(profile), `uninstall removed the user's profile:\n${profile}`);
+  }
+});

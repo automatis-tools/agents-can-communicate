@@ -93,11 +93,12 @@ function adopt(source, { marketplaceRoot, stateRoot, sockets = [] }) {
     // Another setting that names the profile would be left naming none.
     const named = entries.some(entry => entry.code && !entry.header && entry !== selection
       && literal(entry.value) === PROFILE);
+    // Every ACC that wrote the profile wrote all four tables, with at least
+    // Codex's own socket; a profile of that name without them is the user's.
     const ours = !named && within(["permissions", PROFILE], tables) && exactly(root, { extends: ":workspace" })
-      && (filesystem === null || exactly(filesystem, { [stateRoot]: "write" }))
-      && (network === null || exactly(network, { enabled: true }))
-      && (socketTable === null || socketTable.body.every(entry => direct(socketTable, entry)
-        && granted.has(entry.keys.at(-1)) && literal(entry.value) === "allow"));
+      && exactly(filesystem, { [stateRoot]: "write" }) && exactly(network, { enabled: true })
+      && socketTable !== null && socketTable.body.length > 0 && socketTable.body.every(entry =>
+        direct(socketTable, entry) && granted.has(entry.keys.at(-1)) && literal(entry.value) === "allow");
     if (ours) {
       spans.push(...tables.filter(found => found !== null).flatMap(found => found.spans));
       if (selection) spans.push(selection);
