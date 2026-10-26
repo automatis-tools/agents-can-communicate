@@ -72,3 +72,30 @@ test("a new home on a CLI older than the self-installing one still needs the sta
   assert.equal(plan.reasonCode, "managed_install_missing");
   assert.equal(plan.requiresInstall, true);
 });
+
+// #331, measured on Codex 0.164.0 (2026-10-26), in a fresh home and in the
+// maintainer's standalone one: the daemon runs as `<managed codex> app-server
+// --listen unix:// --analytics-default-enabled --managed-daemon`.
+test("a 0.164.0 daemon with its analytics option is the managed daemon", async t => {
+  const f = await serviceFixture(t, { binLayout: true });
+  await f.selfInstalledLayout({ started: false });
+  f.state.cliVersion = f.state.managedVersion = f.state.serverVersion = "0.164.0";
+  f.state.daemonOptions = "--analytics-default-enabled --managed-daemon";
+  const plan = await f.inspectNativeServiceSetup(f.context);
+  const result = await f.prepareNativeServiceSetup({ context: f.context, plan });
+  assert.equal(result.state, "ready", result.reasonCode);
+  assert.equal(result.started, true);
+  const snapshot = await createCodexMaintenance({ run: f.run, open: f.open }).inspectMaintenance(f.context);
+  assert.equal(snapshot.state, "ready", snapshot.reasonCode);
+});
+
+test("a daemon command line with a word that is no option is still refused", async t => {
+  const f = await maintenanceFixture(t, { binLayout: true });
+  for (const options of ["--analytics-default-enabled extra --managed-daemon", "--managed-daemon; other",
+    "--managed-daemon --listen tcp://0.0.0.0:1"]) {
+    f.state.daemonOptions = options;
+    await f.selfInstalledLayout();
+    const snapshot = await createCodexMaintenance({ run: f.run, open: f.open }).inspectMaintenance(f.context);
+    assert.equal(snapshot.reasonCode, "daemon_identity_unavailable", options);
+  }
+});

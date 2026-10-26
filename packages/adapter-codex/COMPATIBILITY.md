@@ -1,5 +1,19 @@
 # Codex compatibility
 
+## Daemon launch option, 2026-10-26
+
+Codex 0.164.0 on macOS arm64 (#331). In a fresh isolated home, `codex app-server daemon start`
+installed the self-installed layout and ran the daemon as
+`<CODEX_HOME>/packages/app-server-daemon/releases/0.164.0-aarch64-apple-darwin/bin/codex
+app-server --listen unix:// --analytics-default-enabled --managed-daemon`. The maintainer's
+standalone daemon ran with the same options. `daemon version` reported the expected managed
+path, socket and versions.
+
+ACC accepted only `--managed-daemon` after the listener, so it reported
+`daemon_identity_unavailable`, and a fresh-home `acc install` exited 4. ACC now accepts any
+valueless option after `--listen unix://`. The executable, its start time and its listening
+socket still prove the identity.
+
 ## Sender socket permissions and approved recovery, 2026-10-08
 
 Issue #285, Codex 0.162.0 on macOS arm64. In a sender sandbox, `lstat` of the
