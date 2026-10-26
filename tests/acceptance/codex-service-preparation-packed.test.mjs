@@ -27,6 +27,12 @@ test("packed install successfully prepares and verifies a supported Codex servic
       for (let attempt = 0; attempt < 40; attempt += 1) {
         await new Promise(resolve => setTimeout(resolve, 25));
         try { process.kill(pid, 0); } catch { return; }
+        // The daemon outlives the shell that started it, so init adopts it. In a
+        // container without an init process nothing reaps it, and an exited
+        // daemon stays a zombie that signal 0 still finds.
+        const state = await new Promise(resolve => execFile("/bin/ps", ["-p", String(pid), "-o", "stat="],
+          (error, stdout) => resolve(error ? "" : stdout.trim())));
+        if (state === "" || state.startsWith("Z")) return;
       }
       assert.fail(`fixture daemon ${pid} did not exit`);
     } finally {

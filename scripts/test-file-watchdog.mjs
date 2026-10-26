@@ -6,7 +6,10 @@ const file = process.argv[1];
 if (file?.endsWith(".test.mjs")) {
   const timeout = testFileTimeout();
   setTimeout(() => {
-    console.error(`test file ${file} exceeded ${timeout} ms; unfinished work or cleanup kept it alive`);
+    // The resource types say what to look for when the hang cannot be reproduced.
+    const holders = process.getActiveResourcesInfo().join(", ") || "none reported";
+    console.error(`test file ${file} exceeded ${timeout} ms; unfinished work or cleanup kept it alive`
+      + `\ntest file ${file} kept alive by: ${holders}`);
     process.exit(1);
   }, timeout).unref();
 }
