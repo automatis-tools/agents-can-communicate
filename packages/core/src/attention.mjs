@@ -64,12 +64,16 @@ function unavailableRecipients(snapshot, participantId, now, pidIsAlive) {
 
 // Nothing reads a message whose recipient has no session left: a new session of
 // the same client is another participant and inherits no inbox. The other
-// sessions are told, once each; the receipt stays the recipient's (#320).
+// participants are told, once each; the receipt stays the recipient's (#320).
 function leftForEndedSessions(snapshot, { session, participantId, now, pidIsAlive }) {
   const present = new Set((snapshot.sessions ?? [])
     .filter(item => classifySessionPresence(item, now, pidIsAlive) !== "offline")
     .map(item => item.participantId));
-  const noticed = new Set(session?.extensions?.noticedLeftMessages ?? []);
+  // Once per participant: a resumed conversation opens another session of the
+  // same participant, and its transcript already holds the notice.
+  const noticed = new Set([session, ...(snapshot.sessions ?? [])
+    .filter(item => participantId !== undefined && item.participantId === participantId)]
+    .flatMap(item => item?.extensions?.noticedLeftMessages ?? []));
   const receipts = snapshot.receipts ?? [];
   const items = (snapshot.messages ?? []).flatMap(message => {
     const age = Date.parse(now) - Date.parse(message.sentAt);

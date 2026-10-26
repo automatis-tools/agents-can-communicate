@@ -158,3 +158,16 @@ test("a session remembers the sixty-four newest notices it was given", async () 
 
   assert.deepEqual(record.extensions.noticedLeftMessages, ids.slice(6));
 });
+
+test("a resumed conversation is not told again about a left message it was given", async () => {
+  const { service, clock } = makeService();
+  const { reply } = await reviewLeftBehind(service, clock);
+  const first = await service.openSession(opening("claude_b"));
+  await service.recordNotices({ ...owner(first), workspaceId: WORKSPACE, messageIds: [reply.messageId] });
+  await service.closeSession({ ...owner(first), workspaceId: WORKSPACE });
+
+  // A resumed conversation keeps its participant and opens another session.
+  const resumed = await service.openSession(opening("claude_b"));
+
+  assert.deepEqual(await leftItems(service, resumed), []);
+});

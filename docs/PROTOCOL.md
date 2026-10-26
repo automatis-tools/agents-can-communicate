@@ -353,7 +353,7 @@ Message discovery and exact-read contracts are in [CLI](CLI.md) and [MCP](MCP.md
 limited to seven explicit rules: `reply_required`, `acknowledgement_required`,
 `recipient_unavailable`, `claim_conflict`, `claim_contended`, `claim_expired`, and
 `left_for_ended_session`. The last reports a message that waits for a participant whose
-sessions have all ended. Each other session in the room is told once, except the sender.
+sessions have all ended. Each other participant in the room is told once, except the sender.
 The receipt stays with the recipient, and `sync --scope history --message <id>` reads the
 message without a change to it.
 

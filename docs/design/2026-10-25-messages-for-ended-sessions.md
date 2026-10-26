@@ -36,11 +36,14 @@ that such a message exists and how to read it.
     count, because it can still return to its inbox;
   - the message was sent within the last 7 days (`LEFT_MESSAGE_WINDOW_MS`).
   Any obligation counts, including `none`: the reply in #180 had none.
-- **Once per session.** A session is told about a message once. When a hook's context
-  carries the item, the post-write commit that records message offers also records the
-  message id in the session record's `extensions.noticedLeftMessages`. Attention for that
-  session then omits it. The list keeps the 64 newest ids. A query without a session,
-  such as `acc status`, lists every qualifying message.
+- **Once per participant.** A participant is told about a message once. When a hook's
+  context carries the item, the post-write commit that records message offers also records
+  the message id in the session record's `extensions.noticedLeftMessages`. Attention omits
+  a message that any session of the same participant has recorded: a resumed conversation
+  opens another session of the same participant, and its transcript already holds the
+  notice. The real-client capture found this case, when the first design counted per
+  session. Each list keeps the 64 newest ids. A query without a session, such as
+  `acc status`, lists every qualifying message.
 - **Bounded.** At most 5 items per session, newest first (`LEFT_MESSAGE_LIMIT`). Each
   item names the message id, the subject and the recipient, and the summary says how to
   read it: `sync --scope history --message <id>`, which changes no receipt.
@@ -67,7 +70,8 @@ your own user's scope, and leave the receipt to its recipient.
 
 - Core tests with the memory store: the #180 sequence (request, reply, recipient
   closes, new session); a recipient whose session is only `stale` is not reported; the
-  sender is not told; a reported message is not reported again to the same session;
+  sender is not told; a reported message is not reported again to the same participant,
+  including its resumed conversation;
   the newest 5 are reported when more qualify; a message older than the window is not
   reported; a superseded decision is not reported.
 - A hook-runner test: the post-write commit records the notice only when the item
