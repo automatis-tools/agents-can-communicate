@@ -912,9 +912,14 @@ export async function runHook({ adapterId, payload, adapters, dataHome, env,
           assertHookBudget(deadline, "hook budget exhausted before offer commit");
           await context.service.recordOfferSucceeded({ ...input, deadlineAt: deadline });
         }
+        // A notice that cannot be recorded (the session closed meanwhile, or
+        // the budget ran out) is shown again next turn. That must not report
+        // the offers above, already committed, as failed.
         for (const input of noticeInputs) {
-          assertHookBudget(deadline, "hook budget exhausted before notice commit");
-          await context.service.recordNotices(input);
+          try {
+            assertHookBudget(deadline, "hook budget exhausted before notice commit");
+            await context.service.recordNotices(input);
+          } catch { /* shown again next turn */ }
         }
       })();
       return commitPromise;

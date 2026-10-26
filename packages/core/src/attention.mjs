@@ -65,6 +65,8 @@ function unavailableRecipients(snapshot, participantId, now, pidIsAlive) {
 // Nothing reads a message whose recipient has no session left: a new session of
 // the same client is another participant and inherits no inbox. The other
 // participants are told, once each; the receipt stays the recipient's (#320).
+// The summary carries validated ids only: a subject is peer-written, and this
+// line speaks in ACC's voice outside any quoted peer block.
 function leftForEndedSessions(snapshot, { session, participantId, now, pidIsAlive }) {
   const present = new Set((snapshot.sessions ?? [])
     .filter(item => classifySessionPresence(item, now, pidIsAlive) !== "offline")
@@ -74,24 +76,31 @@ function leftForEndedSessions(snapshot, { session, participantId, now, pidIsAliv
   const noticed = new Set([session, ...(snapshot.sessions ?? [])
     .filter(item => participantId !== undefined && item.participantId === participantId)]
     .flatMap(item => item?.extensions?.noticedLeftMessages ?? []));
-  const receipts = snapshot.receipts ?? [];
-  const items = (snapshot.messages ?? []).flatMap(message => {
+  // One pass over the receipts, so a hook's cost stays linear in what the
+  // workspace holds (#298).
+  const waiting = new Map();
+  for (const receipt of snapshot.receipts ?? []) {
+    if (!["queued", "offered"].includes(receipt.state)
+      || present.has(receipt.recipientParticipantId)) continue;
+    if (!waiting.has(receipt.messageId)) waiting.set(receipt.messageId, []);
+    waiting.get(receipt.messageId).push(receipt.recipientParticipantId);
+  }
+  const qualifying = (snapshot.messages ?? []).filter(message => {
     const age = Date.parse(now) - Date.parse(message.sentAt);
-    if (!(message.toParticipantIds?.length > 0) || message.fromParticipantId === participantId
-      || noticed.has(message.messageId) || !(age < LEFT_MESSAGE_WINDOW_MS)) return [];
-    const recipients = receipts.filter(receipt => receipt.messageId === message.messageId
-      && receipt.recipientParticipantId !== participantId
-      && ["queued", "offered"].includes(receipt.state)
-      && !present.has(receipt.recipientParticipantId))
-      .map(receipt => receipt.recipientParticipantId);
-    return recipients.length === 0 ? [] : [{ sentAt: message.sentAt, item: {
-      kind: "left_for_ended_session", priority: ATTENTION_PRIORITY.left_for_ended_session,
-      sourceId: message.messageId,
-      summary: `${message.subject} - waiting for ${recipients.join(", ")}, whose sessions have `
-        + `ended; read it with sync --scope history --message ${message.messageId}` } }];
-  });
-  return items.sort((left, right) => right.sentAt.localeCompare(left.sentAt))
-    .slice(0, LEFT_MESSAGE_LIMIT).map(entry => entry.item);
+    // A sender wrote it, and a co-recipient holds it in its own inbox.
+    return waiting.has(message.messageId) && message.toParticipantIds?.length > 0
+      && message.fromParticipantId !== participantId
+      && !message.toParticipantIds.includes(participantId) && age < LEFT_MESSAGE_WINDOW_MS;
+  }).sort((left, right) => right.sentAt.localeCompare(left.sentAt));
+  // The newest are chosen before the ones already told are dropped. Dropping
+  // first let a backlog longer than the noticed list cycle through it forever.
+  return qualifying.slice(0, LEFT_MESSAGE_LIMIT)
+    .filter(message => !noticed.has(message.messageId))
+    .map(message => ({ kind: "left_for_ended_session",
+      priority: ATTENTION_PRIORITY.left_for_ended_session, sourceId: message.messageId,
+      summary: `${message.kind} from ${message.fromParticipantId} waiting for `
+        + `${waiting.get(message.messageId).join(", ")}, whose sessions have ended; `
+        + `read it with \`acc sync --scope history --message ${message.messageId}\`` }));
 }
 
 function expiredClaims(snapshot, session, now) {

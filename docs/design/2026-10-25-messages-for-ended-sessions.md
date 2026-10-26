@@ -22,10 +22,11 @@ session and for Codex.
 A new attention kind, `left_for_ended_session`, tells the other sessions in the room
 that such a message exists and how to read it.
 
-- **Who is told.** Every session whose participant is neither the recipient nor the
-  sender. The sender wrote the message and, while it carries an obligation, already sees
-  `recipient_unavailable`. Knowledge is shared; authority is not: a session that is told
-  cannot acknowledge or answer on the recipient's behalf.
+- **Who is told.** Every participant that is neither the sender nor a recipient of the
+  message. The sender wrote it and, while it carries an obligation, already sees
+  `recipient_unavailable`; a co-recipient holds the message in its own inbox. Knowledge
+  is shared; authority is not: a session that is told cannot acknowledge or answer on the
+  recipient's behalf.
 - **Which messages.** All of these hold:
   - the message is current (a superseded or withdrawn decision does not count) and is
     addressed to participants, not to the room;
@@ -42,11 +43,16 @@ that such a message exists and how to read it.
   a message that any session of the same participant has recorded: a resumed conversation
   opens another session of the same participant, and its transcript already holds the
   notice. The real-client capture found this case, when the first design counted per
-  session. Each list keeps the 64 newest ids. A query without a session, such as
-  `acc status`, lists every qualifying message.
-- **Bounded.** At most 5 items per session, newest first (`LEFT_MESSAGE_LIMIT`). Each
-  item names the message id, the subject and the recipient, and the summary says how to
-  read it: `sync --scope history --message <id>`, which changes no receipt.
+  session. Each list keeps the 64 newest ids.
+- **Bounded.** The 5 newest qualifying messages (`LEFT_MESSAGE_LIMIT`) are chosen first,
+  and those the participant was already told about are then dropped. Choosing after the
+  drop let a backlog longer than the 64-id list cycle through it on every prompt (found in
+  review). `acc status`, which has no session, shows the same 5 newest. The receipts are
+  read in one pass, so a hook's cost stays linear in what the workspace holds.
+- **Text.** The summary carries validated ids only: the message kind, the sender, the
+  recipients, and how to read it, `` `acc sync --scope history --message <id>` ``, which
+  changes no receipt. The subject is peer-written and the line speaks in ACC's voice
+  outside any quoted peer block, so the subject stays out (found in review).
 - **Priority.** `left_for_ended_session` ranks after the claim kinds (priority 7). It is
   informational: the context projector places it after peer bodies and reminders.
 - **The recipient comes back.** When the recipient participant returns (a resumed
@@ -55,8 +61,7 @@ that such a message exists and how to read it.
 
 ## Compatibility
 
-Attention is computed when it is read; no store record kind changes. The once-per-session
-list lives in the session record's `extensions`, which an older ACC carries through
+Attention is computed when it is read; no store record kind changes. The notice list lives in the session record's `extensions`, which an older ACC carries through
 unchanged, since every session update spreads the current record. An older ACC reading
 the same store shows no `left_for_ended_session` items and ignores the list.
 

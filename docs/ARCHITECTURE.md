@@ -184,7 +184,7 @@ Attention is computed from seven explicit rules for current obligations:
 | 4 | `claim_conflict` | this session's intent hint overlaps another live claim |
 | 5 | `claim_contended` | a peer intent hint overlaps a live claim this session owns |
 | 6 | `claim_expired` | a claim this session owned has reached its lease time |
-| 7 | `left_for_ended_session` | a message sent in the last 7 days to another participant, whose sessions have all ended, was never retrieved; told once to each participant that is neither its sender nor its recipient, 5 at most |
+| 7 | `left_for_ended_session` | a message sent in the last 7 days to another participant, whose sessions have all ended, was never retrieved; told once to each participant that is neither its sender nor a recipient, the 5 newest |
 
 Semantic relevance belongs to the receiving model; correctness never depends on a hidden
 classifier.

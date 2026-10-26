@@ -55,7 +55,7 @@ async function leftBehind(t) {
     subject: "Review findings", body: "two edge cases are untested" });
   await sender.closeSession({ sessionId: recipient.accSessionId, workspaceId,
     generation: recipient.generation });
-  return { root, invoke, message };
+  return { root, invoke, message, sender, workspaceId };
 }
 
 test("a later session's context carries a left message once, after the bytes are written", async t => {
@@ -85,4 +85,18 @@ test("another later session is still told after the first one was", async t => {
   const other = await invoke(event("beforeTurn", root, "harness-other"));
 
   assert.match(other.stdout, new RegExp(`\\[left_for_ended_session\\] ${message.messageId}`));
+});
+
+test("a notice that cannot be recorded leaves the offer commit standing", async t => {
+  const { root, invoke, message, sender, workspaceId } = await leftBehind(t);
+  const later = await invoke(event("sessionStart", root, "harness-later"));
+  const turn = await invoke(event("beforeTurn", root, "harness-later"));
+  assert.match(turn.stdout, new RegExp(message.messageId));
+
+  // The session closes between the write and the commit: the notice cannot be
+  // recorded, and it is shown again next time, which is the safe direction.
+  await sender.closeSession({ sessionId: later.accSessionId, workspaceId,
+    generation: later.generation });
+
+  await turn.commitOffers();
 });
