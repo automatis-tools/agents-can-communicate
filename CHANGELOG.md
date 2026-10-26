@@ -1,5 +1,28 @@
 # Changelog
 
+## Unreleased — a refused state write is named as such
+
+- When a client sandbox or host policy denies writes under ACC's data home, ACC now says so.
+  Before, runtime admission failed, and every command answered `runtime unavailable; retry
+  after the update or run acc update to recover`. `acc doctor` reported
+  `unavailable_during_update` while the runtime was ready and nothing was pending (#316,
+  seen in ChatGPT Work Mode and in a Codex chat without ACC's rules file). Commands now exit
+  4 with `reasonCode: state_access_denied`, name the refused write and the real update
+  state, and point to a process that can write the data home. `acc doctor` reports
+  `scope: runtime` and `workspaceInspection: state_access_denied` with the refusal. Hooks
+  still fail open, and name only the refused code.
+
+| Development artifact | Value |
+|---|---|
+| Built from | `78f586439316d3a93ae07f6100d55b5eec43ae95` |
+| Tarball | `agents-can-communicate-0.12.1.tgz`, 620,751 bytes, 380 files |
+| sha256 | `110aa5a0e93cd44e2cf1438aea47c041c97c014b34dc7fdacdf41f9be3205297` |
+
+The exact archive passed package verification. See
+[development evidence](docs/release-evidence/unreleased-state-access-denied.md).
+This is not a published release; the package version remains `0.12.1`.
+The earlier candidate and release records below retain their original provenance.
+
 ## 0.12.1 — release candidate
 
 - New Codex chats no longer open in ACC's permission profile `acc-workspace`, which Codex
