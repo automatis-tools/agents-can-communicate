@@ -31,6 +31,20 @@ test("a successful assertion cannot hold its file process open beyond the file d
   assert.match(result.stdout + result.stderr, /leaked-handle\.test\.mjs.*100 ms|100 ms.*leaked-handle\.test\.mjs/);
 });
 
+test("the file deadline names the resources that kept the file alive", async t => {
+  const root = await mkdtemp(path.join(tmpdir(), "acc-file-holders-"));
+  t.after(() => removeFixture(root));
+  const file = path.join(root, "held-by-server.test.mjs");
+  await writeFile(file, 'import net from "node:net";\nimport test from "node:test";\n'
+    + 'test("assertion passed", () => {});\nnet.createServer().listen(0, "127.0.0.1");\n');
+  const args = nodeTestArguments([file]).filter(argument => argument !== "--test-force-exit");
+  const result = await run(process.execPath, args, {
+    cwd: repo, env: environment({ ACC_TEST_FILE_TIMEOUT_MS: "300", ACC_TEST_FORCE_EXIT: "0" }), timeout: 10_000,
+  }).then(value => ({ ...value, code: 0 }), error => error);
+  assert.equal(result.code, 1);
+  assert.match(result.stdout + result.stderr, /kept alive by: .*TCPServerWrap/);
+});
+
 test("completed files exit naturally and do not wait for the watchdog", async t => {
   const root = await mkdtemp(path.join(tmpdir(), "acc-file-complete-"));
   t.after(() => removeFixture(root));
