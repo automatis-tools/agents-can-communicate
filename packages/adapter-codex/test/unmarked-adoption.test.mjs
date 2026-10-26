@@ -26,6 +26,9 @@ async function fixture(t) {
     adapter: createCodexAdapter() };
 }
 
+// ACC writes no rules file on Windows, so there it keeps selecting its own profile.
+const DEFAULT = process.platform === "win32" ? /^default_permissions = "acc-workspace"$/m
+  : /^default_permissions = ":workspace"$/m;
 const stripComments = text => text.split("\n").filter(line => !line.trim().startsWith("#")).join("\n");
 const count = (text, pattern) => (text.match(pattern) ?? []).length;
 const foreign = '[marketplaces.other]\nsource = "https://example.invalid/skills.git"\nsource_type = "git"\n\n'
@@ -53,7 +56,7 @@ test("an install whose markers a rewrite removed is adopted and marked again", a
   assert.equal(count(after, /^\[marketplaces\.acc-local\]$/gm), 1);
   assert.equal(count(after, /^\[permissions\.acc-workspace\]$/gm), 1);
   assert.equal(count(after, /^default_permissions = /gm), 1);
-  assert.match(after, /^default_permissions = ":workspace"$/m);
+  assert.match(after, DEFAULT);
   assert.ok(after.includes(foreign), "the client's own tables changed");
   const detected = await f.adapter.detect(f.context);
   assert.equal(detected.outgoingDelivery.state, "configured");
@@ -123,7 +126,7 @@ test("the sorted, comment-free shape of the maintainer's config is adopted", asy
   assert.equal(count(after, /^\[marketplaces\.acc-local\]$/gm), 1);
   assert.equal(count(after, /^\[permissions\.acc-workspace\]$/gm), 1);
   assert.equal(count(after, /^default_permissions = /gm), 1);
-  assert.match(after, /^default_permissions = ":workspace"$/m);
+  assert.match(after, DEFAULT);
   assert.match(after, /^\[marketplaces\.other\]$/m);
   assert.match(after, /^\[hooks\.state\."agents-can-communicate@acc-local:hooks\.json:stop:0:0"\]$/m);
 });

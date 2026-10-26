@@ -148,3 +148,13 @@ test("a wrapper path a rule cannot hold as it is gets no rule", async t => {
   assert.ok(result.diagnostics.some(line => line.includes("cannot be written in a rule")));
   await assert.rejects(readFile(rulesPath(codexHome), "utf8"), { code: "ENOENT" });
 });
+
+test("ACC's rule cannot carry ACC's commands on Windows or through a path the rule cannot spell", async () => {
+  const { ruleAllowsCommands } = await import("../src/allow-rule.mjs");
+  assert.equal(await ruleAllowsCommands({ codexHome: "/nonexistent/.codex", cliShim: "/home/u/acc-cli.sh",
+    hostPlatform: "win32" }), false);
+  assert.equal(await ruleAllowsCommands({ codexHome: "/nonexistent/.codex", cliShim: 'C:\\Users\\u\\acc-cli.sh',
+    hostPlatform: "linux" }), false);
+  assert.equal(await ruleAllowsCommands({ codexHome: "/nonexistent/.codex", cliShim: "/home/u/acc-cli.sh",
+    hostPlatform: "linux" }), true);
+});
