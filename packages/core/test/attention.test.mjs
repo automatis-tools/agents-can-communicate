@@ -165,13 +165,10 @@ test("attention refuses to infer presence without a liveness probe", () => {
     participantId: "participant_a", now: NOW }), error => error.code === EXIT.USAGE);
 });
 
-// Each read of a receipt array element, counted where the computation reads it.
-function countingReceipts(receipts, counter) {
-  return new Proxy(receipts, { get(target, property, receiver) {
-    if (typeof property === "string" && /^\d+$/.test(property)) counter.visits += 1;
-    return Reflect.get(target, property, receiver);
-  } });
-}
+// Every field read of every record, wherever it is read from: a copy of the
+// array still holds these objects, so a pass over a copy is counted too.
+const countingRecords = (records, counter) => records.map(record => new Proxy(record, {
+  get(target, property, receiver) { counter.reads += 1; return Reflect.get(target, property, receiver); } }));
 
 // #305: one pass per concern, not one pass over every receipt for each request.
 test("outgoing attention visits each receipt a bounded number of times, acknowledged history too", () => {
@@ -184,11 +181,13 @@ test("outgoing attention visits each receipt a bounded number of times, acknowle
       receipts.push({ messageId, recipientParticipantId: "participant_gone",
         state: acknowledged ? "acknowledged" : "queued" });
     }
-    const counter = { visits: 0 };
-    const items = computeAttention({ messages, receipts: countingReceipts(receipts, counter),
-      sessions: [], claims: [], intents: [] }, options());
+    const receiptReads = { reads: 0 }, messageReads = { reads: 0 };
+    const items = computeAttention({ messages: countingRecords(messages, messageReads),
+      receipts: countingRecords(receipts, receiptReads), sessions: [], claims: [], intents: [] }, options());
     assert.equal(items.length, acknowledged ? 0 : 400);
-    assert.ok(counter.visits <= 4 * receipts.length, `${counter.visits} receipt visits for ${receipts.length} receipts`);
+    // A pass reads a few fields of a record; one pass per record for each request reads 400 times as many.
+    assert.ok(receiptReads.reads <= 12 * receipts.length, `${receiptReads.reads} field reads for ${receipts.length} receipts`);
+    assert.ok(messageReads.reads <= 24 * messages.length, `${messageReads.reads} field reads for ${messages.length} messages`);
   }
 });
 
@@ -206,6 +205,9 @@ test("recipient_unavailable keeps fanout, presence, receipt order and decision s
         decisionChange: { action: "replace", messageIds: ["message_a"] } },
       { messageId: "message_d", fromParticipantId: "participant_a", toParticipantIds: ["participant_gone"],
         kind: "note", subject: "Just so you know", obligation: "none" },
+      // Addressed to nobody: a room message, whatever its receipts say.
+      { messageId: "message_e", fromParticipantId: "participant_a", toParticipantIds: [],
+        kind: "request", subject: "Anyone", obligation: "reply" },
     ],
     receipts: [
       { messageId: "message_c", recipientParticipantId: "participant_gone", state: "offered" },
@@ -214,10 +216,12 @@ test("recipient_unavailable keeps fanout, presence, receipt order and decision s
       { messageId: "message_a", recipientParticipantId: "participant_gone", state: "queued" },
       { messageId: "message_b", recipientParticipantId: "participant_closed", state: "retrieved" },
       { messageId: "message_d", recipientParticipantId: "participant_gone", state: "queued" },
+      { messageId: "message_e", recipientParticipantId: "participant_gone", state: "queued" },
     ],
     sessions, claims: [], intents: [],
   };
-  // A replaced decision is quiet, a note asks nothing, and an online recipient is available.
+  // A replaced decision is quiet, a note asks nothing, a room message has no recipient to
+  // wait for, and an online recipient is available.
   assert.deepEqual(computeAttention(snapshot, options()).map(item => [item.kind, item.sourceId, item.summary]), [
     ["recipient_unavailable", "message_b", "Fan out - participant_gone is unavailable"],
     ["recipient_unavailable", "message_b", "Fan out - participant_closed is unavailable"],
