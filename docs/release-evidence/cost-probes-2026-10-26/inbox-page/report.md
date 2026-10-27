@@ -1,8 +1,8 @@
 # Cost comparison: inbox
 
 - Baseline: `v0.12.2`, 718ea7c3df73891605182f6e1c74366026e67898, sources `924f5fae1b052249c790d310bc0a071c85145ecde5be9e83bf07870e60bc68d4`
-- Candidate: `worktree`, ca1ac9fc7e803646c728353c00f84e0a7dbc0db2, sources `924f5fae1b052249c790d310bc0a071c85145ecde5be9e83bf07870e60bc68d4`
-- Harness: ca1ac9fc7e803646c728353c00f84e0a7dbc0db2
+- Candidate: `worktree`, 1ae97c784d804e0d1d685d1333e9f86002f76d5a, sources `924f5fae1b052249c790d310bc0a071c85145ecde5be9e83bf07870e60bc68d4`
+- Harness: 1ae97c784d804e0d1d685d1333e9f86002f76d5a
 - Host: v26.5.1, Darwin, arm64, Apple M5 Max, 18 cores
 - Durability: fsync: real
 - Settings: 10 rounds, 10 samples per child, 3 warm-up calls
@@ -11,61 +11,61 @@
 
 Scenario hash `f888c080a80e43414b9dcfbe1a35836341dc9acf9de4c67dca72d763c5e4dbde`. **benchmark**.
 
-- baseline fixture: `1a2cb129af3cb4626e3d8768aa414a4fc2211332680c8bf46d98a26bd15a2f4e`
-- candidate fixture: `1a2cb129af3cb4626e3d8768aa414a4fc2211332680c8bf46d98a26bd15a2f4e`
+- baseline fixture: `1093ea081e2916690d7b77d7cd0de3b45251db508d6dd6b86a2d83e0cf25d53b`
+- candidate fixture: `1093ea081e2916690d7b77d7cd0de3b45251db508d6dd6b86a2d83e0cf25d53b`
 
 | Side | n | median ms | IQR ms | min ms | max ms | p95 ms | p99 ms |
 |---|---:|---:|---:|---:|---:|---:|---:|
-| baseline | 100 | 5.7695 | 1.061198 | 4.869125 | 14.848125 | 9.688663 | - |
-| candidate | 100 | 5.971417 | 1.245427 | 4.927166 | 14.112084 | 12.274666 | - |
+| baseline | 100 | 5.520354 | 0.419843 | 5.083875 | 11.483625 | 6.329742 | - |
+| candidate | 100 | 5.523958 | 0.510146 | 5.012916 | 6.729125 | 6.215904 | - |
 
 Tails not reported - baseline p99: insufficient evidence: 100 samples, 1000 needed; candidate p99: insufficient evidence: 100 samples, 1000 needed.
 
-Paired by round, candidate median / baseline median: 1.045 (range 0.571..1.815 over 10 rounds).
+Paired by round, candidate median / baseline median: 1.009 (range 0.864..1.103 over 10 rounds).
 
 Diagnostic operation counts (what each side touched; never a validity condition):
 
 | Observation | baseline | candidate |
 |---|---:|---:|
 | enumerations.events/readdir | 1 | 1 |
-| enumerations.events/readdirEntries | 57 | 57 |
+| enumerations.events/readdirEntries | 62 | 62 |
 | enumerations.metadata/readdir | 4 | 4 |
-| enumerations.metadata/readdirEntries | 68 | 68 |
+| enumerations.metadata/readdirEntries | 72 | 72 |
 | pageReads | 0 | 0 |
-| readBytes | 35117..35119 | 35117..35119 |
-| stateByKind.message | 30 | 30 |
-| stateByKind.receipt | 30 | 30 |
+| readBytes | 37224 | 37224 |
+| stateByKind.message | 32 | 32 |
+| stateByKind.receipt | 32 | 32 |
 | stateByKind.session | 4 | 4 |
-| stateReads | 64 | 64 |
+| stateReads | 68 | 68 |
 
 ## {"probe":"inbox","messages":30,"backlog":270,"operation":"page","limit":1,"mix":true,"seed":1}
 
 Scenario hash `6630ceb0a10eaf7fcfa3a41825cfe64c3da0101513a40bda8581261b50dd6ecd`. **benchmark**.
 
-- baseline fixture: `54f785cb35cc9f6573fbddbcfb406bde867b9ef3a199ebfc0bac288e6acc59db`
-- candidate fixture: `54f785cb35cc9f6573fbddbcfb406bde867b9ef3a199ebfc0bac288e6acc59db`
+- baseline fixture: `34410714f6e2dfa975312d2bc218e89bb0f818344996386fe05864ab6c41f10e`
+- candidate fixture: `34410714f6e2dfa975312d2bc218e89bb0f818344996386fe05864ab6c41f10e`
 
 | Side | n | median ms | IQR ms | min ms | max ms | p95 ms | p99 ms |
 |---|---:|---:|---:|---:|---:|---:|---:|
-| baseline | 100 | 33.830126 | 4.599042 | 31.694542 | 59.653958 | 52.757611 | - |
-| candidate | 100 | 35.767666 | 7.382666 | 31.899416 | 84.44375 | 62.196462 | - |
+| baseline | 100 | 33.406708 | 1.847667 | 31.858375 | 53.319542 | 37.102804 | - |
+| candidate | 100 | 33.383 | 1.773438 | 31.764542 | 45.027666 | 37.479177 | - |
 
 Tails not reported - baseline p99: insufficient evidence: 100 samples, 1000 needed; candidate p99: insufficient evidence: 100 samples, 1000 needed.
 
-Paired by round, candidate median / baseline median: 0.993 (range 0.848..1.552 over 10 rounds).
+Paired by round, candidate median / baseline median: 1.011 (range 0.939..1.059 over 10 rounds).
 
 Diagnostic operation counts (what each side touched; never a validity condition):
 
 | Observation | baseline | candidate |
 |---|---:|---:|
 | enumerations.events/readdir | 1 | 1 |
-| enumerations.events/readdirEntries | 331 | 331 |
+| enumerations.events/readdirEntries | 330 | 330 |
 | enumerations.metadata/readdir | 4 | 4 |
-| enumerations.metadata/readdirEntries | 608 | 608 |
+| enumerations.metadata/readdirEntries | 612 | 612 |
 | pageReads | 0 | 0 |
-| readBytes | 298642..298643 | 298642..298643 |
-| stateByKind.message | 300 | 300 |
-| stateByKind.receipt | 300 | 300 |
+| readBytes | 300730 | 300730 |
+| stateByKind.message | 302 | 302 |
+| stateByKind.receipt | 302 | 302 |
 | stateByKind.session | 4 | 4 |
-| stateReads | 604 | 604 |
+| stateReads | 608 | 608 |
 

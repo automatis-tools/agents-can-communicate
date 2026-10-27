@@ -1,63 +1,63 @@
 # Cost comparison: attention
 
 - Baseline: `v0.12.2`, 718ea7c3df73891605182f6e1c74366026e67898, sources `924f5fae1b052249c790d310bc0a071c85145ecde5be9e83bf07870e60bc68d4`
-- Candidate: `worktree`, ca1ac9fc7e803646c728353c00f84e0a7dbc0db2, sources `924f5fae1b052249c790d310bc0a071c85145ecde5be9e83bf07870e60bc68d4`
-- Harness: ca1ac9fc7e803646c728353c00f84e0a7dbc0db2
+- Candidate: `worktree`, 1ae97c784d804e0d1d685d1333e9f86002f76d5a, sources `924f5fae1b052249c790d310bc0a071c85145ecde5be9e83bf07870e60bc68d4`
+- Harness: 1ae97c784d804e0d1d685d1333e9f86002f76d5a
 - Host: v26.5.1, Darwin, arm64, Apple M5 Max, 18 cores
 - Durability: fsync: real
 - Settings: 10 rounds, 10 samples per child, 3 warm-up calls
 
-## {"probe":"attention","ownRequests":1000,"fanout":1,"acknowledgedShare":0,"offlineShare":0,"inboundObligations":0,"witnesses":4,"seed":1}
+## {"probe":"attention","ownRequests":1000,"fanout":1,"acknowledgedShare":0,"offlineShare":0,"inboundObligations":0,"witnesses":4,"leftRule":"limit","seed":1}
 
-Scenario hash `eb503ff9710642e443b107aaf1b2fe4e55d9a127adbe7494419b8112cdf69b2e`. **benchmark**.
+Scenario hash `07df3381855de06f79cf76f2f7beea0c8864ca78389311a869d5b662e9c11f36`. **benchmark**.
 
-- baseline fixture: `8b79f4ff8226c41aa4406ea44b64b877bfece0b634547905ce4bef345ef7b3a1`
-- candidate fixture: `8b79f4ff8226c41aa4406ea44b64b877bfece0b634547905ce4bef345ef7b3a1`
+- baseline fixture: `fa7979553f13a4177c397d2a6c6c192eb9074e6ce564482811d25a76b42d7b55`
+- candidate fixture: `fa7979553f13a4177c397d2a6c6c192eb9074e6ce564482811d25a76b42d7b55`
 
 | Side | n | median ms | IQR ms | min ms | max ms | p95 ms | p99 ms |
 |---|---:|---:|---:|---:|---:|---:|---:|
-| baseline | 100 | 7.311209 | 0.185105 | 6.66475 | 13.229583 | 11.137915 | - |
-| candidate | 100 | 7.2995 | 0.199469 | 6.623625 | 12.169167 | 10.916517 | - |
+| baseline | 100 | 7.480145 | 0.26375 | 6.859459 | 9.164791 | 8.184073 | - |
+| candidate | 100 | 7.507041 | 0.351771 | 6.800334 | 11.245708 | 8.225971 | - |
 
 Tails not reported - baseline p99: insufficient evidence: 100 samples, 1000 needed; candidate p99: insufficient evidence: 100 samples, 1000 needed.
 
-Paired by round, candidate median / baseline median: 0.995 (range 0.974..1.018 over 10 rounds).
+Paired by round, candidate median / baseline median: 1.002 (range 0.931..1.027 over 10 rounds).
 
 Diagnostic operation counts (what each side touched; never a validity condition):
 
 | Observation | baseline | candidate |
 |---|---:|---:|
-| items | 12 | 12 |
-| messageVisits | 2026 | 2026 |
-| messages | 1013 | 1013 |
-| receiptVisits | 1024143 | 1024143 |
-| receipts | 1013 | 1013 |
-| sessionVisits | 30 | 30 |
+| items | 22 | 22 |
+| messageVisits | 2068 | 2068 |
+| messages | 1034 | 1034 |
+| receiptVisits | 1049510 | 1049510 |
+| receipts | 1034 | 1034 |
+| sessionVisits | 61 | 61 |
 
-## {"probe":"attention","ownRequests":8000,"fanout":1,"acknowledgedShare":0,"offlineShare":0,"inboundObligations":0,"witnesses":4,"seed":1}
+## {"probe":"attention","ownRequests":8000,"fanout":1,"acknowledgedShare":0,"offlineShare":0,"inboundObligations":0,"witnesses":4,"leftRule":"limit","seed":1}
 
-Scenario hash `79274dbff63a8d5a3b900fd1ed8e62881815f3e26ab0bae9b3d0e38e42045c12`. **benchmark**.
+Scenario hash `bb9ce0a36a933dabc99f655cc1decb40e886d8eef8c655e4d1f1b39a8fa95adc`. **benchmark**.
 
-- baseline fixture: `1a99ee3894fad4956b541b6b00c883c1d92a33f0a90aef9e1dc504769caa4edb`
-- candidate fixture: `1a99ee3894fad4956b541b6b00c883c1d92a33f0a90aef9e1dc504769caa4edb`
+- baseline fixture: `b390b319dfa8fa9858b7ae748427b793489105bd18e0624aa7413ad8f37652ea`
+- candidate fixture: `b390b319dfa8fa9858b7ae748427b793489105bd18e0624aa7413ad8f37652ea`
 
 | Side | n | median ms | IQR ms | min ms | max ms | p95 ms | p99 ms |
 |---|---:|---:|---:|---:|---:|---:|---:|
-| baseline | 100 | 248.004458 | 37.863323 | 209.324667 | 458.231416 | 423.003429 | - |
-| candidate | 100 | 250.017854 | 38.573969 | 208.996 | 681.098958 | 422.681202 | - |
+| baseline | 100 | 260.388604 | 156.53325 | 209.154125 | 459.899375 | 439.477298 | - |
+| candidate | 100 | 270.271354 | 173.1625 | 209.353834 | 444.074417 | 433.880993 | - |
 
 Tails not reported - baseline p99: insufficient evidence: 100 samples, 1000 needed; candidate p99: insufficient evidence: 100 samples, 1000 needed.
 
-Paired by round, candidate median / baseline median: 1.005 (range 0.875..1.175 over 10 rounds).
+Paired by round, candidate median / baseline median: 1.035 (range 0.94..1.157 over 10 rounds).
 
 Diagnostic operation counts (what each side touched; never a validity condition):
 
 | Observation | baseline | candidate |
 |---|---:|---:|
-| items | 12 | 12 |
-| messageVisits | 16026 | 16026 |
-| messages | 8013 | 8013 |
-| receiptVisits | 64192143 | 64192143 |
-| receipts | 8013 | 8013 |
-| sessionVisits | 30 | 30 |
+| items | 22 | 22 |
+| messageVisits | 16068 | 16068 |
+| messages | 8034 | 8034 |
+| receiptVisits | 64392510 | 64392510 |
+| receipts | 8034 | 8034 |
+| sessionVisits | 61 | 61 |
 
