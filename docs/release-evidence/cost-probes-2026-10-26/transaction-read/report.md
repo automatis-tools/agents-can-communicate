@@ -1,8 +1,8 @@
 # Cost comparison: transaction
 
 - Baseline: `v0.12.2`, 718ea7c3df73891605182f6e1c74366026e67898, sources `924f5fae1b052249c790d310bc0a071c85145ecde5be9e83bf07870e60bc68d4`
-- Candidate: `worktree`, 1ae97c784d804e0d1d685d1333e9f86002f76d5a, sources `924f5fae1b052249c790d310bc0a071c85145ecde5be9e83bf07870e60bc68d4`
-- Harness: 1ae97c784d804e0d1d685d1333e9f86002f76d5a
+- Candidate: `worktree`, 31231946630526483270adbf21b62c5aa0d47ecf, sources `924f5fae1b052249c790d310bc0a071c85145ecde5be9e83bf07870e60bc68d4`
+- Harness: 31231946630526483270adbf21b62c5aa0d47ecf
 - Host: v26.5.1, Darwin, arm64, Apple M5 Max, 18 cores
 - Durability: fsync: skipped; NODE_OPTIONS `--import file:///Users/mmykola87/work/automatis-tools/agents-can-communicate/agents-can-communicate/.gitworktrees/feat-comparable-cost-probes/scripts/test-skip-fsync.mjs`
 - Settings: 10 rounds, 10 samples per child, 3 warm-up calls
@@ -16,12 +16,12 @@ Scenario hash `4de70cf77abb9f8c8df866e3b35a25f41dffeb3ac8476bcaf21dd4b2f1d3a39d`
 
 | Side | n | median ms | IQR ms | min ms | max ms | p95 ms | p99 ms |
 |---|---:|---:|---:|---:|---:|---:|---:|
-| baseline | 100 | 1.716583 | 0.110936 | 1.589959 | 3.537291 | 2.016377 | - |
-| candidate | 100 | 1.752876 | 0.170687 | 1.564459 | 6.525208 | 3.51494 | - |
+| baseline | 100 | 2.008333 | 0.579605 | 1.586959 | 6.142625 | 4.054869 | - |
+| candidate | 100 | 1.911375 | 0.496739 | 1.555042 | 53.713333 | 7.99419 | - |
 
 Tails not reported - baseline p99: insufficient evidence: 100 samples, 1000 needed; candidate p99: insufficient evidence: 100 samples, 1000 needed.
 
-Paired by round, candidate median / baseline median: 1.032 (range 0.978..1.315 over 10 rounds).
+Paired by round, candidate median / baseline median: 0.982 (range 0.816..2.847 over 10 rounds).
 
 Diagnostic operation counts (what each side touched; never a validity condition):
 
@@ -32,7 +32,7 @@ Diagnostic operation counts (what each side touched; never a validity condition)
 | enumerations.metadata/readdir | 1 | 1 |
 | enumerations.metadata/readdirEntries | 6 | 6 |
 | events | 100 | 100 |
-| readBytes | 3204 | 3204 |
+| readBytes | 3203..3204 | 3203..3204 |
 | stateByKind.message | 1 | 1 |
 | stateByKind.receipt | 1 | 1 |
 | stateReads | 2 | 2 |
@@ -46,12 +46,12 @@ Scenario hash `05eebd41ac71f19ea966819f92dc4115d6f1889b7301ae4a5373bd3ce358a23f`
 
 | Side | n | median ms | IQR ms | min ms | max ms | p95 ms | p99 ms |
 |---|---:|---:|---:|---:|---:|---:|---:|
-| baseline | 100 | 3.320104 | 0.243822 | 3.071291 | 5.58875 | 3.818025 | - |
-| candidate | 100 | 3.355 | 0.294947 | 3.040625 | 4.948541 | 3.846858 | - |
+| baseline | 100 | 3.725167 | 0.775875 | 3.015792 | 66.404292 | 10.285854 | - |
+| candidate | 100 | 3.710354 | 0.619094 | 3.104042 | 8.733917 | 5.204506 | - |
 
 Tails not reported - baseline p99: insufficient evidence: 100 samples, 1000 needed; candidate p99: insufficient evidence: 100 samples, 1000 needed.
 
-Paired by round, candidate median / baseline median: 1.027 (range 0.946..1.084 over 10 rounds).
+Paired by round, candidate median / baseline median: 0.991 (range 0.357..1.219 over 10 rounds).
 
 Diagnostic operation counts (what each side touched; never a validity condition):
 
@@ -62,7 +62,7 @@ Diagnostic operation counts (what each side touched; never a validity condition)
 | enumerations.metadata/readdir | 1 | 1 |
 | enumerations.metadata/readdirEntries | 6 | 6 |
 | events | 100 | 100 |
-| readBytes | 5794 | 5794 |
+| readBytes | 5793..5794 | 5793..5794 |
 | stateByKind.message | 1 | 1 |
 | stateByKind.receipt | 1 | 1 |
 | stateReads | 2 | 2 |
@@ -76,12 +76,12 @@ Scenario hash `073fc8318993111b73c4577d4c15bcbd92053cc27890101be30da7e87c3a28ef`
 
 | Side | n | median ms | IQR ms | min ms | max ms | p95 ms | p99 ms |
 |---|---:|---:|---:|---:|---:|---:|---:|
-| baseline | 100 | 3.168479 | 0.261135 | 2.888375 | 4.271167 | 3.858919 | - |
-| candidate | 100 | 3.067792 | 0.137782 | 2.910083 | 5.486875 | 3.635597 | - |
+| baseline | 100 | 3.443 | 0.605313 | 2.965416 | 9.694459 | 5.721825 | - |
+| candidate | 100 | 3.506209 | 0.506032 | 3.025542 | 14.704375 | 9.370832 | - |
 
 Tails not reported - baseline p99: insufficient evidence: 100 samples, 1000 needed; candidate p99: insufficient evidence: 100 samples, 1000 needed.
 
-Paired by round, candidate median / baseline median: 0.964 (range 0.939..1.034 over 10 rounds).
+Paired by round, candidate median / baseline median: 1.013 (range 0.853..1.738 over 10 rounds).
 
 Diagnostic operation counts (what each side touched; never a validity condition):
 
@@ -92,7 +92,7 @@ Diagnostic operation counts (what each side touched; never a validity condition)
 | enumerations.metadata/readdir | 1 | 1 |
 | enumerations.metadata/readdirEntries | 6 | 6 |
 | events | 2000 | 2000 |
-| readBytes | 3204 | 3204 |
+| readBytes | 3203..3204 | 3203..3204 |
 | stateByKind.message | 1 | 1 |
 | stateByKind.receipt | 1 | 1 |
 | stateReads | 2 | 2 |
@@ -106,12 +106,12 @@ Scenario hash `7dc7175a35e17fcd1a2674998b15e88cbe16615fa60ee0ec99e24e4effde4321`
 
 | Side | n | median ms | IQR ms | min ms | max ms | p95 ms | p99 ms |
 |---|---:|---:|---:|---:|---:|---:|---:|
-| baseline | 100 | 4.72525 | 0.340979 | 4.390709 | 13.2955 | 9.692477 | - |
-| candidate | 100 | 4.664645 | 0.383532 | 4.357041 | 13.014 | 10.116061 | - |
+| baseline | 100 | 5.094146 | 0.699729 | 4.45675 | 36.830208 | 8.408314 | - |
+| candidate | 100 | 5.283042 | 0.944511 | 4.487 | 10.974834 | 7.887241 | - |
 
 Tails not reported - baseline p99: insufficient evidence: 100 samples, 1000 needed; candidate p99: insufficient evidence: 100 samples, 1000 needed.
 
-Paired by round, candidate median / baseline median: 0.992 (range 0.48..2.172 over 10 rounds).
+Paired by round, candidate median / baseline median: 1.022 (range 0.887..1.298 over 10 rounds).
 
 Diagnostic operation counts (what each side touched; never a validity condition):
 
@@ -122,7 +122,7 @@ Diagnostic operation counts (what each side touched; never a validity condition)
 | enumerations.metadata/readdir | 1 | 1 |
 | enumerations.metadata/readdirEntries | 6 | 6 |
 | events | 2000 | 2000 |
-| readBytes | 5794 | 5794 |
+| readBytes | 5793..5794 | 5793..5794 |
 | stateByKind.message | 1 | 1 |
 | stateByKind.receipt | 1 | 1 |
 | stateReads | 2 | 2 |

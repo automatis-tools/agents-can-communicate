@@ -1,6 +1,6 @@
 # Development evidence: comparable cost probes
 
-Captured in the night of October 27, 2026 (Toronto time), on macOS 27.0.0 arm64 (Apple M5 Max,
+Captured on October 27, 2026, around noon (Toronto time), on macOS 27.0.0 arm64 (Apple M5 Max,
 18 cores, 128 GiB), with Node 26.5.1 (V8 14.6.202.34). This is development evidence for #304. It
 changes no packed file, so no package was built, and the package version remains `0.12.2`.
 
@@ -9,7 +9,7 @@ changes no packed file, so no package was built, and the package version remains
 `node scripts/measure/run.mjs` compared two sides under the same conditions:
 - the baseline, tag `v0.12.2` (`718ea7c3`), exported with `git archive` and installed apart with
   `npm ci`;
-- the candidate, this branch's checkout at `1ae97c78`, clean.
+- the candidate, this branch's checkout at `31231946`, clean.
 
 The harness was the same commit, also clean, and it rendered each `report.md`. Both sides carry
 the same package sources, manifests, lockfile and `bin/`, so their `sourcesHash` is the same:
@@ -36,23 +36,29 @@ the same.
 
 | Probe and scenario | Baseline median | Candidate median | Paired ratio | Diagnostic counts |
 |---|---:|---:|---:|---|
-| attention, 1,000 pending requests | 7.48 | 7.51 | 1.002 | 1,049,510 receipt visits |
-| attention, 8,000 pending requests | 260.4 | 270.3 | 1.035 | 64,392,510 receipt visits |
-| attention, 1,000 acknowledged requests | 7.48 | 7.38 | 0.995 | 1,049,510 receipt visits |
-| attention, 8,000 acknowledged requests | 248.3 | 252.8 | 1.005 | 64,392,510 receipt visits |
-| inbox exact read, 30 messages, no backlog | 43.9 | 44.0 | 0.999 | 68 primary reads, 71 event entries listed |
-| inbox exact read, 30 messages, backlog 270 | 70.4 | 71.2 | 1.013 | 608 primary reads, 339 event entries listed |
-| inbox page of 1, 30 messages, no backlog | 5.52 | 5.52 | 1.009 | 68 primary reads, 62 event entries listed |
-| inbox page of 1, 30 messages, backlog 270 | 33.41 | 33.38 | 1.011 | 608 primary reads, 330 event entries listed |
-| transaction read, 100 events | 1.72 | 1.75 | 1.032 | 2 primary reads, 111 event entries listed |
-| transaction read, 100 events, pending journal | 3.32 | 3.36 | 1.027 | 2 primary reads, 114 event entries listed |
-| transaction read, 2,000 events | 3.17 | 3.07 | 0.964 | 2 primary reads, 2,011 event entries listed |
-| transaction read, 2,000 events, pending journal | 4.73 | 4.67 | 0.992 | 2 primary reads, 2,014 event entries listed |
+| attention, 1,000 pending requests | 7.63 | 7.56 | 0.998 | 1,049,510 receipt visits |
+| attention, 8,000 pending requests | 272.3 | 271.0 | 0.994 | 64,392,510 receipt visits |
+| attention, 1,000 acknowledged requests | 7.37 | 7.39 | 1.001 | 1,049,510 receipt visits |
+| attention, 8,000 acknowledged requests | 248.8 | 248.9 | 0.992 | 64,392,510 receipt visits |
+| inbox exact read, 30 messages, no backlog | 44.5 | 45.4 | 1.097 | 68 primary reads, 71 event entries listed |
+| inbox exact read, 30 messages, backlog 270 | 76.9 | 76.6 | 0.980 | 608 primary reads, 339 event entries listed |
+| inbox page of 1, 30 messages, no backlog | 6.08 | 6.06 | 1.008 | 68 primary reads, 62 event entries listed |
+| inbox page of 1, 30 messages, backlog 270 | 35.98 | 34.94 | 0.970 | 608 primary reads, 330 event entries listed |
+| transaction read, 100 events | 2.01 | 1.91 | 0.982 | 2 primary reads, 111 event entries listed |
+| transaction read, 100 events, pending journal | 3.73 | 3.71 | 0.991 | 2 primary reads, 114 event entries listed |
+| transaction read, 2,000 events | 3.44 | 3.51 | 1.013 | 2 primary reads, 2,011 event entries listed |
+| transaction read, 2,000 events, pending journal | 5.09 | 5.28 | 1.022 | 2 primary reads, 2,014 event entries listed |
 
-For equal code, the median paired ratios lie between 0.964 and 1.035. Single rounds spread wider,
-from 0.48 to 2.17, both in the pending-journal read with 2,000 events: a spike inside one round
+For equal code, the median paired ratios lie between 0.970 and 1.097. Single rounds spread wider,
+from 0.357 to 2.847, both in the transaction reads with 100 events: a spike inside one round
 moves that round's ratio, and the median of the rounds does not follow it. The reports give each
 scenario's range.
+
+The 1.097 is noise, and it shows where the noise floor lies on this machine. The exact read writes
+with real `fsync`. In rounds 3, 5 and 8 of that scenario the load average stood between 12 and 27.
+Five of those six children took between 77 and 139 ms against about 45 ms in the other rounds,
+and the candidate's more than the baseline's in each of the three rounds. A difference of a tenth in a scenario bound by `fsync` is therefore not evidence
+on a machine this loaded. Measure such a scenario at a lower load, or with more rounds.
 
 Each attention scenario returned its 22 witness items and nothing else, as its shares require:
 - 4 outbound and 4 inbound witnesses;
@@ -89,8 +95,8 @@ been opened before it. Every read returned the state that the stopped step had d
 product's read finishes an open journal before it reads, and the tests show that the receipt
 record alone still holds the old state. Finishing the step is what a pending-journal read adds to
 a plain one, in the same run:
-- 3.32 ms against 1.72 ms at 100 events, and 4.73 ms against 3.17 ms at 2,000;
-- 5,794 bytes read against 3,204.
+- 3.73 ms against 2.01 ms at 100 events, and 5.09 ms against 3.44 ms at 2,000;
+- 5,793 bytes read against 3,203.
 
 ### Exact inbox reads have two costs
 
@@ -103,17 +109,17 @@ median:
 
 | Exact read | No backlog | Backlog 270 |
 |---|---:|---:|
-| without a transition | 5.66-6.37 | 32.75-33.28 |
-| with a transition | 43.79-44.84 | 70.49-73.85 |
+| without a transition | 6.36-8.43 | 36.29-44.11 |
+| with a transition | 44.10-54.52 | 76.34-91.15 |
 
-The backlog adds about 27 ms to either kind. The receipt states that the fixture holds at each
+The backlog adds about 30 ms to either kind. The receipt states that the fixture holds at each
 position confirm the split, at every position of both scenarios. These figures come from
 `samplesNs` in [inbox-exact/run.json](cost-probes-2026-10-26/inbox-exact/run.json).
 
 ### Tails
 
 The p95 column comes from exactly 100 samples per side. On this loaded machine it is noisy: for
-the transaction read with 100 events, equal code gave 2.0 ms and 3.5 ms. The reports leave p99 out
+the transaction read with 100 events, equal code gave 4.1 ms and 8.0 ms. The reports leave p99 out
 as insufficient evidence, because it needs 1,000 samples per side.
 
 ## Raw data
@@ -128,7 +134,7 @@ sample, the host, the sides, the harness, the load around each child and the fix
 
 ## Limits
 
-- One machine was measured, at 1-minute load averages from 3.5 to 10.3. The load around each
+- One machine was measured, at 1-minute load averages from 4.1 to 32.1. The load around each
   child is in `run.json`. Absolute times move with the load, so compare within one run, never
   across runs.
 - The comparisons are function and store-API calls in a fresh process, not CLI or hook end-to-end

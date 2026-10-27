@@ -1,8 +1,8 @@
 # Cost comparison: attention
 
 - Baseline: `v0.12.2`, 718ea7c3df73891605182f6e1c74366026e67898, sources `924f5fae1b052249c790d310bc0a071c85145ecde5be9e83bf07870e60bc68d4`
-- Candidate: `worktree`, 1ae97c784d804e0d1d685d1333e9f86002f76d5a, sources `924f5fae1b052249c790d310bc0a071c85145ecde5be9e83bf07870e60bc68d4`
-- Harness: 1ae97c784d804e0d1d685d1333e9f86002f76d5a
+- Candidate: `worktree`, 31231946630526483270adbf21b62c5aa0d47ecf, sources `924f5fae1b052249c790d310bc0a071c85145ecde5be9e83bf07870e60bc68d4`
+- Harness: 31231946630526483270adbf21b62c5aa0d47ecf
 - Host: v26.5.1, Darwin, arm64, Apple M5 Max, 18 cores
 - Durability: fsync: real
 - Settings: 10 rounds, 10 samples per child, 3 warm-up calls
@@ -16,12 +16,12 @@ Scenario hash `ae7e2e26acdbcda9d56b7055a07410122d5d3362fbb5c4daac0984465628c7d8`
 
 | Side | n | median ms | IQR ms | min ms | max ms | p95 ms | p99 ms |
 |---|---:|---:|---:|---:|---:|---:|---:|
-| baseline | 100 | 7.478854 | 0.424406 | 6.831541 | 8.192958 | 8.047856 | - |
-| candidate | 100 | 7.379874 | 0.330396 | 6.8195 | 11.857209 | 8.356176 | - |
+| baseline | 100 | 7.367355 | 0.264999 | 6.840958 | 9.50875 | 8.041161 | - |
+| candidate | 100 | 7.390104 | 0.289281 | 6.813 | 8.052459 | 7.777382 | - |
 
 Tails not reported - baseline p99: insufficient evidence: 100 samples, 1000 needed; candidate p99: insufficient evidence: 100 samples, 1000 needed.
 
-Paired by round, candidate median / baseline median: 0.995 (range 0.952..1.092 over 10 rounds).
+Paired by round, candidate median / baseline median: 1.001 (range 0.916..1.047 over 10 rounds).
 
 Diagnostic operation counts (what each side touched; never a validity condition):
 
@@ -43,12 +43,12 @@ Scenario hash `7e2200dfc3419dda2e7a956f15a6cff05e7fb8697a2b660a74316f8ac3898fde`
 
 | Side | n | median ms | IQR ms | min ms | max ms | p95 ms | p99 ms |
 |---|---:|---:|---:|---:|---:|---:|---:|
-| baseline | 100 | 248.274812 | 36.840708 | 210.810041 | 476.647417 | 439.994798 | - |
-| candidate | 100 | 252.774625 | 36.970053 | 208.818875 | 459.557 | 426.708315 | - |
+| baseline | 100 | 248.824812 | 104.833906 | 207.815833 | 548.303833 | 439.31646 | - |
+| candidate | 100 | 248.935334 | 37.349084 | 208.131917 | 486.472708 | 436.450901 | - |
 
 Tails not reported - baseline p99: insufficient evidence: 100 samples, 1000 needed; candidate p99: insufficient evidence: 100 samples, 1000 needed.
 
-Paired by round, candidate median / baseline median: 1.005 (range 0.986..1.089 over 10 rounds).
+Paired by round, candidate median / baseline median: 0.992 (range 0.73..1.12 over 10 rounds).
 
 Diagnostic operation counts (what each side touched; never a validity condition):
 
