@@ -1,5 +1,27 @@
 # Changelog
 
+## Unreleased — attention reads each receipt once
+
+- Attention no longer grows with the square of a session's own requests (#305). To find the
+  recipients of a request who are not online, ACC filtered every receipt in the workspace once
+  for each request the session had sent, also when every request was acknowledged. At 8,000
+  requests that was 64 million receipt visits and about a third of a second for each hook that
+  computes attention; at 16,000, a second. ACC now reads the receipts once, kept per request in
+  their own order. The attention items, their order and their wording are unchanged. Measured
+  against the code before, a session with 8,000 requests computes attention in 4.4 ms instead
+  of 340 ms, and the receipt visits grow with the receipts instead of with their square.
+
+| Development artifact | Value |
+|---|---|
+| Built from | `5b90eb75825557731e6ce01fd62df8b9e71461f3` |
+| Tarball | `agents-can-communicate-0.12.2.tgz`, 621,745 bytes, 380 files |
+| sha256 | `eda33a3331fbe663260634037738f3d49163cc64366f07fac55298fa3a84ec8e` |
+
+The exact archive passed package verification. See
+[development evidence](docs/release-evidence/unreleased-attention-receipts.md).
+This is not a published release; the package version remains `0.12.2`.
+The earlier candidate and release records below retain their original provenance.
+
 ## 0.12.2 — release candidate
 
 - A process that may not use ACC's state is told so (#316, #334). Before, when a client
