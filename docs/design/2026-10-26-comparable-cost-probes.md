@@ -166,7 +166,11 @@ shows the validator does not depend on the current algorithm.
 `report.md` beside `run.json` names each side's ref, commit and sources hash, the harness, the
 durability and host, each side's fixture digests and any child errors or validation failures. It
 gives each side's median, interquartile range, minimum and maximum, and its operation counts. It
-labels each figure:
+also gives the candidate's median over the baseline's, round by round, with the median and range
+of those ratios. The two sides of a round run next to each other, so a change in machine load
+between rounds moves both. The pooled medians can differ for equal code when load changes during
+a run; the paired ratio is the comparison to read. `node scripts/measure/report.mjs <run.json>`
+renders a recorded run's report again. It labels each figure:
 - **Benchmark**: both sides valid, alternated over at least ten rounds, and at least one hundred
   samples per side.
 - **Smoke**: valid, but short of that.

@@ -1,8 +1,8 @@
 # Cost comparison: inbox
 
 - Baseline: `v0.12.2`, 718ea7c3df73891605182f6e1c74366026e67898, sources `924f5fae1b052249c790d310bc0a071c85145ecde5be9e83bf07870e60bc68d4`
-- Candidate: `worktree`, 8cdf7d2953e09515baa1c41180d002dea058863f, sources `924f5fae1b052249c790d310bc0a071c85145ecde5be9e83bf07870e60bc68d4`
-- Harness: 8cdf7d2953e09515baa1c41180d002dea058863f
+- Candidate: `worktree`, ca1ac9fc7e803646c728353c00f84e0a7dbc0db2, sources `924f5fae1b052249c790d310bc0a071c85145ecde5be9e83bf07870e60bc68d4`
+- Harness: ca1ac9fc7e803646c728353c00f84e0a7dbc0db2
 - Host: v26.5.1, Darwin, arm64, Apple M5 Max, 18 cores
 - Durability: fsync: real
 - Settings: 10 rounds, 10 samples per child, 3 warm-up calls
@@ -16,10 +16,12 @@ Scenario hash `f888c080a80e43414b9dcfbe1a35836341dc9acf9de4c67dca72d763c5e4dbde`
 
 | Side | n | median ms | IQR ms | min ms | max ms | p95 ms | p99 ms |
 |---|---:|---:|---:|---:|---:|---:|---:|
-| baseline | 100 | 5.629729 | 0.76503 | 4.814292 | 11.392583 | 9.477812 | - |
-| candidate | 100 | 5.534167 | 0.428458 | 4.930208 | 7.931667 | 6.46915 | - |
+| baseline | 100 | 5.7695 | 1.061198 | 4.869125 | 14.848125 | 9.688663 | - |
+| candidate | 100 | 5.971417 | 1.245427 | 4.927166 | 14.112084 | 12.274666 | - |
 
 Tails not reported - baseline p99: insufficient evidence: 100 samples, 1000 needed; candidate p99: insufficient evidence: 100 samples, 1000 needed.
+
+Paired by round, candidate median / baseline median: 1.045 (range 0.571..1.815 over 10 rounds).
 
 Diagnostic operation counts (what each side touched; never a validity condition):
 
@@ -30,7 +32,7 @@ Diagnostic operation counts (what each side touched; never a validity condition)
 | enumerations.metadata/readdir | 4 | 4 |
 | enumerations.metadata/readdirEntries | 68 | 68 |
 | pageReads | 0 | 0 |
-| readBytes | 35119 | 35119 |
+| readBytes | 35117..35119 | 35117..35119 |
 | stateByKind.message | 30 | 30 |
 | stateByKind.receipt | 30 | 30 |
 | stateByKind.session | 4 | 4 |
@@ -45,10 +47,12 @@ Scenario hash `6630ceb0a10eaf7fcfa3a41825cfe64c3da0101513a40bda8581261b50dd6ecd`
 
 | Side | n | median ms | IQR ms | min ms | max ms | p95 ms | p99 ms |
 |---|---:|---:|---:|---:|---:|---:|---:|
-| baseline | 100 | 33.195292 | 2.16522 | 31.6875 | 54.169125 | 40.122299 | - |
-| candidate | 100 | 32.972625 | 1.094666 | 31.721708 | 44.582625 | 36.490708 | - |
+| baseline | 100 | 33.830126 | 4.599042 | 31.694542 | 59.653958 | 52.757611 | - |
+| candidate | 100 | 35.767666 | 7.382666 | 31.899416 | 84.44375 | 62.196462 | - |
 
 Tails not reported - baseline p99: insufficient evidence: 100 samples, 1000 needed; candidate p99: insufficient evidence: 100 samples, 1000 needed.
+
+Paired by round, candidate median / baseline median: 0.993 (range 0.848..1.552 over 10 rounds).
 
 Diagnostic operation counts (what each side touched; never a validity condition):
 
@@ -59,7 +63,7 @@ Diagnostic operation counts (what each side touched; never a validity condition)
 | enumerations.metadata/readdir | 4 | 4 |
 | enumerations.metadata/readdirEntries | 608 | 608 |
 | pageReads | 0 | 0 |
-| readBytes | 298643 | 298643 |
+| readBytes | 298642..298643 | 298642..298643 |
 | stateByKind.message | 300 | 300 |
 | stateByKind.receipt | 300 | 300 |
 | stateByKind.session | 4 | 4 |
