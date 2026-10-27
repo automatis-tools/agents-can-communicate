@@ -8,6 +8,8 @@ import { decisionView, isCurrentDecision } from "./decision-state.mjs";
 
 const listable = (message, receipt) => receipt.state === "queued" || receipt.state === "offered"
   || (receipt.state === "retrieved" && message.obligation !== "none");
+// Every state a listable receipt can be in; an acknowledged one never is.
+const PENDING = ["queued", "offered", "retrieved"];
 
 export function createInboxService(ports, sessions) {
   const { store, clock, ids } = ports;
@@ -54,33 +56,82 @@ export function createInboxService(ports, sessions) {
     return { message: owned.message, receipt };
   }
 
+  // The reader's receipts in these states, keyed by message.
+  async function receiptsInState(tx, session, states) {
+    const receipts = new Map();
+    for (const state of states) {
+      for (const id of await tx.lookup("receiptsByRecipientState",
+        [session.workspaceId, session.participantId, state])) {
+        const receipt = await tx.load("receipt", id);
+        if (receipt !== null) receipts.set(receipt.messageId, receipt);
+      }
+    }
+    return receipts;
+  }
+
+  // The reader's receipt for one message, by its id; null unless it is the reader's.
+  async function ownReceipt(tx, session, messageId) {
+    // Anything but a string names no message, as a listing would have found.
+    if (typeof messageId !== "string") return null;
+    const receipt = await tx.load("receipt", receiptId(messageId, session.participantId));
+    return receipt?.messageId === messageId && receipt.recipientParticipantId === session.participantId
+      ? receipt : null;
+  }
+
+  // The messages of these receipts, each with its decision status. A decision's
+  // status depends on its whole group, so a decision brings every decision with it.
+  async function messagesFor(tx, session, receipts) {
+    const messages = new Map();
+    for (const messageId of receipts.keys()) {
+      const message = await tx.load("message", messageId);
+      if (message !== null) messages.set(messageId, message);
+    }
+    if (![...messages.values()].some(message => message.kind === "decision")) return messages;
+    const decisions = [];
+    for (const id of await tx.lookup("messagesByKind", [session.workspaceId, "decision"])) {
+      const decision = await tx.load("message", id);
+      if (decision !== null) decisions.push(decision);
+    }
+    const view = decisionView(decisions);
+    return new Map([...messages].map(([id, message]) => [id, view(message)]));
+  }
+
   async function listInbox(input) {
     const session = await requireOpen(input, "list the inbox");
     return store.transaction(async tx => {
+      await tx.load("session", input.sessionId);
       await requireOpen(input, "list the inbox", tx);
-      const receipts = new Map(tx.list("receipt", receipt =>
-        receipt.recipientParticipantId === session.participantId)
-        .map(receipt => [receipt.messageId, receipt]));
-      const all = tx.list("message"), view = decisionView(all);
-      const messages = all.filter(message => receipts.has(message.messageId)).map(view);
-      return messagePage(messages, input, {
+      const receipts = await receiptsInState(tx, session, PENDING);
+      // The cursor names the last message of the previous page, which may have been
+      // resolved since. It still anchors the page while it is addressed to the reader.
+      if (input.cursor != null && !receipts.has(input.cursor)) {
+        const anchor = await ownReceipt(tx, session, input.cursor);
+        if (anchor !== null) receipts.set(input.cursor, anchor);
+      }
+      const messages = await messagesFor(tx, session, receipts);
+      return messagePage([...messages.values()], input, {
         include: message => isCurrentDecision(message) && listable(message, receipts.get(message.messageId)),
         project: message => ({ message: messageSummary(message),
           receipt: receipts.get(message.messageId) }),
       });
-    }, { kinds: ["session", "message", "receipt"] });
+    // Loaded by id or index, so the cost follows the reader's records, not the workspace (#306).
+    }, { kinds: ["session", "message", "receipt"], exactKinds: ["session", "message", "receipt"] });
   }
 
   async function readInbox(input) {
     const session = await requireOpen(input, "read the inbox");
     const now = clock.now();
     return store.transaction(async tx => {
+      await tx.load("session", input.sessionId);
       await requireOpen(input, "read the inbox", tx);
-      const all = tx.list("message"), view = decisionView(all);
-      const messages = new Map(all.map(item => [item.messageId, view(item)]));
-      let selected = tx.list("receipt", receipt =>
-        receipt.recipientParticipantId === session.participantId)
-        .filter(receipt => messages.has(receipt.messageId));
+      let receipts;
+      if (input.messageId === undefined) receipts = await receiptsInState(tx, session, PENDING);
+      else {
+        const receipt = await ownReceipt(tx, session, input.messageId);
+        receipts = new Map(receipt === null ? [] : [[input.messageId, receipt]]);
+      }
+      const messages = await messagesFor(tx, session, receipts);
+      let selected = [...receipts.values()].filter(receipt => messages.has(receipt.messageId));
       if (input.messageId === undefined) {
         selected = selected.filter(receipt => listable(messages.get(receipt.messageId), receipt)
           && isCurrentDecision(messages.get(receipt.messageId)));
@@ -103,7 +154,8 @@ export function createInboxService(ports, sessions) {
         ? { message: messages.get(receipt.messageId), receipt }
         : { ...advanceOwned(tx, session, receipt.messageId, "retrieved", now),
           message: messages.get(receipt.messageId) });
-    }, { kinds: ["session", "message", "receipt"] });
+    // Loaded by id or index, so the cost follows the reader's records, not the workspace (#306).
+    }, { kinds: ["session", "message", "receipt"], exactKinds: ["session", "message", "receipt"] });
   }
 
   async function acknowledgeMessage(input) {

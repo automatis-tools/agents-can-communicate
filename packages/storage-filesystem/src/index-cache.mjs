@@ -1,7 +1,7 @@
 import { AccError, EXIT, TRANSACTION_INDEXES, assertIndexTuple, indexKeysFor }
   from "@agents-can-communicate/protocol";
 import { assertPublicationDeadline } from "./deadline.mjs";
-import { createIndexIO } from "./index-io.mjs";
+import { createIndexIO, INDEX_VERSION } from "./index-io.mjs";
 import { createIndexTree } from "./index-tree.mjs";
 import { encodeIndexPage, IndexCacheUnavailable } from "./index-pages.mjs";
 
@@ -59,7 +59,7 @@ export function createIndexCache({ paths, root, workspaceId, publishOptions, loa
     } });
     const roots = {};
     for (const index of Object.keys(deltas)) roots[index] = await tree.apply(null, deltas[index]);
-    const manifest = { indexVersion: 1, workspaceId, journalGeneration: active.generation, roots };
+    const manifest = { indexVersion: INDEX_VERSION, workspaceId, journalGeneration: active.generation, roots };
     const { io } = tools(deadlineAt);
     try {
       // Publish only the final reachable tree, children before parents. The

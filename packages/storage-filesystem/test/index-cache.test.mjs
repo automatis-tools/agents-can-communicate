@@ -8,6 +8,7 @@ import { openFilesystemStore } from "../src/store.mjs";
 import { readActiveJournal } from "../src/active-journal.mjs";
 import { createMemoryStore, createFakeClock, createFakeIds } from "../../../tests/helpers/memory-store.mjs";
 import { exactMessage, EXACT_NOW as NOW, EXACT_WORKSPACE as WS } from "../../../tests/helpers/exact-transaction-contract.mjs";
+import { INDEX_DIRECTORY } from "../src/index-io.mjs";
 
 const key = client => [WS, "participant_a", client];
 const exact = { kinds: ["message", "receipt"], exactKinds: ["message", "receipt"] };
@@ -23,7 +24,7 @@ async function fixture(t, failAt) {
   t.after(() => rm(root, { recursive: true, force: true }));
   const store = await openFilesystemStore({ root, workspaceId: WS,
     clock: createFakeClock(NOW), ids: createFakeIds(), failAt });
-  return { root, store, manifestFile: path.join(root, "indexes/v1/cache.json") };
+  return { root, store, manifestFile: path.join(root, INDEX_DIRECTORY, "cache.json") };
 }
 
 test("generic indexed writes advance authority", async t => {
@@ -130,7 +131,7 @@ test("wrong epochs, workspace and corrupt pages rebuild from verified primary", 
     assert.equal(store.indexDiagnostics().at(-1)?.code, "index_rebuilt");
   }
   const manifest = JSON.parse(await readFile(manifestFile));
-  await writeFile(path.join(root, "indexes/v1/pages", manifest.roots.messageByClientKey + ".json"), "corrupt cache");
+  await writeFile(path.join(root, INDEX_DIRECTORY, "pages", manifest.roots.messageByClientKey + ".json"), "corrupt cache");
   assert.deepEqual(await lookup(store), ["message_a"]);
   assert.equal(store.indexDiagnostics().at(-1)?.code, "index_rebuilt");
 });
@@ -144,7 +145,7 @@ test("unsafe cache directories allow verified fallback without writes through a 
   await seed(store, "message_b", "client_b");
   assert.deepEqual(await lookup(store, "client_b"), ["message_b"]);
   assert.equal(store.indexDiagnostics().at(-1)?.code, "index_unavailable");
-  await assert.rejects(readFile(path.join(outside, "v1/cache.json")), { code: "ENOENT" });
+  await assert.rejects(readFile(path.join(outside, path.basename(INDEX_DIRECTORY), "cache.json")), { code: "ENOENT" });
   // Fallback is not a corruption catch around authoritative records.
   await writeFile(path.join(root, "state/message/message_a.json"), "corrupt primary");
   await assert.rejects(lookup(store), { code: EXIT.DATA });

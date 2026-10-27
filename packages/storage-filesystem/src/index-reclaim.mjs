@@ -2,7 +2,7 @@ import path from "node:path";
 import { idleJournal, readActiveJournal } from "./active-journal.mjs";
 import { listDirectoryEntries, nameCommittedLater } from "./atomic-json.mjs";
 import { condemn, detachDoomed, discard, expired } from "./doomed-directory.mjs";
-import { createIndexIO } from "./index-io.mjs";
+import { createIndexIO, INDEX_DIRECTORY } from "./index-io.mjs";
 import { IndexCacheUnavailable } from "./index-pages.mjs";
 import { readReclaimProgress, writeReclaimProgress } from "./index-reclaim-progress.mjs";
 import { readStoreIdentity } from "./identity.mjs";
@@ -22,7 +22,7 @@ export async function reclaimIndexPages(paths, { root, roots, limit = 512, deadl
   let spent = 0, reclaimed = 0;
   const result = (remaining, deferred = false) => ({ reclaimed, remaining, spent, deferred });
   if (expired(deadlineAt)) return result(true, true);
-  const directory = path.join(root, "indexes", "v1", "pages");
+  const directory = path.join(root, INDEX_DIRECTORY, "pages");
   try { await assertManagedDirectory(root, directory); }
   catch (error) { return result(error.code !== "ENOENT", error.code !== "ENOENT"); }
   if (limit < 4) return result(true);
@@ -105,7 +105,7 @@ export async function reclaimIndexPages(paths, { root, roots, limit = 512, deadl
 }
 
 async function discardCache(root, collect) {
-  const directory = path.join(root, "indexes", "v1");
+  const directory = path.join(root, INDEX_DIRECTORY);
   // Only a validated cache directory may move. Damage/unsafe cache paths stay
   // untouched, and the changed durable epoch already makes their roots stale.
   try {

@@ -4,6 +4,7 @@ import { mkdtemp, mkdir, readFile, rm, symlink } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
+import { INDEX_DIRECTORY } from "../src/index-io.mjs";
 
 // Missing exports are the initial RED, rather than a broken fixture import.
 const optional = specifier => import(specifier).catch(error => {
@@ -96,11 +97,13 @@ test("closed index definitions preserve tuple boundaries and exclude bodies", ()
     ["receiptsByMessage", ["workspace_a", "../message"]]]) {
     assert.throws(() => definitions.assertIndexTuple(index, key));
   }
-  assert.deepEqual(definitions.indexKeysFor("message", { workspaceId: "workspace_a",
+  assert.deepEqual(definitions.indexKeysFor("message", { workspaceId: "workspace_a", kind: "note",
     fromParticipantId: "participant_a", clientMessageId: "client_0", body: "PRIVATE_MESSAGE_BODY" }),
-  [{ index: "messageByClientKey", tuple: tuple(0) }]);
-  assert.deepEqual(definitions.indexKeysFor("receipt", { workspaceId: "workspace_a", messageId: "message_a" }),
-    [{ index: "receiptsByMessage", tuple: ["workspace_a", "message_a"] }]);
+  [{ index: "messageByClientKey", tuple: tuple(0) }, { index: "messagesByKind", tuple: ["workspace_a", "note"] }]);
+  assert.deepEqual(definitions.indexKeysFor("receipt", { workspaceId: "workspace_a", messageId: "message_a",
+    recipientParticipantId: "participant_b", state: "queued" }),
+  [{ index: "receiptsByMessage", tuple: ["workspace_a", "message_a"] },
+    { index: "receiptsByRecipientState", tuple: ["workspace_a", "participant_b", "queued"] }]);
   assert.deepEqual(definitions.indexKeysFor("session", {}), []);
 });
 
@@ -115,18 +118,18 @@ test("real filesystem pages publish safely without flushing or following junctio
   } });
   const tree = trees.createIndexTree(io);
   const head = await tree.apply(null, [add(tuple(0), "message_a")]);
-  const manifest = { indexVersion: 1, workspaceId: "workspace_a", journalGeneration: "0000000000000000",
-    roots: { messageByClientKey: head, receiptsByMessage: null } };
+  const manifest = { indexVersion: ios.INDEX_VERSION, workspaceId: "workspace_a", journalGeneration: "0000000000000000",
+    roots: { messageByClientKey: head, messagesByKind: null, receiptsByMessage: null, receiptsByRecipientState: null } };
   await io.writeManifest(manifest);
   assert.deepEqual(await io.readManifest(), manifest);
   assert.deepEqual(await tree.lookup(head, tuple(0)), ["message_a"]);
   assert.equal(flushes, 0);
-  const bytes = await readFile(path.join(root, "indexes/v1/pages", head + ".json"));
+  const bytes = await readFile(path.join(root, INDEX_DIRECTORY, "pages", head + ".json"));
   assert.equal(sha(bytes), head);
   const outside = path.join(root, "outside");
   await mkdir(outside);
-  await rm(path.join(root, "indexes/v1/pages"), { recursive: true });
-  await symlink(outside, path.join(root, "indexes/v1/pages"), "junction");
+  await rm(path.join(root, INDEX_DIRECTORY, "pages"), { recursive: true });
+  await symlink(outside, path.join(root, INDEX_DIRECTORY, "pages"), "junction");
   await assert.rejects(io.readPage(head), pages.IndexCacheUnavailable);
   await assert.rejects(io.writePage({ type: "group", ids: ["message_escape"], next: null }), pages.IndexCacheUnavailable);
 });

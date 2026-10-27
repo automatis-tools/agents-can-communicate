@@ -4,6 +4,11 @@ import { assertPortableId } from "./ids.mjs";
 export const TRANSACTION_INDEXES = Object.freeze({
   messageByClientKey: Object.freeze({ kind: "message", fields: ["workspaceId", "fromParticipantId", "clientMessageId"] }),
   receiptsByMessage: Object.freeze({ kind: "receipt", fields: ["workspaceId", "messageId"] }),
+  // A page reads a recipient's pending receipts, never its acknowledged history (#306).
+  receiptsByRecipientState: Object.freeze({ kind: "receipt",
+    fields: ["workspaceId", "recipientParticipantId", "state"] }),
+  // A decision's status depends on its whole group, so its readers look up every decision (#306).
+  messagesByKind: Object.freeze({ kind: "message", fields: ["workspaceId", "kind"] }),
 });
 
 export function assertIndexTuple(index, tuple) {

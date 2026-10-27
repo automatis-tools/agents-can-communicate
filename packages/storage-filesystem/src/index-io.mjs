@@ -1,15 +1,23 @@
 import path from "node:path";
-import { assertPortableId } from "@agents-can-communicate/protocol";
+import { TRANSACTION_INDEXES, assertPortableId } from "@agents-can-communicate/protocol";
 import { publishAtomic } from "./atomic-json.mjs";
 import { withRegularNoFollow } from "./safe-file.mjs";
 import { assertPageHash, decodeIndexPage, encodeIndexPage, INDEX_PAGE_BYTES, IndexCacheUnavailable }
   from "./index-pages.mjs";
 
+// The cache of this index set. ACC 0.12 keeps two indexes in `indexes/v1` and refuses a
+// manifest with any other set, so this set lives apart: an older writer never touches it,
+// and its commits leave this manifest behind the journal generation, which marks it stale
+// (#306). Neither version reads or writes the other's cache.
+export const INDEX_DIRECTORY = path.join("indexes", "v2");
+export const INDEX_VERSION = 2;
+const ROOTS = Object.keys(TRANSACTION_INDEXES).sort().join(",");
+
 function manifestShape(value) {
   const keys = object => object && !Array.isArray(object) ? Object.keys(object).sort().join(",") : "";
   if (keys(value) !== "indexVersion,journalGeneration,roots,workspaceId"
-    || value.indexVersion !== 1 || !/^[0-9]{16}$/.test(value.journalGeneration)
-    || keys(value.roots) !== "messageByClientKey,receiptsByMessage") {
+    || value.indexVersion !== INDEX_VERSION || !/^[0-9]{16}$/.test(value.journalGeneration)
+    || keys(value.roots) !== ROOTS) {
     throw new IndexCacheUnavailable("invalid_manifest");
   }
   assertPortableId(value.workspaceId, "index workspace ID");
@@ -17,7 +25,7 @@ function manifestShape(value) {
   return value;
 }
 export function createIndexIO({ paths, root, publishOptions }) {
-  const directory = path.join(root, "indexes", "v1");
+  const directory = path.join(root, INDEX_DIRECTORY);
   const options = { ...publishOptions, root, tmpDir: paths.tmp, stageDir: paths.stage, durability: "none" };
   const cache = async operation => {
     try { return await operation(); }

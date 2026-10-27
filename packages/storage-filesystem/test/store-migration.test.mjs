@@ -10,6 +10,7 @@ import { journalEntry, writeJournalEntry } from "../src/journal.mjs";
 import { stateEnvelope } from "../src/record-id.mjs";
 import { createFakeClock, createFakeIds } from "../../../tests/helpers/memory-store.mjs";
 import { exactMessage, EXACT_NOW as NOW, EXACT_WORKSPACE as WS } from "../../../tests/helpers/exact-transaction-contract.mjs";
+import { INDEX_DIRECTORY } from "../src/index-io.mjs";
 
 async function legacy(t) {
   const root = await mkdtemp(path.join(tmpdir(), "acc-store-migration-"));
@@ -105,7 +106,7 @@ test("migration refuses corrupt primary and verifies cache again on version seve
   await assert.rejects(migrate(f.options), { code: EXIT.DATA });
   assert.equal(JSON.parse(await readFile(f.identityFile)).storeVersion, 6);
   await writeFile(file, bytes); await migrate(f.options);
-  const manifestFile = path.join(f.root, "indexes/v1/cache.json");
+  const manifestFile = path.join(f.root, INDEX_DIRECTORY, "cache.json");
   await rm(manifestFile);
   assert.deepEqual(await migrate(f.options), { fromVersion: 7, toVersion: 7, migrated: false });
   assert.equal(JSON.parse(await readFile(manifestFile)).workspaceId, WS);

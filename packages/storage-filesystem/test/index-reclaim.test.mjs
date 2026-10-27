@@ -14,6 +14,7 @@ import { processFixtureEnv } from "../../../tests/helpers/process-env.mjs";
 import { createFakeClock, createFakeIds } from "../../../tests/helpers/memory-store.mjs";
 import { exactMessage, EXACT_WORKSPACE as WS, EXACT_NOW as NOW }
   from "../../../tests/helpers/exact-transaction-contract.mjs";
+import { INDEX_DIRECTORY } from "../src/index-io.mjs";
 
 const exact = { kinds: ["message", "receipt"], exactKinds: ["message", "receipt"] };
 const lookup = (store, client = "client_a") => store.transaction(
@@ -32,7 +33,7 @@ async function fixture(t, failAt) {
     }
   }, { kinds: ["message", "receipt"] });
   await lookup(store);
-  return { root, store, clock, ids, manifest: path.join(root, "indexes/v1/cache.json") };
+  return { root, store, clock, ids, manifest: path.join(root, INDEX_DIRECTORY, "cache.json") };
 }
 
 test("indexed prune fences a bounded prefix, permits key reuse and preserves surviving receipts", async t => {
@@ -77,7 +78,7 @@ test("bounded reachability visits delete nothing until every current root is ver
     tx.put("message", "message_a", { ...message, clientMessageId: `client_${i}` },
       tx.generationOf("message", "message_a"));
   }, exact);
-  const directory = path.join(f.root, "indexes/v1/pages"), before = (await readdir(directory)).sort();
+  const directory = path.join(f.root, INDEX_DIRECTORY, "pages"), before = (await readdir(directory)).sort();
   const { reclaimIndexPages } = await import("../src/index-reclaim.mjs");
   const io = createIndexIO({ paths: f.store.paths, root: f.root, publishOptions: {} });
   const manifest = await io.readManifest();
@@ -107,7 +108,7 @@ test("an unverified referenced page suppresses all unreachable-page deletion", a
   const f = await fixture(t);
   const { reclaimIndexPages } = await import("../src/index-reclaim.mjs");
   const manifest = JSON.parse(await readFile(f.manifest));
-  const directory = path.join(f.root, "indexes/v1/pages"), before = (await readdir(directory)).sort();
+  const directory = path.join(f.root, INDEX_DIRECTORY, "pages"), before = (await readdir(directory)).sort();
   await writeFile(path.join(directory, manifest.roots.messageByClientKey + ".json"), "broken cache page");
   const result = await reclaimIndexPages(f.store.paths, { root: f.root, roots: manifest.roots, limit: 128 });
   assert.equal(result.reclaimed, 0);
@@ -206,7 +207,7 @@ for (const withMarker of [false, true]) test(`process-exit prune recovery flushe
   });
   assert.deepEqual(measured.result, []);
   const idle = measured.trace.findIndex(e => e.operation === "rename" && /^journal[/\\]active\.[01]$/.test(e.to));
-  const cache = measured.trace.findIndex(e => e.operation === "rename" && e.to === path.join("indexes", "v1", "cache.json"));
+  const cache = measured.trace.findIndex(e => e.operation === "rename" && e.to === path.join(INDEX_DIRECTORY, "cache.json"));
   assert(idle >= 0 && cache > idle, "recovery is completed before the negative cache is checkpointed");
   if (process.platform !== "win32") {
     const flush = measured.trace.findIndex(e => e.operation === "sync" && e.file === path.join("state", "message"));
