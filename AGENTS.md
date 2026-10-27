@@ -27,15 +27,54 @@ npm pack && node scripts/verify-package.mjs   # what a user actually receives
 On macOS outside CI, `npm test` skips fsync and runs more test files at once: each flush there
 is a 4 ms F_FULLFSYNC. `ACC_TEST_REAL_FSYNC=1 npm test` keeps every flush; CI always does.
 
-`npm test` always executes the complete suite. A successful local run records a disposable
-receipt outside the checkout. Pre-push uses `npm test -- --if-needed` only for the same clean
-pushed tree: unchanged file bytes, installed workspace links, Node and test environment can
-reuse that receipt for 24 hours. Changed inputs, a failed rerun, uncertain dependencies or an
-unavailable cache run the gate again. Syntax checks likewise reuse only successful parses of
-identical files with the same Node/options. Commit-message and pushed-history checks always run.
+Plain `npm test` always executes the complete suite. A successful local run records a disposable
+full receipt outside the checkout. Pre-push can select documentation tests for an ordinary branch
+only when every change since its exact pushed base is an audited documentation change.
+Each ref keeps its own plan before identical trees join. Full requirements take precedence over
+documentation requirements, then measurement-only requirements. For ordinary refs, main, release,
+code changes, new branches without a usable base, and uncertain plans require the full suite.
 
-CI never reuses local suite receipts. Windows runs `npm test -- --shard 1/2` and `2/2`; their
-union is the whole discovered list, and the existing Windows check requires both to pass.
+To create and inspect a standalone plan for the latest commit, use:
+
+```bash
+acc_plan="$(mktemp -t acc-docs-plan.XXXXXX)"
+node scripts/change-plan.mjs --base "$(git rev-parse HEAD^)" \
+  --target "$(git rev-parse HEAD)" --event push \
+  --ref "$(git symbolic-ref HEAD)" --output "$acc_plan"
+npm test -- --selection-plan "$acc_plan" --list
+npm test -- --selection-plan "$acc_plan"
+npm test -- --selection-plan "$acc_plan" --if-needed
+rm "$acc_plan"
+```
+
+For multiple commits, replace `HEAD^` with the exact pushed base commit. Keep the plan outside
+the checkout. The runner validates its immutable Git facts, complete test discovery and actual
+checkout bytes. Missing, invalid, stale or unsupported plans restore full discovery. Selection
+cannot combine with shards. Listing never runs tests, packs, verifies packages or records proof.
+
+Every uncached documentation run executes the complete selected documentation profile and verifies the
+exact single archive already created by its packed template. This smoke never repacks.
+The output identifies documentation, full, cached and shard results separately. Documentation
+success records only a documentation receipt. It never proves full-suite success. Full success
+cannot satisfy a documentation receipt request either. Keep the explicit package gate above
+for shipped documentation and final artifact qualification.
+
+Pre-push runs attribution first and syntax-checks the actual target. It passes selection arguments
+only when the target's test script and scoped runner contract match the trusted implementation,
+including imported selection, cache, process and package helpers. Historical or changed contracts
+run their own full suite. Ignored executable inputs or dirty target bytes require an isolated checkout.
+
+Pre-push adds `--if-needed` only for a supported clean current checkout. The same scope can reuse
+its receipt for 24 hours when file bytes, installed workspace links, Node and environment match.
+Changed inputs, failed reruns, uncertain dependencies or unavailable cache state require execution.
+Actual reruns invalidate both receipts first. If an existing exact-key proof cannot be removed or
+its absence cannot be established, validation stops before execution with a fixed diagnostic.
+Syntax checks likewise reuse only successful parses of identical files with the same Node/options.
+Commit-message and pushed-history checks always run.
+
+CI executes its existing full gates and never reuses local suite receipts. This local optimization
+does not change GitHub routing. Windows runs `npm test -- --shard 1/2` and `2/2`. Their union is
+the whole discovered list, and the existing Windows check requires both to pass.
 `--list` can inspect a shard without packing. Test files have a ten-minute process deadline
 (`ACC_TEST_FILE_TIMEOUT_MS`) in addition to the five-minute default per-test deadline
 (`ACC_TEST_TIMEOUT_MS`), so leaked handles cannot silently hold a gate forever. The runner
