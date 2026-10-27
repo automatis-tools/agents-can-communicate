@@ -1,4 +1,6 @@
 import assert from "node:assert/strict";
+import { spawn } from "node:child_process";
+import { once } from "node:events";
 import { mkdtemp, readdir, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -67,6 +69,36 @@ test("a candidate that skips work makes the comparison invalid", async t => {
   assert.ok(run.children.some(item => item.side === "candidate" && item.validation.length > 0));
   assert.match(report, /\*\*invalid\*\*: candidate failed validation/);
 });
+
+test("repeated --vary runs every combination of the values in one run", async t => {
+  const { child, run } = await measure(t, ["--probe", "attention", "--set", "inboundObligations=2",
+    "--vary", "ownRequests=10,20", "--vary", "fanout=1,2", "--rounds", "1", "--samples", "1", "--warmup", "0"]);
+  assert.equal(child.code, 0, child.stderr);
+  assert.deepEqual(run.scenarios.map(({ scenario }) => [scenario.ownRequests, scenario.fanout]),
+    [[10, 1], [10, 2], [20, 1], [20, 2]]);
+  assert.equal(run.children.length, 4 * 2);
+});
+
+test("a runner stopped by SIGINT ends its child and removes its directory",
+  { skip: process.platform === "win32" && "Windows ends a process without running its signal handlers" }, async t => {
+    const out = await mkdtemp(path.join(tmpdir(), "acc-measure-run-"));
+    t.after(() => rm(out, { recursive: true, force: true }));
+    const children = async () => (await readdir(tmpdir())).filter(name => name.startsWith("acc-measure-child-"));
+    const before = await children();
+    const runnerProcess = spawn(process.execPath, [runner, "--probe", "attention", "--set", "ownRequests=3000",
+      "--rounds", "4", "--samples", "200", "--baseline", "worktree", "--candidate", "worktree", "--out", out],
+    { env: { ...process.env, GIT_DIR: "" }, stdio: "ignore" });
+    const exited = once(runnerProcess, "exit");
+    // Its first child has started once its directory exists.
+    for (const end = Date.now() + 60_000; (await children()).length === before.length;) {
+      assert.ok(Date.now() < end, "the runner never started a child");
+      await new Promise(resolve => setTimeout(resolve, 50));
+    }
+    runnerProcess.kill("SIGINT");
+    const [code] = await exited;
+    assert.equal(code, 130);
+    assert.deepEqual((await children()).filter(name => !before.includes(name)), []);
+  });
 
 test("a scenario too small for its calls is refused before anything runs", async t => {
   const { child, run } = await measure(t, ["--probe", "inbox", "--set", "operation=exact", "--set", "messages=3",

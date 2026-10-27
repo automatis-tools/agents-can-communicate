@@ -4,14 +4,16 @@
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { digest, multisetFailures, random, shuffle } from "../probe-kit.mjs";
-import { eventsAfter, loadStoreSide, openInstance, openStoreFixture, primaryDigest, receiptStates }
-  from "../store-fixture.mjs";
+import { eventsAfter, loadStoreSide, openInstance, openStoreFixture, primaryDigest, receiptStates, stateDigest,
+  visibleEvents } from "../store-fixture.mjs";
 
 // `limit` 20 is the product's default page; `mix` spreads obligations and receipt states.
 const defaults = { messages: 30, backlog: 30, operation: "exact", limit: 20, mix: true, seed: 1 };
 const OBLIGATIONS = ["none", "acknowledge", "reply"];
 // The message kind each obligation belongs to in the protocol.
 const KIND = { none: "note", acknowledge: "decision", reply: "question" };
+// Every kind a call must leave as it was: an exact read may move one receipt and append its event.
+const OTHER_KINDS = ["workspace", "participant", "session", "intent", "claim", "message"];
 
 function scenario(input = {}) {
   const value = { probe: "inbox", ...defaults, ...input };
@@ -61,7 +63,8 @@ async function build(scenario, side) {
   }
   const { cursor } = await eventsAfter(fixture, side, null);
   return { scenario, side, fixture, reader, next: 0, target: null, eventCursor: cursor,
-    receipts: await receiptStates(fixture, side), digest: await primaryDigest(fixture, side) };
+    receipts: await receiptStates(fixture, side), digest: await primaryDigest(fixture, side),
+    others: await stateDigest(fixture, side, OTHER_KINDS) };
 }
 
 const capacity = value => value.operation === "exact" ? value.messages : Infinity;
@@ -83,8 +86,9 @@ const FIELDS = ["messageId", "subject", "body", "kind", "obligation"];
 const PAGE_BYTES = 12_000;
 const pageBytes = value => Buffer.byteLength(JSON.stringify(value, null, 2));
 
-// Receipts and events after a call, against what the call may change.
-async function storeChanges(built, moved) {
+// Receipts, events and other records after a call, against what the call may change.
+// `seen` is what the measured store showed before any other store opened.
+async function storeChanges(built, moved, seen) {
   const failures = [], now = await receiptStates(built.fixture, built.side);
   for (const [id, before] of built.receipts) {
     const after = now.get(id), expected = moved?.id === id ? moved.state : before.state;
@@ -95,18 +99,24 @@ async function storeChanges(built, moved) {
     }
   }
   for (const id of now.keys()) if (!built.receipts.has(id)) failures.push(`inbox: receipt ${id} appeared`);
-  const { events, cursor } = await eventsAfter(built.fixture, built.side, built.eventCursor);
+  const { events } = seen, recovered = await eventsAfter(built.fixture, built.side, built.eventCursor);
+  if (recovered.events.length !== events.length) {
+    failures.push(`inbox: the call left ${recovered.events.length - events.length} event(s) behind an open journal`);
+  }
+  const others = await stateDigest(built.fixture, built.side, OTHER_KINDS);
+  if (others !== built.others) failures.push("inbox: the call changed records other than receipts");
+  built.others = others;
   const wanted = moved && moved.state !== built.receipts.get(moved.id)?.state ? 1 : 0;
   if (events.length !== wanted) failures.push(`inbox: the call published ${events.length} event(s), not ${wanted}`);
   else if (wanted === 1 && (events[0].type !== "message.retrieved" || events[0].payload?.messageId !== built.target.messageId)) {
     failures.push(`inbox: the call published ${events[0].type} for ${events[0].payload?.messageId}`);
   }
   built.receipts = now;
-  built.eventCursor = cursor;
+  built.eventCursor = recovered.cursor;
   return failures;
 }
 
-async function validateExact(built, result) {
+async function validateExact(built, result, seen) {
   const target = built.target, failures = [];
   const id = built.side.receiptId(target.messageId, "reader");
   const before = built.receipts.get(id)?.state;
@@ -121,18 +131,19 @@ async function validateExact(built, result) {
       failures.push(`inbox: returned the receipt of ${receipt?.messageId} for ${receipt?.recipientParticipantId}`);
     } else if (receipt.state !== after) failures.push(`inbox: the returned receipt is ${receipt.state}, not ${after}`);
   }
-  failures.push(...await storeChanges(built, { id, state: after }));
+  failures.push(...await storeChanges(built, { id, state: after }, seen));
   target.state = after;
   return failures;
 }
 
-async function validatePage(built, result) {
+async function validatePage(built, result, seen) {
   const failures = [], { scenario } = built;
   const wanted = built.reader.filter(item => listable(built.receipts.get(built.side.receiptId(item.messageId, "reader"))?.state,
     item.obligation)).sort(newestFirst);
   const items = Array.isArray(result?.items) ? result.items : [];
   const k = items.length, full = Math.min(scenario.limit, wanted.length);
   if (k > full || (wanted.length > 0 && k < 1)) failures.push(`inbox page: ${k} items for a limit of ${scenario.limit}`);
+  if (pageBytes(result ?? {}) > PAGE_BYTES) failures.push(`inbox page: ${pageBytes(result)} bytes, over the ${PAGE_BYTES}-byte page`);
   const ids = items.map(item => item.message?.messageId);
   const prefix = wanted.slice(0, k);
   if (ids.join() !== prefix.map(item => item.messageId).join()) {
@@ -161,11 +172,14 @@ async function validatePage(built, result) {
       failures.push(`inbox page: ${k} items where ${k + 1} fit the ${PAGE_BYTES}-byte page`);
     }
   }
-  return [...failures, ...await storeChanges(built, null)];
+  return [...failures, ...await storeChanges(built, null, seen)];
 }
 
-const validate = async (built, result) => built.scenario.operation === "exact"
-  ? validateExact(built, result) : validatePage(built, result);
+// The measured store is read first: opening any other store finishes a journal the call left open.
+async function validate(built, result, input) {
+  const seen = await visibleEvents(input.store, built.eventCursor);
+  return built.scenario.operation === "exact" ? validateExact(built, result, seen) : validatePage(built, result, seen);
+}
 
 async function observe(built) {
   const helper = path.resolve(import.meta.dirname, "..", "..", "..", "tests", "helpers", "store-io-probe.mjs");
@@ -174,11 +188,14 @@ async function observe(built) {
   let measured;
   try { measured = await probe.capture(() => operate(built, input)); } finally { probe.stop(); }
   const enumerations = Object.fromEntries(Object.entries(measured.io).filter(([key]) => /\/readdir(Entries)?$/.test(key)));
-  return { failures: await validate(built, measured.result), stateReads: measured.stateReads,
+  return { failures: await validate(built, measured.result, input), stateReads: measured.stateReads,
     stateByKind: measured.stateByKind, readBytes: measured.readBytes, pageReads: measured.pageReads, enumerations };
 }
 
 const full = item => Object.fromEntries(FIELDS.map(field => [field, item[field]]));
+const rewriteMessage = (store, messageId) => store.transaction(tx => {
+  tx.put("message", messageId, { ...tx.get("message", messageId), body: "rewritten" }, tx.generationOf("message", messageId));
+}, { kinds: ["message"] });
 const exactMutations = {
   // Reads the next message while claiming the intended one.
   "wrong-message": async () => async (built, input) => {
@@ -223,6 +240,23 @@ const exactMutations = {
       .find(receipt => receipt.messageId !== built.target.messageId && receipt.state === item.receipt.state);
     return [{ ...item, receipt: { ...item.receipt, messageId: other.messageId, recipientParticipantId: other.recipient } }];
   },
+  // Leaves the retrieval behind its journal for the next store that opens.
+  "leaves-journal": async () => async built => {
+    const target = built.reader[built.next++];
+    built.target = target;
+    const crash = async point => { if (point === "after-journal") throw new Error("probe crash"); };
+    const { service } = await openInstance(built.fixture, built.side, { failAt: crash });
+    const [item] = await service.readInbox({ ...built.fixture.owner("reader"), messageId: target.messageId })
+      .catch(error => { if (error.message !== "probe crash") throw error; return [null]; })
+      ?? [null];
+    const state = item?.receipt.state ?? "retrieved";
+    return [{ message: full(target), receipt: { messageId: target.messageId, recipientParticipantId: "reader", state } }];
+  },
+  "rewrites-message": async operate => async (built, input) => {
+    const result = await operate(built, input);
+    await rewriteMessage(input.store, built.target.messageId);
+    return result;
+  },
   // Writes a message to the reader while reading one, so a receipt appears.
   "creates-receipt": async operate => async (built, input) => {
     const result = await operate(built, input);
@@ -256,7 +290,22 @@ const pageMutations = {
         receipt: { messageId: item.messageId, recipientParticipantId: "reader", state: "queued" } }));
     return { items, nextCursor: built.reader.length > items.length ? items.at(-1).message.messageId : null };
   },
-  // Always one item short of a full page, with a cursor that continues it.
+  // Fills the page to its limit, whatever the byte budget says.
+  "over-budget": async operate => async (built, input) => {
+    const result = await operate(built, input);
+    if (result.nextCursor === null || result.items.length >= built.scenario.limit) return result;
+    const rest = await input.service.listInbox({ ...built.fixture.owner("reader"),
+      limit: built.scenario.limit - result.items.length, cursor: result.nextCursor });
+    const items = [...result.items, ...rest.items];
+    return { items, nextCursor: rest.nextCursor === null ? null : items.at(-1).message.messageId };
+  },
+  "rewrites-message": async operate => async (built, input) => {
+    const result = await operate(built, input);
+    await rewriteMessage(input.store, built.reader[0].messageId);
+    return result;
+  },
+  // Always one item short of a full page, with a cursor that continues it; with
+  // a limit of 1 that is the empty page.
   "short-page": async operate => async (built, input) => {
     const result = await operate(built, input);
     if (result.items.length < 2) return { ...result, items: [], nextCursor: null };

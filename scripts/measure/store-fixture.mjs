@@ -67,9 +67,8 @@ export async function receiptStates(fixture, side) {
   })), { kinds: ["receipt"] });
 }
 
-/** Published events after a cursor, read through a fresh store. */
-export async function eventsAfter(fixture, side, cursor) {
-  const { store } = await openInstance(fixture, side);
+/** Events after a cursor that one store instance shows, without opening another. */
+export async function visibleEvents(store, cursor) {
   const events = [];
   for (let after = cursor; ;) {
     const page = await store.eventsSince(WORKSPACE, after, 500);
@@ -77,6 +76,23 @@ export async function eventsAfter(fixture, side, cursor) {
     if (page.events.length === 0) return { events, cursor: after };
     after = page.cursor;
   }
+}
+
+/**
+ * Published events after a cursor, read through a fresh store. Opening a store
+ * finishes any journal left open, so a validator reads what the measured store
+ * shows first (`visibleEvents`): a call that left its own work behind a journal
+ * would otherwise be completed by its validator.
+ */
+export async function eventsAfter(fixture, side, cursor) {
+  return visibleEvents((await openInstance(fixture, side)).store, cursor);
+}
+
+/** A digest of every record of these kinds, read through a fresh store: what a call must leave alone. */
+export async function stateDigest(fixture, side, kinds) {
+  const { store } = await openInstance(fixture, side);
+  return digest(await store.transaction(tx => kinds.map(kind => tx.list(kind)
+    .map(record => JSON.stringify(record)).sort()), { kinds }));
 }
 
 /** A digest of what the records mean - sessions, messages, receipts and the event log - not their file layout. */

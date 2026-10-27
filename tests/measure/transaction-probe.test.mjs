@@ -11,8 +11,10 @@ const read = transaction.scenario({ messages: 6, events: 40, operation: "read", 
 const write = transaction.scenario({ messages: 6, events: 40, operation: "write", seed: 5 });
 const journal = transaction.scenario({ messages: 6, events: 40, operation: "read", pendingJournal: true, seed: 5 });
 
-const call = async (value, operate = transaction.operate) =>
-  transaction.validate(value, await operate(value, await transaction.prepare(value)));
+const call = async (value, operate = transaction.operate) => {
+  const input = await transaction.prepare(value);
+  return transaction.validate(value, await operate(value, input), input);
+};
 
 async function built(t, scenario) {
   const side = await transaction.load(repo);

@@ -41,6 +41,11 @@ export function classify(run) {
       if (own.some(child => child.error)) reasons.push(`${side} child failed`);
       if (own.some(child => child.validation.length > 0)) reasons.push(`${side} failed validation`);
     }
+    // A negative control that validates means the validator missed the defect it plants.
+    const candidate = children.filter(child => child.side === "candidate");
+    if (run.candidateMutation && candidate.length > 0 && candidate.every(child => !child.error && child.validation.length === 0)) {
+      reasons.push(`the negative control ${run.candidateMutation} passed validation`);
+    }
     if (new Set(children.filter(child => !child.error).map(child => child.fixtureDigest)).size > 1) {
       reasons.push("the sides' fixtures differ");
     }
@@ -108,7 +113,7 @@ export function renderReport(run) {
       const digests = [...new Set(children.filter(child => child.side === name && child.fixtureDigest).map(child => child.fixtureDigest))];
       if (digests.length) lines.push(`- ${name} fixture: ${digests.map(value => `\`${value}\``).join(", ")}`);
     }
-    const problems = children.flatMap(child => [child.error, ...child.validation.slice(0, 3)]
+    const problems = children.flatMap(child => [child.error, child.cleanupError, ...child.validation.slice(0, 3)]
       .filter(Boolean).map(text => `round ${child.round} ${child.side}: ${text}`));
     if (problems.length) lines.push("", "Problems:", "", ...[...new Set(problems)].slice(0, 12).map(text => `- ${text}`));
     lines.push("");

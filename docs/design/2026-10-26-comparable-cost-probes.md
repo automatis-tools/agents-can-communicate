@@ -35,8 +35,12 @@ A probe is a **scenario**, a **validator** and **observations**:
 Every call gets its own input, prepared outside the timed section: a copy of the attention
 snapshot, or a store instance opened as a hook process opens one. The store probes validate
 through a second instance opened after the call, so an answer kept in the measured instance's
-memory is checked against what the store holds. A probe states how many calls a scenario
-allows. The runner refuses a scenario too small for its warm-up calls, samples and observed call
+memory is checked against what the store holds. Opening a store finishes any journal left open,
+so before any other instance opens, a validator reads the events that the measured instance
+shows. A call that left its own work behind a journal shows fewer events than the store holds
+after recovery, and fails. Every other record kind - workspace, participants, sessions,
+intents, claims and messages - must be as it was after every call. A probe states how many calls
+a scenario allows. The runner refuses a scenario too small for its warm-up calls, samples and observed call
 before anything runs.
 
 ### Attention (#305)
@@ -46,19 +50,26 @@ before anything runs.
   `inboundObligations` addressed to the measured participant, split between reply and
   acknowledgement; and `witnesses`, 4 by default.
 - Witnesses are items that every scenario must return, whatever its shares: requests to a
-  participant with no session, and pending inbound obligations. With them come requests to one
-  recipient in each presence the product tells apart: a closed session, one silent for more than
-  three heartbeat cadences, one past the unknown-pid floor, one with a dead pid, and one with a
-  live pid. The first four are due as `recipient_unavailable`, and the last is not, so a
-  computation that takes any session record for presence fails. Witness ids carry a prefix of
-  the scenario hash, so an answer computed for another fixture never matches, even one with the
-  same seed. A scenario that expects nothing cannot tell useful work from a constant answer, and
-  the validator refuses one.
+  participant with no session, and pending inbound obligations. With them, each of eight
+  recipients gets a request from the measured participant and a message left by another one:
+  - a closed session, a session past the unknown-pid floor, and one with a dead pid are offline:
+    the request is due as `recipient_unavailable` and the left message as
+    `left_for_ended_session`;
+  - a session silent past three heartbeat cadences is stale, with or without a live pid: the
+    request is due, and the left message is not, because a stale recipient is still present;
+  - a live pid that heartbeated recently is online, and so is a recipient with one online session
+    beside a closed one, in either order: neither is due.
+  So a computation that takes any session record for presence, lets one record of several
+  decide, or takes a live pid for online at any age fails. Witness ids carry a prefix of the
+  scenario hash, so an answer computed for another fixture never matches, even one with the same
+  seed. A scenario that expects nothing cannot tell useful work from a constant answer, and the
+  validator refuses one.
 - Fixture: the snapshot `computeAttention` reads.
-- Validator: the exact expected attention items. Each pending receipt of an offline recipient
-  gives `recipient_unavailable`, and each pending inbound obligation gives `reply_required` or
-  `acknowledgement_required`, in ACC's priority order. Fully acknowledged history gives nothing
-  beyond the witnesses.
+- Validator: the exact expected attention items. Each pending receipt of a recipient with no
+  online session gives `recipient_unavailable`, each pending inbound obligation gives
+  `reply_required` or `acknowledgement_required`, and each witness message left for an offline
+  recipient gives `left_for_ended_session`, in ACC's priority order. Fully acknowledged history
+  gives nothing beyond the witnesses.
 - Observations: time per call; receipt and message visits, counted in the observed call
   through proxies on the snapshot's own arrays. Work on a copy that the implementation makes is
   not counted. `computeAttention` copies the messages first, so `messageVisits` counts that copy
@@ -83,7 +94,8 @@ before anything runs.
     that cursor that continues the list. A page holds `limit` items, or every listable one,
     unless the next item would take the formatted page past the product's 12,000-byte budget.
     The follow-up page supplies that next item exactly as a page carries it, so the check
-    measures the page the product would have built. No receipt, generation or event changes.
+    measures the page the product would have built. A page itself never passes the budget. No
+    receipt, generation or event changes.
   In both cases every other receipt keeps its state and generation, and no receipt appears.
 - Each exact call reads a message not read before, so the scenario allows `messages` calls.
 - Observations: primary reads by kind, bytes read, index page reads, and directory enumerations,
@@ -99,8 +111,9 @@ before anything runs.
 - A read fixture holds the reader's receipts in every state it can step from: queued, offered,
   retrieved and acknowledged, in turn. Before each read, outside the timed section, another store
   instance steps the target's receipt once through the product's own operations: an offer, a
-  retrieval or an acknowledgement. An answer kept from before that step is therefore wrong, and
-  the history grows by one event per read.
+  retrieval or an acknowledgement. An acknowledged receipt has no step. An answer kept from
+  before a step is therefore wrong, and the history grows by one event for each read of a
+  receipt that is not acknowledged.
 - `pendingJournal` stops each of those steps after its journal, as a crash would, and the measured
   store is opened before the step. Its own read must finish the decided step and return the new
   state. The step's event is then allowed once and is not counted as the read's commit. The
@@ -120,24 +133,32 @@ before anything runs.
 Each probe ships mutations that wrap a correct implementation and break it in one way:
 - attention: drop one item, answer a constant empty list, skip unavailable recipients, duplicate
   the first item, answer from a stale fixture, reverse the order, take any session record for
-  presence, answer for a fixture of another size with the same seed;
+  presence, let the last session record decide, take a live pid for online at any age, answer
+  for a fixture of another size with the same seed;
 - inbox exact: read the wrong message, skip the receipt transition, move the receipt without its
   event, return a summary for the body, move an unrelated receipt, return an extra item, return
-  another message's receipt, create a receipt;
+  another message's receipt, create a receipt, leave the retrieval behind its journal, rewrite
+  the message;
 - inbox page: drop the last item, return an empty page, advance receipts, reverse the order,
-  return a garbage cursor, ignore receipt states, return one item fewer than fits;
+  return a garbage cursor, ignore receipt states, return one item fewer than fits (with a limit
+  of 1, the empty page), fill the page past the byte budget, rewrite a message;
 - transaction: commit on a read, return the wrong receipt, advance a receipt on a read, answer
-  from the receipts as built, answer a constant state without reading, read the record past a
-  pending journal, skip a write's commit, commit twice, write to the wrong target.
+  from the receipts as built, answer a constant state without reading, rewrite the message, read
+  the record past a pending journal, skip a write's commit, commit twice, leave a write behind its
+  journal, write to the wrong target.
 
-The test suite runs every mutation through the validator and requires each one to fail. A correct
-alternative implementation, such as attention with receipts grouped by message, must pass. That
-shows the validator does not depend on the current algorithm.
+The test suite runs every mutation through the validator and requires each one to fail. Correct
+alternative implementations must pass: an attention computation that groups the receipts by
+message once and decides presence once per participant, as #305 may, and a transaction read of
+the receipt record outside a transaction when no journal is open. That shows the validators do
+not depend on the current algorithm.
 
 ## Comparable runs
 
 `node scripts/measure/run.mjs --probe <name> --set <key=value> --vary <key=a,b> --baseline <ref>
---candidate <ref|worktree>` materializes each side, then alternates them:
+--candidate <ref|worktree>` materializes each side, then alternates them. `--vary` can be
+repeated, and the scenarios are then every combination of the values, so scenarios to compare
+with each other run in one run:
 - A side is a commit, exported with `git archive` and installed with `npm ci` into a temporary
   directory that is reused only after a completed install, or `worktree`, the current checkout
   with its dirty state recorded.
@@ -148,7 +169,8 @@ shows the validator does not depend on the current algorithm.
   recorded with its error. A child that fails prints the error's stack with the samples and
   validation failures it had gathered. The run continues and is still written.
 - Each child gets its own temporary directory, which the runner removes when the child ends,
-  killed or not.
+  killed or not. A directory that cannot be removed is recorded with the child and never costs
+  the run. A runner stopped by SIGINT or SIGTERM ends its child and removes its directory first.
 - The run records:
   - each side's commit, its dirty state and a hash of what it runs: package sources, the package
     manifests, the lockfile and `bin/`;
@@ -159,7 +181,8 @@ shows the validator does not depend on the current algorithm.
   - the durability setting, real `fsync` by default, and the `NODE_OPTIONS` the children got;
   - every raw sample.
 - A run whose sides validate differently, whose child failed, or whose fixture digests differ is
-  reported as invalid rather than compared.
+  reported as invalid rather than compared. So is a run with `--candidate-mutation` whose
+  candidate passed validation: that negative control shows a validator that missed its defect.
 
 ## Reports
 
@@ -168,9 +191,11 @@ durability and host, each side's fixture digests and any child errors or validat
 gives each side's median, interquartile range, minimum and maximum, and its operation counts. It
 also gives the candidate's median over the baseline's, round by round, with the median and range
 of those ratios. The two sides of a round run next to each other, so a change in machine load
-between rounds moves both. The pooled medians can differ for equal code when load changes during
-a run; the paired ratio is the comparison to read. `node scripts/measure/report.mjs <run.json>`
-renders a recorded run's report again. It labels each figure:
+between rounds moves both, and the median of the ratios does not follow it. A spike inside one
+round still moves that round's ratio, which the range shows. The pooled medians can differ for
+equal code when load changes during a run; the median paired ratio is the comparison to read.
+`node scripts/measure/report.mjs <run.json>` renders a recorded run's report again. It labels each
+figure:
 - **Benchmark**: both sides valid, alternated over at least ten rounds, and at least one hundred
   samples per side.
 - **Smoke**: valid, but short of that.

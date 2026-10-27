@@ -7,7 +7,8 @@ import inbox from "../../scripts/measure/probes/inbox.mjs";
 // moved and which event it published, read back from a fresh store.
 const repo = path.resolve(import.meta.dirname, "..", "..");
 const exact = inbox.scenario({ messages: 12, backlog: 10, operation: "exact", seed: 3 });
-const page = inbox.scenario({ messages: 12, backlog: 10, operation: "page", limit: 5, seed: 3 });
+// Enough listable messages that the byte budget, not the limit, ends a page.
+const page = inbox.scenario({ messages: 40, backlog: 4, operation: "page", limit: 20, seed: 3 });
 
 async function built(t, scenario) {
   const side = await inbox.load(repo);
@@ -15,7 +16,10 @@ async function built(t, scenario) {
   t.after(() => inbox.dispose(value));
   return value;
 }
-const call = async (value, operate = inbox.operate) => inbox.validate(value, await operate(value, await inbox.prepare(value)));
+const call = async (value, operate = inbox.operate) => {
+  const input = await inbox.prepare(value);
+  return inbox.validate(value, await operate(value, input), input);
+};
 
 test("an inbox scenario builds the same records every time, with receipts in every state", async t => {
   const first = await built(t, exact), second = await built(t, exact);
@@ -56,7 +60,7 @@ test("a page the byte budget ends early passes, and one item fewer than fits fai
   const value = await built(t, scenario);
   const input = await inbox.prepare(value), result = await inbox.operate(value, input);
   assert.ok(result.items.length < scenario.limit, `${result.items.length} items: the budget never ended the page`);
-  assert.deepEqual(await inbox.validate(value, result), []);
+  assert.deepEqual(await inbox.validate(value, result, input), []);
   const short = await inbox.mutationsFor(scenario)["short-page"](inbox.operate, { side: value.side, scenario });
   assert.match((await call(value, short)).join(), /items where .* fit the 12000-byte page/);
 });

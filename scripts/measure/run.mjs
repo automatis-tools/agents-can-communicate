@@ -6,8 +6,11 @@
 //   node scripts/measure/run.mjs --probe attention --set fanout=3 --vary ownRequests=1000,8000 \
 //     --baseline v0.12.2 --candidate worktree --rounds 10 --samples 10 --out <dir>
 //
+// `--vary` can be repeated; the scenarios are every combination of the values.
+//
 // A commit side needs git and tar on PATH and installs with npm.
 import { execFileSync, spawn } from "node:child_process";
+import { rmSync } from "node:fs";
 import { mkdir, mkdtemp, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -20,7 +23,7 @@ import { classify, renderReport } from "./report.mjs";
 const repo = path.resolve(import.meta.dirname, "..", "..");
 const { values } = parseArgs({ options: {
   probe: { type: "string" }, set: { type: "string", multiple: true, default: [] },
-  vary: { type: "string" }, baseline: { type: "string", default: "worktree" },
+  vary: { type: "string", multiple: true, default: [] }, baseline: { type: "string", default: "worktree" },
   candidate: { type: "string", default: "worktree" }, rounds: { type: "string", default: "10" },
   samples: { type: "string", default: "10" }, warmup: { type: "string", default: "3" },
   fsync: { type: "string", default: "real" }, out: { type: "string" },
@@ -39,8 +42,10 @@ const probe = (await import(new URL(`./probes/${values.probe}.mjs`, import.meta.
 const literal = text => (/^-?\d+(\.\d+)?$/.test(text) ? Number(text) : text === "true" ? true : text === "false" ? false : text);
 const pair = text => { const at = text.indexOf("="); return [text.slice(0, at), text.slice(at + 1)]; };
 const base = Object.fromEntries(values.set.map(pair).map(([key, value]) => [key, literal(value)]));
-const scenarios = (values.vary ? pair(values.vary)[1].split(",").map(value => ({ ...base, [pair(values.vary)[0]]: literal(value) }))
-  : [base]).map(input => probe.scenario(input)).map(scenario => ({ scenario, hash: digest(scenario) }));
+const axes = values.vary.map(pair).map(([key, list]) => list.split(",").map(value => [key, literal(value)]));
+const combinations = axes.reduce((all, axis) => all.flatMap(combination => axis.map(entry => [...combination, entry])), [[]]);
+const scenarios = combinations.map(combination => probe.scenario({ ...base, ...Object.fromEntries(combination) }))
+  .map(scenario => ({ scenario, hash: digest(scenario) }));
 // Every call of a child, the observed one included, needs its own fixture record.
 const calls = settings.warmup + settings.samples + 1;
 for (const { scenario } of scenarios) {
@@ -100,6 +105,18 @@ const nodeOptions = [...(process.env.NODE_OPTIONS ?? "").split(/\s+/).filter(Boo
   .filter((token, index, tokens) => !token.includes("test-skip-fsync") && !(token === "--import" && tokens[index + 1]?.includes("test-skip-fsync")));
 if (values.fsync === "skipped") nodeOptions.push("--import", skip);
 
+// A runner stopped by a signal still ends its children and removes their directories.
+const active = new Set();
+for (const [signal, code] of [["SIGINT", 130], ["SIGTERM", 143]]) {
+  process.once(signal, () => {
+    for (const { process_, scratch } of active) {
+      process_?.kill("SIGKILL");
+      try { rmSync(scratch, { recursive: true, force: true, maxRetries: 5 }); } catch {}
+    }
+    process.exit(code);
+  });
+}
+
 async function child(sideName, entry) {
   const input = { probe: values.probe, root: sides[sideName].root, scenario: entry.scenario,
     samples: settings.samples, warmup: settings.warmup,
@@ -108,17 +125,22 @@ async function child(sideName, entry) {
   const scratch = await mkdtemp(path.join(os.tmpdir(), "acc-measure-child-"));
   const loadBefore = os.loadavg(), started = performance.now();
   const ended = fields => ({ loadBefore, loadAfter: os.loadavg(), elapsedMs: Math.round(performance.now() - started), ...fields });
+  const running = { process_: null, scratch };
+  active.add(running);
   const outcome = await new Promise(resolve => {
-    const process_ = spawn(process.execPath, [path.join(import.meta.dirname, "child.mjs"), JSON.stringify(input)],
-      { env: { ...process.env, NODE_OPTIONS: nodeOptions.join(" "), ACC_NO_UPDATE_CHECK: "1",
-        TMPDIR: scratch, TEMP: scratch, TMP: scratch }, stdio: ["ignore", "pipe", "pipe"] });
+    const failed = (error, partial = {}) => resolve(ended({ fixtureDigest: null, validation: [], samplesNs: [],
+      observations: {}, ...partial, error }));
+    let process_;
+    try {
+      process_ = running.process_ = spawn(process.execPath, [path.join(import.meta.dirname, "child.mjs"), JSON.stringify(input)],
+        { env: { ...process.env, NODE_OPTIONS: nodeOptions.join(" "), ACC_NO_UPDATE_CHECK: "1",
+          TMPDIR: scratch, TEMP: scratch, TMP: scratch }, stdio: ["ignore", "pipe", "pipe"] });
+    } catch (error) { return failed(`${sideName} child did not start: ${error.message}`); }
     let stdout = "", stderr = "", timedOut = false;
     const timer = setTimeout(() => { timedOut = true; process_.kill("SIGKILL"); }, settings.timeoutMs);
     process_.stdout.on("data", chunk => { stdout += chunk; });
     process_.stderr.on("data", chunk => { stderr += chunk; });
     const parsed = () => { try { return JSON.parse(stdout.trim().split("\n").at(-1)); } catch { return null; } };
-    const failed = (error, partial = {}) => resolve(ended({ fixtureDigest: null, validation: [], samplesNs: [],
-      observations: {}, ...partial, error }));
     // Node ends an uncaught error with its version line, so the cause is further up.
     const tail = () => stderr.trim().split("\n").slice(-20).join("\n");
     process_.on("error", error => { clearTimeout(timer); failed(`${sideName} child did not start: ${error.message}`); });
@@ -133,8 +155,10 @@ async function child(sideName, entry) {
       resolve(ended(result));
     });
   });
-  await rm(scratch, { recursive: true, force: true, maxRetries: 5 });
-  return outcome;
+  active.delete(running);
+  // A directory that will not go is reported with the child; it never costs the run.
+  const cleanup = await rm(scratch, { recursive: true, force: true, maxRetries: 5 }).then(() => null, error => error.message);
+  return cleanup === null ? outcome : { ...outcome, cleanupError: `could not remove ${scratch}: ${cleanup}` };
 }
 
 const cpus = os.cpus();

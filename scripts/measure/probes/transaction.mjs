@@ -5,13 +5,15 @@
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { digest } from "../probe-kit.mjs";
-import { eventsAfter, loadStoreSide, openInstance, openStoreFixture, primaryDigest, receiptStates, WORKSPACE }
-  from "../store-fixture.mjs";
+import { eventsAfter, loadStoreSide, openInstance, openStoreFixture, primaryDigest, receiptStates, stateDigest,
+  visibleEvents, WORKSPACE } from "../store-fixture.mjs";
 
 // `pendingJournal` stops each read's step behind its journal, as a crash would.
 const defaults = { messages: 30, events: 100, operation: "read", pendingJournal: false, seed: 1 };
 // What the product publishes for a successful offer.
 const OFFER_EVENT = "message.offer_succeeded";
+// Every kind a measured call must leave as it was: it may move one receipt and append events.
+const OTHER_KINDS = ["workspace", "participant", "session", "intent", "claim", "message"];
 
 function scenario(input = {}) {
   const value = { probe: "transaction", ...defaults, ...input };
@@ -77,7 +79,8 @@ async function build(scenario, side) {
     await fixture.service.setIntent({ ...fixture.owner("sender"), summary: `history ${round}`, mode: "edit" });
   }
   const built = { scenario, side, fixture, messages, next: 0, target: null, states, initial: new Map(states),
-    pending: null, moved: null, events: counter.count, digest: await primaryDigest(fixture, side) };
+    pending: null, moved: null, events: counter.count, digest: await primaryDigest(fixture, side),
+    others: await stateDigest(fixture, side, OTHER_KINDS) };
   built.eventCursor = (await eventsAfter(fixture, side, null)).cursor;
   built.receipts = await receiptStates(fixture, side);
   return built;
@@ -127,13 +130,18 @@ async function operate(built, input) {
   return input.service.recordOfferSucceeded(offer(built.fixture, message.messageId));
 }
 
-async function validate(built, result) {
+async function validate(built, result, input) {
   const failures = [], { fixture, side } = built, write = built.scenario.operation === "write";
   const expected = write ? "offered" : built.states.get(built.target);
   if (result?.messageId !== built.target || result?.recipientParticipantId !== "reader" || result?.state !== expected) {
     failures.push(`transaction: returned ${result?.messageId} ${result?.state}, not ${built.target} ${expected}`);
   }
-  const { events, cursor } = await eventsAfter(fixture, side, built.eventCursor);
+  // What the measured store shows, before any other store opens and finishes a journal it left open.
+  const { events } = await visibleEvents(input.store, built.eventCursor);
+  const recovered = await eventsAfter(fixture, side, built.eventCursor), cursor = recovered.cursor;
+  if (recovered.events.length !== events.length) {
+    failures.push(`transaction: the call left ${recovered.events.length - events.length} event(s) behind an open journal`);
+  }
   // Finishing the stopped step publishes its event once; that is no commit of the read's.
   const own = events.filter(event => {
     const finished = built.pending && !built.pending.published && event.type === built.pending.event
@@ -163,6 +171,9 @@ async function validate(built, result) {
     }
   }
   for (const id of now.keys()) if (!built.receipts.has(id)) failures.push(`transaction: receipt ${id} appeared`);
+  const others = await stateDigest(fixture, side, OTHER_KINDS);
+  if (others !== built.others) failures.push("transaction: the call changed records other than its receipt");
+  built.others = others;
   if (write) built.states.set(built.target, "offered");
   built.pending = null;
   built.receipts = now;
@@ -177,7 +188,7 @@ async function observe(built) {
   let measured;
   try { measured = await probe.capture(() => operate(built, input)); } finally { probe.stop(); }
   const enumerations = Object.fromEntries(Object.entries(measured.io).filter(([key]) => /\/readdir(Entries)?$/.test(key)));
-  return { failures: await validate(built, measured.result), events: built.events, stateReads: measured.stateReads,
+  return { failures: await validate(built, measured.result, input), events: built.events, stateReads: measured.stateReads,
     stateByKind: measured.stateByKind, readBytes: measured.readBytes, enumerations };
 }
 
@@ -193,17 +204,26 @@ const readMutations = {
     const result = await operate(built, input);
     return { ...result, messageId: built.messages[built.next % built.messages.length].messageId };
   },
-  // Offers a message that is still queued, where a read must change nothing.
+  // Offers another message that is still queued, where a read must change nothing.
   "advances-on-read": async () => async (built, input) => {
-    built.next += 1;
-    const message = built.messages.find(item => built.states.get(item.messageId) === "queued");
-    built.target = message.messageId;
-    return input.service.recordOfferSucceeded(offer(built.fixture, message.messageId));
+    const intended = built.messages[built.next++];
+    built.target = intended.messageId;
+    const other = built.messages.find(item => item !== intended && built.states.get(item.messageId) === "queued");
+    const result = await input.service.recordOfferSucceeded(offer(built.fixture, other.messageId));
+    // What the store now holds, so later steps start from it.
+    built.states.set(other.messageId, "offered");
+    return result;
   },
   // Answers from the receipts as first built, missing every step since.
   "stale-state": async operate => async (built, input) => {
     const result = await operate(built, input);
     return { ...result, state: built.initial.get(built.target) };
+  },
+  // Rewrites the target message's body while reading its receipt.
+  "rewrites-message": async operate => async (built, input) => {
+    const result = await operate(built, input);
+    await rewriteMessage(input.store, built.target);
+    return result;
   },
   // Answers without reading the store at all.
   "constant-state": async () => async built => {
@@ -211,6 +231,15 @@ const readMutations = {
     built.target = message.messageId;
     return { messageId: message.messageId, recipientParticipantId: "reader", state: "queued" };
   },
+};
+const rewriteMessage = (store, messageId) => store.transaction(tx => {
+  tx.put("message", messageId, { ...tx.get("message", messageId), body: "rewritten" }, tx.generationOf("message", messageId));
+}, { kinds: ["message"] });
+// A write that stops after its journal, as a crash would, and reports success.
+const stopAfterJournal = async (fixture, side, write) => {
+  const crash = async point => { if (point === "after-journal") throw new Error("probe crash"); };
+  await write((await openInstance(fixture, side, { failAt: crash })).service)
+    .catch(error => { if (error.message !== "probe crash") throw error; });
 };
 // Reads the receipt record as it lies on disk, outside any transaction. Without
 // an open journal that is a correct read; with one, it misses the decision.
@@ -230,6 +259,13 @@ const writeMutations = {
     const result = await operate(built, input);
     await intentWrite(built, input);
     return result;
+  },
+  // Leaves its decided write behind the journal for the next store that opens.
+  "leaves-journal": async () => async built => {
+    const message = built.messages[built.next++];
+    built.target = message.messageId;
+    await stopAfterJournal(built.fixture, built.side, service => service.recordOfferSucceeded(offer(built.fixture, message.messageId)));
+    return { messageId: message.messageId, recipientParticipantId: "reader", state: "offered" };
   },
   "wrong-target": async () => async (built, input) => {
     const intended = built.messages[built.next], other = built.messages[built.next + 1];

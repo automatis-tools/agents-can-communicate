@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import path from "node:path";
 import test from "node:test";
+import { pathToFileURL } from "node:url";
 import attention from "../../scripts/measure/probes/attention.mjs";
 
 // #304: a probe proves the useful work from its scenario alone, so a correct
@@ -31,8 +32,8 @@ test("fully acknowledged history stays quiet beside the witnesses every scenario
   const side = await attention.load(repo);
   const quiet = await attention.build(attention.scenario({ ...scenario, acknowledgedShare: 1 }), side);
   assert.deepEqual(quiet.expected.map(item => item.sourceId).filter(id => !id.includes("witness")), []);
-  // Two per witness, and one for each of the four unavailable presences.
-  assert.equal(quiet.expected.length, 2 * scenario.witnesses + 4);
+  // Two per witness, five unavailable recipients, and three messages left for ended sessions.
+  assert.equal(quiet.expected.length, 2 * scenario.witnesses + 8);
   assert.deepEqual(await attention.validate(quiet, await attention.operate(quiet)), []);
   for (const [name, mutate] of Object.entries(attention.mutations)) {
     const failures = await attention.validate(quiet, await (await mutate(attention.operate, { side, scenario: quiet.scenario }))(quiet));
@@ -40,11 +41,15 @@ test("fully acknowledged history stays quiet beside the witnesses every scenario
   }
 });
 
-test("a session record alone is no presence: closed, silent, expired and dead-pid recipients are due", async () => {
+test("a session record alone is no presence, and one online session of several is", async () => {
   const side = await attention.load(repo);
   const built = await attention.build(scenario, side);
   const presence = built.expected.filter(item => item.sourceId.includes("presence")).map(item => item.detail).sort();
-  assert.deepEqual(presence, ["peer_closed", "peer_dead_pid", "peer_expired", "peer_stale"]);
+  assert.deepEqual(presence, ["peer_closed", "peer_dead_pid", "peer_expired", "peer_live_pid_silent", "peer_stale"]);
+  // Stale recipients are unavailable but still present: only the offline ones have left.
+  const left = built.expected.filter(item => item.kind === "left_for_ended_session").map(item => item.sourceId);
+  assert.equal(left.length, 3);
+  assert.deepEqual(await attention.validate(built, await attention.operate(built)), []);
 });
 
 test("witnesses carry the scenario, so another size with the same seed expects other items", async () => {
@@ -68,6 +73,65 @@ test("each call reads its own copy of the snapshot", async () => {
   assert.notEqual(first.snapshot, second.snapshot);
   assert.notEqual(first.snapshot.receipts, built.snapshot.receipts);
   assert.deepEqual(first.snapshot, built.snapshot);
+});
+
+// A correct computation built another way, as #305 may build it: receipts grouped
+// by message once, and presence decided once per participant.
+async function groupedAttention() {
+  const core = name => import(pathToFileURL(path.join(repo, "packages", "core", "src", name)).href);
+  const [{ ATTENTION_PRIORITY, LEFT_MESSAGE_WINDOW_MS, LEFT_MESSAGE_LIMIT }, { classifySessionPresence },
+    { decisionView, isCurrentDecision }] = await Promise.all([core("attention.mjs"), core("sessions.mjs"),
+    core("decision-state.mjs")]);
+  const RANK = { offline: 0, stale: 1, online: 2 };
+  return (snapshot, { participantId, now, pidIsAlive }) => {
+    const messages = snapshot.messages.map(decisionView(snapshot.messages)).filter(isCurrentDecision);
+    const byMessage = new Map();
+    for (const receipt of snapshot.receipts) {
+      if (!byMessage.has(receipt.messageId)) byMessage.set(receipt.messageId, []);
+      byMessage.get(receipt.messageId).push(receipt);
+    }
+    const best = new Map();
+    for (const session of snapshot.sessions) {
+      const rank = RANK[classifySessionPresence(session, now, pidIsAlive)];
+      best.set(session.participantId, Math.max(rank, best.get(session.participantId) ?? -1));
+    }
+    const items = [], left = [];
+    const item = (kind, sourceId, summary) => items.push({ kind, priority: ATTENTION_PRIORITY[kind], sourceId, summary });
+    for (const message of messages) {
+      const receipts = byMessage.get(message.messageId) ?? [];
+      const kind = { reply: "reply_required", acknowledge: "acknowledgement_required" }[message.obligation];
+      for (const receipt of receipts) {
+        if (kind && receipt.recipientParticipantId === participantId && receipt.state !== "acknowledged") {
+          item(kind, message.messageId, `message ${message.messageId} is a ${message.kind}`);
+        }
+      }
+      if (message.fromParticipantId === participantId && message.toParticipantIds.length > 0 && message.obligation !== "none") {
+        for (const receipt of receipts) {
+          if (receipt.state !== "acknowledged" && best.get(receipt.recipientParticipantId) !== RANK.online) {
+            item("recipient_unavailable", message.messageId, `${message.subject} - ${receipt.recipientParticipantId} is unavailable`);
+          }
+        }
+      }
+      if (message.fromParticipantId !== participantId && message.toParticipantIds.length > 0
+        && !message.toParticipantIds.includes(participantId)
+        && Date.parse(now) - Date.parse(message.sentAt) < LEFT_MESSAGE_WINDOW_MS
+        && receipts.some(receipt => ["queued", "offered"].includes(receipt.state)
+          && (best.get(receipt.recipientParticipantId) ?? RANK.offline) === RANK.offline)) left.push(message);
+    }
+    left.sort((a, b) => b.sentAt.localeCompare(a.sentAt));
+    for (const message of left.slice(0, LEFT_MESSAGE_LIMIT)) item("left_for_ended_session", message.messageId, "waiting");
+    return items.sort((a, b) => a.priority - b.priority || a.sourceId.localeCompare(b.sourceId));
+  };
+}
+
+test("a correct computation built another way passes, receipts grouped by message", async () => {
+  const side = await attention.load(repo), grouped = await groupedAttention();
+  for (const value of [scenario, attention.scenario({ ...scenario, acknowledgedShare: 1 }),
+    attention.scenario({ ...scenario, fanout: 1, offlineShare: 0, inboundObligations: 0 })]) {
+    const built = await attention.build(value, side);
+    assert.deepEqual(await attention.validate(built, grouped(attention.prepare(built).snapshot, built.context)), [],
+      JSON.stringify(value));
+  }
 });
 
 test("a correct computation that walks the records in another order passes", async () => {

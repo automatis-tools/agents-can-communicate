@@ -68,6 +68,14 @@ test("a child that failed makes its comparison invalid, and the report says why"
   assert.match(renderReport({ ...value, candidateMutation: "drop-one" }), /timed out after 1 ms[\s\S]*drop-one|drop-one[\s\S]*timed out after 1 ms/);
 });
 
+test("a negative control that passes validation is invalid, never a benchmark", () => {
+  const passed = classify({ ...run(), candidateMutation: "drop-one" }).s;
+  assert.equal(passed.label, "invalid");
+  assert.match(passed.reasons.join(), /the negative control drop-one passed validation/);
+  const caught = classify({ ...run({ failures: ["attention: missing 1 x item"] }), candidateMutation: "drop-one" }).s;
+  assert.doesNotMatch(caught.reasons.join(), /negative control/);
+});
+
 test("a paired ratio compares the sides round by round, so load that moves both cancels", () => {
   const value = run();
   // One slow round for both sides: the pooled medians move, the ratio does not.

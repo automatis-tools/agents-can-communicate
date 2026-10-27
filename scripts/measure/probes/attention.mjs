@@ -6,13 +6,14 @@ import { canonical, counted, digest, multisetFailures, pad, random, shuffle } fr
 
 const NOW = "2026-10-26T12:00:00.000Z";
 const ME = "measured";
-const PRIORITY = { reply_required: 1, acknowledgement_required: 2, recipient_unavailable: 3 };
+const PRIORITY = { reply_required: 1, acknowledgement_required: 2, recipient_unavailable: 3, left_for_ended_session: 7 };
 const PENDING = ["queued", "offered", "retrieved"];
 
 // Witnesses are items every scenario must return, whatever its shares: a
 // scenario that expects nothing cannot tell useful work from a constant answer.
-// With them come requests to one recipient in each presence the product tells
-// apart, so a computation that takes any session record for presence fails.
+// With them come requests to recipients whose sessions the product judges in
+// different ways, so a computation that takes any session record for presence,
+// or lets one record of several decide, fails.
 const defaults = { ownRequests: 100, fanout: 2, acknowledgedShare: 0.5, offlineShare: 0.5,
   inboundObligations: 20, witnesses: 4, seed: 1 };
 
@@ -34,14 +35,22 @@ const session = (participantId, now, fields = {}) => ({ sessionId: `session_${pa
   state: "open", heartbeatAt: now, heartbeatCadenceMs: 60_000, pid: null, ...fields });
 const ago = minutes => new Date(Date.parse(NOW) - minutes * 60_000).toISOString();
 const LIVE_PID = 4242, DEAD_PID = 4343;
-// Recipient, session and whether a request to it is due: closed, silent past three
-// cadences, past the unknown-pid floor, and a dead pid are unavailable; a live pid is not.
+// Recipient, its sessions, whether a request to it is due as `recipient_unavailable`
+// (only an online session makes a recipient available), and whether a message left for
+// it by someone else is due as `left_for_ended_session` (only an offline one is gone).
 const PRESENCE = [
-  ["peer_closed", { state: "closed" }, true],
-  ["peer_stale", { heartbeatAt: ago(5) }, true],
-  ["peer_expired", { heartbeatAt: ago(31) }, true],
-  ["peer_dead_pid", { pid: DEAD_PID }, true],
-  ["peer_live_pid", { pid: LIVE_PID, heartbeatAt: ago(2) }, false],
+  ["peer_closed", [{ state: "closed" }], true, true],
+  // Silent past three cadences is stale: unavailable, but still present.
+  ["peer_stale", [{ heartbeatAt: ago(5) }], true, false],
+  // Past the unknown-pid floor is offline.
+  ["peer_expired", [{ heartbeatAt: ago(31) }], true, true],
+  ["peer_dead_pid", [{ pid: DEAD_PID }], true, true],
+  ["peer_live_pid", [{ pid: LIVE_PID, heartbeatAt: ago(2) }], false, false],
+  // A live pid does not make a silent session online.
+  ["peer_live_pid_silent", [{ pid: LIVE_PID, heartbeatAt: ago(10) }], true, false],
+  // One online session of several makes the recipient available, first or last.
+  ["peer_online_then_closed", [{}, { state: "closed" }], false, false],
+  ["peer_closed_then_online", [{ state: "closed" }, {}], false, false],
 ];
 
 // Build the snapshot computeAttention reads, and the items it must return.
@@ -84,13 +93,21 @@ async function build(scenario, side) {
   // Named by the whole scenario, so an answer computed for another fixture never matches.
   const tag = digest(scenario).slice(0, 12);
   if (scenario.witnesses > 0) {
-    for (const [index, [recipient, fields, due]] of PRESENCE.entries()) {
-      sessions.push(session(recipient, NOW, fields));
+    for (const [index, [recipient, records, due, gone]] of PRESENCE.entries()) {
+      for (const [number, fields] of records.entries()) {
+        sessions.push({ ...session(recipient, NOW, fields), sessionId: `session_${recipient}_${number}` });
+      }
       const messageId = `message_witness_presence_${tag}_${pad(index)}`;
       messages.push({ messageId, kind: "request", obligation: "reply", fromParticipantId: ME,
         toParticipantIds: [recipient], subject: `presence ${recipient}`, sentAt: sentAt(-100 - index) });
       receipts.push({ messageId, recipientParticipantId: recipient, state: "offered" });
       if (due) expected.push({ kind: "recipient_unavailable", sourceId: messageId, detail: recipient });
+      // Left for it by another participant; fewer than the product reports at most.
+      const left = `message_witness_left_${tag}_${pad(index)}`;
+      messages.push({ messageId: left, kind: "note", obligation: "none", fromParticipantId: "peer_sender",
+        toParticipantIds: [recipient], subject: `left for ${recipient}`, sentAt: sentAt(-200 - index) });
+      receipts.push({ messageId: left, recipientParticipantId: recipient, state: "queued" });
+      if (gone) expected.push({ kind: "left_for_ended_session", sourceId: left, detail: null });
     }
   }
   for (let index = 0; index < scenario.witnesses; index++) {
@@ -171,6 +188,14 @@ const mutations = {
   "presence-ignored": async operate => async (built, input = prepare(built)) => operate(built,
     { snapshot: { ...input.snapshot, sessions: input.snapshot.sessions.map(item => ({ ...item, state: "open",
       heartbeatAt: NOW, pid: null })) } }),
+  // Lets the last session record of each participant decide its presence.
+  "last-session-decides": async operate => async (built, input = prepare(built)) => operate(built,
+    { snapshot: { ...input.snapshot, sessions: [...new Map(input.snapshot.sessions
+      .map(item => [item.participantId, item])).values()] } }),
+  // Takes a live pid for online at any age.
+  "live-pid-any-age": async operate => async (built, input = prepare(built)) => operate(built,
+    { snapshot: { ...input.snapshot, sessions: input.snapshot.sessions.map(item => item.pid === LIVE_PID
+      ? { ...item, heartbeatAt: NOW } : item) } }),
   // The answer for a fixture with the same seed and one more request.
   "other-size": async (operate, { side, scenario }) => {
     const other = await operate(await build({ ...scenario, ownRequests: scenario.ownRequests + 1 }, side));
