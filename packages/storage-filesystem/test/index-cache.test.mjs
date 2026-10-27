@@ -161,3 +161,27 @@ test("a retained handle recovers a decided writer before trusting its old cache"
   assert.deepEqual(await lookup(store, "client_b"), ["message_b"]);
   assert.equal((await store.stateRecord(WS, "message", "message_b")).clientMessageId, "client_b");
 });
+
+// #306: a data home a client sandbox keeps read-only cannot take the cache, and a page
+// makes four lookups. Each must not read every primary record again.
+test("a cache that cannot be published is rebuilt once per journal generation, not per lookup", async t => {
+  const { createStoreIoProbe } = await import("../../../tests/helpers/store-io-probe.mjs");
+  const { root, store, manifestFile } = await fixture(t,
+    async point => { if (point === "before-index-manifest") throw new Error("read-only cache"); });
+  for (let i = 0; i < 20; i++) await seed(store, `message_${i}`, `client_${i}`);
+  await rm(manifestFile, { force: true });
+  const probe = createStoreIoProbe(root);
+  t.after(() => probe.stop());
+  const once = await probe.capture(() => lookup(store, "client_3"));
+  const fourTimes = await probe.capture(() => store.transaction(async tx => {
+    for (const client of ["client_1", "client_2", "client_5", "client_7"]) await tx.lookup("messageByClientKey", key(client));
+  }, exact));
+  assert.deepEqual(once.result, ["message_3"]);
+  assert.equal(store.indexDiagnostics().at(-1)?.code, "index_unavailable");
+  await assert.rejects(readFile(manifestFile), { code: "ENOENT" });
+  // The rebuilt tree is kept for this generation: four lookups read only what they select.
+  assert.ok(fourTimes.stateReads <= 4, `${fourTimes.stateReads} primary reads for four lookups`);
+  // A write moves the generation, and the next lookup rebuilds and finds it.
+  await seed(store, "message_new", "client_new");
+  assert.deepEqual(await lookup(store, "client_new"), ["message_new"]);
+});

@@ -59,11 +59,18 @@ Every lookup already takes one of four paths, and each must stay correct:
 - **cold**: no manifest; the lookup rebuilds every index from all message and receipt records,
   publishes the cache, and answers from it;
 - **rebuilt**: a stale manifest, after a writer that does not maintain v2; the same rebuild;
-- **unavailable**: the rebuilt cache cannot be published; the lookup answers from the tree it
-  built in memory, and the next lookup rebuilds again.
+- **unavailable**: the rebuilt cache cannot be published, as in a client sandbox that keeps the
+  data home read-only; the lookup answers from the tree it built in memory.
+
+A page makes four lookups. On the unavailable path each rebuilt the whole tree, four full reads
+where the old page made one. The store instance therefore keeps the tree it rebuilt in memory
+for the journal generation it describes, the same condition under which a published manifest
+is valid: message and receipt records change only through the journal, which moves the
+generation. A hook opens its own store, so it rebuilds at most once.
 
 Cold, rebuilt and unavailable lookups read the whole workspace once, as every read does today.
-The saving is on the warm path, which a workspace reaches after its first lookup.
+The saving is on the warm path, which a workspace reaches after its first lookup. An exact read
+of anything but a decision makes no lookup at all, so every path costs it the same.
 
 ## Measurement
 

@@ -14,6 +14,11 @@ const references = page => page.type === "branch" ? page.children.map(([, hash])
 
 export function createIndexCache({ paths, root, workspaceId, publishOptions, loadPrimary }) {
   let diagnostic = [];
+  // The last tree rebuilt in memory, for the journal generation it describes. A cache
+  // that cannot be published - a read-only data home in a client sandbox - would
+  // otherwise read every primary record again for each lookup (#306). Message and
+  // receipt records change only through the journal, which moves the generation.
+  let rebuilt = null;
   const note = (code, reason) => { diagnostic = [{ code, reason }]; };
   const tools = deadlineAt => {
     const io = createIndexIO({ paths, root, publishOptions: { ...publishOptions, deadlineAt } });
@@ -93,7 +98,10 @@ export function createIndexCache({ paths, root, workspaceId, publishOptions, loa
     } catch (error) {
       if (!(error instanceof IndexCacheUnavailable)) throw error;
     }
-    ({ manifest, tree } = await rebuild(active, deadlineAt));
+    if (rebuilt === null || rebuilt.generation !== active.generation || active.state !== "idle") {
+      rebuilt = { generation: active.generation, ...await rebuild(active, deadlineAt) };
+    }
+    ({ manifest, tree } = rebuilt);
     return select(await tree.lookup(manifest.roots[index], tuple));
 
     async function select(ids) {
