@@ -10,9 +10,13 @@ export const source = path.resolve(import.meta.dirname, "../..");
 import * as planner from "../../scripts/change-plan.mjs";
 import * as gitModule from "../../scripts/change-plan-git.mjs";
 export const event = { kind: "push", ref: "refs/heads/topic" };
-export const git = async (repo, ...args) => (await run("git", ["-C", repo, ...args], {
-  env: cleanEnv(),
-})).stdout.trim();
+export const git = async (repo, ...args) => {
+  const env = cleanEnv();
+  // The parent gate's object policy must not disable these private alias controls.
+  delete env.GIT_NO_REPLACE_OBJECTS;
+  delete env.GIT_REPLACE_REF_BASE;
+  return (await run("git", ["-C", repo, ...args], { env })).stdout.trim();
+};
 export async function put(repo, file, text = "export {};\n") {
   await mkdir(path.dirname(path.join(repo, file)), { recursive: true });
   await writeFile(path.join(repo, file), text);
