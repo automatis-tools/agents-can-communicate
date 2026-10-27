@@ -138,7 +138,7 @@ test("historical selection runner executes full without unknown flags", async t 
 test("changed selection, cache, process and package helpers restore the actual full suite", async t => {
   const f = await pushDocsFixture(t);
   for (const file of ["scripts/test-selection.mjs", "scripts/gate-cache.mjs", "scripts/push-process-tree.mjs",
-    "tests/helpers/packed-template.mjs", "scripts/verify-package.mjs", "packages/cli/src/managed-runtime/npm-cli.mjs"]) {
+    "tests/helpers/packed-template.mjs", "scripts/verify-package.mjs"]) {
     const original = await f.read(file);
     await f.write(file, `${original}\n// historical helper contract\n`);
     await f.audit(); const base = await f.commit("historical helper");

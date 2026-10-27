@@ -20,9 +20,10 @@ export async function pushDocsFixture(t) {
     // template still packs and installs using this real npm CLI on both sides.
     const bytes = file === "tests/helpers/npm-run.mjs" ? `
       import {execFile} from 'node:child_process'; import {promisify} from 'node:util';
-      import {npmCli} from '../../packages/cli/src/managed-runtime/npm-cli.mjs';
+      import {realpath} from 'node:fs/promises'; import path from 'node:path';
       export async function runNpm(args,options={}) {
-        const npm = await npmCli(options.env ?? process.env);
+        const npm = process.env.npm_execpath ?? await realpath(path.join(path.dirname(process.execPath),
+          process.platform === 'win32' ? 'node_modules/npm/bin/npm-cli.js' : 'npm'));
         return promisify(execFile)(process.execPath,[npm,...args],options);
       }` : await readFile(path.join(repo, file), "utf8");
     await write(file, bytes);

@@ -4,11 +4,11 @@ import { createHash } from "node:crypto";
 import { mkdtemp, realpath, rm } from "node:fs/promises";
 import { homedir, tmpdir } from "node:os";
 import path from "node:path";
+import { createRequire } from "node:module";
 import { promisify } from "node:util";
 import { pathToFileURL } from "node:url";
 import { checkoutMatchesCommit } from "./push-tree-check.mjs";
 import { stopPushProcessTree, terminationFailure } from "./push-process-tree.mjs";
-import { npmCli } from "../packages/cli/src/managed-runtime/npm-cli.mjs";
 
 const run = promisify(execFile);
 const zero = oid => /^0+$/.test(oid);
@@ -123,17 +123,21 @@ export async function resolvePushTrees(repo, refs, { planForRef } = {}) {
 // Never expose command environment or checkout paths.
 // Optional executor/platform overrides are solely a command-boundary test seam;
 // production always uses native spawn/platform and fixed taskkill arguments.
-export async function runPushCommand(file, args, { cwd, signal, input, quiet = false,
+export function runPushCommand(file, args, { cwd, signal, input, quiet = false,
   platform = process.platform, spawnCommand = spawn, env = {} } = {}) {
-  if (signal?.aborted) throw Error("push validation interrupted");
-  const commandEnv = { ...pushEnvironment(), ...env };
-  if (file === "npm") {
-    args = [await npmCli(commandEnv), ...args];
-    file = process.execPath;
-  }
   return new Promise((resolve, reject) => {
     if (signal?.aborted) { reject(Error("push validation interrupted")); return; }
     const windows = platform === "win32";
+    const commandEnv = { ...pushEnvironment(), ...env };
+    if (windows && file === "npm") {
+      // Resolve the installed npm package without asking cmd.exe to parse argv.
+      const search = Object.entries(commandEnv).find(([key]) => key.toUpperCase() === "PATH")?.[1] ?? "";
+      const manifest = createRequire(import.meta.url).resolve("npm/package.json", {
+        paths: [path.dirname(process.execPath), ...search.split(path.delimiter).filter(Boolean)],
+      });
+      args = [path.join(path.dirname(manifest), "bin", "npm-cli.js"), ...args];
+      file = process.execPath;
+    }
     const child = spawnCommand(file, args, { cwd, env: commandEnv, detached: !windows,
       shell: false, stdio: ["pipe", "pipe", "pipe"] });
     let stdout = "";
