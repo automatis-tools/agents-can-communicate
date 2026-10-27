@@ -16,7 +16,7 @@ const run = promisify(execFile);
 // "", and every command fails with `not a git repository: ''`. Stripped rather
 // than caught: swallowing the failure would drop the revision precisely when
 // the script is run the way the release doc says to run it.
-const INHERITED = ["GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_COMMON_DIR",
+export const INHERITED = ["GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_COMMON_DIR",
   "GIT_OBJECT_DIRECTORY", "GIT_ALTERNATE_OBJECT_DIRECTORIES", "GIT_PREFIX",
   "GIT_QUARANTINE_PATH"];
 
