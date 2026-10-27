@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -128,4 +128,30 @@ test("an ignored newly discovered failing test cannot reuse an earlier successfu
   assert.equal(result.code, 1, "ignored discovery reused an obsolete full-suite receipt");
   assert.match(result.stdout + result.stderr, /ignored discovered test must execute/);
   assert.equal(await f.count(), 2);
+});
+
+
+test("inherited Node test-worker context refuses execution before packing or proof", async t => {
+  const f = await fixture(t);
+  const temporary = path.join(f.base, "temporary");
+  const diagnostic = path.join(f.base, "diagnostic.json");
+  await mkdir(temporary);
+  const env = { TMPDIR: temporary, TMP: temporary, TEMP: temporary, ACC_GATE_DIAGNOSTIC: diagnostic };
+  for (const context of ["child-v8", "child"]) {
+    for (const args of [[], ["--if-needed"]]) {
+      const result = await f.invoke(args, { ...env, NODE_TEST_CONTEXT: context });
+      assert.equal(result.code, 2, result.stdout + result.stderr);
+      assert.match(result.stderr, /NODE_TEST_CONTEXT.*outside a Node test worker/);
+      assert.doesNotMatch(result.stdout, /test gate receipt/);
+      assert.equal(await f.count(), 0, "nested execution created a packed template");
+      assert.deepEqual(await readdir(temporary), [], "nested execution created cache or report state");
+      assert.equal(await readFile(diagnostic, "utf8").catch(() => null), null);
+    }
+    const listed = await f.invoke(["--if-needed", "--list"], { ...env, NODE_TEST_CONTEXT: context });
+    assert.equal(listed.code, 0, listed.stderr);
+    assert.ok(listed.stdout.includes(path.join(f.root, "tests/probe.test.mjs")));
+    assert.equal(await f.count(), 0, "readonly listing created a packed template");
+    assert.deepEqual(await readdir(temporary), [], "readonly listing created cache or report state");
+    assert.equal(await readFile(diagnostic, "utf8").catch(() => null), null);
+  }
 });

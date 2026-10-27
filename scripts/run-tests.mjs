@@ -31,6 +31,10 @@ let files;
 let selection;
 try {
   options = runnerOptions(process.argv.slice(2));
+  if (process.env.NODE_TEST_CONTEXT && !options.list) {
+    throw new Error("NODE_TEST_CONTEXT is set; run the test gate outside a Node test worker, "
+      + "or clear NODE_TEST_CONTEXT in an explicit child fixture; --list remains available");
+  }
   if (!options.list) {
     nodeTestArguments([]); // Validate test deadline before allocating fixtures.
     testFileTimeout();
