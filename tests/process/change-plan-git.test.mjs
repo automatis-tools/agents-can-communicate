@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
-import { cp, readFile, writeFile } from "node:fs/promises";
+import { cp, mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import test from "node:test";
 import { fixture as pushFixture, invokePush, refLine, cleanEnv } from "../helpers/push-fixture.mjs";
@@ -160,8 +160,13 @@ test("PR validation merge verifies both exact base and requested head ancestry",
 
 for (const failure of ["call", "import"]) test(`planner ${failure} failure preserves passing and failing full gates and measurement policy`, async t => {
   const f = await pushFixture(t);
-  const scripts = path.join(f.base, "driver");
+  const driverRoot = path.join(f.base, "driver");
+  const scripts = path.join(driverRoot, "scripts");
   await cp(path.join(source, "scripts"), scripts, { recursive: true });
+  // The trusted driver now imports the pure npm resolver outside scripts.
+  const npmHelper = "packages/cli/src/managed-runtime/npm-cli.mjs";
+  await mkdir(path.dirname(path.join(driverRoot, npmHelper)), { recursive: true });
+  await cp(path.join(source, npmHelper), path.join(driverRoot, npmHelper));
   const plannerFile = path.join(scripts, "change-plan.mjs");
   const marker = path.join(f.base, "planner-called");
   const original = await readFile(plannerFile, "utf8");

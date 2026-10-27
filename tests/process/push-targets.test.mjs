@@ -214,18 +214,22 @@ test("Windows termination is awaited for the owned PID before command rejection"
   const killer = controlledProcess(23456);
   const controller = new AbortController();
   const calls = [];
+  const started = Promise.withResolvers();
   const running = runPushCommand("npm", ["test"], { cwd: path.resolve(import.meta.dirname, "../.."),
     signal: controller.signal, quiet: true, platform: "win32", spawnCommand: (file, args, options) => {
       calls.push({ file, args, options });
+      started.resolve();
       return calls.length === 1 ? target : killer;
     } });
   let settled = false;
   running.then(() => { settled = true; }, () => { settled = true; });
+  await started.promise;
   controller.abort();
   target.emit("close", 1);
   await new Promise(resolve => setImmediate(resolve));
   assert.equal(settled, false, "command settled before descendant termination completed");
-  assert.equal(calls[0].options.shell, true);
+  assert.equal(calls[0].file, process.execPath);
+  assert.equal(calls[0].options.shell, false);
   assert.equal(calls[1].file, "taskkill");
   assert.deepEqual(calls[1].args, ["/pid", "12345", "/t", "/f"]);
   killer.emit("close", 0);
@@ -238,12 +242,14 @@ for (const failure of ["error", "nonzero", "throw"]) {
     const killer = controlledProcess(23456);
     const controller = new AbortController();
     let calls = 0;
+    const started = Promise.withResolvers();
     const running = runPushCommand("npm", ["test"], { cwd: path.resolve(import.meta.dirname, "../.."),
       signal: controller.signal, quiet: true, platform: "win32", spawnCommand: () => {
-        if (++calls === 1) return target;
+        if (++calls === 1) { started.resolve(); return target; }
         if (failure === "throw") throw Error("launch denied");
         return killer;
       } });
+    await started.promise;
     controller.abort();
     if (failure === "error") assert.doesNotThrow(() => killer.emit("error", Error("launch denied")));
     else if (failure === "nonzero") killer.emit("close", 1);

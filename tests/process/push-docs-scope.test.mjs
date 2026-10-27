@@ -1,6 +1,6 @@
 // Real ref bases, executed sentinels and exact target bytes protect routing.
 import assert from "node:assert/strict";
-import { readFile, realpath } from "node:fs/promises";
+import { mkdir, readFile, realpath } from "node:fs/promises";
 import path from "node:path";
 import test from "node:test";
 import { parsePushRefs, resolvePushTrees } from "../../scripts/push-targets.mjs";
@@ -138,7 +138,7 @@ test("historical selection runner executes full without unknown flags", async t 
 test("changed selection, cache, process and package helpers restore the actual full suite", async t => {
   const f = await pushDocsFixture(t);
   for (const file of ["scripts/test-selection.mjs", "scripts/gate-cache.mjs", "scripts/push-process-tree.mjs",
-    "tests/helpers/packed-template.mjs", "scripts/verify-package.mjs"]) {
+    "tests/helpers/packed-template.mjs", "scripts/verify-package.mjs", "packages/cli/src/managed-runtime/npm-cli.mjs"]) {
     const original = await f.read(file);
     await f.write(file, `${original}\n// historical helper contract\n`);
     await f.audit(); const base = await f.commit("historical helper");
@@ -157,4 +157,30 @@ test("changed selection, cache, process and package helpers restore the actual f
   const before = (await f.records("runtime")).length;
   passed(await f.invoke(refLine(target, "docs", base)));
   assert.equal((await f.records("runtime")).length, before + 1);
+});
+
+// This runs the actual hook/runner/npm pipeline. Native Windows remains a CI
+// qualification; the separate command-boundary control simulates its spawn.
+test("docs push preserves an external TEMP with spaces and shell metacharacters and npm lifecycle", async t => {
+  const f = await pushDocsFixture(t);
+  const temporary = path.join(f.base, "temp space & (owned) %literal% !data! ^");
+  await mkdir(temporary);
+  Object.assign(f.env, { TMPDIR: temporary, TMP: temporary, TEMP: temporary });
+  const lifecycle = path.join(f.base, "lifecycle");
+  const manifest = JSON.parse(await f.read("package.json"));
+  Object.assign(manifest.scripts, { pretest: "node lifecycle.mjs", posttest: "node lifecycle.mjs" });
+  await f.write("package.json", JSON.stringify(manifest));
+  await f.write("lifecycle.mjs", `import {appendFileSync} from 'node:fs';
+    appendFileSync(${JSON.stringify(lifecycle)},process.env.npm_lifecycle_event+'\\n');`);
+  await f.audit(); const base = await f.commit("npm lifecycle controls");
+  await f.write("README.md", "# after special temporary path\n");
+  const target = await f.commit("docs under special TEMP");
+  const result = await f.invoke(refLine(target, "docs", base)); passed(result);
+  assert.match(result.stdout, /documentation subset passed: 8 of 9 files/);
+  assert.ok(result.stdout.includes(temporary), "selection plan was not placed in the owned TEMP");
+  assert.equal((await f.records("docs")).length, 1);
+  assert.equal((await f.records("runtime")).length, 0);
+  assert.equal((await f.records("smoke")).length, 1);
+  assert.equal((await f.records("packs")).length, 1);
+  assert.equal(await readFile(lifecycle, "utf8"), "pretest\nposttest\n");
 });
