@@ -21,8 +21,16 @@ release-evidence records retain their original source, artifact, and capture pro
 npm ci
 npm run check      # syntax-check every tracked .mjs
 npm test           # the whole suite; refuses to pass on an empty file list
-npm pack && node scripts/verify-package.mjs   # what a user actually receives
+
+# Pack once outside the checkout, then verify that exact archive.
+set -o pipefail
+acc_package="$(mktemp -d "${TMPDIR:-/tmp}/acc-package.XXXXXX")"
+npm pack --pack-destination "$acc_package" &&
+  node scripts/verify-package.mjs "$acc_package"/*.tgz 2>&1 |
+  tee "$acc_package/verification.log"
 ```
+
+Keep `$acc_package` with the validation evidence. It contains the archive and the verification log, including its SHA-256 digest.
 
 On macOS outside CI, `npm test` skips fsync and runs more test files at once: each flush there
 is a 4 ms F_FULLFSYNC. `ACC_TEST_REAL_FSYNC=1 npm test` keeps every flush; CI always does.
