@@ -12,6 +12,12 @@ const repo = path.resolve(import.meta.dirname, "..", "..");
 const acc = path.join(repo, "bin", "acc.mjs");
 const hook = path.join(repo, "bin", "acc-hook.mjs");
 
+function runWriteHook(input, options) {
+  const child = run(process.execPath, [hook, "codex"], options);
+  child.child.stdin.end(input);
+  return child;
+}
+
 /**
  * A claim is a string, and a file has many spellings.
  *
@@ -22,7 +28,8 @@ const hook = path.join(repo, "bin", "acc-hook.mjs");
  * the symlink and the relative-target defects, arrived at from the claim side
  * instead of the target side.
  */
-export async function claimSpellingProject(t, { owner = "hook", hookEnv = {} } = {}) {
+export async function claimSpellingProject(t,
+  { owner = "hook", hookEnv = {}, runWrite = runWriteHook } = {}) {
   const base = await realpath(await mkdtemp(path.join(tmpdir(), "acc-spelling-")));
   t.after(() => rm(base, { recursive: true, force: true }));
   const env = await processFixtureEnv(base);
@@ -78,14 +85,27 @@ export async function claimSpellingProject(t, { owner = "hook", hookEnv = {} } =
     "--enforcement", "guarded", "--reason", "editing"],
   { env: { ...env, ...owners.holder } });
 
-  const write = file => {
-    const child = run(process.execPath, [hook, "codex"],
-      { env: { ...env, ACC_PARTICIPANT: "writer" }, cwd: base });
-    child.child.stdin.end(JSON.stringify({ hook_event_name: "PreToolUse",
+  const write = async file => {
+    // Only this executor is replaceable: startup and claim controls remain real.
+    const child = runWrite(JSON.stringify({ hook_event_name: "PreToolUse",
       session_id: "writer", cwd: root, tool_name: "apply_patch",
       tool_input: { command: `*** Begin Patch\n*** Update File: ${file}\n@@\n-a\n+b\n`
-        + "*** End Patch" } }));
-    return child.then(() => "allow", () => "deny");
+        + "*** End Patch" } }),
+    { env: { ...env, ACC_PARTICIPANT: "writer" }, cwd: base });
+    return child.then(({ stdout, stderr }) => {
+      if (stdout !== "" || stderr !== "") {
+        throw Object.assign(new Error("claim fixture: writer PreToolUse returned unexpected output"
+          + ` (exit 0; stdout: ${stdout.trim()}; stderr: ${stderr.trim()})`),
+        { code: 0, stdout, stderr });
+      }
+      return "allow";
+    }, error => {
+      const reason = typeof error.stderr === "string" ? error.stderr.trim() : "";
+      if (error.code === 2 && error.stdout === ""
+        && /^file:[^\r\n]+ is claimed by holder \(session [^\r\n)]+\)$/.test(reason)
+        && reason.endsWith(` (session ${owners.holder.ACC_SESSION})`)) return "deny";
+      throw error;
+    });
   };
   return { root, env, claim, write };
 }
