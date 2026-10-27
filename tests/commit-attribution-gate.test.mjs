@@ -5,7 +5,7 @@
 // the suite, and the two CLI modes the Lint job runs.
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
-import { chmod, mkdtemp, rm, stat, utimes, writeFile } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, readFile, rm, stat, utimes, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -331,6 +331,14 @@ test("only a clean HEAD tree can request full-suite receipt reuse", async t => {
   const stub = "#!/bin/sh\nif [ \"$2\" = -- ]; then echo 'receipt requested' >&2; "
     + "else echo 'suite required' >&2; fi\nexit 0\n";
   const { root, git, commit } = await scratch(t, { PATH: await stubNpmPath(t, stub) });
+  // A known full-suite runner contract permits --if-needed. Older or arbitrary
+  // npm scripts receive plain npm test instead of an unsupported extra option.
+  await mkdir(path.join(root, "scripts"));
+  for (const file of ["run-tests.mjs", "test-shards.mjs"]) {
+    await writeFile(path.join(root, "scripts", file), await readFile(path.join(repo, "scripts", file)));
+  }
+  await writeFile(path.join(root, "package.json"), JSON.stringify({ scripts: { test: "node scripts/run-tests.mjs" } }));
+  assert.equal((await commit("chore: known suite contract\n")).code, 0);
   const clean = await git(["push", "-q", "origin", "HEAD:refs/heads/clean"]);
   assert.equal(clean.code, 0, clean.stderr);
   assert.match(clean.stderr, /receipt requested/);
