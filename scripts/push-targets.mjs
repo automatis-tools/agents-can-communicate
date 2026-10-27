@@ -86,11 +86,11 @@ export async function resolvePushTrees(repo, refs) {
 // Optional executor/platform overrides are solely a command-boundary test seam;
 // production always uses native spawn/platform and fixed taskkill arguments.
 export function runPushCommand(file, args, { cwd, signal, input, quiet = false,
-  platform = process.platform, spawnCommand = spawn } = {}) {
+  platform = process.platform, spawnCommand = spawn, env = {} } = {}) {
   return new Promise((resolve, reject) => {
     if (signal?.aborted) { reject(Error("push validation interrupted")); return; }
     const windows = platform === "win32";
-    const child = spawnCommand(file, args, { cwd, env: pushEnvironment(), detached: !windows,
+    const child = spawnCommand(file, args, { cwd, env: { ...pushEnvironment(), ...env }, detached: !windows,
       shell: windows && file === "npm", stdio: ["pipe", "pipe", "pipe"] });
     let stdout = "";
     let stderr = "";
@@ -102,18 +102,18 @@ export function runPushCommand(file, args, { cwd, signal, input, quiet = false,
           let killer;
           try { killer = spawnCommand("taskkill", ["/pid", String(child.pid), "/t", "/f"], { stdio: "ignore" }); }
           catch { resolve(terminationFailure()); return; }
-          killer.once("error", () => resolve(terminationFailure()));
-          killer.once("close", code => resolve(code === 0 ? null : terminationFailure()));
+          const timeout = setTimeout(() => { killer.unref?.(); resolve(terminationFailure()); }, 2000);
+          killer.once("error", () => { clearTimeout(timeout); resolve(terminationFailure()); });
+          killer.once("close", code => { clearTimeout(timeout); resolve(code === 0 ? null : terminationFailure()); });
         });
       }
       else cancellation = stopPushProcessTree(child.pid);
-      // A denied kill may leave the child alive indefinitely. Report it now,
-      // release our handles, and let the checkout owner retain its directory.
+      // Teardown completion, not inherited pipe closure, bounds cancellation.
+      // The checkout owner retains interrupted resources even after confirmed kills.
       cancellation.then(error => {
-        if (!error) return;
         child.unref?.();
         for (const stream of [child.stdin, child.stdout, child.stderr]) stream.destroy();
-        reject(error);
+        reject(error ?? Error("push validation interrupted"));
       });
     };
     signal?.addEventListener("abort", abort, { once: true });

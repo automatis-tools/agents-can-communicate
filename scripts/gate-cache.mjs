@@ -268,7 +268,7 @@ export async function savePassed(kind, snapshot) {
       const now = Date.now();
       await Promise.all((await readdir(directory)).map(async name => {
         const candidate = path.join(directory, name);
-        if (/^(?:test|tests|syntax)-[a-f0-9]{64}\.json$/.test(name)
+        if (/^(?:test|test-docs|tests|syntax)-[a-f0-9]{64}\.json$/.test(name)
           && now - (await lstat(candidate)).mtimeMs > MAX_AGE) await rm(candidate, { force: true });
       })).catch(() => {});
     }
@@ -283,4 +283,17 @@ export async function savePassed(kind, snapshot) {
 export async function clearPassed(kind, snapshot) {
   const file = receiptFile(kind, snapshot);
   if (file) await rm(file, { force: true }).catch(() => {});
+}
+
+// A failed rerun must not leave a readable exact-key proof for a later process.
+// The optional removal seam permits portable denied-filesystem controls.
+export async function invalidateGateProofs(snapshot, { remove = rm } = {}) {
+  const failures = await Promise.all(["test", "test-docs"].map(async kind => {
+    const file = receiptFile(kind, snapshot);
+    if (!file) return false;
+    try { await remove(file, { force: true }); } catch { /* Read back even after denied removal. */ }
+    try { await lstat(file); return true; }
+    catch (error) { return error.code !== "ENOENT"; }
+  }));
+  if (failures.some(Boolean)) throw Error("existing gate proof could not be invalidated; validation did not start");
 }

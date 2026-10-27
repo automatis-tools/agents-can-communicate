@@ -12,9 +12,12 @@ import path from "node:path";
 
 import { TEST_FILE_CONCURRENCY, nodeTestArguments, skipsFsync, testBatches, testEnvironment,
   testFileTimeout } from "./test-runner-plan.mjs";
-import { runnerOptions, shardFiles } from "./test-shards.mjs";
-import { clearPassed, hasPassed, receiptDecision, savePassed, testFingerprint } from "./gate-cache.mjs";
+import { runnerOptions } from "./test-shards.mjs";
+import { invalidateGateProofs, hasPassed, receiptDecision, savePassed, testFingerprint } from "./gate-cache.mjs";
 import { gateIdentity, readGateTimings, writeGateDiagnostic } from "./gate-diagnostics.mjs";
+import { resolveTestSelection } from "./test-selection.mjs";
+import { verifyScopedPackage } from "./scoped-package.mjs";
+import { checkoutMatchesCommit } from "./push-tree-check.mjs";
 import { discoverTestFiles } from "./validation-discovery.mjs";
 import { runTestBatch } from "./test-process.mjs";
 import { createPackedTemplate } from "../tests/helpers/packed-template.mjs";
@@ -25,13 +28,16 @@ const invocationStarted = performance.now();
 
 let options;
 let files;
+let selection;
 try {
   options = runnerOptions(process.argv.slice(2));
   if (!options.list) {
     nodeTestArguments([]); // Validate test deadline before allocating fixtures.
     testFileTimeout();
   }
-  files = shardFiles(await discoverTestFiles(repo), options.shard);
+  selection = await resolveTestSelection({ repo, files: await discoverTestFiles(repo), options });
+  files = selection.files;
+  if (selection.fallbackReason) console.log(`test selection: ${selection.fallbackReason}; running full discovery`);
 } catch (error) {
   console.error(error.message);
   process.exit(2);
@@ -62,7 +68,8 @@ if (options.list) {
 const destination = process.env.ACC_GATE_DIAGNOSTIC
   ?? (process.env.ACC_TEST_TIMINGS ? `${process.env.ACC_TEST_TIMINGS}.manifest.json` : undefined);
 const identity = destination ? await gateIdentity(repo) : {};
-const context = { ...identity, platform: process.platform, node: process.version, scope: "full",
+const context = { ...identity, platform: process.platform, node: process.version, scope: selection.scope,
+  ...(selection.plan ? { planDigest: selection.plan.planDigest, selectionDigest: selection.plan.selectionDigest } : {}),
   ...(options.shard ? { shard: `${options.shard.part}/${options.shard.count}` } : {}),
   fileCount: files.length, concurrency: TEST_FILE_CONCURRENCY, fsyncMode: skipsFsync() ? "skipped" : "real" };
 const events = [];
@@ -82,22 +89,24 @@ async function execute() {
   const snapshot = await phase("fingerprint", () => process.env.CI ? null : testFingerprint(repo));
   inputDigest = snapshot?.key;
   events.at(-1).result = process.env.CI ? "ci-disabled" : snapshot ? "available" : "inputs-uncertain";
-  decision = await phase("cache-lookup", () => receiptDecision("test", snapshot));
+  decision = await phase("cache-lookup", () => receiptDecision(selection.kind, snapshot));
   events.at(-1).result = decision.reason;
   console.log(`test gate receipt: ${decision.reason}`);
   if (options.ifNeeded && decision.reused) {
-    console.log("test gate: unchanged files and environment already passed the full suite");
+    console.log(selection.scope === "docs" ? "documentation gate: unchanged files and environment already passed the documentation subset and package smoke"
+      : "test gate: unchanged files and environment already passed the full suite");
     outcome = "reused";
     return;
   }
   // A fresh failure must invalidate an older success for the same inputs.
-  await clearPassed("test", snapshot);
+  await invalidateGateProofs(snapshot);
   const reportDir = await mkdtemp(path.join(tmpdir(), "acc-test-report-"));
   const batches = testBatches(files.map(file => path.relative(repo, file)), {
     testOptions: { timings: path.join(reportDir, "batch-00000.jsonl") },
   });
   const failed = [];
   let template;
+  let retainTemplate = false;
   try {
     template = await phase("packed-template", () => createPackedTemplate());
     console.log(`packed template ready in ${(events.at(-1).durationMs / 1000).toFixed(2)} s`);
@@ -116,9 +125,16 @@ async function execute() {
         else records[existing] = result.timeoutRecord;
       }
     }
+    if (failed.length === 0 && selection.scope === "docs") {
+      await phase("package-smoke", () => verifyScopedPackage({ repo, template }));
+      console.log("documentation package smoke passed");
+    }
+  } catch (error) {
+    retainTemplate = error.code === "SCOPED_PACKAGE_RETAINED";
+    throw error;
   } finally {
     await phase("cleanup", async () => {
-      try { if (template !== undefined) await removeFixture(template); }
+      try { if (template !== undefined && !retainTemplate) await removeFixture(template); }
       finally { await removeFixture(reportDir); }
     });
   }
@@ -137,6 +153,7 @@ async function execute() {
     console.log(failed.length === 0 ? `all ${batches.length} batches passed`
       : `batch(es) ${failed.join(", ")} of ${batches.length} failed`);
   }
+  if (failed.length === 0 && selection.scope === "docs") console.log(`documentation subset passed: ${files.length} of ${selection.fullCount} files`);
   process.exitCode = failed.length === 0 ? 0 : 1;
   outcome = failed.length === 0 ? "passed" : "failed";
   if (failed.length === 0 && options.shard === null && snapshot !== null) {
@@ -145,9 +162,10 @@ async function execute() {
     let persistence = !after ? "inputs-uncertain" : snapshot.key !== after.key
       ? "fingerprint-changed" : "observation-changed";
     const start = performance.now();
-    if (snapshot.key === after?.key && snapshot.stamp === after.stamp) {
-      await savePassed("test", snapshot);
-      persistence = await hasPassed("test", snapshot) ? "saved" : "unavailable";
+    const checkoutValid = selection.scope !== "docs" || await checkoutMatchesCommit(repo, selection.plan.targetCommit);
+    if (snapshot.key === after?.key && snapshot.stamp === after.stamp && checkoutValid) {
+      await savePassed(selection.kind, snapshot);
+      persistence = await hasPassed(selection.kind, snapshot) ? "saved" : "unavailable";
     }
     console.log(`test gate receipt after run: ${persistence}`);
     events.push({ schema: 1, ...context, event: "receipt-persistence", durationMs: performance.now() - start,
