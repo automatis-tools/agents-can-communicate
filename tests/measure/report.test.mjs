@@ -48,6 +48,19 @@ test("ten alternating rounds with one hundred samples per side and valid work ar
   assert.equal(classify(run()).s.label, "benchmark");
 });
 
+test("a round without one child of each side does not count toward a benchmark", () => {
+  // Twenty samples per child: nine paired rounds would still hold enough samples.
+  const missing = run({ samples: 20 });
+  missing.children = missing.children.filter(child => !(child.round === 4 && child.side === "candidate"));
+  const verdict = classify(missing).s;
+  assert.equal(verdict.label, "smoke");
+  assert.match(verdict.reasons.join(), /1 round\(s\) without one child of each side/);
+  assert.match(verdict.reasons.join(), /9 paired rounds, 10 needed/);
+  const doubled = run({ samples: 20 });
+  doubled.children.push({ ...doubled.children.find(child => child.round === 2 && child.side === "baseline") });
+  assert.equal(classify(doubled).s.label, "smoke");
+});
+
 test("fewer rounds, fewer samples or no alternation make it smoke", () => {
   assert.equal(classify(run({ rounds: 9, samples: 20 })).s.label, "smoke");
   assert.equal(classify(run({ samples: 9 })).s.label, "smoke");

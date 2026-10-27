@@ -84,7 +84,12 @@ async function build(scenario, side) {
 }
 
 const capacity = value => value.operation === "exact" ? value.messages : Infinity;
-const prepare = async built => openInstance(built.fixture, built.side);
+async function prepare(built) {
+  const input = await openInstance(built.fixture, built.side);
+  // Every record written from here on is the measured call's.
+  built.generations = built.fixture.ids.count("generation");
+  return input;
+}
 
 async function operate(built, input) {
   const { fixture, scenario } = built;
@@ -117,14 +122,20 @@ const pageBytes = value => Buffer.byteLength(JSON.stringify(value, null, 2));
 
 // Receipts, events and other records after a call, against what the call may change.
 // `seen` is what the measured store showed before any other store opened.
-async function storeChanges(built, moved, seen) {
+async function storeChanges(built, moved, seen, written) {
   const failures = [], now = await receiptStates(built.fixture, built.side);
+  // A transition writes its receipt once, with the first generation the call takes;
+  // anything else writes nothing.
+  const transition = moved && moved.state !== built.receipts.get(moved.id)?.state;
+  if (written !== (transition ? 1 : 0)) failures.push(`inbox: the call wrote ${written} record(s), not ${transition ? 1 : 0}`);
   for (const [id, before] of built.receipts) {
     const after = now.get(id), expected = moved?.id === id ? moved.state : before.state;
+    const generation = transition && moved.id === id ? built.fixture.ids.nameOf("generation", built.generations + 1)
+      : before.generation;
     if (after === undefined) failures.push(`inbox: receipt for ${before.messageId} disappeared`);
     else if (after.state !== expected) failures.push(`inbox: ${before.messageId} is ${after.state}, not ${expected}`);
-    else if ((after.generation !== before.generation) !== (expected !== before.state)) {
-      failures.push(`inbox: receipt for ${before.messageId} was ${expected === before.state ? "rewritten" : "not rewritten"}`);
+    else if (after.generation !== generation) {
+      failures.push(`inbox: receipt for ${before.messageId} has generation ${after.generation}, not ${generation}`);
     }
   }
   for (const id of now.keys()) if (!built.receipts.has(id)) failures.push(`inbox: receipt ${id} appeared`);
@@ -135,7 +146,7 @@ async function storeChanges(built, moved, seen) {
   const others = await stateDigest(built.fixture, built.side, OTHER_KINDS);
   if (others !== built.others) failures.push("inbox: the call changed records other than receipts");
   built.others = others;
-  const wanted = moved && moved.state !== built.receipts.get(moved.id)?.state ? 1 : 0;
+  const wanted = transition ? 1 : 0;
   if (events.length !== wanted) failures.push(`inbox: the call published ${events.length} event(s), not ${wanted}`);
   else if (wanted === 1 && (events[0].type !== "message.retrieved" || events[0].payload?.messageId !== built.target.messageId)) {
     failures.push(`inbox: the call published ${events[0].type} for ${events[0].payload?.messageId}`);
@@ -145,7 +156,7 @@ async function storeChanges(built, moved, seen) {
   return failures;
 }
 
-async function validateExact(built, result, seen) {
+async function validateExact(built, result, seen, written) {
   const target = built.target, failures = [];
   const id = built.side.receiptId(target.messageId, "reader");
   const before = built.receipts.get(id)?.state;
@@ -164,12 +175,12 @@ async function validateExact(built, result, seen) {
       failures.push(`inbox: returned the receipt of ${receipt?.messageId} for ${receipt?.recipientParticipantId}`);
     } else if (receipt.state !== after) failures.push(`inbox: the returned receipt is ${receipt.state}, not ${after}`);
   }
-  failures.push(...await storeChanges(built, { id, state: after }, seen));
+  failures.push(...await storeChanges(built, { id, state: after }, seen, written));
   target.state = after;
   return failures;
 }
 
-async function validatePage(built, result, seen) {
+async function validatePage(built, result, seen, written) {
   const failures = [], { scenario } = built;
   const wanted = built.reader.filter(item => item.decision !== "superseded"
     && listable(built.receipts.get(built.side.receiptId(item.messageId, "reader"))?.state, item.obligation)).sort(newestFirst);
@@ -205,13 +216,15 @@ async function validatePage(built, result, seen) {
       failures.push(`inbox page: ${k} items where ${k + 1} fit the ${PAGE_BYTES}-byte page`);
     }
   }
-  return [...failures, ...await storeChanges(built, null, seen)];
+  return [...failures, ...await storeChanges(built, null, seen, written)];
 }
 
 // The measured store is read first: opening any other store finishes a journal the call left open.
 async function validate(built, result, input) {
+  const written = built.fixture.ids.count("generation") - built.generations;
   const seen = await visibleEvents(input.store, built.eventCursor);
-  return built.scenario.operation === "exact" ? validateExact(built, result, seen) : validatePage(built, result, seen);
+  return built.scenario.operation === "exact" ? validateExact(built, result, seen, written)
+    : validatePage(built, result, seen, written);
 }
 
 // What one call touched, measured on a separate untimed call of the code the child measures.
@@ -292,6 +305,14 @@ const exactMutations = {
   "rewrites-message": async operate => async (built, input) => {
     const result = await operate(built, input);
     await rewriteMessage(input.store, built.target.messageId);
+    return result;
+  },
+  // Retrieves the message, then writes its receipt again with the same state and no event.
+  "rewrites-receipt": async operate => async (built, input) => {
+    const result = await operate(built, input);
+    const id = built.side.receiptId(built.target.messageId, "reader");
+    await input.store.transaction(tx => { tx.put("receipt", id, tx.get("receipt", id), tx.generationOf("receipt", id)); },
+      { kinds: ["receipt"] });
     return result;
   },
   // Writes a message to the reader while reading one, so a receipt appears.

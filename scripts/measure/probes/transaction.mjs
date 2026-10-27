@@ -95,6 +95,13 @@ const capacity = value => value.messages;
 // decision. Finishing the step is the product's way; leaving it to the next store
 // that opens is a read-only one, and both are correct.
 async function prepare(built) {
+  const input = await prepareCall(built);
+  // Every record written from here on is the measured call's.
+  built.generations = built.fixture.ids.count("generation");
+  return input;
+}
+
+async function prepareCall(built) {
   const { fixture, side, scenario } = built;
   if (scenario.operation === "write") return openInstance(fixture, side);
   const message = built.messages[built.next];
@@ -106,11 +113,15 @@ async function prepare(built) {
     fixture.clock.advance(1_000);
     const crash = async point => { if (point === "after-journal") throw new Error("probe crash"); };
     const { service } = await openInstance(fixture, side, { failAt: crash });
+    const before = fixture.ids.count("generation");
     await step.run(service, fixture, message.messageId).then(() => { throw new Error("the step did not stop at its journal"); },
       error => { if (error.message !== "probe crash") throw error; });
+    if (fixture.ids.count("generation") !== before + 1) throw new Error("the stopped step wrote other than its receipt");
     built.states.set(message.messageId, step.next);
     built.pending = { messageId: message.messageId, event: step.event, published: false };
-    built.moved = { id: side.receiptId(message.messageId, "reader"), state: step.next };
+    // The receipt the journal decided, generation and all: finishing it writes nothing new.
+    built.moved = { id: side.receiptId(message.messageId, "reader"), state: step.next,
+      generation: fixture.ids.nameOf("generation", before + 1) };
     return measured;
   }
   if (step !== undefined) {
@@ -134,6 +145,9 @@ async function operate(built, input) {
 
 async function validate(built, result, input) {
   const failures = [], { fixture, side } = built, write = built.scenario.operation === "write";
+  // A write writes its receipt once; a read writes nothing, finishing a stopped step included.
+  const written = fixture.ids.count("generation") - built.generations;
+  if (written !== (write ? 1 : 0)) failures.push(`transaction: the call wrote ${written} record(s), not ${write ? 1 : 0}`);
   const expected = write ? "offered" : built.states.get(built.target);
   if (result?.messageId !== built.target || result?.recipientParticipantId !== "reader" || result?.state !== expected) {
     failures.push(`transaction: returned ${result?.messageId} ${result?.state}, not ${built.target} ${expected}`);
@@ -164,11 +178,15 @@ async function validate(built, result, input) {
     }
   }
   const now = await receiptStates(fixture, side);
-  const moved = write ? { id: side.receiptId(built.target, "reader"), state: "offered" } : built.moved;
+  const moved = write ? { id: side.receiptId(built.target, "reader"), state: "offered",
+    generation: fixture.ids.nameOf("generation", built.generations + 1) } : built.moved;
   for (const [id, before] of built.receipts) {
     const after = now.get(id);
     if (id === moved?.id) {
       if (after?.state !== moved.state) failures.push(`transaction: ${before.messageId} is ${after?.state}, not ${moved.state}`);
+      else if (after.generation !== moved.generation) {
+        failures.push(`transaction: ${before.messageId} has generation ${after.generation}, not ${moved.generation}`);
+      }
     } else if (after?.state !== before.state || after?.generation !== before.generation) {
       failures.push(`transaction: an unrelated receipt for ${before.messageId} changed`);
     }
@@ -230,6 +248,12 @@ const readMutations = {
     await rewriteMessage(input.store, built.target);
     return result;
   },
+  // Rewrites the target receipt as it stands after a correct read.
+  "rewrites-receipt": async operate => async (built, input) => {
+    const result = await operate(built, input);
+    await rewriteReceipt(input.store, built.side.receiptId(built.target, "reader"));
+    return result;
+  },
   // Answers without reading the store at all.
   "constant-state": async () => async built => {
     const message = built.messages[built.next++];
@@ -237,6 +261,10 @@ const readMutations = {
     return { messageId: message.messageId, recipientParticipantId: "reader", state: "queued" };
   },
 };
+// The same record once more, in a transaction of its own and without an event.
+const rewriteReceipt = (store, id) => store.transaction(tx => {
+  tx.put("receipt", id, tx.get("receipt", id), tx.generationOf("receipt", id));
+}, { kinds: ["receipt"] });
 const rewriteMessage = (store, messageId) => store.transaction(tx => {
   tx.put("message", messageId, { ...tx.get("message", messageId), body: "rewritten" }, tx.generationOf("message", messageId));
 }, { kinds: ["message"] });
@@ -271,6 +299,12 @@ const writeMutations = {
     built.target = message.messageId;
     await stopAfterJournal(built.fixture, built.side, service => service.recordOfferSucceeded(offer(built.fixture, message.messageId)));
     return { messageId: message.messageId, recipientParticipantId: "reader", state: "offered" };
+  },
+  // Offers the message, then writes its receipt again with the same state.
+  "rewrites-receipt": async operate => async (built, input) => {
+    const result = await operate(built, input);
+    await rewriteReceipt(input.store, built.side.receiptId(built.target, "reader"));
+    return result;
   },
   "wrong-target": async () => async (built, input) => {
     const intended = built.messages[built.next], other = built.messages[built.next + 1];

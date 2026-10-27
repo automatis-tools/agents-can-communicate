@@ -40,7 +40,10 @@ so before any other instance opens, a validator reads the events that the measur
 shows. A call that left its own work behind a journal shows fewer events than the store holds
 after recovery, and fails. Every other record kind - workspace, participants, sessions,
 intents, claims and messages - must be as it was after every call, generation included: a
-rewrite with the same content is still a write. A probe states how many calls
+rewrite with the same content is still a write. The fixture's id generator hands a store each
+record's generation, so a validator knows how many records a call wrote and which generation
+the record it moved must carry: an exact read with a transition and a write write their receipt
+once, and every read, finishing a stopped step included, writes nothing. A probe states how many calls
 a scenario allows. The runner refuses a scenario too small for its warm-up calls, samples and observed call
 before anything runs.
 
@@ -155,15 +158,16 @@ Each probe ships mutations that wrap a correct implementation and break it in on
 - inbox exact: read the wrong message, skip the receipt transition, move the receipt without its
   event, return a summary for the body, move an unrelated receipt, return an extra item, return
   another message's receipt, create a receipt, leave the retrieval behind its journal, rewrite
-  the message;
+  the message, write the receipt a second time;
 - inbox page: drop the last item, return an empty page, advance receipts, reverse the order,
   return a garbage cursor, ignore receipt states, return one item fewer than fits (with a limit
   of 1, the empty page), fill the page past the byte budget (and past the limit when the limit
   ends it first), rewrite a message, carry the bodies, list a replaced decision;
 - transaction: commit on a read, return the wrong receipt, advance a receipt on a read, answer
-  from the receipts as built, answer a constant state without reading, rewrite the message, read
-  the record past a pending journal, skip a write's commit, commit twice, leave a write behind its
-  journal, write to the wrong target.
+  from the receipts as built, answer a constant state without reading, rewrite the message,
+  rewrite the receipt, read the record past a pending journal, skip a write's commit, commit
+  twice, write the receipt a second time, leave a write behind its journal, write to the wrong
+  target.
 
 The test suite runs every mutation through the validator and requires each one to fail. Correct
 alternative implementations must pass: an attention computation that groups the receipts by
@@ -217,8 +221,8 @@ round still moves that round's ratio, which the range shows. The pooled medians 
 equal code when load changes during a run; the median paired ratio is the comparison to read.
 `node scripts/measure/report.mjs <run.json>` renders a recorded run's report again. It labels each
 figure:
-- **Benchmark**: both sides valid, alternated over at least ten rounds, and at least one hundred
-  samples per side.
+- **Benchmark**: both sides valid, alternated over at least ten rounds that each hold exactly
+  one child of each side, and at least one hundred samples per side in those rounds.
 - **Smoke**: valid, but short of that.
 - **Diagnostic**: operation counts. They are nearly deterministic: bytes read vary slightly with
   the width of the process ids a fixture records. They are never benchmark results.

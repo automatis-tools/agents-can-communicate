@@ -16,13 +16,22 @@ export function fixedClock(start = START) {
     advance: milliseconds => { current += milliseconds; return new Date(current).toISOString(); } };
 }
 
+// A store writes each record with a generation from `next("generation")`, so how far
+// that counter moved during a call is how many records the call wrote.
 export function fixedIds(prefix = "") {
   const counters = new Map();
-  return { next(kind) {
-    const value = (counters.get(kind) ?? 0) + 1;
-    counters.set(kind, value);
-    return `${kind}_${prefix}${pad(value)}`;
-  } };
+  const name = (kind, value) => `${kind}_${prefix}${pad(value)}`;
+  return {
+    next(kind) {
+      const value = (counters.get(kind) ?? 0) + 1;
+      counters.set(kind, value);
+      return name(kind, value);
+    },
+    /** How many ids of this kind have been handed out. */
+    count: kind => counters.get(kind) ?? 0,
+    /** The id handed out as the `value`th of this kind. */
+    nameOf: name,
+  };
 }
 
 const module = (root, ...parts) => import(pathToFileURL(path.join(root, "packages", ...parts)).href);

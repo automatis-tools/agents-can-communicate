@@ -49,13 +49,17 @@ export function classify(run) {
     if (new Set(children.filter(child => !child.error).map(child => child.fixtureDigest)).size > 1) {
       reasons.push("the sides' fixtures differ");
     }
-    const rounds = new Set(children.map(child => child.round)).size;
-    const firsts = new Set([...new Set(children.map(child => child.round))]
-      .map(round => children.find(child => child.round === round)?.side));
-    const samples = side => children.filter(child => child.side === side)
+    // A round counts only with exactly one child of each side: the pair is what a round compares.
+    const all = [...new Set(children.map(child => child.round))];
+    const paired = all.filter(round => ["baseline", "candidate"].every(side =>
+      children.filter(child => child.round === round && child.side === side).length === 1));
+    const rounds = paired.length;
+    const firsts = new Set(paired.map(round => children.find(child => child.round === round)?.side));
+    const samples = side => children.filter(child => child.side === side && paired.includes(child.round))
       .reduce((total, child) => total + child.samplesNs.length, 0);
     const short = [];
-    if (rounds < BENCHMARK.rounds) short.push(`${rounds} rounds, ${BENCHMARK.rounds} needed`);
+    if (paired.length < all.length) short.push(`${all.length - paired.length} round(s) without one child of each side`);
+    if (rounds < BENCHMARK.rounds) short.push(`${rounds} paired rounds, ${BENCHMARK.rounds} needed`);
     if (firsts.size < 2) short.push("the order never alternated");
     for (const side of ["baseline", "candidate"]) {
       if (samples(side) < BENCHMARK.samplesPerSide) short.push(`${side} has ${samples(side)} samples, ${BENCHMARK.samplesPerSide} needed`);
