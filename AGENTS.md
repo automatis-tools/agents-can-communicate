@@ -84,6 +84,11 @@ its absence cannot be established, validation stops before execution with a fixe
 Syntax checks likewise reuse only successful parses of identical files with the same Node/options.
 Commit-message and pushed-history checks always run.
 
+Codex changes `CODEX_TOOL_CALL_ID` between tool executions, so the complete-environment fingerprint
+intentionally misses across those executions. Keep validation and push in one shell invocation,
+for example `npm test && git push`, to keep that metadata stable. All other reuse safeguards still
+apply, including matching scope, bytes, dependencies, Node and environment, and a receipt within 24 hours.
+
 CI executes its existing full gates and never reuses local suite receipts. This local optimization
 does not change GitHub routing. Windows runs `npm test -- --shard 1/2` and `2/2`. Their union is
 the whole discovered list, and the existing Windows check requires both to pass.
