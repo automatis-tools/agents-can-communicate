@@ -6,7 +6,7 @@
 // strip those quotes and expand the glob; PowerShell does not, and Node exits 0
 // when a pattern matches nothing. The Windows CI job therefore ran zero tests
 // and reported success - green, and testing nothing.
-import { mkdir, mkdtemp, readdir, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
@@ -15,30 +15,13 @@ import { TEST_FILE_CONCURRENCY, nodeTestArguments, skipsFsync, testBatches, test
 import { runnerOptions, shardFiles } from "./test-shards.mjs";
 import { clearPassed, hasPassed, receiptDecision, savePassed, testFingerprint } from "./gate-cache.mjs";
 import { gateIdentity, readGateTimings, writeGateDiagnostic } from "./gate-diagnostics.mjs";
+import { discoverTestFiles } from "./validation-discovery.mjs";
 import { runTestBatch } from "./test-process.mjs";
 import { createPackedTemplate } from "../tests/helpers/packed-template.mjs";
 import { removeFixture } from "../tests/helpers/fixture-cleanup.mjs";
 
 const repo = path.resolve(import.meta.dirname, "..");
 const invocationStarted = performance.now();
-
-// Everything that ships or guards. node_modules is not ours.
-const ROOTS = ["tests", "packages"];
-const SKIP = new Set(["node_modules", ".git"]);
-
-async function collect(root) {
-  const found = [];
-  const walk = async directory => {
-    for (const entry of await readdir(directory, { withFileTypes: true })) {
-      if (SKIP.has(entry.name)) continue;
-      const full = path.join(directory, entry.name);
-      if (entry.isDirectory()) await walk(full);
-      else if (entry.name.endsWith(".test.mjs")) found.push(full);
-    }
-  };
-  await walk(path.join(repo, root));
-  return found;
-}
 
 let options;
 let files;
@@ -48,7 +31,7 @@ try {
     nodeTestArguments([]); // Validate test deadline before allocating fixtures.
     testFileTimeout();
   }
-  files = shardFiles((await Promise.all(ROOTS.map(collect))).flat().sort(), options.shard);
+  files = shardFiles(await discoverTestFiles(repo), options.shard);
 } catch (error) {
   console.error(error.message);
   process.exit(2);

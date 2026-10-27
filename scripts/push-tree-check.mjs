@@ -50,7 +50,7 @@ function gitEnvironment() {
 
 export async function checkoutMatchesCommit(repo, commit) {
   try {
-    const git = async args => (await run("git", ["-C", repo, ...args],
+    const git = async args => (await run("git", ["--no-replace-objects", "-C", repo, ...args],
       { env: gitEnvironment(), maxBuffer: 64 * 1024 * 1024 })).stdout;
     const root = (await git(["rev-parse", "--show-toplevel"])).trim();
     const format = (await git(["rev-parse", "--show-object-format"])).trim();
