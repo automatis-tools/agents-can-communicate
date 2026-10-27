@@ -27,19 +27,39 @@ test("the current attention computation does the useful work", async () => {
   assert.deepEqual(await attention.validate(built, await attention.operate(built)), []);
 });
 
-test("fully acknowledged history is expected to stay quiet", async () => {
+test("fully acknowledged history stays quiet beside the witnesses every scenario carries", async () => {
   const side = await attention.load(repo);
   const quiet = await attention.build(attention.scenario({ ...scenario, acknowledgedShare: 1 }), side);
-  assert.deepEqual(quiet.expected, []);
+  assert.deepEqual(quiet.expected.map(item => item.sourceId).filter(id => !id.includes("witness")), []);
+  assert.equal(quiet.expected.length, 2 * scenario.witnesses);
   assert.deepEqual(await attention.validate(quiet, await attention.operate(quiet)), []);
+  for (const [name, mutate] of Object.entries(attention.mutations)) {
+    const failures = await attention.validate(quiet, await (await mutate(attention.operate, { side, scenario: quiet.scenario }))(quiet));
+    assert.notDeepEqual(failures, [], `${name} passed on quiet history`);
+  }
+});
+
+test("a scenario that expects nothing is refused, since a constant answer would pass it", async () => {
+  const side = await attention.load(repo);
+  const empty = await attention.build(attention.scenario({ ...scenario, acknowledgedShare: 1, witnesses: 0 }), side);
+  assert.match((await attention.validate(empty, [])).join(), /expects nothing/);
+});
+
+test("each call reads its own copy of the snapshot", async () => {
+  const side = await attention.load(repo);
+  const built = await attention.build(scenario, side);
+  const first = attention.prepare(built), second = attention.prepare(built);
+  assert.notEqual(first.snapshot, second.snapshot);
+  assert.notEqual(first.snapshot.receipts, built.snapshot.receipts);
+  assert.deepEqual(first.snapshot, built.snapshot);
 });
 
 test("a correct computation that walks the records in another order passes", async () => {
   const side = await attention.load(repo);
   const built = await attention.build(scenario, side);
-  const reversed = { ...built, snapshot: { ...built.snapshot,
+  const reversed = { snapshot: { ...built.snapshot,
     messages: [...built.snapshot.messages].reverse(), receipts: [...built.snapshot.receipts].reverse() } };
-  assert.deepEqual(await attention.validate(built, await attention.operate(reversed)), []);
+  assert.deepEqual(await attention.validate(built, await attention.operate(built, reversed)), []);
 });
 
 test("every negative mutation fails validation", async () => {

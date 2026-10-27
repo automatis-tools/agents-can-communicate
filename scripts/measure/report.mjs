@@ -34,9 +34,12 @@ export function classify(run) {
     for (const side of ["baseline", "candidate"]) {
       const own = children.filter(child => child.side === side);
       if (own.length === 0) reasons.push(`${side} has no runs`);
+      if (own.some(child => child.error)) reasons.push(`${side} child failed`);
       if (own.some(child => child.validation.length > 0)) reasons.push(`${side} failed validation`);
     }
-    if (new Set(children.map(child => child.fixtureDigest)).size > 1) reasons.push("the sides' fixtures differ");
+    if (new Set(children.filter(child => !child.error).map(child => child.fixtureDigest)).size > 1) {
+      reasons.push("the sides' fixtures differ");
+    }
     const rounds = new Set(children.map(child => child.round)).size;
     const firsts = new Set([...new Set(children.map(child => child.round))]
       .map(round => children.find(child => child.round === round)?.side));
@@ -67,14 +70,25 @@ const flat = (value, prefix = "") => Object.entries(value ?? {}).flatMap(([key, 
 export function renderReport(run) {
   const labels = classify(run), lines = [];
   lines.push(`# Cost comparison: ${run.probe}`, "");
-  lines.push(`- Baseline: ${run.sides.baseline.label}${run.sides.baseline.commit ? ` (${run.sides.baseline.commit})` : ""}`);
-  lines.push(`- Candidate: ${run.sides.candidate.label}${run.sides.candidate.commit ? ` (${run.sides.candidate.commit})` : ""}`);
+  const side = value => [value.ref && `\`${value.ref}\``, value.commit, value.dirty && "dirty",
+    value.sourcesHash && `sources \`${value.sourcesHash}\``].filter(Boolean).join(", ");
+  lines.push(`- Baseline: ${side(run.sides.baseline)}`, `- Candidate: ${side(run.sides.candidate)}`);
+  if (run.candidateMutation) lines.push(`- Candidate mutation: \`${run.candidateMutation}\` (a negative control)`);
+  if (run.harness) lines.push(`- Harness: ${run.harness.commit}${run.harness.dirty ? ", dirty" : ""}`);
   if (run.host) lines.push(`- Host: ${[run.host.node, run.host.os, run.host.arch, run.host.cpuModel, run.host.cores && `${run.host.cores} cores`].filter(Boolean).join(", ")}`);
-  if (run.durability) lines.push(`- Durability: fsync: ${run.durability.fsync}`);
+  if (run.durability) lines.push(`- Durability: fsync: ${run.durability.fsync}${run.durability.nodeOptions ? `; NODE_OPTIONS \`${run.durability.nodeOptions}\`` : ""}`);
   lines.push(`- Settings: ${run.settings.rounds} rounds, ${run.settings.samples} samples per child, ${run.settings.warmup} warm-up calls`, "");
   for (const { hash, scenario } of run.scenarios) {
     const verdict = labels[hash], children = run.children.filter(child => child.scenarioHash === hash);
     lines.push(`## ${JSON.stringify(scenario)}`, "", `Scenario hash \`${hash}\`. **${verdict.label}**${verdict.reasons.length ? `: ${verdict.reasons.join("; ")}` : ""}.`, "");
+    for (const name of ["baseline", "candidate"]) {
+      const digests = [...new Set(children.filter(child => child.side === name && child.fixtureDigest).map(child => child.fixtureDigest))];
+      if (digests.length) lines.push(`- ${name} fixture: ${digests.map(value => `\`${value}\``).join(", ")}`);
+    }
+    const problems = children.flatMap(child => [child.error, ...child.validation.slice(0, 3)]
+      .filter(Boolean).map(text => `round ${child.round} ${child.side}: ${text}`));
+    if (problems.length) lines.push("", "Problems:", "", ...[...new Set(problems)].slice(0, 12).map(text => `- ${text}`));
+    lines.push("");
     lines.push("| Side | n | median ms | IQR ms | min ms | max ms | p95 ms | p99 ms |", "|---|---:|---:|---:|---:|---:|---:|---:|");
     const tails = [];
     for (const side of ["baseline", "candidate"]) {

@@ -8,6 +8,10 @@ import transaction from "../../scripts/measure/probes/transaction.mjs";
 const repo = path.resolve(import.meta.dirname, "..", "..");
 const read = transaction.scenario({ messages: 6, events: 40, operation: "read", seed: 5 });
 const write = transaction.scenario({ messages: 6, events: 40, operation: "write", seed: 5 });
+const journal = transaction.scenario({ messages: 6, events: 40, operation: "read", pendingJournal: true, seed: 5 });
+
+const call = async (value, operate = transaction.operate) =>
+  transaction.validate(value, await operate(value, await transaction.prepare(value)));
 
 async function built(t, scenario) {
   const side = await transaction.load(repo);
@@ -26,27 +30,33 @@ test("the fixture holds the messages and at least the events the scenario names"
 
 test("a read returns the receipt's state and commits no event", async t => {
   const value = await built(t, read);
-  for (let call = 0; call < 3; call++) {
-    assert.deepEqual(await transaction.validate(value, await transaction.operate(value)), [], `call ${call}`);
+  for (let index = 0; index < 3; index++) {
+    assert.deepEqual(await call(value), [], `call ${index}`);
   }
 });
 
 test("a write commits exactly one event, with the next sequence", async t => {
   const value = await built(t, write);
-  for (let call = 0; call < 3; call++) {
-    assert.deepEqual(await transaction.validate(value, await transaction.operate(value)), [], `call ${call}`);
+  for (let index = 0; index < 3; index++) {
+    assert.deepEqual(await call(value), [], `call ${index}`);
   }
 });
 
+test("a read after a write stopped at its journal sees the decision, and commits nothing of its own", async t => {
+  const value = await built(t, journal);
+  for (let index = 0; index < 8; index++) assert.deepEqual(await call(value), [], `call ${index}`);
+  assert.equal(value.pending.published, true, "the decided event was published once");
+});
+
 test("every negative mutation for each operation fails validation", async t => {
-  for (const scenario of [read, write]) {
+  for (const scenario of [read, write, journal]) {
     const mutations = transaction.mutationsFor(scenario);
     assert.ok(Object.keys(mutations).length >= 3, scenario.operation);
     for (const [name, mutate] of Object.entries(mutations)) {
       const value = await built(t, scenario);
-      const operate = await mutate(transaction.operate, { side: value.side, scenario });
-      const failures = await transaction.validate(value, await operate(value));
-      assert.notDeepEqual(failures, [], `${scenario.operation}/${name} passed validation`);
+      const failures = await call(value, await mutate(transaction.operate, { side: value.side, scenario }));
+      const label = `${scenario.operation}${scenario.pendingJournal ? " after a stopped write" : ""}/${name}`;
+      assert.notDeepEqual(failures, [], `${label} passed validation`);
     }
   }
 });

@@ -57,6 +57,13 @@ test("failed validation or different fixtures make the comparison invalid", () =
   assert.match(classify(run({ digests: ["a", "b"] })).s.reasons.join(), /fixtures differ/);
 });
 
+test("a child that failed makes its comparison invalid, and the report says why", () => {
+  const value = run();
+  value.children[0] = { ...value.children[0], error: "baseline child timed out after 1 ms", samplesNs: [] };
+  assert.match(classify(value).s.reasons.join(), /baseline child failed/);
+  assert.match(renderReport({ ...value, candidateMutation: "drop-one" }), /timed out after 1 ms[\s\S]*drop-one|drop-one[\s\S]*timed out after 1 ms/);
+});
+
 test("the report labels each figure and names a tail it cannot support", () => {
   const text = renderReport({ ...run({ rounds: 2, samples: 5 }), host: { node: "v26.5.1", cpuModel: "test" },
     durability: { fsync: "real" } });

@@ -35,7 +35,10 @@ test("a short attention comparison alternates its sides and records what makes i
   for (const key of ["node", "v8", "os", "release", "arch", "cpuModel", "cores", "memoryBytes"]) {
     assert.ok(run.host[key] !== undefined, key);
   }
+  assert.match(run.harness.commit, /^[0-9a-f]{40}$/);
+  assert.equal(typeof run.harness.dirty, "boolean");
   assert.equal(run.durability.fsync, "real");
+  assert.doesNotMatch(run.durability.nodeOptions, /test-skip-fsync/);
   for (const item of run.children) {
     assert.deepEqual(item.validation, []);
     assert.equal(item.samplesNs.length, 3);
@@ -44,6 +47,7 @@ test("a short attention comparison alternates its sides and records what makes i
   }
   assert.match(report, /\*\*smoke\*\*/);
   assert.match(report, /insufficient evidence/);
+  assert.match(report, new RegExp(run.sides.baseline.sourcesHash));
 });
 
 test("a store probe runs in the same way, with durability as asked", async t => {
@@ -51,6 +55,7 @@ test("a store probe runs in the same way, with durability as asked", async t => 
     "--rounds", "2", "--samples", "2", "--warmup", "1", "--fsync", "skipped"]);
   assert.equal(child.code, 0, child.stderr);
   assert.equal(run.durability.fsync, "skipped");
+  assert.match(run.durability.nodeOptions, /--import file:/);
   assert.ok(run.children.every(item => item.validation.length === 0), JSON.stringify(run.children.map(item => item.validation)));
   assert.ok(run.children.every(item => item.observations.enumerations !== undefined));
 });
@@ -61,4 +66,22 @@ test("a candidate that skips work makes the comparison invalid", async t => {
   assert.equal(child.code, 1, child.stdout);
   assert.ok(run.children.some(item => item.side === "candidate" && item.validation.length > 0));
   assert.match(report, /\*\*invalid\*\*: candidate failed validation/);
+});
+
+test("a scenario too small for its calls is refused before anything runs", async t => {
+  const { child, run } = await measure(t, ["--probe", "inbox", "--set", "operation=exact", "--set", "messages=3",
+    "--set", "backlog=0", "--rounds", "1", "--samples", "5", "--warmup", "1"]);
+  assert.equal(child.code, 2, child.stdout);
+  assert.match(child.stderr, /needs 7 calls, and the scenario allows 3/);
+  assert.equal(run, null);
+});
+
+test("a child that fails or overruns is recorded, the run is still written, and it is invalid", async t => {
+  const { child, run, report } = await measure(t, ["--probe", "attention", "--set", "ownRequests=20",
+    "--rounds", "1", "--samples", "2", "--warmup", "1", "--timeout-ms", "1"]);
+  assert.equal(child.code, 1, child.stdout);
+  assert.equal(run.children.length, 2);
+  assert.ok(run.children.every(item => /timed out/.test(item.error)), JSON.stringify(run.children));
+  assert.match(report, /\*\*invalid\*\*/);
+  assert.match(report, /timed out/);
 });

@@ -16,12 +16,12 @@ export function fixedClock(start = START) {
     advance: milliseconds => { current += milliseconds; return new Date(current).toISOString(); } };
 }
 
-export function fixedIds() {
+export function fixedIds(prefix = "") {
   const counters = new Map();
   return { next(kind) {
     const value = (counters.get(kind) ?? 0) + 1;
     counters.set(kind, value);
-    return `${kind}_${pad(value)}`;
+    return `${kind}_${prefix}${pad(value)}`;
   } };
 }
 
@@ -34,38 +34,68 @@ export async function loadStoreSide(root) {
   return { root, openFilesystemStore, createCoordinationService, receiptId };
 }
 
+/** A new store and service on an existing root, as a fresh hook process would open them. */
+export async function openInstance(fixture, side, options = {}) {
+  const store = await side.openFilesystemStore({ root: fixture.root, workspaceId: WORKSPACE,
+    clock: fixture.clock, ids: fixture.ids, ...options });
+  return { store, service: side.createCoordinationService({ store, clock: fixture.clock, ids: fixture.ids }) };
+}
+
 /** A store, its service and open sessions for each participant named. */
 export async function openStoreFixture(side, participants, prefix) {
   const root = await realpath(await mkdtemp(path.join(tmpdir(), `acc-probe-${prefix}-`)));
   const clock = fixedClock(), ids = fixedIds();
-  const store = await side.openFilesystemStore({ root, workspaceId: WORKSPACE, clock, ids });
-  const service = side.createCoordinationService({ store, clock, ids });
-  const sessions = {};
+  const fixture = { root, clock, ids, sessions: {} };
+  Object.assign(fixture, await openInstance(fixture, side));
   for (const participantId of participants) {
-    sessions[participantId] = await service.openSession({ workspaceId: WORKSPACE, participantId,
+    fixture.sessions[participantId] = await fixture.service.openSession({ workspaceId: WORKSPACE, participantId,
       harness: "probe", heartbeatCadenceMs: 60_000 });
   }
-  return { root, clock, ids, store, service, sessions,
-    owner: participant => ({ workspaceId: WORKSPACE, sessionId: sessions[participant].sessionId,
-      generation: sessions[participant].generation }),
-    dispose: () => rm(root, { recursive: true, force: true }) };
+  fixture.owner = participant => ({ workspaceId: WORKSPACE, sessionId: fixture.sessions[participant].sessionId,
+    generation: fixture.sessions[participant].generation });
+  fixture.dispose = () => rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+  return fixture;
 }
 
-/** Every receipt with its generation, read through the side's store. */
+/** Every receipt with its generation, read through a fresh store: a cache in the measured one proves nothing. */
 export async function receiptStates(fixture, side) {
-  return fixture.store.transaction(tx => new Map(tx.list("receipt").map(receipt => {
+  const { store } = await openInstance(fixture, side);
+  return store.transaction(tx => new Map(tx.list("receipt").map(receipt => {
     const id = side.receiptId(receipt.messageId, receipt.recipientParticipantId);
     return [id, { messageId: receipt.messageId, recipient: receipt.recipientParticipantId,
       state: receipt.state, generation: tx.generationOf("receipt", id) }];
   })), { kinds: ["receipt"] });
 }
 
-/** A digest of the primary records' meaning: messages and receipts, not their file layout. */
-export async function primaryDigest(fixture) {
-  return fixture.store.transaction(tx => digest({
+/** Published events after a cursor, read through a fresh store. */
+export async function eventsAfter(fixture, side, cursor) {
+  const { store } = await openInstance(fixture, side);
+  const events = [];
+  for (let after = cursor; ;) {
+    const page = await store.eventsSince(WORKSPACE, after, 500);
+    events.push(...page.events);
+    if (page.events.length === 0) return { events, cursor: after };
+    after = page.cursor;
+  }
+}
+
+/** A digest of what the records mean - sessions, messages, receipts and the event log - not their file layout. */
+export async function primaryDigest(fixture, side) {
+  const { store } = await openInstance(fixture, side);
+  const records = await store.transaction(tx => ({
+    // Ordered by participant: session ids are random, and would order differently each build.
+    sessions: tx.list("session").map(session => [session.participantId, session.sessionId, session.state]).sort(),
     messages: tx.list("message").map(message => [message.messageId, message.fromParticipantId,
-      message.toParticipantIds, message.kind, message.obligation, message.subject, message.sentAt]).sort(),
+      message.toParticipantIds, message.kind, message.obligation, message.subject, message.body, message.sentAt]).sort(),
     receipts: tx.list("receipt").map(receipt => [receipt.messageId, receipt.recipientParticipantId,
       receipt.state]).sort(),
-  }), { kinds: ["message", "receipt"] });
+  }), { kinds: ["session", "message", "receipt"] });
+  const { events } = await eventsAfter(fixture, side, null);
+  // Session ids and generations are random by design; each is named by its participant.
+  let text = JSON.stringify({ ...records, events: events.map(event =>
+    [event.sequence, event.type, event.actorSessionId, event.payload]) });
+  for (const [participant, session] of Object.entries(fixture.sessions)) {
+    text = text.replaceAll(session.sessionId, `session:${participant}`).replaceAll(session.generation, `generation:${participant}`);
+  }
+  return digest(text);
 }
