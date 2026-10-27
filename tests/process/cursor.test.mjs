@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
-import { mkdir, mkdtemp, realpath, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, readdir, realpath, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import test from "node:test";
+import test, { after } from "node:test";
 import { promisify } from "node:util";
 
 import { EXIT } from "@agents-can-communicate/protocol";
@@ -51,9 +51,53 @@ async function workspace(t) {
   return { project, env, cli, session, syncFrom, syncScope };
 }
 
+// Only rejected inputs share this fixture: they must not change its durable
+// authorities. Valid syncs and hooks keep independent workspaces.
+async function durableState(place) {
+  const root = path.join(place.env.ACC_DATA_HOME, "acc", "workspaces");
+  const files = [];
+  for (const workspace of await readdir(root)) {
+    for (const area of ["state", "events", "journal", path.join("retained", "state")]) {
+      const directory = path.join(root, workspace, area);
+      const entries = await readdir(directory, { recursive: true, withFileTypes: true })
+        .catch(error => { if (error.code === "ENOENT") return []; throw error; });
+      for (const entry of entries) {
+        if (!entry.isFile()) continue;
+        const file = path.join(entry.parentPath, entry.name);
+        files.push([path.relative(root, file), await readFile(file)]);
+      }
+    }
+    // The event floor is durable despite living beside transient lock files.
+    for (const name of ["protocol.json", path.join("locks", "retention.json")]) {
+      const file = path.join(root, workspace, name);
+      const bytes = await readFile(file)
+        .catch(error => { if (error.code === "ENOENT") return null; throw error; });
+      files.push([path.relative(root, file), bytes]);
+    }
+  }
+  return files.sort(([left], [right]) => left.localeCompare(right));
+}
+
+let invalidFixture;
+let invalidCleanup;
+after(() => invalidCleanup?.());
+
+async function invalidWorkspace(t) {
+  // The file owns cleanup, so an individual consumer cannot remove the fixture
+  // before the remaining cases run. workspace registers it even if setup fails.
+  invalidFixture ??= workspace({ after: cleanup => { invalidCleanup = cleanup; } })
+    .then(async place => ({
+      place, before: await durableState(place),
+    }));
+  const { place, before } = await invalidFixture;
+  t.after(async () => assert.deepEqual(await durableState(place), before,
+    "a rejected sync changed durable state"));
+  return place;
+}
+
 for (const cursor of ["not-a-cursor", "-1", "0000000000000001; DROP", "1", "00000000000000001"]) {
   test(`a cursor of ${JSON.stringify(cursor)} is refused, not answered with silence`, async t => {
-    const place = await workspace(t);
+    const place = await invalidWorkspace(t);
 
     const refused = await place.syncFrom(cursor).then(() => null, error => error);
 
@@ -103,7 +147,7 @@ test("a turn still works, because that is where cursors actually come from", asy
  */
 for (const scope of ["ful", "FULL", "nonsense", ""]) {
   test(`a scope of ${JSON.stringify(scope)} is refused, not turned into a delta`, async t => {
-    const place = await workspace(t);
+    const place = await invalidWorkspace(t);
 
     const refused = await place.syncScope(scope).then(() => null, error => error);
 
