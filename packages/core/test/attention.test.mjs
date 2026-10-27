@@ -164,3 +164,63 @@ test("attention refuses to infer presence without a liveness probe", () => {
   assert.throws(() => computeAttention({ sessions: [] }, { session: null,
     participantId: "participant_a", now: NOW }), error => error.code === EXIT.USAGE);
 });
+
+// Each read of a receipt array element, counted where the computation reads it.
+function countingReceipts(receipts, counter) {
+  return new Proxy(receipts, { get(target, property, receiver) {
+    if (typeof property === "string" && /^\d+$/.test(property)) counter.visits += 1;
+    return Reflect.get(target, property, receiver);
+  } });
+}
+
+// #305: one pass per concern, not one pass over every receipt for each request.
+test("outgoing attention visits each receipt a bounded number of times, acknowledged history too", () => {
+  for (const acknowledged of [false, true]) {
+    const messages = [], receipts = [];
+    for (let index = 0; index < 400; index++) {
+      const messageId = `message_${String(index).padStart(4, "0")}`;
+      messages.push({ messageId, fromParticipantId: "participant_a", toParticipantIds: ["participant_gone"],
+        kind: "request", subject: `request ${index}`, obligation: "reply", sentAt: NOW });
+      receipts.push({ messageId, recipientParticipantId: "participant_gone",
+        state: acknowledged ? "acknowledged" : "queued" });
+    }
+    const counter = { visits: 0 };
+    const items = computeAttention({ messages, receipts: countingReceipts(receipts, counter),
+      sessions: [], claims: [], intents: [] }, options());
+    assert.equal(items.length, acknowledged ? 0 : 400);
+    assert.ok(counter.visits <= 4 * receipts.length, `${counter.visits} receipt visits for ${receipts.length} receipts`);
+  }
+});
+
+test("recipient_unavailable keeps fanout, presence, receipt order and decision state", () => {
+  const sessions = [open("session_here", "participant_here"),
+    { ...open("session_closed", "participant_closed"), state: "closed" }];
+  const snapshot = {
+    messages: [
+      { messageId: "message_b", fromParticipantId: "participant_a", toParticipantIds: ["participant_closed",
+        "participant_gone", "participant_here"], kind: "request", subject: "Fan out", obligation: "reply" },
+      { messageId: "message_a", fromParticipantId: "participant_a", toParticipantIds: ["participant_gone"],
+        kind: "decision", subject: "First choice", obligation: "acknowledge" },
+      { messageId: "message_c", fromParticipantId: "participant_a", toParticipantIds: ["participant_gone"],
+        kind: "decision", subject: "Second choice", obligation: "acknowledge",
+        decisionChange: { action: "replace", messageIds: ["message_a"] } },
+      { messageId: "message_d", fromParticipantId: "participant_a", toParticipantIds: ["participant_gone"],
+        kind: "note", subject: "Just so you know", obligation: "none" },
+    ],
+    receipts: [
+      { messageId: "message_c", recipientParticipantId: "participant_gone", state: "offered" },
+      { messageId: "message_b", recipientParticipantId: "participant_gone", state: "queued" },
+      { messageId: "message_b", recipientParticipantId: "participant_here", state: "queued" },
+      { messageId: "message_a", recipientParticipantId: "participant_gone", state: "queued" },
+      { messageId: "message_b", recipientParticipantId: "participant_closed", state: "retrieved" },
+      { messageId: "message_d", recipientParticipantId: "participant_gone", state: "queued" },
+    ],
+    sessions, claims: [], intents: [],
+  };
+  // A replaced decision is quiet, a note asks nothing, and an online recipient is available.
+  assert.deepEqual(computeAttention(snapshot, options()).map(item => [item.kind, item.sourceId, item.summary]), [
+    ["recipient_unavailable", "message_b", "Fan out - participant_gone is unavailable"],
+    ["recipient_unavailable", "message_b", "Fan out - participant_closed is unavailable"],
+    ["recipient_unavailable", "message_c", "Second choice - participant_gone is unavailable"],
+  ]);
+});

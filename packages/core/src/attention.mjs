@@ -48,18 +48,19 @@ function presenceByParticipant(snapshot, now, pidIsAlive) {
 
 function unavailableRecipients(snapshot, participantId, now, pidIsAlive) {
   const online = presenceByParticipant(snapshot, now, pidIsAlive);
-  const receipts = snapshot.receipts ?? [];
-  return (snapshot.messages ?? []).flatMap(message => {
-    if (message.fromParticipantId !== participantId || message.toParticipantIds?.length === 0
-      || message.obligation === "none") return [];
-    return receipts.filter(receipt => receipt.messageId === message.messageId
-      && receipt.state !== "acknowledged"
-      && !online.has(receipt.recipientParticipantId))
-      .map(receipt => ({ kind: "recipient_unavailable",
-        priority: ATTENTION_PRIORITY.recipient_unavailable,
-        sourceId: message.messageId,
-        summary: `${message.subject} - ${receipt.recipientParticipantId} is unavailable` }));
-  });
+  const asking = (snapshot.messages ?? []).filter(message => message.fromParticipantId === participantId
+    && message.toParticipantIds?.length !== 0 && message.obligation !== "none");
+  // One pass over the receipts, kept per message in their own order. Filtering
+  // every receipt for each request cost 64 million visits at 8000 requests, and
+  // the same when all of them were acknowledged (#305).
+  const waiting = new Map(asking.map(message => [message.messageId, []]));
+  for (const receipt of snapshot.receipts ?? []) {
+    if (receipt.state === "acknowledged" || online.has(receipt.recipientParticipantId)) continue;
+    waiting.get(receipt.messageId)?.push(receipt.recipientParticipantId);
+  }
+  return asking.flatMap(message => waiting.get(message.messageId).map(recipient => ({
+    kind: "recipient_unavailable", priority: ATTENTION_PRIORITY.recipient_unavailable,
+    sourceId: message.messageId, summary: `${message.subject} - ${recipient} is unavailable` })));
 }
 
 // Nothing reads a message whose recipient has no session left: a new session of
