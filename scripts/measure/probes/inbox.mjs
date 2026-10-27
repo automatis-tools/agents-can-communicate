@@ -90,7 +90,7 @@ async function observe(built) {
   const probe = createStoreIoProbe(built.fixture.root);
   try {
     const measured = await probe.capture(() => operate(built));
-    const enumerations = Object.fromEntries(Object.entries(measured.io).filter(([key]) => key.endsWith("/readdir")));
+    const enumerations = Object.fromEntries(Object.entries(measured.io).filter(([key]) => /\/readdir(Entries)?$/.test(key)));
     return { failures: await validate(built, measured.result), stateReads: measured.stateReads,
       stateByKind: measured.stateByKind, readBytes: measured.readBytes, pageReads: measured.pageReads, enumerations };
   } finally { probe.stop(); }
