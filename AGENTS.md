@@ -72,6 +72,10 @@ only when the target's test script and scoped runner contract match the trusted 
 including imported selection, cache, process and package helpers. Historical or changed contracts
 run their own full suite. Ignored executable inputs or dirty target bytes require an isolated checkout.
 
+`scripts/validation-impact.json` records `sourceDigest` for all non-documentation Git entries except the manifest itself.
+Code, helper, test or configuration drift requires full execution until a deliberate documentation-reader audit refreshes that pin.
+Review external documentation readers and dynamic test discovery before updating the pin. The planner never refreshes it automatically.
+
 Pre-push adds `--if-needed` only for a supported clean current checkout. The same scope can reuse
 its receipt for 24 hours when file bytes, installed workspace links, Node and environment match.
 Changed inputs, failed reruns, uncertain dependencies or unavailable cache state require execution.
