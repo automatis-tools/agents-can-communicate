@@ -10,6 +10,7 @@ import { mkdir, mkdtemp, readdir, readFile, stat, writeFile } from "node:fs/prom
 import os from "node:os";
 import path from "node:path";
 import { parseArgs } from "node:util";
+import { INHERITED } from "../git-provenance.mjs";
 import { digest } from "./probe-kit.mjs";
 import { classify, renderReport } from "./report.mjs";
 
@@ -36,7 +37,9 @@ const base = Object.fromEntries(values.set.map(pair).map(([key, value]) => [key,
 const scenarios = (values.vary ? pair(values.vary)[1].split(",").map(value => ({ ...base, [pair(values.vary)[0]]: literal(value) }))
   : [base]).map(input => probe.scenario(input)).map(scenario => ({ scenario, hash: digest(scenario) }));
 
-const git = (...args) => execFileSync("git", args, { cwd: repo, encoding: "utf8" }).trim();
+// A suite or a hook exports GIT_DIR='' and friends; they describe another repository.
+const gitEnv = Object.fromEntries(Object.entries(process.env).filter(([name]) => !INHERITED.includes(name)));
+const git = (...args) => execFileSync("git", args, { cwd: repo, encoding: "utf8", env: gitEnv }).trim();
 async function sourcesHash(root) {
   const files = [];
   for (const name of (await readdir(path.join(root, "packages"))).sort()) {
@@ -61,7 +64,7 @@ async function materialize(label, ref) {
   const root = path.join(os.tmpdir(), `acc-measure-${commit}`);
   if (!await stat(path.join(root, "node_modules")).then(() => true, () => false)) {
     await mkdir(root, { recursive: true });
-    execFileSync("sh", ["-c", `git archive ${commit} | tar -x -C "${root}"`], { cwd: repo, stdio: "inherit" });
+    execFileSync("sh", ["-c", `git archive ${commit} | tar -x -C "${root}"`], { cwd: repo, stdio: "inherit", env: gitEnv });
     execFileSync("npm", ["ci", "--no-audit", "--no-fund"], { cwd: root, stdio: ["ignore", "ignore", "inherit"] });
   }
   return { label, ref, root, commit, dirty: false, sourcesHash: await sourcesHash(root) };

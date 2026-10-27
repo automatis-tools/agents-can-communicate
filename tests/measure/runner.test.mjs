@@ -7,14 +7,15 @@ import { runProcess } from "../helpers/run-process.mjs";
 
 // #304: a comparison alternates its sides, keeps what makes two runs
 // comparable, and says what its evidence supports. Both sides are this
-// checkout here, so the suite needs no install.
+// checkout here, so the suite needs no install. GIT_DIR='' is what CI and the
+// suite export to keep fixture repositories off this checkout.
 const runner = path.resolve(import.meta.dirname, "..", "..", "scripts", "measure", "run.mjs");
 
 async function measure(t, args) {
   const out = await mkdtemp(path.join(tmpdir(), "acc-measure-run-"));
   t.after(() => rm(out, { recursive: true, force: true }));
   const child = await runProcess([runner, ...args, "--baseline", "worktree", "--candidate", "worktree",
-    "--out", out], { timeoutMs: 120_000 });
+    "--out", out], { timeoutMs: 120_000, env: { GIT_DIR: "" } });
   return { child, out, run: JSON.parse(await readFile(path.join(out, "run.json"), "utf8").catch(() => "null")),
     report: await readFile(path.join(out, "report.md"), "utf8").catch(() => "") };
 }
