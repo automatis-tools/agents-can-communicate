@@ -89,6 +89,16 @@ intentionally misses across those executions. Keep validation and push in one sh
 for example `npm test && git push`, to keep that metadata stable. All other reuse safeguards still
 apply, including matching scope, bytes, dependencies, Node and environment, and a receipt within 24 hours.
 
+For `pushDocsFixture`, request `{ ci: false }` when testing local receipt reuse.
+Request `{ ci: true }` when testing CI execution without receipts. The default inherits
+CI from the parent. Change only the fixture's copied environment. Never clear parent
+`process.env.CI`. Check both modes after fixture changes:
+
+```bash
+node --test tests/process/push-docs-scope.test.mjs tests/process/test-runner-docs.test.mjs tests/commit-attribution-gate.test.mjs
+CI=1 node --test tests/process/push-docs-scope.test.mjs tests/process/test-runner-docs.test.mjs tests/commit-attribution-gate.test.mjs
+```
+
 CI executes its existing full gates and never reuses local suite receipts. This local optimization
 does not change GitHub routing. Windows runs `npm test -- --shard 1/2` and `2/2`. Their union is
 the whole discovered list, and the existing Windows check requires both to pass.
