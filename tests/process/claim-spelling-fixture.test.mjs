@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
+import { access } from "node:fs/promises";
 import path from "node:path";
 import test from "node:test";
 import { pathToFileURL } from "node:url";
@@ -56,8 +57,8 @@ test("claim guard fixture accepts the real Codex deny contract and an unrelated 
 });
 
 // Each control catches the old mapping of any executor rejection to "deny".
-// Only EACCES is injected; the other two faults cross the real process boundary.
-for (const [name, execute, check] of [
+// Only EACCES is injected; the other controls cross the real process boundary.
+const writeFaults = [
   ["missing module", (_input, options) => run(process.execPath, ["--input-type=module", "-e",
     `console.log('module control started'); await import(${JSON.stringify(
       pathToFileURL(path.join(import.meta.dirname, "missing-claim-hook.mjs")).href)});`], options),
@@ -90,31 +91,38 @@ for (const [name, execute, check] of [
     assert.equal(error.stdout, "");
     assert.equal(error.stderr, "acc: failed to load hook\n");
   }],
-]) {
-  test(`claim guard fixture rejects ${name} and preserves its original error`, async t => {
-    let original;
-    const place = await claimSpellingProject(t, { runWrite: async (...args) => {
-      try { return await execute(...args); }
-      catch (error) { original = error; throw error; }
-    } });
-    await place.claim("file:src/physics.mjs");
+];
+
+test("claim guard fixture rejects executor faults", async t => {
+  let executeWrite;
+  // Parent cleanup runs after every awaited consumer, including failing subtests.
+  // Faults do not use claim state, so this one fixture stays read-only after startup.
+  const place = await claimSpellingProject(t, { runWrite: (...args) => executeWrite(...args) });
+  t.after(() => assert.rejects(access(path.dirname(place.root)), { code: "ENOENT" }));
+  for (const [name, execute, check] of writeFaults) {
+    await t.test(`claim guard fixture rejects ${name} and preserves its original error`, async () => {
+      let original;
+      executeWrite = async (...args) => {
+        try { return await execute(...args); }
+        catch (error) { original = error; throw error; }
+      };
+      await assert.rejects(place.write("src/physics.mjs"), error => {
+        assert.equal(error, original);
+        check(error);
+        return true;
+      });
+    });
+  }
+
+  await t.test("claim guard fixture rejects a zero-exit fail-open diagnostic", async () => {
+    executeWrite = (_input, options) => run(process.execPath,
+      ["-e", "console.error('acc: coordination unavailable: control')"], options);
     await assert.rejects(place.write("src/physics.mjs"), error => {
-      assert.equal(error, original);
-      check(error);
+      assert.match(error.message, /claim fixture: writer PreToolUse.*exit 0/);
+      assert.equal(error.code, 0);
+      assert.equal(error.stdout, "");
+      assert.equal(error.stderr, "acc: coordination unavailable: control\n");
       return true;
     });
-  });
-}
-
-test("claim guard fixture rejects a zero-exit fail-open diagnostic", async t => {
-  const place = await claimSpellingProject(t, { runWrite: (_input, options) =>
-    run(process.execPath, ["-e", "console.error('acc: coordination unavailable: control')"], options) });
-  await place.claim("file:src/physics.mjs");
-  await assert.rejects(place.write("src/physics.mjs"), error => {
-    assert.match(error.message, /claim fixture: writer PreToolUse.*exit 0/);
-    assert.equal(error.code, 0);
-    assert.equal(error.stdout, "");
-    assert.equal(error.stderr, "acc: coordination unavailable: control\n");
-    return true;
   });
 });
