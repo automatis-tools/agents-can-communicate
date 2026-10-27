@@ -77,7 +77,7 @@ const CHOICES = Object.freeze({
 
 const NOTES = Object.freeze({
   doctor: ["--repair completes recoverable writes without changing the store contract.",
-    "--migrate-store explicitly changes contract 6 to 7 after old clients and unmanaged store users stop; it cannot be combined with --repair."],
+    "--migrate-store moves a contract 6 or 7 store to contract 8 after old clients and unmanaged store users stop, as ACC does itself after an update; it cannot be combined with --repair."],
   install: ["Without --delivery, one default-No question covers all selected clients that need a decision.",
     "--indicator on|off controls the compact indicator in supported clients; omission preserves the saved choice (initially off).",
     "--delivery actionable|all gives explicit complete-setup consent; --delivery off disables incoming automatic requests.",

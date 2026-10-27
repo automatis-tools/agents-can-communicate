@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { tmpdir } from "node:os";
 import test from "node:test";
@@ -12,7 +12,7 @@ import { createFakeClock, createFakeIds } from "../../../tests/helpers/memory-st
 import { exactMessage, EXACT_NOW as NOW, EXACT_WORKSPACE as WS } from "../../../tests/helpers/exact-transaction-contract.mjs";
 import { INDEX_DIRECTORY } from "../src/index-io.mjs";
 
-async function legacy(t) {
+async function legacy(t, storeVersion = 6) {
   const root = await mkdtemp(path.join(tmpdir(), "acc-store-migration-"));
   t.after(() => rm(root, { recursive: true, force: true }));
   const clock = createFakeClock(NOW), ids = createFakeIds();
@@ -23,7 +23,7 @@ async function legacy(t) {
       messageId: "message_a", recipientParticipantId: "participant_a", state: "queued", updatedAt: NOW });
   }, { kinds: ["message", "receipt"] });
   const identityFile = path.join(root, "protocol.json");
-  const identity = { ...JSON.parse(await readFile(identityFile)), storeVersion: 6 };
+  const identity = { ...JSON.parse(await readFile(identityFile)), storeVersion };
   await writeFile(identityFile, encode(identity));
   return { root, paths: opened.paths, clock, ids, identity, identityFile,
     options: { root, workspaceId: WS, clock, ids, allowMigration: true } };
@@ -34,20 +34,48 @@ const migrate = options => {
 };
 const primaryBytes = async root => Promise.all(["message/message_a", "receipt/receipt_a"]
   .map(name => readFile(path.join(root, "state", name + ".json"))));
+const CURRENT = storage.STORE_VERSION;
+// Contract 8 writes each receipt's message obligation into it (#306); nothing else changes.
+const receiptRecord = async root => JSON.parse(await readFile(path.join(root, "state/receipt/receipt_a.json"))).record;
+async function sameRecords(root, before) {
+  const [message, receipt] = before, [messageAfter] = await primaryBytes(root);
+  assert.deepEqual(messageAfter, message);
+  const { extensions, ...rest } = await receiptRecord(root);
+  assert.deepEqual(extensions, { obligation: "none" });
+  const { extensions: none, ...original } = JSON.parse(receipt).record;
+  assert.deepEqual(rest, original);
+}
 
 test("migration preserves records and initialized identity", async t => {
   const f = await legacy(t), before = await primaryBytes(f.root);
   await assert.rejects(storage.openFilesystemStore(f.options), error =>
     error.code === EXIT.DATA && /doctor --migrate-store/.test(error.message));
-  assert.deepEqual(await migrate(f.options), { fromVersion: 6, toVersion: 7, migrated: true });
+  assert.deepEqual(await migrate(f.options), { fromVersion: 6, toVersion: CURRENT, migrated: true });
   const after = JSON.parse(await readFile(f.identityFile));
-  assert.deepEqual(after, { ...f.identity, storeVersion: 7 });
-  assert.deepEqual(await primaryBytes(f.root), before);
+  assert.deepEqual(after, { ...f.identity, storeVersion: CURRENT });
+  await sameRecords(f.root, before);
   const opened = await storage.openFilesystemStore(f.options);
   assert.deepEqual(await opened.transaction(tx => tx.lookup("messageByClientKey", [WS, "participant_a", "client_a"]),
     { kinds: ["message"], exactKinds: ["message"] }), ["message_a"]);
-  assert.deepEqual(await migrate(f.options), { fromVersion: 7, toVersion: 7, migrated: false });
-  assert.deepEqual(await primaryBytes(f.root), before);
+  const migrated = await primaryBytes(f.root);
+  assert.deepEqual(await migrate(f.options), { fromVersion: CURRENT, toVersion: CURRENT, migrated: false });
+  assert.deepEqual(await primaryBytes(f.root), migrated);
+});
+
+test("a contract-7 store gains its receipts' obligations and a v2 cache, and its v1 cache goes", async t => {
+  const f = await legacy(t, 7), before = await primaryBytes(f.root);
+  // The cache ACC 0.12 kept beside the store.
+  const legacyCache = path.join(f.root, "indexes", "v1");
+  await mkdir(path.join(legacyCache, "pages"), { recursive: true });
+  await writeFile(path.join(legacyCache, "cache.json"), "{}\n");
+  await assert.rejects(storage.openFilesystemStore(f.options), error => error.code === EXIT.DATA
+    && error.details?.reasonCode === "store_migration_required" && /doctor --migrate-store/.test(error.message));
+  assert.deepEqual(await migrate(f.options), { fromVersion: 7, toVersion: CURRENT, migrated: true });
+  await sameRecords(f.root, before);
+  await assert.rejects(stat(path.join(legacyCache, "cache.json")), { code: "ENOENT" });
+  const opened = await storage.openFilesystemStore(f.options);
+  assert.deepEqual(await opened.transaction(tx => tx.lookup("receiptsByRecipientState", [WS, "participant_a", "queued"]),
+    { kinds: ["receipt"], exactKinds: ["receipt"] }), ["receipt_a"]);
 });
 
 test("migration recovers decided version-six journal first", async t => {
@@ -79,11 +107,11 @@ for (const phase of ["after-index-pages", "before-store-version-switch", "after-
     } }));
     assert.equal(hit, true, "the migration must reach this publication boundary");
     assert.equal(JSON.parse(await readFile(f.identityFile)).storeVersion,
-      phase === "after-store-version-switch" ? 7 : 6);
+      phase === "after-store-version-switch" ? CURRENT : 6);
     const result = await migrate(f.options);
-    assert.equal(result.toVersion, 7);
+    assert.equal(result.toVersion, CURRENT);
     assert.equal(result.migrated, phase !== "after-store-version-switch");
-    assert.deepEqual(await primaryBytes(f.root), before);
+    await sameRecords(f.root, before);
   });
 }
 
@@ -91,7 +119,7 @@ test("migration refuses absent opt-in, deadlines and invalid identity without sw
   const f = await legacy(t);
   await assert.rejects(migrate({ ...f.options, allowMigration: false }), { code: EXIT.USAGE });
   await assert.rejects(migrate({ ...f.options, deadlineAt: 0 }), { code: EXIT.CONFLICT });
-  for (const identity of [{ ...f.identity, storeVersion: 8 }, { ...f.identity, workspaceId: "workspace_other" },
+  for (const identity of [{ ...f.identity, storeVersion: CURRENT + 1 }, { ...f.identity, workspaceId: "workspace_other" },
     { ...f.identity, initialisedAt: null }, { ...f.identity, extra: "unknown" }]) {
     const before = encode(identity); await writeFile(f.identityFile, before);
     await assert.rejects(migrate(f.options), { code: EXIT.DATA });
@@ -99,7 +127,7 @@ test("migration refuses absent opt-in, deadlines and invalid identity without sw
   }
 });
 
-test("migration refuses corrupt primary and verifies cache again on version seven", async t => {
+test("migration refuses corrupt primary and verifies cache again on the current version", async t => {
   const f = await legacy(t), file = path.join(f.root, "state/message/message_a.json");
   const bytes = await readFile(file);
   await writeFile(file, "invalid primary bytes");
@@ -108,6 +136,6 @@ test("migration refuses corrupt primary and verifies cache again on version seve
   await writeFile(file, bytes); await migrate(f.options);
   const manifestFile = path.join(f.root, INDEX_DIRECTORY, "cache.json");
   await rm(manifestFile);
-  assert.deepEqual(await migrate(f.options), { fromVersion: 7, toVersion: 7, migrated: false });
+  assert.deepEqual(await migrate(f.options), { fromVersion: CURRENT, toVersion: CURRENT, migrated: false });
   assert.equal(JSON.parse(await readFile(manifestFile)).workspaceId, WS);
 });

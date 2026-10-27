@@ -3,6 +3,8 @@ import { assertPortableId } from "@agents-can-communicate/protocol";
 
 export const INDEX_PAGE_BYTES = 65_536;
 export const INDEX_PAGE_ENTRIES = 32;
+// A leaf entry holds up to this many record IDs itself; a larger group is a page (#306).
+export const INLINE_GROUP_IDS = 8;
 const HASH = /^[a-f0-9]{64}$/;
 export class IndexCacheUnavailable extends Error {
   constructor(reason, cause) {
@@ -32,6 +34,13 @@ export function canonicalTuple(tuple) {
 function limited(values, limit = INDEX_PAGE_ENTRIES) {
   if (!Array.isArray(values) || values.length === 0 || values.length > limit) refuse("page_entry_limit");
 }
+function recordIds(ids, limit) {
+  limited(ids, limit);
+  try { ids.forEach(id => assertPortableId(id, "index record ID")); }
+  catch (error) { throw new IndexCacheUnavailable("invalid_record_id", error); }
+  unique(ids);
+  if (ids.some((id, i) => i > 0 && ids[i - 1].localeCompare(id) >= 0)) refuse("noncanonical_ids");
+}
 export function validateIndexPage(page) {
   if (page?.type === "branch") {
     closed(page, ["type", "children"]); limited(page.children, 16);
@@ -48,17 +57,17 @@ export function validateIndexPage(page) {
     const keys = [];
     for (const entry of page.entries) {
       closed(entry, ["digest", "tuple", "ids"]);
-      assertPageHash(entry.digest); assertPageHash(entry.ids); keys.push(canonicalTuple(entry.tuple));
+      assertPageHash(entry.digest); keys.push(canonicalTuple(entry.tuple));
+      // A group page's hash, or the group itself while it is small.
+      if (Array.isArray(entry.ids)) recordIds(entry.ids, INLINE_GROUP_IDS);
+      else assertPageHash(entry.ids);
     }
     unique(keys);
     if (keys.some((key, i) => i > 0 && keys[i - 1].localeCompare(key) >= 0)) refuse("noncanonical_keys");
   } else if (page?.type === "group") {
-    closed(page, ["type", "ids", "next"]); limited(page.ids);
+    closed(page, ["type", "ids", "next"]);
     if (page.next !== null) assertPageHash(page.next);
-    try { page.ids.forEach(id => assertPortableId(id, "index record ID")); }
-    catch (error) { throw new IndexCacheUnavailable("invalid_record_id", error); }
-    unique(page.ids);
-    if (page.ids.some((id, i) => i > 0 && page.ids[i - 1].localeCompare(id) >= 0)) refuse("noncanonical_ids");
+    recordIds(page.ids, INDEX_PAGE_ENTRIES);
   } else refuse("unknown_page_type");
   return page;
 }

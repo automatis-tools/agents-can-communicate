@@ -3,6 +3,7 @@ import { mkdir, mkdtemp, readFile, realpath, rm, stat, writeFile } from "node:fs
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
+import { receiptId } from "../../packages/core/src/conversations.mjs";
 import { createCoordinationService } from "../../packages/core/src/service.mjs";
 import { openFilesystemStore } from "../../packages/storage-filesystem/src/store.mjs";
 import { createFakeClock, createFakeIds } from "../helpers/memory-store.mjs";
@@ -17,8 +18,8 @@ async function fixture(t, failAt) {
   const root = await realpath(await mkdtemp(path.join(tmpdir(), "acc-inbox-cost-")));
   t.after(() => rm(root, { recursive: true, force: true }));
   const clock = createFakeClock("2026-10-27T12:00:00.000Z"), ids = createFakeIds();
-  const reopen = (options = {}) => openFilesystemStore({ root, workspaceId, clock, ids, ...options })
-    .then(store => createCoordinationService({ store, clock, ids }));
+  const openStore = (options = {}) => openFilesystemStore({ root, workspaceId, clock, ids, ...options });
+  const reopen = options => openStore(options).then(store => createCoordinationService({ store, clock, ids }));
   const service = await reopen();
   const open = participantId => service.openSession({ workspaceId, participantId,
     harness: "fixture", heartbeatCadenceMs: 60_000 });
@@ -30,7 +31,7 @@ async function fixture(t, failAt) {
     return service.sendMessage({ ...owner(sender), clientMessageId: `client_${sent++}`, toParticipantIds: [to],
       kind: "note", obligation: "none", subject: `message ${sent}`, body: "Same measured fixture", ...fields });
   };
-  return { root, service, reopen, sender, reader, send, failAt };
+  return { root, service, reopen, openStore, sender, reader, send, failAt };
 }
 
 const probeOf = (t, root) => { const probe = createStoreIoProbe(root); t.after(() => probe.stop()); return probe; };
@@ -175,4 +176,38 @@ test("a decision's status comes from its whole group, and other groups are never
   assert.equal(item.message.decisionStatus.headCount, 2);
   // Its receipt, its message, and the two other decisions of its group: no unrelated decision.
   assert.ok(page.stateByKind.message <= 3, JSON.stringify(page.stateByKind));
+});
+
+test("a walk over a long decision chain reads the index manifest once", async t => {
+  const f = await fixture(t), probe = probeOf(t, f.root);
+  let previous = null;
+  for (let index = 0; index < 40; index++) {
+    previous = await f.service.sendMessage({ ...owner(f.sender), clientMessageId: `chain_${index}`, toParticipantIds: ["reader"],
+      kind: "decision", obligation: "acknowledge", subject: `choice ${index}`, body: "Use this",
+      ...(previous === null ? {} : { supersedes: [previous.messageId] }) });
+  }
+  const page = await probe.capture(() => f.service.listInbox({ ...owner(f.reader), limit: 20 }));
+  assert.deepEqual(page.result.items.map(item => item.message.messageId), [previous.messageId]);
+  assert.equal(page.result.items[0].message.decisionStatus.state, "current");
+  // Forty lookups along the chain, from one validated manifest and the pages already read.
+  assert.ok((page.io["index-manifest/reads"] ?? 0) <= 1, JSON.stringify(page.io));
+  assert.ok(page.pageReads <= 40, `${page.pageReads} index page reads`);
+});
+
+test("a receipt written without its obligation gains it when it is retrieved", async t => {
+  const f = await fixture(t), probe = probeOf(t, f.root);
+  const note = await f.send("reader");
+  // As a receipt written before contract 8 kept the obligation.
+  const store = await f.openStore();
+  const id = receiptId(note.messageId, "reader");
+  await store.transaction(tx => {
+    const { extensions, ...legacy } = tx.get("receipt", id);
+    tx.put("receipt", id, legacy, tx.generationOf("receipt", id));
+  }, { kinds: ["receipt"] });
+  await f.service.readInbox({ ...owner(f.reader), messageId: note.messageId });
+  const stored = await store.transaction(tx => tx.get("receipt", id), { kinds: ["receipt"] });
+  assert.equal(stored.extensions?.obligation, "none");
+  const page = await probe.capture(() => f.service.listInbox({ ...owner(f.reader), limit: 5 }));
+  assert.deepEqual(page.result.items, []);
+  assert.equal(page.stateByKind.receipt ?? 0, 0, "the read note left the receipt index");
 });

@@ -74,7 +74,11 @@ test("steady sends do not scale primary reads with backlog; receipts read only t
   assert.equal(reopenedRetry.stateByKind.message, 1);
   assert.equal(reopenedRetry.stateByKind.receipt ?? 0, 0, "reopen never scans unrelated recipients");
   await rm(path.join(f.root, "indexes"), { recursive: true });
-  const recovery = await probe.capture(() => coldService.sendMessage({ ...owner(f.sender),
+  // A fresh store, as the next hook opens one: this instance keeps the pages it validated
+  // for the generation, and losing the files changes nothing it knows.
+  const recovered = createCoordinationService({ store: await openFilesystemStore({ root: f.root, workspaceId,
+    clock: f.clock, ids: f.ids }), clock: f.clock, ids: f.ids });
+  const recovery = await probe.capture(() => recovered.sendMessage({ ...owner(f.sender),
     clientMessageId: "client_0", toParticipantIds: ["reader"], kind: "note", obligation: "none",
     subject: "client_0", body: "Same measured fixture" }));
   assert.equal(recovery.result.messageId, messages[0].messageId);

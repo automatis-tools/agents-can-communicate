@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { assertPortableId } from "@agents-can-communicate/protocol";
-import { assertPageHash, canonicalTuple, IndexCacheUnavailable } from "./index-pages.mjs";
+import { assertPageHash, canonicalTuple, INLINE_GROUP_IDS, IndexCacheUnavailable } from "./index-pages.mjs";
 
 const compare = (a, b) => a.localeCompare(b);
 const keyOf = entry => canonicalTuple(entry.tuple);
@@ -101,7 +101,8 @@ export function createIndexTree({ readPage, writePage, digestTuple = digest }) {
         root = page.next;
       }
     }
-    return idsRoot === null ? [] : groupLookup(idsRoot);
+    if (idsRoot === null) return [];
+    return Array.isArray(idsRoot) ? [...idsRoot] : groupLookup(idsRoot);
   }
   const leaf = (entries, next = null) => writePage({ type: "leaf",
     entries: [...entries].sort((a, b) => compare(keyOf(a), keyOf(b))), next });
@@ -124,11 +125,22 @@ export function createIndexTree({ readPage, writePage, digestTuple = digest }) {
     for (const route of [...routes.keys()].sort()) children.push([route, await split(routes.get(route), depth + 1)]);
     return writePage({ type: "branch", children });
   }
+  // A small group lives in its leaf entry and moves to a page when it outgrows it; a page
+  // stays a page, so a group near the limit does not flip with every change.
+  async function groupChange(ids, id, operation) {
+    if (!Array.isArray(ids)) return groupUpdate(ids, id, operation);
+    const next = ids.filter(found => found !== id);
+    if (operation === "put") next.push(id);
+    next.sort(compare);
+    if (next.length === ids.length && next.every((found, i) => found === ids[i])) return ids;
+    if (next.length === 0) return null;
+    return next.length <= INLINE_GROUP_IDS ? next : groupPages(next, 0);
+  }
   async function update(root, tuple, id, operation, depth = 0, prefix = "", seen = new Set()) {
     const hash = assertPageHash(digestTuple(tuple)), key = canonicalTuple(tuple);
     if (root === null) {
       if (operation === "remove") return null;
-      return leaf([{ digest: hash, tuple, ids: await groupUpdate(null, id, operation) }]);
+      return leaf([{ digest: hash, tuple, ids: [id] }]);
     }
     const page = await read(root, seen); checkNode(page, depth, prefix);
     if (page.type === "branch") {
@@ -142,7 +154,7 @@ export function createIndexTree({ readPage, writePage, digestTuple = digest }) {
     }
     const entries = [...page.entries], at = entries.findIndex(entry => keyOf(entry) === key);
     if (at !== -1) {
-      const ids = await groupUpdate(entries[at].ids, id, operation);
+      const ids = await groupChange(entries[at].ids, id, operation);
       if (ids === entries[at].ids) return root;
       if (ids === null) entries.splice(at, 1);
       else entries[at] = { ...entries[at], ids };
@@ -153,7 +165,7 @@ export function createIndexTree({ readPage, writePage, digestTuple = digest }) {
       return next === page.next ? root : leaf(entries, next);
     }
     if (operation === "remove") return root;
-    entries.push({ digest: hash, tuple, ids: await groupUpdate(null, id, operation) });
+    entries.push({ digest: hash, tuple, ids: [id] });
     return split(entries, depth);
   }
   async function apply(root, deltas) {

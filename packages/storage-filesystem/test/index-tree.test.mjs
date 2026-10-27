@@ -84,6 +84,52 @@ test("a large ID group changes along its route, not along its length", async () 
   bounded(published);
 });
 
+// #306: most tuples hold one or two records. Their IDs live in the leaf entry, so a cold
+// rebuild writes pages for the tree, not one for every tuple.
+test("a group of up to eight IDs lives in its leaf entry", async () => {
+  const { tree, published } = memory();
+  const root = await tree.apply(null, Array.from({ length: 300 }, (_, i) => add(tuple(i), `message_${i}`)));
+  assert.ok(published.filter(({ page }) => page.type === "group").length === 0, "no group page for single IDs");
+  assert.deepEqual(await tree.lookup(root, tuple(7)), ["message_7"]);
+  const ids = Array.from({ length: 9 }, (_, i) => `message_extra_${i}`);
+  let grown = root;
+  for (const id of ids.slice(0, 7)) grown = await tree.apply(grown, [add(tuple(7), id)]);
+  assert.deepEqual(await tree.lookup(grown, tuple(7)), ["message_7", ...ids.slice(0, 7)].sort((a, b) => a.localeCompare(b)));
+  grown = await tree.apply(grown, [add(tuple(7), ids[7])]);
+  assert.ok(published.some(({ page }) => page.type === "group"), "the ninth ID moves the group to its own page");
+  assert.deepEqual((await tree.lookup(grown, tuple(7))).length, 9);
+  bounded(published);
+});
+
+test("a forged group cannot answer: misrouted, chained, too deep or not a group", async () => {
+  const { tree, writePage } = memory();
+  const digestOf = value => sha(Buffer.from(value));
+  const under = async ids => writePage({ type: "leaf",
+    entries: [{ digest: digestOf(pages.canonicalTuple(tuple(0))), tuple: tuple(0), ids }], next: null });
+  const id = "message_forged", route = digestOf(id);
+  const group = await writePage({ type: "group", ids: [id], next: null });
+  const wrong = route[0] === "a" ? "b" : "a";
+  const forged = {
+    misrouted: await writePage({ type: "branch", children: [[wrong, group]] }),
+    chained: await writePage({ type: "group", ids: ["message_a"], next: group }),
+    leaf: await writePage({ type: "branch", children: [[route[0], await under(group)]] }),
+  };
+  // Sixty-five branches along the ID's own digest: one deeper than a digest has digits.
+  let deep = group;
+  for (let depth = 64; depth >= 0; depth--) deep = await writePage({ type: "branch", children: [[route[depth] ?? "0", deep]] });
+  forged.deep = deep;
+  const reasons = { misrouted: "misrouted_group_id", chained: "invalid_group_reference",
+    leaf: "invalid_group_reference", deep: "radix_depth_exceeded" };
+  for (const [name, hash] of Object.entries(forged)) {
+    await assert.rejects(tree.lookup(await under(hash), tuple(0)),
+      error => error instanceof pages.IndexCacheUnavailable && error.reason === reasons[name], name);
+  }
+  // An inline group must be small, ordered and made of record IDs.
+  for (const ids of [[], Array.from({ length: 9 }, (_, i) => `message_${i}`), ["message_b", "message_a"], ["../outside"]]) {
+    await assert.rejects(under(ids), pages.IndexCacheUnavailable, JSON.stringify(ids));
+  }
+});
+
 test("full digest collisions remain separate", async () => {
   const { tree, published } = memory(() => "f".repeat(64));
   const root = await tree.apply(null, Array.from({ length: 33 }, (_, i) => add(tuple(i), `message_${i}`)));

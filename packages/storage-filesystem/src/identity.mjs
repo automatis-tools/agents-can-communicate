@@ -4,7 +4,11 @@ import { AccError, EXIT, assertPortableId } from "@agents-can-communicate/protoc
 
 import { encode, nameCommittedLater, publishAtomic, readJsonIfPresent } from "./atomic-json.mjs";
 
-export const STORE_VERSION = 7;
+// Contract 8 keeps the index cache in `indexes/v2`, with the inbox indexes, and each
+// receipt keeps its message's obligation (#306).
+export const STORE_VERSION = 8;
+// The older contracts a migration moves to this one.
+const MIGRATABLE = [6, 7];
 
 export function identityPath(paths) {
   return path.join(paths.root, "protocol.json");
@@ -12,12 +16,13 @@ export function identityPath(paths) {
 
 function assertIdentity(record, workspaceId, filePath, versions = [STORE_VERSION]) {
   if (!versions.includes(record?.storeVersion)) {
-    const message = record?.storeVersion === 6
-      ? "store contract 6 requires explicit migration: stop other store users and run acc doctor --migrate-store"
+    const older = MIGRATABLE.includes(record?.storeVersion);
+    const message = older
+      ? `store contract ${record.storeVersion} requires migration: stop other store users and run acc doctor --migrate-store`
       : "unknown store version";
     throw new AccError(EXIT.DATA, message, { filePath,
       storeVersion: record?.storeVersion,
-      ...(record?.storeVersion === 6 ? { reasonCode: "store_migration_required" } : {}) });
+      ...(older ? { reasonCode: "store_migration_required" } : {}) });
   }
   if (Object.keys(record).sort().join(",") !== "initialisedAt,storeVersion,workspaceId"
     || typeof record.initialisedAt !== "string" || !Number.isFinite(Date.parse(record.initialisedAt))) {
@@ -79,5 +84,5 @@ export async function readMigrationIdentity(paths, workspaceId) {
   assertPortableId(workspaceId, "workspace id");
   const found = await readJsonIfPresent(identityPath(paths), paths.root);
   if (found === null) throw new AccError(EXIT.DATA, "store is not initialised", { filePath: identityPath(paths) });
-  return assertIdentity(found.value, workspaceId, identityPath(paths), [6, STORE_VERSION]);
+  return assertIdentity(found.value, workspaceId, identityPath(paths), [...MIGRATABLE, STORE_VERSION]);
 }

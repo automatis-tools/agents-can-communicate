@@ -9,7 +9,7 @@ const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 const matches = (kind, record, index, tuple) => indexKeysFor(kind, record)
   .some(key => key.index === index && same(key.tuple, tuple));
 const references = page => page.type === "branch" ? page.children.map(([, hash]) => hash)
-  : page.type === "leaf" ? [...page.entries.map(entry => entry.ids), page.next].filter(Boolean)
+  : page.type === "leaf" ? [...page.entries.map(entry => entry.ids).filter(ids => typeof ids === "string"), page.next].filter(Boolean)
     : [page.next].filter(Boolean);
 
 export function createIndexCache({ paths, root, workspaceId, publishOptions, loadPrimary }) {
@@ -20,6 +20,10 @@ export function createIndexCache({ paths, root, workspaceId, publishOptions, loa
   // change only through the journal, which moves the generation. A published tree is
   // read from its pages, so it is not kept.
   let unpublished = null;
+  // The manifest this instance validated, and the pages it decoded since, for the journal
+  // generation the manifest belongs to. Pages are content-addressed and never change, so
+  // a walk that makes one lookup per decision reads each page once (#306).
+  let validated = null;
   const note = (code, reason) => { diagnostic = [{ code, reason }]; };
   const tools = deadlineAt => {
     const io = createIndexIO({ paths, root, publishOptions: { ...publishOptions, deadlineAt } });
@@ -102,13 +106,25 @@ export function createIndexCache({ paths, root, workspaceId, publishOptions, loa
     assertIndexTuple(index, tuple);
     let tree, manifest;
     try {
-      const selected = tools(deadlineAt);
-      tree = selected.tree;
-      manifest = await valid(selected.io, active);
-      if (manifest === null) throw new IndexCacheUnavailable("missing_manifest");
+      // Each lookup reads through its own deadline; only the decoded pages are shared.
+      const { io } = tools(deadlineAt);
+      const remembering = pages => ({ ...io, readPage: async hash => {
+        if (!pages.has(hash)) pages.set(hash, await io.readPage(hash));
+        return pages.get(hash);
+      } });
+      if (validated === null || validated.generation !== active.generation || active.state !== "idle") {
+        validated = null;
+        const pages = new Map();
+        manifest = await valid(remembering(pages), active);
+        if (manifest === null) throw new IndexCacheUnavailable("missing_manifest");
+        validated = { generation: active.generation, manifest, pages };
+      }
+      manifest = validated.manifest;
+      tree = createIndexTree(remembering(validated.pages));
       return await select(await tree.lookup(manifest.roots[index], tuple));
     } catch (error) {
       if (!(error instanceof IndexCacheUnavailable)) throw error;
+      validated = null;
     }
     if (unpublished === null || unpublished.generation !== active.generation || active.state !== "idle") {
       const result = await rebuild(active, deadlineAt);

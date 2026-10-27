@@ -89,7 +89,7 @@ test("bounded reachability visits delete nothing until every current root is ver
     const page = await io.readPage(hash);
     reachable.set(hash, await readFile(path.join(directory, hash + ".json")));
     pending.push(...(page.type === "branch" ? page.children.map(([, child]) => child)
-      : page.type === "leaf" ? [...page.entries.map(e => e.ids), page.next].filter(Boolean)
+      : page.type === "leaf" ? [...page.entries.map(e => e.ids).filter(ids => typeof ids === "string"), page.next].filter(Boolean)
         : [page.next].filter(Boolean)));
   }
   const limited = await reclaimIndexPages(f.store.paths, { root: f.root, roots: manifest.roots, limit: 1 });

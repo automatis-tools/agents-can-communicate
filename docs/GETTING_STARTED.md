@@ -17,8 +17,8 @@ pair or session-bound ACC MCP tools. See [CLI ownership](CLI.md#coordinate-from-
 ACC requires Node.js 24 or newer on macOS, Linux, or Windows 10 or 11. On Windows, read
 [Windows](#windows) below first.
 
-Already using ACC? Follow the [upgrade guide](UPGRADING.md#from-09x): from 0.9.x, each
-store moves to contract 7 once no session still runs 0.9.x code.
+Already using ACC? Follow the [upgrade guide](UPGRADING.md): when an update changes the store
+contract, each store moves to it once no session still runs older ACC code.
 
 ```bash
 npm install -g agents-can-communicate

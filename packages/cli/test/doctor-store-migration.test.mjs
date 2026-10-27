@@ -5,7 +5,7 @@ import path from "node:path";
 import { tmpdir } from "node:os";
 import test from "node:test";
 import { EXIT, SCHEMA_VERSION } from "@agents-can-communicate/protocol";
-import { openFilesystemStore } from "@agents-can-communicate/storage-filesystem";
+import { openFilesystemStore, STORE_VERSION } from "@agents-can-communicate/storage-filesystem";
 import { main } from "../src/main.mjs";
 import { parseArgs } from "../src/args.mjs";
 import { discoverWorkspace } from "../src/workspace-discovery.mjs";
@@ -69,14 +69,14 @@ test("migration dispatch locates v6 state without opening a v7 service", async t
   assert.equal(result.code, EXIT.OK, JSON.stringify(result.body));
   assert.equal(result.body.data.migrated, true);
   assert.equal(result.body.data.fromVersion, 6);
-  assert.equal(JSON.parse(await readFile(f.identityFile)).storeVersion, 7);
+  assert.equal(JSON.parse(await readFile(f.identityFile)).storeVersion, STORE_VERSION);
   assert.equal((await f.run(["status"], { managementOnly: true })).code, EXIT.DATA);
 });
 
 test("an unmanaged install uses the same data-home admission fence", async t => {
   const f = await fixture(t, false), result = await f.run(["doctor", "--migrate-store"]);
   assert.equal(result.code, EXIT.OK, JSON.stringify(result.body));
-  assert.equal(result.body.data.toVersion, 7);
+  assert.equal(result.body.data.toVersion, STORE_VERSION);
 });
 
 test("a cache fault is a separate diagnostic after a recorded CLI send", async t => {
@@ -147,11 +147,11 @@ for (const harness of ["mcp", "cli"]) {
     const bindings = path.join(f.paths.root, "bindings"); await mkdir(bindings, { recursive: true });
     await writeFile(path.join(bindings, createHash("sha256").update(nativeId).digest("hex").slice(0, 32) + ".json"),
       JSON.stringify({ schemaVersion: 1, harnessSessionId: nativeId, accSessionId: "session_mcp", generation: "generation_mcp" }));
-    if (harness === "mcp") assert.deepEqual(await listActivationBlockers(f.manager, { incomingStoreVersion: 7 }), [],
+    if (harness === "mcp") assert.deepEqual(await listActivationBlockers(f.manager, { incomingStoreVersion: STORE_VERSION }), [],
       "inactive legacy MCP continuity must not become an unknown native hold during a later activation");
     const result = await migrate(f);
     assert.equal(result.code, harness === "mcp" ? EXIT.OK : EXIT.CONFLICT, JSON.stringify(result.body));
-    assert.equal(JSON.parse(await readFile(f.identityFile)).storeVersion, harness === "mcp" ? 7 : 6);
+    assert.equal(JSON.parse(await readFile(f.identityFile)).storeVersion, harness === "mcp" ? STORE_VERSION : 6);
   });
 }
 

@@ -240,15 +240,18 @@ unknown holder postponed, is recorded as unfinished, and the next ACC command an
 later starts the worker that finishes it. Parsed help, version, and update recovery remain
 available when workspace admission is unavailable.
 
-Store contract 7 adds exact transaction loads and rebuildable indexes. ACC 0.12 keeps two,
-`messageByClientKey` and `receiptsByMessage`, in `indexes/v1`. Later versions keep four in
-`indexes/v2`: those two, `receiptsByRecipientState` (a recipient's receipts that can still be
-listed) and `decisionsByTarget` (the decisions that replace or withdraw a decision). An inbox read
-uses them to load only the reader's own records (#306). Each version reads and writes only its
-own directory, so an older writer leaves the v2 manifest behind the journal generation, and the
-next newer reader rebuilds it. Content-addressed pages contain portable key tuples and record
-references, never message bodies. Each page is bounded by 32 entries and 64 KiB; radix branches
-have at most 16 children, and an ID group larger than one page branches on its IDs' digests.
+Store contract 7 adds exact transaction loads and rebuildable indexes, `messageByClientKey`
+and `receiptsByMessage`, in `indexes/v1`. Store contract 8 keeps four in `indexes/v2`: those
+two, `receiptsByRecipientState` (a recipient's receipts that can still be listed) and
+`decisionsByTarget` (the decisions that replace or withdraw a decision). An inbox read uses
+them to load only the reader's own records (#306). A receipt keeps its message's obligation in
+`extensions.obligation`, so the index can leave out a note its reader has retrieved; read
+surfaces never show that field. The 7-to-8 migration writes the obligation into every receipt,
+builds `indexes/v2` and removes `indexes/v1`; no contract-7 writer shares a contract-8 store.
+Content-addressed pages contain portable key tuples and record references, never message
+bodies. Each page is bounded by 32 entries and 64 KiB; radix branches have at most 16 children.
+An ID group of up to eight IDs is stored in its leaf entry; a larger one is a page, and one
+larger than a page branches on its IDs' digests.
 Under the writer mutex, the cache is trusted only for the same workspace and the
 current idle journal generation. Every message/receipt put or remove advances
 that durable authority. Other journalled writes carry valid unchanged roots

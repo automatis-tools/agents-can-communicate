@@ -48,7 +48,11 @@ export function createInboxService(ports, sessions) {
     if (nextState === owned.receipt.state) {
       return { message: owned.message, receipt: owned.receipt };
     }
-    const receipt = { ...owned.receipt, state: nextState, updatedAt: now };
+    // A receipt from before contract 8 gains its message's obligation here, so a note
+    // leaves the receipt index once it is read (#306).
+    const receipt = { ...owned.receipt, state: nextState, updatedAt: now,
+      ...(owned.receipt.extensions?.obligation === undefined
+        ? { extensions: { ...owned.receipt.extensions, obligation: owned.message.obligation } } : {}) };
     tx.put("receipt", owned.id, receipt, tx.generationOf("receipt", owned.id));
     tx.append({ schemaVersion: SCHEMA_VERSION, eventId: ids.next("event"),
       workspaceId: session.workspaceId, actorSessionId: session.sessionId,

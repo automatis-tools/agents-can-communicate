@@ -11,7 +11,7 @@ import { syncPruneDirectories } from "./prune-durability.mjs";
 import { assertManagedDirectory } from "./safe-directory.mjs";
 
 const children = page => page.type === "branch" ? page.children.map(([, hash]) => hash)
-  : page.type === "leaf" ? [...page.entries.map(entry => entry.ids), page.next].filter(Boolean)
+  : page.type === "leaf" ? [...page.entries.map(entry => entry.ids).filter(ids => typeof ids === "string"), page.next].filter(Boolean)
     : [page.next].filter(Boolean);
 
 // The caller holds the writer mutex. Persist both mark and sweep progress: a
@@ -114,6 +114,20 @@ async function discardCache(root, collect) {
     await condemn(directory, doomed);
     collect(directory, doomed);
   } catch { /* Cache loss or refusal cannot fail a completed primary prune. */ }
+}
+
+/**
+ * Moves the cache contract 7 kept, `indexes/v1`, out of the store, for the sweep to
+ * remove. Only a store migration calls it, once no older ACC can read the store.
+ * Contract 8 never reads that directory, so one that is missing, damaged or unsafe
+ * stays where it is rather than fail the migration.
+ */
+export async function discardContractSevenCache(root) {
+  const directory = path.join(root, "indexes", "v1");
+  try {
+    await assertManagedDirectory(root, directory);
+    await condemn(directory, await detachDoomed(root));
+  } catch { /* Nothing reads it again. */ }
 }
 
 // Existing empty-publication journals fence physical retirement without
