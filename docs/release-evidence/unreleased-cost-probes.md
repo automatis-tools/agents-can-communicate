@@ -67,3 +67,6 @@ fixture digests) and its `report.md`:
 - The comparisons are function and store-API calls in a fresh process, not CLI or hook end-to-end
   latency.
 - The transaction run skipped flushes, and its report says so.
+- The store I/O probe observes descriptor reads, through file handles. It does not yet observe
+  direct promise-based reads (#347), so a primary-read count is a lower bound: the true count
+  can be higher.
