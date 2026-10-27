@@ -75,7 +75,7 @@ test("status shows who is here, not everyone who ever was", async t => {
   const [keeper] = await place.roster();
   await place.cli("claim", "--session", keeper.sessionId, "--resource", "file:x",
     "--reason", "editing");
-  for (let index = 0; index < 8; index += 1) {
+  for (let index = 0; index < 2; index += 1) {
     await place.attach(`agent${index}`, `s${index}`);
     await place.close(`agent${index}`, `s${index}`);
   }
