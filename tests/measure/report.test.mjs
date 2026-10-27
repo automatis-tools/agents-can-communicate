@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { classify, renderReport, summarize } from "../../scripts/measure/report.mjs";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import path from "node:path";
+import { classify, pairedRatios, renderReport, summarize } from "../../scripts/measure/report.mjs";
+import { runProcess } from "../helpers/run-process.mjs";
 
 // #304: a report says what its evidence supports - a benchmark, a smoke
 // observation, a diagnostic, or not enough samples for a tail.
@@ -62,6 +66,30 @@ test("a child that failed makes its comparison invalid, and the report says why"
   value.children[0] = { ...value.children[0], error: "baseline child timed out after 1 ms", samplesNs: [] };
   assert.match(classify(value).s.reasons.join(), /baseline child failed/);
   assert.match(renderReport({ ...value, candidateMutation: "drop-one" }), /timed out after 1 ms[\s\S]*drop-one|drop-one[\s\S]*timed out after 1 ms/);
+});
+
+test("a paired ratio compares the sides round by round, so load that moves both cancels", () => {
+  const value = run();
+  // One slow round for both sides: the pooled medians move, the ratio does not.
+  for (const child of value.children.filter(item => item.round === 9)) child.samplesNs = child.samplesNs.map(sample => sample * 50);
+  const paired = pairedRatios(value.children);
+  assert.equal(paired.rounds, 10);
+  assert.equal(paired.median, 0.655);
+  assert.equal(paired.min, 0.655);
+  assert.match(renderReport(value), /Paired by round, candidate median \/ baseline median: 0\.655 \(range 0\.655\.\.0\.655 over 10 rounds\)/);
+  value.children[0] = { ...value.children[0], error: "baseline child failed", samplesNs: [] };
+  assert.equal(pairedRatios(value.children).rounds, 9);
+});
+
+test("a recorded run renders its report again from run.json", async t => {
+  const directory = await mkdtemp(path.join(tmpdir(), "acc-measure-report-"));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  const file = path.join(directory, "run.json"), value = run();
+  await writeFile(file, JSON.stringify(value));
+  const script = path.resolve(import.meta.dirname, "..", "..", "scripts", "measure", "report.mjs");
+  const child = await runProcess([script, file], { timeoutMs: 60_000 });
+  assert.equal(child.code, 0, child.stderr);
+  assert.equal(child.stdout, `${renderReport(value)}\n`);
 });
 
 test("the report labels each figure and names a tail it cannot support", () => {

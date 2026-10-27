@@ -1,6 +1,10 @@
 // Summaries and labels for a comparison run (#304). A figure is a benchmark only
 // when the evidence supports one; operation counts are diagnostics, and a tail
 // percentile without enough samples is named as insufficient evidence.
+//
+//   node scripts/measure/report.mjs <run.json>   renders a run's report again
+import { readFile } from "node:fs/promises";
+import { fileURLToPath } from "node:url";
 
 export const BENCHMARK = Object.freeze({ rounds: 10, samplesPerSide: 100 });
 export const TAIL_SAMPLES = Object.freeze({ p95: 100, p99: 1000 });
@@ -57,6 +61,25 @@ export function classify(run) {
   return result;
 }
 
+/**
+ * The candidate's median over the baseline's, round by round. The two sides of a
+ * round run next to each other, so a change in machine load between rounds moves
+ * both; the pooled medians alone can differ for equal code.
+ */
+export function pairedRatios(children) {
+  const median = samples => quantile([...samples].sort((left, right) => left - right), 0.5);
+  const ratios = [];
+  for (const round of [...new Set(children.map(child => child.round))].sort((left, right) => left - right)) {
+    const of = side => children.find(child => child.round === round && child.side === side && !child.error
+      && child.samplesNs.length > 0);
+    const baseline = of("baseline"), candidate = of("candidate");
+    if (baseline && candidate) ratios.push(median(candidate.samplesNs) / median(baseline.samplesNs));
+  }
+  if (ratios.length === 0) return null;
+  const sorted = [...ratios].sort((left, right) => left - right), fixed = value => Number(value.toFixed(3));
+  return { rounds: ratios.length, median: fixed(quantile(sorted, 0.5)), min: fixed(sorted[0]), max: fixed(sorted.at(-1)) };
+}
+
 const range = values => {
   const numbers = values.filter(value => typeof value === "number");
   if (numbers.length === 0) return JSON.stringify(values[0] ?? null);
@@ -98,6 +121,11 @@ export function renderReport(run) {
       for (const [key, note] of Object.entries(summary.tails)) if (note !== "reported") tails.push(`${side} ${key}: ${note}`);
     }
     if (tails.length) lines.push("", `Tails not reported - ${tails.join("; ")}.`);
+    const paired = pairedRatios(children);
+    if (paired) {
+      lines.push("", `Paired by round, candidate median / baseline median: ${paired.median} `
+        + `(range ${paired.min}..${paired.max} over ${paired.rounds} rounds).`);
+    }
     const keys = [...new Set(children.flatMap(child => flat(child.observations).map(([key]) => key)))].sort();
     if (keys.length) {
       lines.push("", "Diagnostic operation counts (what each side touched; never a validity condition):", "",
@@ -111,4 +139,8 @@ export function renderReport(run) {
     lines.push("");
   }
   return lines.join("\n");
+}
+
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  process.stdout.write(`${renderReport(JSON.parse(await readFile(process.argv[2], "utf8")))}\n`);
 }
