@@ -7,6 +7,22 @@ import path from "node:path";
 import { promisify } from "node:util";
 
 const run = promisify(execFile);
+// Test teardown only: signals are asynchronous. Observe recorded fixture PIDs
+// dead (or zombie, unable to read bytes) before removing their retained tree.
+export async function waitForOwnedProcessExit(pids) {
+  const ids = [...new Set(pids.filter(pid => Number.isInteger(pid) && pid > 0))];
+  if (!ids.length) return;
+  const deadline = Date.now() + 5000;
+  while (Date.now() < deadline) {
+    const { stdout } = await run("ps", ["-p", ids.join(","), "-o", "pid=,stat="]).catch(error => {
+      if (error.code === 1) return { stdout: error.stdout ?? "" };
+      throw error;
+    });
+    if (!stdout.trim() || stdout.trim().split("\n").every(line => /Z/.test(line.trim().split(/\s+/)[1]))) return;
+    await new Promise(resolve => setTimeout(resolve, 10));
+  }
+  throw Error("owned fixture process teardown remained live");
+}
 export const repo = path.resolve(import.meta.dirname, "../..");
 export const pushScript = process.env.ACC_PUSH_TEST_DRIVER ?? path.join(repo, "scripts/validate-push.mjs");
 export function cleanEnv() {

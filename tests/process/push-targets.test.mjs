@@ -8,7 +8,7 @@ import { pathToFileURL } from "node:url";
 import { chmod, readFile, symlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 import test from "node:test";
-import { fixture, invokePush, refLine } from "../helpers/push-fixture.mjs";
+import { fixture, invokePush, refLine, waitForOwnedProcessExit } from "../helpers/push-fixture.mjs";
 import { parsePushRefs, resolvePushTrees, runPushCommand, withPushCheckout } from "../../scripts/push-targets.mjs";
 import { checkoutMatchesCommit } from "../../scripts/push-tree-check.mjs";
 
@@ -116,7 +116,7 @@ test("deletion-only pushes have no checkout or syntax dependency and malformed l
 });
 
 
-test("interruption stops the target child and removes only its owned checkout", { timeout: 15000, skip: process.platform === "win32" }, async t => {
+test("interruption stops visible target children and retains its owned checkout", { timeout: 15000, skip: process.platform === "win32" }, async t => {
   const f = await fixture(t);
   const oid = await f.oid();
   const helper = pathToFileURL(path.resolve(import.meta.dirname, "../../scripts/push-targets.mjs")).href;
@@ -140,6 +140,7 @@ test("interruption stops the target child and removes only its owned checkout", 
   let deadline;
   let pid;
   let descendant;
+  let owned;
   let ownershipMonitor;
   let removedWhileAlive = false;
   try {
@@ -147,7 +148,7 @@ test("interruption stops the target child and removes only its owned checkout", 
       if (stdout.includes("READY ")) resolve();
     })), new Promise((_, reject) => { deadline = setTimeout(() => reject(Error("helper did not start")), 10000); })]);
     clearTimeout(deadline);
-    const owned = stdout.match(/READY (.+)/)[1].trim();
+    owned = stdout.match(/READY (.+)/)[1].trim();
     const until = Date.now() + 5000;
     while (!await f.exists(marker) || !await f.exists(descendantMarker)) {
       assert.ok(Date.now() < until, "target child never became ready");
@@ -168,15 +169,22 @@ test("interruption stops the target child and removes only its owned checkout", 
     clearInterval(ownershipMonitor);
     for (const ownedPid of [pid, descendant]) assert.throws(() => process.kill(ownedPid, 0), /ESRCH/, "owned child/descendant survived cancellation");
     assert.equal(removedWhileAlive, false, "checkout was removed under a live owned descendant");
-    assert.equal(await f.exists(owned), false);
-    assert.equal((await f.git(["worktree", "list", "--porcelain"])).stdout.match(/^worktree /gm).length, 1);
+    assert.equal(await f.exists(owned), true, "visible termination cannot prove historical worker ownership");
+    assert.equal((await f.git(["worktree", "list", "--porcelain"])).stdout.match(/^worktree /gm).length, 2);
   } finally {
     clearTimeout(deadline);
     clearInterval(ownershipMonitor);
     child.kill("SIGTERM");
+    pid ||= Number(await readFile(marker, "utf8").catch(() => "0"));
+    descendant ||= Number(await readFile(descendantMarker, "utf8").catch(() => "0"));
     if (pid) { try { process.kill(-pid, "SIGKILL"); } catch { /* Already dead. */ } }
     if (descendant) { try { process.kill(descendant, "SIGKILL"); } catch { /* Already dead. */ } }
     await closed;
+    await waitForOwnedProcessExit([pid, descendant]);
+    if (owned && await f.exists(owned)) {
+      await f.git(["worktree", "remove", "--force", owned]);
+      await import("node:fs/promises").then(fs => fs.rm(path.dirname(owned), { recursive: true, force: true }));
+    }
   }
 });
 

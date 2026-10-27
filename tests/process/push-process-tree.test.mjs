@@ -7,13 +7,13 @@ import path from "node:path";
 import test from "node:test";
 import { pathToFileURL } from "node:url";
 import { stopPushProcessTree } from "../../scripts/push-process-tree.mjs";
-import { fixture } from "../helpers/push-fixture.mjs";
+import { fixture, waitForOwnedProcessExit } from "../helpers/push-fixture.mjs";
 
 const url = file => pathToFileURL(path.resolve(import.meta.dirname, "../../scripts", file)).href;
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 const alive = pid => { try { process.kill(pid, 0); return true; } catch { return false; } };
 
-test("interruption terminates the real detached batch and worker before checkout cleanup",
+test("interruption terminates the real detached batch and worker and retains checkout",
   { timeout: 20000, skip: process.platform === "win32" }, async t => {
     const f = await fixture(t);
     const workerMarker = path.join(f.base, "worker");
@@ -58,16 +58,19 @@ test("interruption terminates the real detached batch and worker before checkout
       assert.match(stderr, /interrupted/);
       assert.ok(pids.every(pid => !alive(pid)), "detached batch or worker survived cancellation");
       assert.equal(removedWhileAlive, false, "owned checkout disappeared under actual batch workers");
-      assert.equal(await f.exists(owned), false);
-      assert.equal((await f.git(["worktree", "list", "--porcelain"])).stdout.match(/^worktree /gm).length, 1);
+      assert.equal(await f.exists(owned), true, "visible termination cannot prove historical worker ownership");
+      assert.equal((await f.git(["worktree", "list", "--porcelain"])).stdout.match(/^worktree /gm).length, 2);
     } finally {
       clearInterval(monitor);
+      const teardownPids = [];
       for (const file of [runnerMarker, batchMarker, workerMarker]) {
         const pid = Number(await readFile(file, "utf8").catch(() => "0"));
+        teardownPids.push(pid);
         if (pid) { try { process.kill(pid, "SIGKILL"); } catch { /* Already dead. */ } }
       }
       validator.kill("SIGKILL");
       await closed;
+      await waitForOwnedProcessExit(teardownPids);
       if (owned && await f.exists(owned)) {
         await f.git(["worktree", "remove", "--force", owned]);
         await import("node:fs/promises").then(fs => fs.rm(path.dirname(owned), { recursive: true, force: true }));

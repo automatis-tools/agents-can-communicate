@@ -80,8 +80,9 @@ export async function resolvePushTrees(repo, refs) {
   return [...joined.values()];
 }
 
-// Cancel owned POSIX descendants including detached batch groups before
-// worktree cleanup. Never expose command environment or checkout paths.
+// Best-effort cancellation of currently visible descendants, including detached
+// batch groups. This cannot prove historical ownership of reparented workers.
+// Never expose command environment or checkout paths.
 // Optional executor/platform overrides are solely a command-boundary test seam;
 // production always uses native spawn/platform and fixed taskkill arguments.
 export function runPushCommand(file, args, { cwd, signal, input, quiet = false,
@@ -142,6 +143,9 @@ export function runPushCommand(file, args, { cwd, signal, input, quiet = false,
   });
 }
 
+// Validation interruption handling ends only after the final byte audit and
+// abort decision. Cleanup then commits with those handlers removed; later
+// signals follow caller/OS behavior, not interrupted-validation retention.
 export async function withPushCheckout(repo, target, callback) {
   const controller = new AbortController();
   const interrupt = () => controller.abort();
@@ -166,18 +170,23 @@ export async function withPushCheckout(repo, target, callback) {
     await callback(checkout, controller.signal);
     if (controller.signal.aborted) throw Error("push validation interrupted");
     if (!await checkoutMatchesCommit(checkout, target.commit)) throw Error("target changed during validation");
+    if (controller.signal.aborted) throw Error("push validation interrupted");
   } catch (error) {
     if (error.code === "PUSH_TERMINATION_UNCONFIRMED") cleanupAllowed = false;
+    if (owned && controller.signal.aborted) {
+      cleanupAllowed = false;
+      if (error.code !== "PUSH_TERMINATION_UNCONFIRMED") {
+        throw Error("push validation interrupted; owned checkout retained for recovery", { cause: error });
+      }
+    }
     throw error;
   } finally {
-    try {
-      if (owned && cleanupAllowed) {
-        try { if (registered) await pushGit(repo, ["worktree", "remove", "--force", checkout]); }
-        finally { await rm(owned, { recursive: true, force: true, maxRetries: 5 }); }
-      }
-    } finally {
-      process.off("SIGINT", interrupt);
-      process.off("SIGTERM", interrupt);
+    // Commit to cleanup synchronously before its first destructive await.
+    process.off("SIGINT", interrupt);
+    process.off("SIGTERM", interrupt);
+    if (owned && cleanupAllowed && !controller.signal.aborted) {
+      try { if (registered) await pushGit(repo, ["worktree", "remove", "--force", checkout]); }
+      finally { await rm(owned, { recursive: true, force: true, maxRetries: 5 }); }
     }
   }
 }

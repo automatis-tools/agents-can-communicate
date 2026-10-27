@@ -1,5 +1,6 @@
-// Abort-only POSIX ownership discovery. ACC's existing batch runner creates a
-// detached group, so killing npm's PGID alone cannot authorize checkout removal.
+// Abort-only POSIX snapshot cancellation, including visible detached groups.
+// A worker reparented before this snapshot can be invisible. Success confirms
+// only observed termination and never authorizes interrupted checkout removal.
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 
