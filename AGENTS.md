@@ -59,6 +59,7 @@ For multiple commits, replace `HEAD^` with the exact pushed base commit. Keep th
 the checkout. The runner validates its immutable Git facts, complete test discovery and actual
 checkout bytes. Missing, invalid, stale or unsupported plans restore full discovery. Selection
 cannot combine with shards. Listing never runs tests, packs, verifies packages or records proof.
+Run real gates outside Node test workers, or clear `NODE_TEST_CONTEXT` in explicit child fixtures; `--list` remains available.
 
 Every uncached documentation run executes the complete selected documentation profile and verifies the
 exact single archive already created by its packed template. This smoke never repacks.
