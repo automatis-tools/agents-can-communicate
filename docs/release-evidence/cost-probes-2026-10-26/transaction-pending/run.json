@@ -1,0 +1,1872 @@
+{
+  "schemaVersion": 1,
+  "probe": "transaction",
+  "startedAt": "2026-10-27T03:22:38.998Z",
+  "settings": {
+    "rounds": 10,
+    "samples": 10,
+    "warmup": 3,
+    "timeoutMs": 900000
+  },
+  "harness": {
+    "commit": "8cdf7d2953e09515baa1c41180d002dea058863f",
+    "dirty": false
+  },
+  "host": {
+    "node": "v26.5.1",
+    "v8": "14.6.202.34-node.24",
+    "os": "Darwin",
+    "release": "27.0.0",
+    "arch": "arm64",
+    "cpuModel": "Apple M5 Max",
+    "cores": 18,
+    "memoryBytes": 137438953472
+  },
+  "durability": {
+    "fsync": "skipped",
+    "nodeOptions": "--import file:///Users/mmykola87/work/automatis-tools/agents-can-communicate/agents-can-communicate/.gitworktrees/feat-comparable-cost-probes/scripts/test-skip-fsync.mjs"
+  },
+  "sides": {
+    "baseline": {
+      "label": "baseline",
+      "ref": "v0.12.2",
+      "commit": "718ea7c3df73891605182f6e1c74366026e67898",
+      "dirty": false,
+      "sourcesHash": "924f5fae1b052249c790d310bc0a071c85145ecde5be9e83bf07870e60bc68d4"
+    },
+    "candidate": {
+      "label": "candidate",
+      "ref": "worktree",
+      "commit": "8cdf7d2953e09515baa1c41180d002dea058863f",
+      "dirty": false,
+      "sourcesHash": "924f5fae1b052249c790d310bc0a071c85145ecde5be9e83bf07870e60bc68d4"
+    }
+  },
+  "scenarios": [
+    {
+      "scenario": {
+        "probe": "transaction",
+        "messages": 30,
+        "events": 100,
+        "operation": "read",
+        "pendingJournal": true,
+        "seed": 1
+      },
+      "hash": "05eebd41ac71f19ea966819f92dc4115d6f1889b7301ae4a5373bd3ce358a23f"
+    },
+    {
+      "scenario": {
+        "probe": "transaction",
+        "messages": 30,
+        "events": 2000,
+        "operation": "read",
+        "pendingJournal": true,
+        "seed": 1
+      },
+      "hash": "7dc7175a35e17fcd1a2674998b15e88cbe16615fa60ee0ec99e24e4effde4321"
+    }
+  ],
+  "children": [
+    {
+      "round": 0,
+      "side": "baseline",
+      "scenarioHash": "05eebd41ac71f19ea966819f92dc4115d6f1889b7301ae4a5373bd3ce358a23f",
+      "loadBefore": [
+        11.9072265625,
+        12.01708984375,
+        10.62451171875
+      ],
+      "loadAfter": [
+        11.9072265625,
+        12.01708984375,
+        10.62451171875
+      ],
+      "elapsedMs": 1131,
+      "fixtureDigest": "23ca3c74508daafced573a2112d510ab2698ff155b5da2c79ed5e009a98bdd98",
+      "validation": [],
+      "samplesNs": [
+        2088750,
+        1926459,
+        1921000,
+        1963750,
+        1736750,
+        2011584,
+        1940250,
+        2602042,
+        3120042,
+        2001125
+      ],
+      "observations": {
+        "events": 100,
+        "stateReads": 2,
+        "stateByKind": {
+          "receipt": 1,
+          "message": 1
+        },
+        "readBytes": 3046,
+        "enumerations": {
+          "metadata/readdir": 1,
+          "metadata/readdirEntries": 6,
+          "events/readdir": 1,
+          "events/readdirEntries": 101
+        }
+      }
+    },
+    {
+      "round": 0,
+      "side": "candidate",
+      "scenarioHash": "05eebd41ac71f19ea966819f92dc4115d6f1889b7301ae4a5373bd3ce358a23f",
+      "loadBefore": [
+        11.9072265625,
+        12.01708984375,
+        10.62451171875
+      ],
+      "loadAfter": [
+        11.9072265625,
+        12.01708984375,
+        10.62451171875
+      ],
+      "elapsedMs": 1118,
+      "fixtureDigest": "23ca3c74508daafced573a2112d510ab2698ff155b5da2c79ed5e009a98bdd98",
+      "validation": [],
+      "samplesNs": [
+        1726542,
+        1756375,
+        1719166,
+        1969333,
+        1824834,
+        2607250,
+        2906167,
+        2106792,
+        2116167,
+        1658000
+      ],
+      "observations": {
+        "events": 100,
+        "stateReads": 2,
+        "stateByKind": {
+          "receipt": 1,
+          "message": 1
+        },
+        "readBytes": 3046,
+        "enumerations": {
+          "metadata/readdir": 1,
+          "metadata/readdirEntries": 6,
+          "events/readdir": 1,
+          "events/readdirEntries": 101
+        }
+      }
+    },
+    {
+      "round": 0,
+      "side": "baseline",
+      "scenarioHash": "7dc7175a35e17fcd1a2674998b15e88cbe16615fa60ee0ec99e24e4effde4321",
+      "loadBefore": [
+        11.9072265625,
+        12.01708984375,
+        10.62451171875
+      ],
+      "loadAfter": [
+        14.80615234375,
+        12.6513671875,
+        10.88232421875
+      ],
+      "elapsedMs": 19333,
+      "fixtureDigest": "57a23fc48f1c9ae1636fef74b7ac4cf0239d216e54c974cbf61c2f2d614bada4",
+      "validation": [],
+      "samplesNs": [
+        3306750,
+        3295333,
+        8216292,
+        5145167,
+        4814208,
+        4535083,
+        4105625,
+        7232667,
+        3840000,
+        3818667
+      ],
+      "observations": {
+        "events": 2000,
+        "stateReads": 2,
+        "stateByKind": {
+          "receipt": 1,
+          "message": 1
+        },
+        "readBytes": 3046,
+        "enumerations": {
+          "metadata/readdir": 1,
+          "metadata/readdirEntries": 6,
+          "events/readdir": 1,
+          "events/readdirEntries": 2001
+        }
+      }
+    },
+    {
+      "round": 0,
+      "side": "candidate",
+      "scenarioHash": "7dc7175a35e17fcd1a2674998b15e88cbe16615fa60ee0ec99e24e4effde4321",
+      "loadBefore": [
+        14.80615234375,
+        12.6513671875,
+        10.88232421875
+      ],
+      "loadAfter": [
+        16.54833984375,
+        13.1904296875,
+        11.1162109375
+      ],
+      "elapsedMs": 20704,
+      "fixtureDigest": "57a23fc48f1c9ae1636fef74b7ac4cf0239d216e54c974cbf61c2f2d614bada4",
+      "validation": [],
+      "samplesNs": [
+        3605459,
+        3129625,
+        7502375,
+        3608125,
+        3246417,
+        3421709,
+        3182375,
+        3556417,
+        6743666,
+        3711709
+      ],
+      "observations": {
+        "events": 2000,
+        "stateReads": 2,
+        "stateByKind": {
+          "receipt": 1,
+          "message": 1
+        },
+        "readBytes": 3046,
+        "enumerations": {
+          "metadata/readdir": 1,
+          "metadata/readdirEntries": 6,
+          "events/readdir": 1,
+          "events/readdirEntries": 2001
+        }
+      }
+    },
+    {
+      "round": 1,
+      "side": "candidate",
+      "scenarioHash": "05eebd41ac71f19ea966819f92dc4115d6f1889b7301ae4a5373bd3ce358a23f",
+      "loadBefore": [
+        16.54833984375,
+        13.1904296875,
+        11.1162109375
+      ],
+      "loadAfter": [
+        16.54833984375,
+        13.1904296875,
+        11.1162109375
+      ],
+      "elapsedMs": 1366,
+      "fixtureDigest": "23ca3c74508daafced573a2112d510ab2698ff155b5da2c79ed5e009a98bdd98",
+      "validation": [],
+      "samplesNs": [
+        3298625,
+        3454917,
+        2043416,
+        1867792,
+        1820667,
+        1959458,
+        4658958,
+        3019459,
+        2283875,
+        2964750
+      ],
+      "observations": {
+        "events": 100,
+        "stateReads": 2,
+        "stateByKind": {
+          "receipt": 1,
+          "message": 1
+        },
+        "readBytes": 3046,
+        "enumerations": {
+          "metadata/readdir": 1,
+          "metadata/readdirEntries": 6,
+          "events/readdir": 1,
+          "events/readdirEntries": 101
+        }
+      }
+    },
+    {
+      "round": 1,
+      "side": "baseline",
+      "scenarioHash": "05eebd41ac71f19ea966819f92dc4115d6f1889b7301ae4a5373bd3ce358a23f",
+      "loadBefore": [
+        16.54833984375,
+        13.1904296875,
+        11.1162109375
+      ],
+      "loadAfter": [
+        17.30517578125,
+        13.40283203125,
+        11.203125
+      ],
+      "elapsedMs": 1302,
+      "fixtureDigest": "23ca3c74508daafced573a2112d510ab2698ff155b5da2c79ed5e009a98bdd98",
+      "validation": [],
+      "samplesNs": [
+        2165583,
+        2415000,
+        1974416,
+        1840250,
+        1875667,
+        2068333,
+        3858292,
+        1960583,
+        2218292,
+        1937792
+      ],
+      "observations": {
+        "events": 100,
+        "stateReads": 2,
+        "stateByKind": {
+          "receipt": 1,
+          "message": 1
+        },
+        "readBytes": 3046,
+        "enumerations": {
+          "metadata/readdir": 1,
+          "metadata/readdirEntries": 6,
+          "events/readdir": 1,
+          "events/readdirEntries": 101
+        }
+      }
+    },
+    {
+      "round": 1,
+      "side": "candidate",
+      "scenarioHash": "7dc7175a35e17fcd1a2674998b15e88cbe16615fa60ee0ec99e24e4effde4321",
+      "loadBefore": [
+        17.30517578125,
+        13.40283203125,
+        11.203125
+      ],
+      "loadAfter": [
+        17.14404296875,
+        13.61865234375,
+        11.3310546875
+      ],
+      "elapsedMs": 22022,
+      "fixtureDigest": "57a23fc48f1c9ae1636fef74b7ac4cf0239d216e54c974cbf61c2f2d614bada4",
+      "validation": [],
+      "samplesNs": [
+        4134125,
+        4466042,
+        4448458,
+        6426291,
+        4388000,
+        3875666,
+        3267917,
+        3593042,
+        3968292,
+        5311083
+      ],
+      "observations": {
+        "events": 2000,
+        "stateReads": 2,
+        "stateByKind": {
+          "receipt": 1,
+          "message": 1
+        },
+        "readBytes": 3046,
+        "enumerations": {
+          "metadata/readdir": 1,
+          "metadata/readdirEntries": 6,
+          "events/readdir": 1,
+          "events/readdirEntries": 2001
+        }
+      }
+    },
+    {
+      "round": 1,
+      "side": "baseline",
+      "scenarioHash": "7dc7175a35e17fcd1a2674998b15e88cbe16615fa60ee0ec99e24e4effde4321",
+      "loadBefore": [
+        17.14404296875,
+        13.61865234375,
+        11.3310546875
+      ],
+      "loadAfter": [
+        19.09912109375,
+        14.30322265625,
+        11.63037109375
+      ],
+      "elapsedMs": 19872,
+      "fixtureDigest": "57a23fc48f1c9ae1636fef74b7ac4cf0239d216e54c974cbf61c2f2d614bada4",
+      "validation": [],
+      "samplesNs": [
+        4511667,
+        3354583,
+        3463583,
+        3159834,
+        2962166,
+        2999167,
+        3213042,
+        3051041,
+        4597083,
+        3048833
+      ],
+      "observations": {
+        "events": 2000,
+        "stateReads": 2,
+        "stateByKind": {
+          "receipt": 1,
+          "message": 1
+        },
+        "readBytes": 3046,
+        "enumerations": {
+          "metadata/readdir": 1,
+          "metadata/readdirEntries": 6,
+          "events/readdir": 1,
+          "events/readdirEntries": 2001
+        }
+      }
+    },
+    {
+      "round": 2,
+      "side": "baseline",
+      "scenarioHash": "05eebd41ac71f19ea966819f92dc4115d6f1889b7301ae4a5373bd3ce358a23f",
+      "loadBefore": [
+        19.09912109375,
+        14.30322265625,
+        11.63037109375
+      ],
+      "loadAfter": [
+        19.09912109375,
+        14.30322265625,
+        11.63037109375
+      ],
+      "elapsedMs": 1103,
+      "fixtureDigest": "23ca3c74508daafced573a2112d510ab2698ff155b5da2c79ed5e009a98bdd98",
+      "validation": [],
+      "samplesNs": [
+        2290375,
+        1762708,
+        1729250,
+        1653042,
+        1943667,
+        3684417,
+        2185792,
+        1926875,
+        1900542,
+        1870333
+      ],
+      "observations": {
+        "events": 100,
+        "stateReads": 2,
+        "stateByKind": {
+          "receipt": 1,
+          "message": 1
+        },
+        "readBytes": 3046,
+        "enumerations": {
+          "metadata/readdir": 1,
+          "metadata/readdirEntries": 6,
+          "events/readdir": 1,
+          "events/readdirEntries": 101
+        }
+      }
+    },
+    {
+      "round": 2,
+      "side": "candidate",
+      "scenarioHash": "05eebd41ac71f19ea966819f92dc4115d6f1889b7301ae4a5373bd3ce358a23f",
+      "loadBefore": [
+        19.09912109375,
+        14.30322265625,
+        11.63037109375
+      ],
+      "loadAfter": [
+        18.8505859375,
+        14.3310546875,
+        11.65576171875
+      ],
+      "elapsedMs": 1169,
+      "fixtureDigest": "23ca3c74508daafced573a2112d510ab2698ff155b5da2c79ed5e009a98bdd98",
+      "validation": [],
+      "samplesNs": [
+        1738875,
+        1680125,
+        1774000,
+        1740709,
+        1702750,
+        2151250,
+        1852375,
+        2019167,
+        2030500,
+        2276459
+      ],
+      "observations": {
+        "events": 100,
+        "stateReads": 2,
+        "stateByKind": {
+          "receipt": 1,
+          "message": 1
+        },
+        "readBytes": 3046,
+        "enumerations": {
+          "metadata/readdir": 1,
+          "metadata/readdirEntries": 6,
+          "events/readdir": 1,
+          "events/readdirEntries": 101
+        }
+      }
+    },
+    {
+      "round": 2,
+      "side": "baseline",
+      "scenarioHash": "7dc7175a35e17fcd1a2674998b15e88cbe16615fa60ee0ec99e24e4effde4321",
+      "loadBefore": [
+        18.8505859375,
+        14.3310546875,
+        11.65576171875
+      ],
+      "loadAfter": [
+        19.02001953125,
+        14.60400390625,
+        11.80029296875
+      ],
+      "elapsedMs": 18168,
+      "fixtureDigest": "57a23fc48f1c9ae1636fef74b7ac4cf0239d216e54c974cbf61c2f2d614bada4",
+      "validation": [],
+      "samplesNs": [
+        5658875,
+        3946834,
+        3766625,
+        3493208,
+        3514792,
+        3786042,
+        2966917,
+        7882375,
+        3090333,
+        3350667
+      ],
+      "observations": {
+        "events": 2000,
+        "stateReads": 2,
+        "stateByKind": {
+          "receipt": 1,
+          "message": 1
+        },
+        "readBytes": 3046,
+        "enumerations": {
+          "metadata/readdir": 1,
+          "metadata/readdirEntries": 6,
+          "events/readdir": 1,
+          "events/readdirEntries": 2001
+        }
+      }
+    },
+    {
+      "round": 2,
+      "side": "candidate",
+      "scenarioHash": "7dc7175a35e17fcd1a2674998b15e88cbe16615fa60ee0ec99e24e4effde4321",
+      "loadBefore": [
+        19.02001953125,
+        14.60400390625,
+        11.80029296875
+      ],
+      "loadAfter": [
+        17.45166015625,
+        14.54443359375,
+        11.84423828125
+      ],
+      "elapsedMs": 18952,
+      "fixtureDigest": "57a23fc48f1c9ae1636fef74b7ac4cf0239d216e54c974cbf61c2f2d614bada4",
+      "validation": [],
+      "samplesNs": [
+        3196666,
+        3183250,
+        3169042,
+        8386000,
+        3272875,
+        3291916,
+        2994875,
+        3440708,
+        3138375,
+        3301959
+      ],
+      "observations": {
+        "events": 2000,
+        "stateReads": 2,
+        "stateByKind": {
+          "receipt": 1,
+          "message": 1
+        },
+        "readBytes": 3046,
+        "enumerations": {
+          "metadata/readdir": 1,
+          "metadata/readdirEntries": 6,
+          "events/readdir": 1,
+          "events/readdirEntries": 2001
+        }
+      }
+    },
+    {
+      "round": 3,
+      "side": "candidate",
+      "scenarioHash": "05eebd41ac71f19ea966819f92dc4115d6f1889b7301ae4a5373bd3ce358a23f",
+      "loadBefore": [
+        17.45166015625,
+        14.54443359375,
+        11.84423828125
+      ],
+      "loadAfter": [
+        17.45166015625,
+        14.54443359375,
+        11.84423828125
+      ],
+      "elapsedMs": 1135,
+      "fixtureDigest": "23ca3c74508daafced573a2112d510ab2698ff155b5da2c79ed5e009a98bdd98",
+      "validation": [],
+      "samplesNs": [
+        1802792,
+        1697709,
+        3467584,
+        3457750,
+        1803875,
+        2195125,
+        1818708,
+        1895500,
+        2074000,
+        1907417
+      ],
+      "observations": {
+        "events": 100,
+        "stateReads": 2,
+        "stateByKind": {
+          "receipt": 1,
+          "message": 1
+        },
+        "readBytes": 3046,
+        "enumerations": {
+          "metadata/readdir": 1,
+          "metadata/readdirEntries": 6,
+          "events/readdir": 1,
+          "events/readdirEntries": 101
+        }
+      }
+    },
+    {
+      "round": 3,
+      "side": "baseline",
+      "scenarioHash": "05eebd41ac71f19ea966819f92dc4115d6f1889b7301ae4a5373bd3ce358a23f",
+      "loadBefore": [
+        17.45166015625,
+        14.54443359375,
+        11.84423828125
+      ],
+      "loadAfter": [
+        17.45166015625,
+        14.54443359375,
+        11.84423828125
+      ],
+      "elapsedMs": 1197,
+      "fixtureDigest": "23ca3c74508daafced573a2112d510ab2698ff155b5da2c79ed5e009a98bdd98",
+      "validation": [],
+      "samplesNs": [
+        1808250,
+        1739375,
+        1969542,
+        3432000,
+        2800125,
+        2103958,
+        2005167,
+        2384833,
+        2038958,
+        2396791
+      ],
+      "observations": {
+        "events": 100,
+        "stateReads": 2,
+        "stateByKind": {
+          "receipt": 1,
+          "message": 1
+        },
+        "readBytes": 3046,
+        "enumerations": {
+          "metadata/readdir": 1,
+          "metadata/readdirEntries": 6,
+          "events/readdir": 1,
+          "events/readdirEntries": 101
+        }
+      }
+    },
+    {
+      "round": 3,
+      "side": "candidate",
+      "scenarioHash": "7dc7175a35e17fcd1a2674998b15e88cbe16615fa60ee0ec99e24e4effde4321",
+      "loadBefore": [
+        17.45166015625,
+        14.54443359375,
+        11.84423828125
+      ],
+      "loadAfter": [
+        18.0537109375,
+        14.86669921875,
+        12.03466796875
+      ],
+      "elapsedMs": 23286,
+      "fixtureDigest": "57a23fc48f1c9ae1636fef74b7ac4cf0239d216e54c974cbf61c2f2d614bada4",
+      "validation": [],
+      "samplesNs": [
+        4312917,
+        5226208,
+        3881417,
+        4363750,
+        3971166,
+        3321459,
+        4244125,
+        6148000,
+        4510958,
+        3713041
+      ],
+      "observations": {
+        "events": 2000,
+        "stateReads": 2,
+        "stateByKind": {
+          "receipt": 1,
+          "message": 1
+        },
+        "readBytes": 3046,
+        "enumerations": {
+          "metadata/readdir": 1,
+          "metadata/readdirEntries": 6,
+          "events/readdir": 1,
+          "events/readdirEntries": 2001
+        }
+      }
+    },
+    {
+      "round": 3,
+      "side": "baseline",
+      "scenarioHash": "7dc7175a35e17fcd1a2674998b15e88cbe16615fa60ee0ec99e24e4effde4321",
+      "loadBefore": [
+        18.0537109375,
+        14.86669921875,
+        12.03466796875
+      ],
+      "loadAfter": [
+        16.7958984375,
+        14.83056640625,
+        12.08935546875
+      ],
+      "elapsedMs": 21203,
+      "fixtureDigest": "57a23fc48f1c9ae1636fef74b7ac4cf0239d216e54c974cbf61c2f2d614bada4",
+      "validation": [],
+      "samplesNs": [
+        4041667,
+        5335042,
+        2992417,
+        3137459,
+        3134625,
+        2896541,
+        2860000,
+        3365875,
+        2970708,
+        4595917
+      ],
+      "observations": {
+        "events": 2000,
+        "stateReads": 2,
+        "stateByKind": {
+          "receipt": 1,
+          "message": 1
+        },
+        "readBytes": 3046,
+        "enumerations": {
+          "metadata/readdir": 1,
+          "metadata/readdirEntries": 6,
+          "events/readdir": 1,
+          "events/readdirEntries": 2001
+        }
+      }
+    },
+    {
+      "round": 4,
+      "side": "baseline",
+      "scenarioHash": "05eebd41ac71f19ea966819f92dc4115d6f1889b7301ae4a5373bd3ce358a23f",
+      "loadBefore": [
+        16.7958984375,
+        14.83056640625,
+        12.08935546875
+      ],
+      "loadAfter": [
+        16.41162109375,
+        14.783203125,
+        12.08837890625
+      ],
+      "elapsedMs": 1126,
+      "fixtureDigest": "23ca3c74508daafced573a2112d510ab2698ff155b5da2c79ed5e009a98bdd98",
+      "validation": [],
+      "samplesNs": [
+        2935666,
+        3444375,
+        1786833,
+        1791084,
+        1821167,
+        1846875,
+        2117375,
+        1797417,
+        1666125,
+        1636042
+      ],
+      "observations": {
+        "events": 100,
+        "stateReads": 2,
+        "stateByKind": {
+          "receipt": 1,
+          "message": 1
+        },
+        "readBytes": 3046,
+        "enumerations": {
+          "metadata/readdir": 1,
+          "metadata/readdirEntries": 6,
+          "events/readdir": 1,
+          "events/readdirEntries": 101
+        }
+      }
+    },
+    {
+      "round": 4,
+      "side": "candidate",
+      "scenarioHash": "05eebd41ac71f19ea966819f92dc4115d6f1889b7301ae4a5373bd3ce358a23f",
+      "loadBefore": [
+        16.41162109375,
+        14.783203125,
+        12.08837890625
+      ],
+      "loadAfter": [
+        16.41162109375,
+        14.783203125,
+        12.08837890625
+      ],
+      "elapsedMs": 1145,
+      "fixtureDigest": "23ca3c74508daafced573a2112d510ab2698ff155b5da2c79ed5e009a98bdd98",
+      "validation": [],
+      "samplesNs": [
+        1985875,
+        1830708,
+        1831083,
+        1918125,
+        1672958,
+        2173833,
+        1787958,
+        2588333,
+        3087625,
+        1981875
+      ],
+      "observations": {
+        "events": 100,
+        "stateReads": 2,
+        "stateByKind": {
+          "receipt": 1,
+          "message": 1
+        },
+        "readBytes": 3046,
+        "enumerations": {
+          "metadata/readdir": 1,
+          "metadata/readdirEntries": 6,
+          "events/readdir": 1,
+          "events/readdirEntries": 101
+        }
+      }
+    },
+    {
+      "round": 4,
+      "side": "baseline",
+      "scenarioHash": "7dc7175a35e17fcd1a2674998b15e88cbe16615fa60ee0ec99e24e4effde4321",
+      "loadBefore": [
+        16.41162109375,
+        14.783203125,
+        12.08837890625
+      ],
+      "loadAfter": [
+        13.21875,
+        14.1640625,
+        11.92822265625
+      ],
+      "elapsedMs": 19952,
+      "fixtureDigest": "57a23fc48f1c9ae1636fef74b7ac4cf0239d216e54c974cbf61c2f2d614bada4",
+      "validation": [],
+      "samplesNs": [
+        3352083,
+        2997459,
+        3613916,
+        3054083,
+        3521584,
+        3365000,
+        4052000,
+        3426583,
+        3316250,
+        2993000
+      ],
+      "observations": {
+        "events": 2000,
+        "stateReads": 2,
+        "stateByKind": {
+          "receipt": 1,
+          "message": 1
+        },
+        "readBytes": 3046,
+        "enumerations": {
+          "metadata/readdir": 1,
+          "metadata/readdirEntries": 6,
+          "events/readdir": 1,
+          "events/readdirEntries": 2001
+        }
+      }
+    },
+    {
+      "round": 4,
+      "side": "candidate",
+      "scenarioHash": "7dc7175a35e17fcd1a2674998b15e88cbe16615fa60ee0ec99e24e4effde4321",
+      "loadBefore": [
+        13.21875,
+        14.1640625,
+        11.92822265625
+      ],
+      "loadAfter": [
+        10.8115234375,
+        13.5537109375,
+        11.76025390625
+      ],
+      "elapsedMs": 20173,
+      "fixtureDigest": "57a23fc48f1c9ae1636fef74b7ac4cf0239d216e54c974cbf61c2f2d614bada4",
+      "validation": [],
+      "samplesNs": [
+        3311750,
+        5024375,
+        3116250,
+        3661375,
+        3272875,
+        3251583,
+        3104209,
+        3367750,
+        5611833,
+        4567417
+      ],
+      "observations": {
+        "events": 2000,
+        "stateReads": 2,
+        "stateByKind": {
+          "receipt": 1,
+          "message": 1
+        },
+        "readBytes": 3046,
+        "enumerations": {
+          "metadata/readdir": 1,
+          "metadata/readdirEntries": 6,
+          "events/readdir": 1,
+          "events/readdirEntries": 2001
+        }
+      }
+    },
+    {
+      "round": 5,
+      "side": "candidate",
+      "scenarioHash": "05eebd41ac71f19ea966819f92dc4115d6f1889b7301ae4a5373bd3ce358a23f",
+      "loadBefore": [
+        10.8115234375,
+        13.5537109375,
+        11.76025390625
+      ],
+      "loadAfter": [
+        10.8115234375,
+        13.5537109375,
+        11.76025390625
+      ],
+      "elapsedMs": 1261,
+      "fixtureDigest": "23ca3c74508daafced573a2112d510ab2698ff155b5da2c79ed5e009a98bdd98",
+      "validation": [],
+      "samplesNs": [
+        1768333,
+        1850500,
+        1712125,
+        1736292,
+        1857125,
+        2090334,
+        2394708,
+        1861000,
+        1895167,
+        2831166
+      ],
+      "observations": {
+        "events": 100,
+        "stateReads": 2,
+        "stateByKind": {
+          "receipt": 1,
+          "message": 1
+        },
+        "readBytes": 3046,
+        "enumerations": {
+          "metadata/readdir": 1,
+          "metadata/readdirEntries": 6,
+          "events/readdir": 1,
+          "events/readdirEntries": 101
+        }
+      }
+    },
+    {
+      "round": 5,
+      "side": "baseline",
+      "scenarioHash": "05eebd41ac71f19ea966819f92dc4115d6f1889b7301ae4a5373bd3ce358a23f",
+      "loadBefore": [
+        10.8115234375,
+        13.5537109375,
+        11.76025390625
+      ],
+      "loadAfter": [
+        10.8115234375,
+        13.5537109375,
+        11.76025390625
+      ],
+      "elapsedMs": 1146,
+      "fixtureDigest": "23ca3c74508daafced573a2112d510ab2698ff155b5da2c79ed5e009a98bdd98",
+      "validation": [],
+      "samplesNs": [
+        1641375,
+        1667375,
+        1901417,
+        2723458,
+        3353667,
+        1863958,
+        1832667,
+        1915333,
+        1887792,
+        1967167
+      ],
+      "observations": {
+        "events": 100,
+        "stateReads": 2,
+        "stateByKind": {
+          "receipt": 1,
+          "message": 1
+        },
+        "readBytes": 3046,
+        "enumerations": {
+          "metadata/readdir": 1,
+          "metadata/readdirEntries": 6,
+          "events/readdir": 1,
+          "events/readdirEntries": 101
+        }
+      }
+    },
+    {
+      "round": 5,
+      "side": "candidate",
+      "scenarioHash": "7dc7175a35e17fcd1a2674998b15e88cbe16615fa60ee0ec99e24e4effde4321",
+      "loadBefore": [
+        10.8115234375,
+        13.5537109375,
+        11.76025390625
+      ],
+      "loadAfter": [
+        9.16015625,
+        12.9453125,
+        11.59228515625
+      ],
+      "elapsedMs": 22122,
+      "fixtureDigest": "57a23fc48f1c9ae1636fef74b7ac4cf0239d216e54c974cbf61c2f2d614bada4",
+      "validation": [],
+      "samplesNs": [
+        3379458,
+        3079625,
+        2985459,
+        3225125,
+        2908125,
+        2957875,
+        4102042,
+        4209417,
+        3855458,
+        3258209
+      ],
+      "observations": {
+        "events": 2000,
+        "stateReads": 2,
+        "stateByKind": {
+          "receipt": 1,
+          "message": 1
+        },
+        "readBytes": 3046,
+        "enumerations": {
+          "metadata/readdir": 1,
+          "metadata/readdirEntries": 6,
+          "events/readdir": 1,
+          "events/readdirEntries": 2001
+        }
+      }
+    },
+    {
+      "round": 5,
+      "side": "baseline",
+      "scenarioHash": "7dc7175a35e17fcd1a2674998b15e88cbe16615fa60ee0ec99e24e4effde4321",
+      "loadBefore": [
+        9.16015625,
+        12.9453125,
+        11.59228515625
+      ],
+      "loadAfter": [
+        13.3173828125,
+        13.537109375,
+        11.84912109375
+      ],
+      "elapsedMs": 31528,
+      "fixtureDigest": "57a23fc48f1c9ae1636fef74b7ac4cf0239d216e54c974cbf61c2f2d614bada4",
+      "validation": [],
+      "samplesNs": [
+        3032125,
+        3631458,
+        3122917,
+        3183917,
+        6746667,
+        4568792,
+        3623500,
+        3373167,
+        3843792,
+        3072875
+      ],
+      "observations": {
+        "events": 2000,
+        "stateReads": 2,
+        "stateByKind": {
+          "receipt": 1,
+          "message": 1
+        },
+        "readBytes": 3046,
+        "enumerations": {
+          "metadata/readdir": 1,
+          "metadata/readdirEntries": 6,
+          "events/readdir": 1,
+          "events/readdirEntries": 2001
+        }
+      }
+    },
+    {
+      "round": 6,
+      "side": "baseline",
+      "scenarioHash": "05eebd41ac71f19ea966819f92dc4115d6f1889b7301ae4a5373bd3ce358a23f",
+      "loadBefore": [
+        13.3173828125,
+        13.537109375,
+        11.84912109375
+      ],
+      "loadAfter": [
+        13.3173828125,
+        13.537109375,
+        11.84912109375
+      ],
+      "elapsedMs": 1217,
+      "fixtureDigest": "23ca3c74508daafced573a2112d510ab2698ff155b5da2c79ed5e009a98bdd98",
+      "validation": [],
+      "samplesNs": [
+        1824916,
+        2048000,
+        2099667,
+        7310875,
+        3331667,
+        3133209,
+        2237958,
+        2084542,
+        1880375,
+        1870667
+      ],
+      "observations": {
+        "events": 100,
+        "stateReads": 2,
+        "stateByKind": {
+          "receipt": 1,
+          "message": 1
+        },
+        "readBytes": 3046,
+        "enumerations": {
+          "metadata/readdir": 1,
+          "metadata/readdirEntries": 6,
+          "events/readdir": 1,
+          "events/readdirEntries": 101
+        }
+      }
+    },
+    {
+      "round": 6,
+      "side": "candidate",
+      "scenarioHash": "05eebd41ac71f19ea966819f92dc4115d6f1889b7301ae4a5373bd3ce358a23f",
+      "loadBefore": [
+        13.3173828125,
+        13.537109375,
+        11.84912109375
+      ],
+      "loadAfter": [
+        13.05126953125,
+        13.47802734375,
+        11.837890625
+      ],
+      "elapsedMs": 2014,
+      "fixtureDigest": "23ca3c74508daafced573a2112d510ab2698ff155b5da2c79ed5e009a98bdd98",
+      "validation": [],
+      "samplesNs": [
+        7022291,
+        4849292,
+        5906959,
+        5411625,
+        3043166,
+        6689417,
+        6083584,
+        7151917,
+        6444792,
+        3530250
+      ],
+      "observations": {
+        "events": 100,
+        "stateReads": 2,
+        "stateByKind": {
+          "receipt": 1,
+          "message": 1
+        },
+        "readBytes": 3046,
+        "enumerations": {
+          "metadata/readdir": 1,
+          "metadata/readdirEntries": 6,
+          "events/readdir": 1,
+          "events/readdirEntries": 101
+        }
+      }
+    },
+    {
+      "round": 6,
+      "side": "baseline",
+      "scenarioHash": "7dc7175a35e17fcd1a2674998b15e88cbe16615fa60ee0ec99e24e4effde4321",
+      "loadBefore": [
+        13.05126953125,
+        13.47802734375,
+        11.837890625
+      ],
+      "loadAfter": [
+        12.482421875,
+        13.3173828125,
+        11.8173828125
+      ],
+      "elapsedMs": 21552,
+      "fixtureDigest": "57a23fc48f1c9ae1636fef74b7ac4cf0239d216e54c974cbf61c2f2d614bada4",
+      "validation": [],
+      "samplesNs": [
+        3424750,
+        3167708,
+        3314792,
+        3601917,
+        3586292,
+        3388250,
+        4605584,
+        4035167,
+        3487291,
+        3248292
+      ],
+      "observations": {
+        "events": 2000,
+        "stateReads": 2,
+        "stateByKind": {
+          "receipt": 1,
+          "message": 1
+        },
+        "readBytes": 3046,
+        "enumerations": {
+          "metadata/readdir": 1,
+          "metadata/readdirEntries": 6,
+          "events/readdir": 1,
+          "events/readdirEntries": 2001
+        }
+      }
+    },
+    {
+      "round": 6,
+      "side": "candidate",
+      "scenarioHash": "7dc7175a35e17fcd1a2674998b15e88cbe16615fa60ee0ec99e24e4effde4321",
+      "loadBefore": [
+        12.482421875,
+        13.3173828125,
+        11.8173828125
+      ],
+      "loadAfter": [
+        10.42626953125,
+        12.7939453125,
+        11.6640625
+      ],
+      "elapsedMs": 18751,
+      "fixtureDigest": "57a23fc48f1c9ae1636fef74b7ac4cf0239d216e54c974cbf61c2f2d614bada4",
+      "validation": [],
+      "samplesNs": [
+        4154292,
+        4535041,
+        3255792,
+        3205708,
+        3104750,
+        3221917,
+        3011625,
+        2949875,
+        5881208,
+        3499500
+      ],
+      "observations": {
+        "events": 2000,
+        "stateReads": 2,
+        "stateByKind": {
+          "receipt": 1,
+          "message": 1
+        },
+        "readBytes": 3046,
+        "enumerations": {
+          "metadata/readdir": 1,
+          "metadata/readdirEntries": 6,
+          "events/readdir": 1,
+          "events/readdirEntries": 2001
+        }
+      }
+    },
+    {
+      "round": 7,
+      "side": "candidate",
+      "scenarioHash": "05eebd41ac71f19ea966819f92dc4115d6f1889b7301ae4a5373bd3ce358a23f",
+      "loadBefore": [
+        10.42626953125,
+        12.7939453125,
+        11.6640625
+      ],
+      "loadAfter": [
+        10.42626953125,
+        12.7939453125,
+        11.6640625
+      ],
+      "elapsedMs": 1299,
+      "fixtureDigest": "23ca3c74508daafced573a2112d510ab2698ff155b5da2c79ed5e009a98bdd98",
+      "validation": [],
+      "samplesNs": [
+        1772833,
+        2075500,
+        2487333,
+        2123208,
+        1864209,
+        2120917,
+        1922583,
+        3566709,
+        4498833,
+        2064917
+      ],
+      "observations": {
+        "events": 100,
+        "stateReads": 2,
+        "stateByKind": {
+          "receipt": 1,
+          "message": 1
+        },
+        "readBytes": 3046,
+        "enumerations": {
+          "metadata/readdir": 1,
+          "metadata/readdirEntries": 6,
+          "events/readdir": 1,
+          "events/readdirEntries": 101
+        }
+      }
+    },
+    {
+      "round": 7,
+      "side": "baseline",
+      "scenarioHash": "05eebd41ac71f19ea966819f92dc4115d6f1889b7301ae4a5373bd3ce358a23f",
+      "loadBefore": [
+        10.42626953125,
+        12.7939453125,
+        11.6640625
+      ],
+      "loadAfter": [
+        10.42626953125,
+        12.7939453125,
+        11.6640625
+      ],
+      "elapsedMs": 1182,
+      "fixtureDigest": "23ca3c74508daafced573a2112d510ab2698ff155b5da2c79ed5e009a98bdd98",
+      "validation": [],
+      "samplesNs": [
+        1710500,
+        1702166,
+        1912708,
+        1798417,
+        2050167,
+        1832125,
+        1664458,
+        2017667,
+        3716375,
+        2525583
+      ],
+      "observations": {
+        "events": 100,
+        "stateReads": 2,
+        "stateByKind": {
+          "receipt": 1,
+          "message": 1
+        },
+        "readBytes": 3046,
+        "enumerations": {
+          "metadata/readdir": 1,
+          "metadata/readdirEntries": 6,
+          "events/readdir": 1,
+          "events/readdirEntries": 101
+        }
+      }
+    },
+    {
+      "round": 7,
+      "side": "candidate",
+      "scenarioHash": "7dc7175a35e17fcd1a2674998b15e88cbe16615fa60ee0ec99e24e4effde4321",
+      "loadBefore": [
+        10.42626953125,
+        12.7939453125,
+        11.6640625
+      ],
+      "loadAfter": [
+        9.0419921875,
+        12.33447265625,
+        11.52587890625
+      ],
+      "elapsedMs": 19475,
+      "fixtureDigest": "57a23fc48f1c9ae1636fef74b7ac4cf0239d216e54c974cbf61c2f2d614bada4",
+      "validation": [],
+      "samplesNs": [
+        3075583,
+        3001291,
+        3258000,
+        3046583,
+        3373041,
+        3773375,
+        5430917,
+        3260833,
+        4194417,
+        4445209
+      ],
+      "observations": {
+        "events": 2000,
+        "stateReads": 2,
+        "stateByKind": {
+          "receipt": 1,
+          "message": 1
+        },
+        "readBytes": 3046,
+        "enumerations": {
+          "metadata/readdir": 1,
+          "metadata/readdirEntries": 6,
+          "events/readdir": 1,
+          "events/readdirEntries": 2001
+        }
+      }
+    },
+    {
+      "round": 7,
+      "side": "baseline",
+      "scenarioHash": "7dc7175a35e17fcd1a2674998b15e88cbe16615fa60ee0ec99e24e4effde4321",
+      "loadBefore": [
+        9.0419921875,
+        12.33447265625,
+        11.52587890625
+      ],
+      "loadAfter": [
+        7.59228515625,
+        11.79296875,
+        11.35009765625
+      ],
+      "elapsedMs": 18364,
+      "fixtureDigest": "57a23fc48f1c9ae1636fef74b7ac4cf0239d216e54c974cbf61c2f2d614bada4",
+      "validation": [],
+      "samplesNs": [
+        5418875,
+        3388917,
+        3216333,
+        3008291,
+        3263750,
+        2946917,
+        2985167,
+        5399291,
+        3062625,
+        3209667
+      ],
+      "observations": {
+        "events": 2000,
+        "stateReads": 2,
+        "stateByKind": {
+          "receipt": 1,
+          "message": 1
+        },
+        "readBytes": 3046,
+        "enumerations": {
+          "metadata/readdir": 1,
+          "metadata/readdirEntries": 6,
+          "events/readdir": 1,
+          "events/readdirEntries": 2001
+        }
+      }
+    },
+    {
+      "round": 8,
+      "side": "baseline",
+      "scenarioHash": "05eebd41ac71f19ea966819f92dc4115d6f1889b7301ae4a5373bd3ce358a23f",
+      "loadBefore": [
+        7.59228515625,
+        11.79296875,
+        11.35009765625
+      ],
+      "loadAfter": [
+        7.59228515625,
+        11.79296875,
+        11.35009765625
+      ],
+      "elapsedMs": 1104,
+      "fixtureDigest": "23ca3c74508daafced573a2112d510ab2698ff155b5da2c79ed5e009a98bdd98",
+      "validation": [],
+      "samplesNs": [
+        1718125,
+        1748500,
+        3740042,
+        4309917,
+        1672708,
+        1761042,
+        1576208,
+        1798709,
+        1657833,
+        1877458
+      ],
+      "observations": {
+        "events": 100,
+        "stateReads": 2,
+        "stateByKind": {
+          "receipt": 1,
+          "message": 1
+        },
+        "readBytes": 3046,
+        "enumerations": {
+          "metadata/readdir": 1,
+          "metadata/readdirEntries": 6,
+          "events/readdir": 1,
+          "events/readdirEntries": 101
+        }
+      }
+    },
+    {
+      "round": 8,
+      "side": "candidate",
+      "scenarioHash": "05eebd41ac71f19ea966819f92dc4115d6f1889b7301ae4a5373bd3ce358a23f",
+      "loadBefore": [
+        7.59228515625,
+        11.79296875,
+        11.35009765625
+      ],
+      "loadAfter": [
+        7.59228515625,
+        11.79296875,
+        11.35009765625
+      ],
+      "elapsedMs": 1089,
+      "fixtureDigest": "23ca3c74508daafced573a2112d510ab2698ff155b5da2c79ed5e009a98bdd98",
+      "validation": [],
+      "samplesNs": [
+        1837875,
+        1916834,
+        1814083,
+        3714542,
+        2778000,
+        1630250,
+        1851000,
+        1761458,
+        1766000,
+        1712000
+      ],
+      "observations": {
+        "events": 100,
+        "stateReads": 2,
+        "stateByKind": {
+          "receipt": 1,
+          "message": 1
+        },
+        "readBytes": 3046,
+        "enumerations": {
+          "metadata/readdir": 1,
+          "metadata/readdirEntries": 6,
+          "events/readdir": 1,
+          "events/readdirEntries": 101
+        }
+      }
+    },
+    {
+      "round": 8,
+      "side": "baseline",
+      "scenarioHash": "7dc7175a35e17fcd1a2674998b15e88cbe16615fa60ee0ec99e24e4effde4321",
+      "loadBefore": [
+        7.59228515625,
+        11.79296875,
+        11.35009765625
+      ],
+      "loadAfter": [
+        6.6396484375,
+        11.3037109375,
+        11.18408203125
+      ],
+      "elapsedMs": 17844,
+      "fixtureDigest": "57a23fc48f1c9ae1636fef74b7ac4cf0239d216e54c974cbf61c2f2d614bada4",
+      "validation": [],
+      "samplesNs": [
+        3957375,
+        3120417,
+        3494458,
+        3109792,
+        3426500,
+        5158083,
+        4574542,
+        3346375,
+        3277583,
+        3236834
+      ],
+      "observations": {
+        "events": 2000,
+        "stateReads": 2,
+        "stateByKind": {
+          "receipt": 1,
+          "message": 1
+        },
+        "readBytes": 3046,
+        "enumerations": {
+          "metadata/readdir": 1,
+          "metadata/readdirEntries": 6,
+          "events/readdir": 1,
+          "events/readdirEntries": 2001
+        }
+      }
+    },
+    {
+      "round": 8,
+      "side": "candidate",
+      "scenarioHash": "7dc7175a35e17fcd1a2674998b15e88cbe16615fa60ee0ec99e24e4effde4321",
+      "loadBefore": [
+        6.6396484375,
+        11.3037109375,
+        11.18408203125
+      ],
+      "loadAfter": [
+        6.1494140625,
+        10.8935546875,
+        11.0390625
+      ],
+      "elapsedMs": 18790,
+      "fixtureDigest": "57a23fc48f1c9ae1636fef74b7ac4cf0239d216e54c974cbf61c2f2d614bada4",
+      "validation": [],
+      "samplesNs": [
+        3538666,
+        3324000,
+        3055958,
+        3113583,
+        2963916,
+        3009708,
+        3278959,
+        2985458,
+        2987292,
+        3108375
+      ],
+      "observations": {
+        "events": 2000,
+        "stateReads": 2,
+        "stateByKind": {
+          "receipt": 1,
+          "message": 1
+        },
+        "readBytes": 3046,
+        "enumerations": {
+          "metadata/readdir": 1,
+          "metadata/readdirEntries": 6,
+          "events/readdir": 1,
+          "events/readdirEntries": 2001
+        }
+      }
+    },
+    {
+      "round": 9,
+      "side": "candidate",
+      "scenarioHash": "05eebd41ac71f19ea966819f92dc4115d6f1889b7301ae4a5373bd3ce358a23f",
+      "loadBefore": [
+        6.1494140625,
+        10.8935546875,
+        11.0390625
+      ],
+      "loadAfter": [
+        6.1494140625,
+        10.8935546875,
+        11.0390625
+      ],
+      "elapsedMs": 979,
+      "fixtureDigest": "23ca3c74508daafced573a2112d510ab2698ff155b5da2c79ed5e009a98bdd98",
+      "validation": [],
+      "samplesNs": [
+        1732500,
+        1634584,
+        1731250,
+        1687083,
+        1778166,
+        1737083,
+        1708375,
+        1839041,
+        1942542,
+        1657459
+      ],
+      "observations": {
+        "events": 100,
+        "stateReads": 2,
+        "stateByKind": {
+          "receipt": 1,
+          "message": 1
+        },
+        "readBytes": 3046,
+        "enumerations": {
+          "metadata/readdir": 1,
+          "metadata/readdirEntries": 6,
+          "events/readdir": 1,
+          "events/readdirEntries": 101
+        }
+      }
+    },
+    {
+      "round": 9,
+      "side": "baseline",
+      "scenarioHash": "05eebd41ac71f19ea966819f92dc4115d6f1889b7301ae4a5373bd3ce358a23f",
+      "loadBefore": [
+        6.1494140625,
+        10.8935546875,
+        11.0390625
+      ],
+      "loadAfter": [
+        6.1494140625,
+        10.8935546875,
+        11.0390625
+      ],
+      "elapsedMs": 1068,
+      "fixtureDigest": "23ca3c74508daafced573a2112d510ab2698ff155b5da2c79ed5e009a98bdd98",
+      "validation": [],
+      "samplesNs": [
+        1607542,
+        1843625,
+        1702000,
+        1664667,
+        2008916,
+        1631000,
+        1955334,
+        1656000,
+        1636334,
+        1614584
+      ],
+      "observations": {
+        "events": 100,
+        "stateReads": 2,
+        "stateByKind": {
+          "receipt": 1,
+          "message": 1
+        },
+        "readBytes": 3046,
+        "enumerations": {
+          "metadata/readdir": 1,
+          "metadata/readdirEntries": 6,
+          "events/readdir": 1,
+          "events/readdirEntries": 101
+        }
+      }
+    },
+    {
+      "round": 9,
+      "side": "candidate",
+      "scenarioHash": "7dc7175a35e17fcd1a2674998b15e88cbe16615fa60ee0ec99e24e4effde4321",
+      "loadBefore": [
+        6.1494140625,
+        10.8935546875,
+        11.0390625
+      ],
+      "loadAfter": [
+        6.744140625,
+        10.671875,
+        10.955078125
+      ],
+      "elapsedMs": 23328,
+      "fixtureDigest": "57a23fc48f1c9ae1636fef74b7ac4cf0239d216e54c974cbf61c2f2d614bada4",
+      "validation": [],
+      "samplesNs": [
+        3122458,
+        3018625,
+        2957750,
+        3177416,
+        2956541,
+        3027084,
+        3417750,
+        3109417,
+        2932166,
+        2940583
+      ],
+      "observations": {
+        "events": 2000,
+        "stateReads": 2,
+        "stateByKind": {
+          "receipt": 1,
+          "message": 1
+        },
+        "readBytes": 3046,
+        "enumerations": {
+          "metadata/readdir": 1,
+          "metadata/readdirEntries": 6,
+          "events/readdir": 1,
+          "events/readdirEntries": 2001
+        }
+      }
+    },
+    {
+      "round": 9,
+      "side": "baseline",
+      "scenarioHash": "7dc7175a35e17fcd1a2674998b15e88cbe16615fa60ee0ec99e24e4effde4321",
+      "loadBefore": [
+        6.744140625,
+        10.671875,
+        10.955078125
+      ],
+      "loadAfter": [
+        6.52978515625,
+        10.42724609375,
+        10.8623046875
+      ],
+      "elapsedMs": 17075,
+      "fixtureDigest": "57a23fc48f1c9ae1636fef74b7ac4cf0239d216e54c974cbf61c2f2d614bada4",
+      "validation": [],
+      "samplesNs": [
+        3585375,
+        3666542,
+        3673000,
+        3704208,
+        4117000,
+        3756167,
+        3493791,
+        3770584,
+        3969250,
+        3596750
+      ],
+      "observations": {
+        "events": 2000,
+        "stateReads": 2,
+        "stateByKind": {
+          "receipt": 1,
+          "message": 1
+        },
+        "readBytes": 3046,
+        "enumerations": {
+          "metadata/readdir": 1,
+          "metadata/readdirEntries": 6,
+          "events/readdir": 1,
+          "events/readdirEntries": 2001
+        }
+      }
+    }
+  ],
+  "finishedAt": "2026-10-27T03:29:55.661Z"
+}

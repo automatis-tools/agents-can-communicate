@@ -29,80 +29,130 @@ A probe is a **scenario**, a **validator** and **observations**:
   are diagnostics. They report what the implementation touched, such as primary reads, bytes,
   directory enumerations and receipt visits. They never decide validity.
 
+Every call gets its own input, prepared outside the timed section: a copy of the attention
+snapshot, or a store instance opened as a hook process opens one. The store probes validate
+through a second instance opened after the call, so an answer kept in the measured instance's
+memory is checked against what the store holds. A probe states how many calls a scenario
+allows. The runner refuses a scenario too small for its warm-up calls, samples and observed call
+before anything runs.
+
 ### Attention (#305)
 
 - Scenario: `ownRequests` sent by the measured participant, each to `fanout` recipients; an
-  `acknowledgedShare` of their receipts acknowledged; an `offlineShare` of recipients offline; and
+  `acknowledgedShare` of their receipts acknowledged; an `offlineShare` of recipients offline;
   `inboundObligations` addressed to the measured participant, split between reply and
-  acknowledgement.
+  acknowledgement; and `witnesses`, 4 by default.
+- Witnesses are items that every scenario must return, whatever its shares: requests to a
+  participant with no session, and pending inbound obligations. Their ids carry the seed, so an
+  answer computed for another fixture never matches. A scenario that expects nothing cannot tell
+  useful work from a constant answer, and the validator refuses one.
 - Fixture: the snapshot `computeAttention` reads.
 - Validator: the exact expected attention items. Each pending receipt of an offline recipient
   gives `recipient_unavailable`, and each pending inbound obligation gives `reply_required` or
-  `acknowledgement_required`, in ACC's priority order. Fully acknowledged history gives nothing.
+  `acknowledgement_required`, in ACC's priority order. Fully acknowledged history gives nothing
+  beyond the witnesses.
 - Observations: time per call; receipt and message visits, counted in one separate untimed call
   through proxies on the snapshot arrays.
 
 ### Inbox (#306)
 
-- Scenario: `messages` addressed to the reader, a `backlog` addressed to other participants,
-  and the operation, either `exact` (one message by id) or `page` (`limit` items).
+- Scenario: `messages` addressed to the reader, a `backlog` addressed to another participant,
+  the operation, either `exact` (one message by id) or `page` (`limit` items, 20 by default as in
+  the product), and `mix`. With `mix`, obligations are spread over none, acknowledge and reply,
+  each with its protocol kind (note, decision, question), and the reader's receipts are moved in
+  turn to queued, offered, retrieved and acknowledged through the product's own operations.
 - Fixture: a filesystem store built through the coordination service.
-- Validator:
-  - exact: the named message, and only its receipt moved to `retrieved`;
-  - page: the oldest `limit` listable messages, in order, with a cursor exactly when more remain,
-    and no receipt changed.
+- Validator, through a fresh store instance after each call:
+  - exact: the named message with its subject, body, kind and obligation; its receipt in the
+    state the read must leave (`retrieved`, or unchanged when already retrieved or acknowledged);
+    the generation changed exactly when the state changed; and exactly one `message.retrieved`
+    event for it when the state changed, none otherwise;
+  - page: the newest listable messages first, between one and `limit` of them, since a page may
+    end early at the product's byte budget; each item's receipt state; a cursor equal to the last
+    item exactly when more remain; a follow-up page from that cursor that continues the list; and
+    no receipt, generation or event changed.
   In both cases every other receipt keeps its state and generation.
+- Each exact call reads a message not read before, so the scenario allows `messages` calls.
 - Observations: primary reads by kind, bytes read, index page reads, and directory enumerations,
-  from the existing store I/O probe; time per call. Each run starts from a fresh fixture copy, so
-  the exact operation's transition is measured every time.
+  from the existing store I/O probe; time per call.
 
 ### Read-only transaction (#307)
 
-- Scenario: `messages` held constant and `events` varied independently.
+- Scenario: `messages` held constant, `events` varied independently, the operation (`read` or
+  `write`), and `pendingJournal`.
 - Fixture: a filesystem store with that many messages and that many published events, the events
   made by ordinary writes.
-- Validator: an exact receipt read returns the receipt's state and appends no event. A write
-  probe in the same scenario must append exactly one event with the next sequence, which detects
-  a skipped commit and an invalid order.
+- `pendingJournal` stops one decided offer after its journal, as a crash would. Every read of that
+  message must return `offered`. A store may finish the decided write while it serves a read; its
+  `message.offer_succeeded` event is then allowed once and is not counted as the read's commit.
+- Validator: an exact receipt read returns the receipt's state and commits no event. A write must
+  commit exactly one `message.offer_succeeded` event with the next sequence for its own message,
+  which detects a skipped commit, a second commit and an invalid order. No unrelated receipt
+  changes in either case.
+- Each write offers a message not offered before, so a write scenario allows `messages` calls.
 - Observations: event directory enumerations, primary reads and time per call.
 
 ## Negative mutations
 
-Each probe ships mutations that wrap a correct implementation and break it: dropping an item,
-returning a constant result, answering from a stale fixture, skipping the receipt transition,
-moving an unrelated receipt, appending an event to a read, and skipping a write's commit. The
-test suite runs every mutation through the validator and requires each one to fail. A correct
+Each probe ships mutations that wrap a correct implementation and break it in one way:
+- attention: drop one item, answer a constant empty list, skip unavailable recipients, duplicate
+  the first item, answer from a stale fixture, reverse the order;
+- inbox exact: read the wrong message, skip the receipt transition, move the receipt without its
+  event, return a summary for the body, move an unrelated receipt, return an extra item;
+- inbox page: drop the last item, return an empty page, advance receipts, reverse the order,
+  return a garbage cursor, ignore receipt states;
+- transaction: commit on a read, return the wrong receipt, advance a receipt on a read, answer
+  from stale state, skip a write's commit, commit twice, write to the wrong target.
+
+The test suite runs every mutation through the validator and requires each one to fail. A correct
 alternative implementation, such as attention with receipts grouped by message, must pass. That
 shows the validator does not depend on the current algorithm.
 
 ## Comparable runs
 
-`node scripts/measure/run.mjs --probe <name> --sizes … --baseline <ref> --candidate <ref|worktree>`
-materializes each side, then alternates them:
+`node scripts/measure/run.mjs --probe <name> --set <key=value> --vary <key=a,b> --baseline <ref>
+--candidate <ref|worktree>` materializes each side, then alternates them:
 - A side is a commit, exported with `git archive` and installed with `npm ci` into a temporary
-  directory, or `worktree`, the current checkout with its dirty state recorded.
+  directory that is reused only after a completed install, or `worktree`, the current checkout
+  with its dirty state recorded.
 - Rounds alternate the order, baseline then candidate and then the reverse. Each side runs in a
-  fresh process that builds its fixture, validates, warms up, and then records its samples.
+  fresh process that builds its fixture, warms up, records its samples, validates every call, and
+  observes one more call.
+- A child that fails, or overruns `--timeout-ms` (15 minutes by default) and is killed, is
+  recorded with its error. The run continues and is still written.
 - The run records:
-  - each side's commit and a hash of its package sources;
+  - each side's commit, its dirty state and a hash of what it runs: package sources, the package
+    manifests, the lockfile and `bin/`;
+  - the harness commit and its dirty state;
   - the scenario hash and each side's fixture digest;
   - the Node and V8 versions, OS, CPU model, core count and memory;
   - the load average before and after each child;
-  - the durability setting, real `fsync` by default;
+  - the durability setting, real `fsync` by default, and the `NODE_OPTIONS` the children got;
   - every raw sample.
-- A run whose sides validate differently, or whose fixture digests differ when the format is
-  unchanged, is reported as invalid rather than compared.
+- A run whose sides validate differently, whose child failed, or whose fixture digests differ when
+  the format is unchanged, is reported as invalid rather than compared.
 
 ## Reports
 
-`report.md` beside `run.json` gives each side's median, interquartile range, minimum and maximum,
-and its operation counts. It labels each figure:
+`report.md` beside `run.json` names each side's ref, commit and sources hash, the harness, the
+durability and host, each side's fixture digests and any child errors or validation failures. It
+gives each side's median, interquartile range, minimum and maximum, and its operation counts. It
+labels each figure:
 - **Benchmark**: both sides valid, alternated over at least ten rounds, and at least one hundred
   samples per side.
 - **Smoke**: valid, but short of that.
-- **Diagnostic**: operation counts, which are deterministic and never benchmark results.
+- **Diagnostic**: operation counts. They are nearly deterministic: bytes read vary slightly with
+  the width of the process ids a fixture records. They are never benchmark results.
 - **Insufficient evidence**: p95 below one hundred samples per side and p99 below one thousand.
   The report names the shortfall instead of printing the percentile.
+
+## Limits
+
+- The validators see results and the store, not how the result was made. A side that memoizes an
+  answer by content across calls in one process could pass. Fresh inputs and fresh store
+  instances per call make such a memo visible only when the content changes between calls.
+- The store I/O probe counts reads through the store's file operations. A direct promise read it
+  does not wrap is missed (#347), so its primary-read counts are a lower bound.
 
 ## Where it lives
 

@@ -1,11 +1,16 @@
 {
   "schemaVersion": 1,
   "probe": "attention",
-  "startedAt": "2026-10-27T01:40:57.640Z",
+  "startedAt": "2026-10-27T02:50:44.199Z",
   "settings": {
     "rounds": 10,
     "samples": 10,
-    "warmup": 3
+    "warmup": 3,
+    "timeoutMs": 900000
+  },
+  "harness": {
+    "commit": "8cdf7d2953e09515baa1c41180d002dea058863f",
+    "dirty": false
   },
   "host": {
     "node": "v26.5.1",
@@ -18,7 +23,8 @@
     "memoryBytes": 137438953472
   },
   "durability": {
-    "fsync": "real"
+    "fsync": "real",
+    "nodeOptions": ""
   },
   "sides": {
     "baseline": {
@@ -26,14 +32,14 @@
       "ref": "v0.12.2",
       "commit": "718ea7c3df73891605182f6e1c74366026e67898",
       "dirty": false,
-      "sourcesHash": "2a8ac0650cb90aaba85c8fbb681cf1dc886e1a7e4c582a980b136ae57e7ea029"
+      "sourcesHash": "924f5fae1b052249c790d310bc0a071c85145ecde5be9e83bf07870e60bc68d4"
     },
     "candidate": {
       "label": "candidate",
       "ref": "worktree",
-      "commit": "d5b6372d594153bf4cdc91f77b901974addbf1e9",
+      "commit": "8cdf7d2953e09515baa1c41180d002dea058863f",
       "dirty": false,
-      "sourcesHash": "2a8ac0650cb90aaba85c8fbb681cf1dc886e1a7e4c582a980b136ae57e7ea029"
+      "sourcesHash": "924f5fae1b052249c790d310bc0a071c85145ecde5be9e83bf07870e60bc68d4"
     }
   },
   "scenarios": [
@@ -45,9 +51,10 @@
         "acknowledgedShare": 0,
         "offlineShare": 0,
         "inboundObligations": 0,
+        "witnesses": 4,
         "seed": 1
       },
-      "hash": "9a35f899f3f9812cd98fcec59cf82e92ce581198077647698b81c7edd762a4d4"
+      "hash": "eb503ff9710642e443b107aaf1b2fe4e55d9a127adbe7494419b8112cdf69b2e"
     },
     {
       "scenario": {
@@ -57,1532 +64,1533 @@
         "acknowledgedShare": 0,
         "offlineShare": 0,
         "inboundObligations": 0,
+        "witnesses": 4,
         "seed": 1
       },
-      "hash": "f880e77b3e7e68a46c8723f6582996d89a3052709f09dc8344b601acd27d98a5"
+      "hash": "79274dbff63a8d5a3b900fd1ed8e62881815f3e26ab0bae9b3d0e38e42045c12"
     }
   ],
   "children": [
     {
       "round": 0,
       "side": "baseline",
-      "scenarioHash": "9a35f899f3f9812cd98fcec59cf82e92ce581198077647698b81c7edd762a4d4",
-      "fixtureDigest": "b629282d9b2e100e9a8d2bd887caadebfeb83afd3a295b67b949d426b6e7fd1d",
-      "validation": [],
-      "samplesNs": [
-        6601166,
-        6699583,
-        6601208,
-        6590167,
-        6815208,
-        6978500,
-        7705584,
-        6905917,
-        6888708,
-        6777417
-      ],
-      "observations": {
-        "messageVisits": 2000,
-        "receiptVisits": 1002000,
-        "sessionVisits": 15,
-        "items": 0,
-        "messages": 1000,
-        "receipts": 1000
-      },
+      "scenarioHash": "eb503ff9710642e443b107aaf1b2fe4e55d9a127adbe7494419b8112cdf69b2e",
       "loadBefore": [
-        12.267578125,
-        10.30615234375,
-        10.8994140625
+        13.56591796875,
+        12.16796875,
+        13.03369140625
       ],
       "loadAfter": [
-        12.267578125,
-        10.30615234375,
-        10.8994140625
+        13.56591796875,
+        12.16796875,
+        13.03369140625
       ],
-      "elapsedMs": 202
+      "elapsedMs": 243,
+      "fixtureDigest": "e99d2cde1f0f2a937616bc6baec43e746fb3c8ef762ff0f8cea8a9b36e482dbf",
+      "validation": [],
+      "samplesNs": [
+        7858458,
+        7462042,
+        7717708,
+        7548709,
+        7282167,
+        7399083,
+        7352166,
+        8524750,
+        8111666,
+        8215875
+      ],
+      "observations": {
+        "messageVisits": 2016,
+        "receiptVisits": 1014048,
+        "sessionVisits": 15,
+        "items": 8,
+        "messages": 1008,
+        "receipts": 1008
+      }
     },
     {
       "round": 0,
       "side": "candidate",
-      "scenarioHash": "9a35f899f3f9812cd98fcec59cf82e92ce581198077647698b81c7edd762a4d4",
-      "fixtureDigest": "b629282d9b2e100e9a8d2bd887caadebfeb83afd3a295b67b949d426b6e7fd1d",
-      "validation": [],
-      "samplesNs": [
-        6538000,
-        6592084,
-        6707875,
-        6780625,
-        6478708,
-        6413458,
-        6788417,
-        6660709,
-        6817792,
-        6829000
-      ],
-      "observations": {
-        "messageVisits": 2000,
-        "receiptVisits": 1002000,
-        "sessionVisits": 15,
-        "items": 0,
-        "messages": 1000,
-        "receipts": 1000
-      },
+      "scenarioHash": "eb503ff9710642e443b107aaf1b2fe4e55d9a127adbe7494419b8112cdf69b2e",
       "loadBefore": [
-        12.267578125,
-        10.30615234375,
-        10.8994140625
+        13.56591796875,
+        12.16796875,
+        13.03369140625
       ],
       "loadAfter": [
-        12.267578125,
-        10.30615234375,
-        10.8994140625
+        13.56591796875,
+        12.16796875,
+        13.03369140625
       ],
-      "elapsedMs": 199
+      "elapsedMs": 243,
+      "fixtureDigest": "e99d2cde1f0f2a937616bc6baec43e746fb3c8ef762ff0f8cea8a9b36e482dbf",
+      "validation": [],
+      "samplesNs": [
+        8419375,
+        7877958,
+        9914958,
+        11818583,
+        7449250,
+        8145083,
+        7764375,
+        7419375,
+        7250250,
+        7157167
+      ],
+      "observations": {
+        "messageVisits": 2016,
+        "receiptVisits": 1014048,
+        "sessionVisits": 15,
+        "items": 8,
+        "messages": 1008,
+        "receipts": 1008
+      }
     },
     {
       "round": 0,
       "side": "baseline",
-      "scenarioHash": "f880e77b3e7e68a46c8723f6582996d89a3052709f09dc8344b601acd27d98a5",
-      "fixtureDigest": "1e6181a0212edc9cf3202a3c850ec2a7f4c7a6e0f867de32712269b800e71eaf",
-      "validation": [],
-      "samplesNs": [
-        203527083,
-        204673834,
-        200403875,
-        197281792,
-        198570334,
-        198671583,
-        198724000,
-        197713542,
-        197651125,
-        200804250
-      ],
-      "observations": {
-        "messageVisits": 16000,
-        "receiptVisits": 64016000,
-        "sessionVisits": 15,
-        "items": 0,
-        "messages": 8000,
-        "receipts": 8000
-      },
+      "scenarioHash": "79274dbff63a8d5a3b900fd1ed8e62881815f3e26ab0bae9b3d0e38e42045c12",
       "loadBefore": [
-        12.267578125,
-        10.30615234375,
-        10.8994140625
+        13.56591796875,
+        12.16796875,
+        13.03369140625
       ],
       "loadAfter": [
-        13.3671875,
-        10.56640625,
-        10.98779296875
+        13.8310546875,
+        12.2626953125,
+        13.05615234375
       ],
-      "elapsedMs": 7843
+      "elapsedMs": 9391,
+      "fixtureDigest": "fee97c20e2294de5f6f8cea792725670450d69e4baa3a608e4d12d15e42dd9c2",
+      "validation": [],
+      "samplesNs": [
+        478009083,
+        455805459,
+        297197083,
+        225471542,
+        266931958,
+        261397500,
+        222631250,
+        259431334,
+        297324583,
+        232799292
+      ],
+      "observations": {
+        "messageVisits": 16016,
+        "receiptVisits": 64112048,
+        "sessionVisits": 15,
+        "items": 8,
+        "messages": 8008,
+        "receipts": 8008
+      }
     },
     {
       "round": 0,
       "side": "candidate",
-      "scenarioHash": "f880e77b3e7e68a46c8723f6582996d89a3052709f09dc8344b601acd27d98a5",
-      "fixtureDigest": "1e6181a0212edc9cf3202a3c850ec2a7f4c7a6e0f867de32712269b800e71eaf",
-      "validation": [],
-      "samplesNs": [
-        207842542,
-        200891041,
-        198320625,
-        201544625,
-        198223000,
-        199338875,
-        206188459,
-        203008125,
-        203141916,
-        221039292
-      ],
-      "observations": {
-        "messageVisits": 16000,
-        "receiptVisits": 64016000,
-        "sessionVisits": 15,
-        "items": 0,
-        "messages": 8000,
-        "receipts": 8000
-      },
+      "scenarioHash": "79274dbff63a8d5a3b900fd1ed8e62881815f3e26ab0bae9b3d0e38e42045c12",
       "loadBefore": [
-        13.3671875,
-        10.56640625,
-        10.98779296875
+        13.8310546875,
+        12.2626953125,
+        13.05615234375
       ],
       "loadAfter": [
-        11.9326171875,
-        10.35009765625,
-        10.90576171875
+        14.625,
+        12.484375,
+        13.125
       ],
-      "elapsedMs": 7995
+      "elapsedMs": 9054,
+      "fixtureDigest": "fee97c20e2294de5f6f8cea792725670450d69e4baa3a608e4d12d15e42dd9c2",
+      "validation": [],
+      "samplesNs": [
+        464683541,
+        455042709,
+        286412250,
+        222952250,
+        263556083,
+        252306584,
+        225195583,
+        256762875,
+        262036542,
+        217129833
+      ],
+      "observations": {
+        "messageVisits": 16016,
+        "receiptVisits": 64112048,
+        "sessionVisits": 15,
+        "items": 8,
+        "messages": 8008,
+        "receipts": 8008
+      }
     },
     {
       "round": 1,
       "side": "candidate",
-      "scenarioHash": "9a35f899f3f9812cd98fcec59cf82e92ce581198077647698b81c7edd762a4d4",
-      "fixtureDigest": "b629282d9b2e100e9a8d2bd887caadebfeb83afd3a295b67b949d426b6e7fd1d",
-      "validation": [],
-      "samplesNs": [
-        8224083,
-        7685041,
-        6835208,
-        6745667,
-        6736292,
-        6904792,
-        6628625,
-        6967333,
-        6831750,
-        6952459
-      ],
-      "observations": {
-        "messageVisits": 2000,
-        "receiptVisits": 1002000,
-        "sessionVisits": 15,
-        "items": 0,
-        "messages": 1000,
-        "receipts": 1000
-      },
+      "scenarioHash": "eb503ff9710642e443b107aaf1b2fe4e55d9a127adbe7494419b8112cdf69b2e",
       "loadBefore": [
-        11.9326171875,
-        10.35009765625,
-        10.90576171875
+        14.625,
+        12.484375,
+        13.125
       ],
       "loadAfter": [
-        11.9326171875,
-        10.35009765625,
-        10.90576171875
+        14.625,
+        12.484375,
+        13.125
       ],
-      "elapsedMs": 218
+      "elapsedMs": 231,
+      "fixtureDigest": "e99d2cde1f0f2a937616bc6baec43e746fb3c8ef762ff0f8cea8a9b36e482dbf",
+      "validation": [],
+      "samplesNs": [
+        7292458,
+        7246375,
+        7328250,
+        7138334,
+        7129875,
+        8154458,
+        9833625,
+        7209417,
+        7142625,
+        7237584
+      ],
+      "observations": {
+        "messageVisits": 2016,
+        "receiptVisits": 1014048,
+        "sessionVisits": 15,
+        "items": 8,
+        "messages": 1008,
+        "receipts": 1008
+      }
     },
     {
       "round": 1,
       "side": "baseline",
-      "scenarioHash": "9a35f899f3f9812cd98fcec59cf82e92ce581198077647698b81c7edd762a4d4",
-      "fixtureDigest": "b629282d9b2e100e9a8d2bd887caadebfeb83afd3a295b67b949d426b6e7fd1d",
-      "validation": [],
-      "samplesNs": [
-        7294250,
-        7282459,
-        7155500,
-        6638167,
-        6714709,
-        6824333,
-        6980000,
-        8002958,
-        7314458,
-        6691875
-      ],
-      "observations": {
-        "messageVisits": 2000,
-        "receiptVisits": 1002000,
-        "sessionVisits": 15,
-        "items": 0,
-        "messages": 1000,
-        "receipts": 1000
-      },
+      "scenarioHash": "eb503ff9710642e443b107aaf1b2fe4e55d9a127adbe7494419b8112cdf69b2e",
       "loadBefore": [
-        11.9326171875,
-        10.35009765625,
-        10.90576171875
+        14.625,
+        12.484375,
+        13.125
       ],
       "loadAfter": [
-        11.9326171875,
-        10.35009765625,
-        10.90576171875
+        14.625,
+        12.484375,
+        13.125
       ],
-      "elapsedMs": 201
+      "elapsedMs": 232,
+      "fixtureDigest": "e99d2cde1f0f2a937616bc6baec43e746fb3c8ef762ff0f8cea8a9b36e482dbf",
+      "validation": [],
+      "samplesNs": [
+        7367500,
+        10899542,
+        10355583,
+        7483417,
+        7225958,
+        7134375,
+        7066750,
+        7246000,
+        7109625,
+        7216541
+      ],
+      "observations": {
+        "messageVisits": 2016,
+        "receiptVisits": 1014048,
+        "sessionVisits": 15,
+        "items": 8,
+        "messages": 1008,
+        "receipts": 1008
+      }
     },
     {
       "round": 1,
       "side": "candidate",
-      "scenarioHash": "f880e77b3e7e68a46c8723f6582996d89a3052709f09dc8344b601acd27d98a5",
-      "fixtureDigest": "1e6181a0212edc9cf3202a3c850ec2a7f4c7a6e0f867de32712269b800e71eaf",
-      "validation": [],
-      "samplesNs": [
-        198345000,
-        192924167,
-        193098958,
-        196996041,
-        194828666,
-        222938375,
-        199532791,
-        203352084,
-        206260709,
-        208698167
-      ],
-      "observations": {
-        "messageVisits": 16000,
-        "receiptVisits": 64016000,
-        "sessionVisits": 15,
-        "items": 0,
-        "messages": 8000,
-        "receipts": 8000
-      },
+      "scenarioHash": "79274dbff63a8d5a3b900fd1ed8e62881815f3e26ab0bae9b3d0e38e42045c12",
       "loadBefore": [
-        11.9326171875,
-        10.35009765625,
-        10.90576171875
+        14.625,
+        12.484375,
+        13.125
       ],
       "loadAfter": [
-        11.34033203125,
-        10.27294921875,
-        10.87158203125
+        15.45068359375,
+        12.7314453125,
+        13.205078125
       ],
-      "elapsedMs": 7760
+      "elapsedMs": 9127,
+      "fixtureDigest": "fee97c20e2294de5f6f8cea792725670450d69e4baa3a608e4d12d15e42dd9c2",
+      "validation": [],
+      "samplesNs": [
+        464295917,
+        408668292,
+        437967208,
+        287752125,
+        214472500,
+        254798167,
+        259226167,
+        250906708,
+        258780708,
+        250353958
+      ],
+      "observations": {
+        "messageVisits": 16016,
+        "receiptVisits": 64112048,
+        "sessionVisits": 15,
+        "items": 8,
+        "messages": 8008,
+        "receipts": 8008
+      }
     },
     {
       "round": 1,
       "side": "baseline",
-      "scenarioHash": "f880e77b3e7e68a46c8723f6582996d89a3052709f09dc8344b601acd27d98a5",
-      "fixtureDigest": "1e6181a0212edc9cf3202a3c850ec2a7f4c7a6e0f867de32712269b800e71eaf",
-      "validation": [],
-      "samplesNs": [
-        202515250,
-        198311667,
-        199391958,
-        197963250,
-        196503250,
-        197443208,
-        196453750,
-        197672250,
-        197690125,
-        200555583
-      ],
-      "observations": {
-        "messageVisits": 16000,
-        "receiptVisits": 64016000,
-        "sessionVisits": 15,
-        "items": 0,
-        "messages": 8000,
-        "receipts": 8000
-      },
+      "scenarioHash": "79274dbff63a8d5a3b900fd1ed8e62881815f3e26ab0bae9b3d0e38e42045c12",
       "loadBefore": [
-        11.34033203125,
-        10.27294921875,
-        10.87158203125
+        15.45068359375,
+        12.7314453125,
+        13.205078125
       ],
       "loadAfter": [
-        10.59228515625,
-        10.13525390625,
-        10.8193359375
+        15.97509765625,
+        12.88525390625,
+        13.25634765625
       ],
-      "elapsedMs": 7667
+      "elapsedMs": 9099,
+      "fixtureDigest": "fee97c20e2294de5f6f8cea792725670450d69e4baa3a608e4d12d15e42dd9c2",
+      "validation": [],
+      "samplesNs": [
+        453442750,
+        433715291,
+        298002167,
+        221691750,
+        254613292,
+        266230917,
+        213485000,
+        249574917,
+        261679458,
+        236410125
+      ],
+      "observations": {
+        "messageVisits": 16016,
+        "receiptVisits": 64112048,
+        "sessionVisits": 15,
+        "items": 8,
+        "messages": 8008,
+        "receipts": 8008
+      }
     },
     {
       "round": 2,
       "side": "baseline",
-      "scenarioHash": "9a35f899f3f9812cd98fcec59cf82e92ce581198077647698b81c7edd762a4d4",
-      "fixtureDigest": "b629282d9b2e100e9a8d2bd887caadebfeb83afd3a295b67b949d426b6e7fd1d",
-      "validation": [],
-      "samplesNs": [
-        6468542,
-        6590208,
-        6546792,
-        6826375,
-        6429667,
-        6465417,
-        6617291,
-        6415625,
-        6386459,
-        6772875
-      ],
-      "observations": {
-        "messageVisits": 2000,
-        "receiptVisits": 1002000,
-        "sessionVisits": 15,
-        "items": 0,
-        "messages": 1000,
-        "receipts": 1000
-      },
+      "scenarioHash": "eb503ff9710642e443b107aaf1b2fe4e55d9a127adbe7494419b8112cdf69b2e",
       "loadBefore": [
-        10.59228515625,
-        10.13525390625,
-        10.8193359375
+        15.97509765625,
+        12.88525390625,
+        13.25634765625
       ],
       "loadAfter": [
-        10.59228515625,
-        10.13525390625,
-        10.8193359375
+        15.97509765625,
+        12.88525390625,
+        13.25634765625
       ],
-      "elapsedMs": 190
+      "elapsedMs": 244,
+      "fixtureDigest": "e99d2cde1f0f2a937616bc6baec43e746fb3c8ef762ff0f8cea8a9b36e482dbf",
+      "validation": [],
+      "samplesNs": [
+        7633125,
+        7695584,
+        8164209,
+        7502792,
+        7431292,
+        11180791,
+        10440792,
+        7128459,
+        7081625,
+        7191875
+      ],
+      "observations": {
+        "messageVisits": 2016,
+        "receiptVisits": 1014048,
+        "sessionVisits": 15,
+        "items": 8,
+        "messages": 1008,
+        "receipts": 1008
+      }
     },
     {
       "round": 2,
       "side": "candidate",
-      "scenarioHash": "9a35f899f3f9812cd98fcec59cf82e92ce581198077647698b81c7edd762a4d4",
-      "fixtureDigest": "b629282d9b2e100e9a8d2bd887caadebfeb83afd3a295b67b949d426b6e7fd1d",
-      "validation": [],
-      "samplesNs": [
-        6583625,
-        6577167,
-        7848542,
-        7196541,
-        6720917,
-        6728084,
-        6819542,
-        6716125,
-        6739625,
-        6652667
-      ],
-      "observations": {
-        "messageVisits": 2000,
-        "receiptVisits": 1002000,
-        "sessionVisits": 15,
-        "items": 0,
-        "messages": 1000,
-        "receipts": 1000
-      },
+      "scenarioHash": "eb503ff9710642e443b107aaf1b2fe4e55d9a127adbe7494419b8112cdf69b2e",
       "loadBefore": [
-        10.59228515625,
-        10.13525390625,
-        10.8193359375
+        15.97509765625,
+        12.88525390625,
+        13.25634765625
       ],
       "loadAfter": [
-        10.59228515625,
-        10.13525390625,
-        10.8193359375
+        17.49853515625,
+        13.251953125,
+        13.38330078125
       ],
-      "elapsedMs": 193
+      "elapsedMs": 223,
+      "fixtureDigest": "e99d2cde1f0f2a937616bc6baec43e746fb3c8ef762ff0f8cea8a9b36e482dbf",
+      "validation": [],
+      "samplesNs": [
+        7250625,
+        7207625,
+        8293458,
+        8016709,
+        7310042,
+        7339208,
+        7201542,
+        7178875,
+        7286042,
+        7300584
+      ],
+      "observations": {
+        "messageVisits": 2016,
+        "receiptVisits": 1014048,
+        "sessionVisits": 15,
+        "items": 8,
+        "messages": 1008,
+        "receipts": 1008
+      }
     },
     {
       "round": 2,
       "side": "baseline",
-      "scenarioHash": "f880e77b3e7e68a46c8723f6582996d89a3052709f09dc8344b601acd27d98a5",
-      "fixtureDigest": "1e6181a0212edc9cf3202a3c850ec2a7f4c7a6e0f867de32712269b800e71eaf",
-      "validation": [],
-      "samplesNs": [
-        203520584,
-        195264667,
-        193223208,
-        201454541,
-        192801250,
-        193476916,
-        193011833,
-        193188458,
-        195145083,
-        200337791
-      ],
-      "observations": {
-        "messageVisits": 16000,
-        "receiptVisits": 64016000,
-        "sessionVisits": 15,
-        "items": 0,
-        "messages": 8000,
-        "receipts": 8000
-      },
+      "scenarioHash": "79274dbff63a8d5a3b900fd1ed8e62881815f3e26ab0bae9b3d0e38e42045c12",
       "loadBefore": [
-        10.59228515625,
-        10.13525390625,
-        10.8193359375
+        17.49853515625,
+        13.251953125,
+        13.38330078125
       ],
       "loadAfter": [
-        10.548828125,
-        10.1455078125,
-        10.81494140625
+        17.85888671875,
+        13.39697265625,
+        13.43359375
       ],
-      "elapsedMs": 7621
+      "elapsedMs": 9182,
+      "fixtureDigest": "fee97c20e2294de5f6f8cea792725670450d69e4baa3a608e4d12d15e42dd9c2",
+      "validation": [],
+      "samplesNs": [
+        463320541,
+        455902583,
+        301514833,
+        223064208,
+        262713375,
+        257547708,
+        224678625,
+        258992000,
+        265209708,
+        228739416
+      ],
+      "observations": {
+        "messageVisits": 16016,
+        "receiptVisits": 64112048,
+        "sessionVisits": 15,
+        "items": 8,
+        "messages": 8008,
+        "receipts": 8008
+      }
     },
     {
       "round": 2,
       "side": "candidate",
-      "scenarioHash": "f880e77b3e7e68a46c8723f6582996d89a3052709f09dc8344b601acd27d98a5",
-      "fixtureDigest": "1e6181a0212edc9cf3202a3c850ec2a7f4c7a6e0f867de32712269b800e71eaf",
-      "validation": [],
-      "samplesNs": [
-        199128000,
-        197435583,
-        194949583,
-        196784250,
-        196114334,
-        195267083,
-        193775125,
-        194301667,
-        194603250,
-        195474708
-      ],
-      "observations": {
-        "messageVisits": 16000,
-        "receiptVisits": 64016000,
-        "sessionVisits": 15,
-        "items": 0,
-        "messages": 8000,
-        "receipts": 8000
-      },
+      "scenarioHash": "79274dbff63a8d5a3b900fd1ed8e62881815f3e26ab0bae9b3d0e38e42045c12",
       "loadBefore": [
-        10.548828125,
-        10.1455078125,
-        10.81494140625
+        17.85888671875,
+        13.39697265625,
+        13.43359375
       ],
       "loadAfter": [
-        9.86376953125,
-        10.01025390625,
-        10.76318359375
+        18.05322265625,
+        13.58203125,
+        13.498046875
       ],
-      "elapsedMs": 7711
+      "elapsedMs": 9205,
+      "fixtureDigest": "fee97c20e2294de5f6f8cea792725670450d69e4baa3a608e4d12d15e42dd9c2",
+      "validation": [],
+      "samplesNs": [
+        450233250,
+        411920375,
+        445447209,
+        289187167,
+        219062375,
+        267754750,
+        254224042,
+        259227292,
+        264037125,
+        262461583
+      ],
+      "observations": {
+        "messageVisits": 16016,
+        "receiptVisits": 64112048,
+        "sessionVisits": 15,
+        "items": 8,
+        "messages": 8008,
+        "receipts": 8008
+      }
     },
     {
       "round": 3,
       "side": "candidate",
-      "scenarioHash": "9a35f899f3f9812cd98fcec59cf82e92ce581198077647698b81c7edd762a4d4",
-      "fixtureDigest": "b629282d9b2e100e9a8d2bd887caadebfeb83afd3a295b67b949d426b6e7fd1d",
-      "validation": [],
-      "samplesNs": [
-        6794000,
-        7007584,
-        6948791,
-        7168167,
-        7667708,
-        7244875,
-        7361791,
-        7172584,
-        6842916,
-        6819000
-      ],
-      "observations": {
-        "messageVisits": 2000,
-        "receiptVisits": 1002000,
-        "sessionVisits": 15,
-        "items": 0,
-        "messages": 1000,
-        "receipts": 1000
-      },
+      "scenarioHash": "eb503ff9710642e443b107aaf1b2fe4e55d9a127adbe7494419b8112cdf69b2e",
       "loadBefore": [
-        9.86376953125,
-        10.01025390625,
-        10.76318359375
+        18.05322265625,
+        13.58203125,
+        13.498046875
       ],
       "loadAfter": [
-        9.86376953125,
-        10.01025390625,
-        10.76318359375
+        18.05322265625,
+        13.58203125,
+        13.498046875
       ],
-      "elapsedMs": 202
+      "elapsedMs": 225,
+      "fixtureDigest": "e99d2cde1f0f2a937616bc6baec43e746fb3c8ef762ff0f8cea8a9b36e482dbf",
+      "validation": [],
+      "samplesNs": [
+        7617709,
+        8670417,
+        7325000,
+        7293875,
+        7525042,
+        7096584,
+        7241333,
+        7264875,
+        7262667,
+        7226042
+      ],
+      "observations": {
+        "messageVisits": 2016,
+        "receiptVisits": 1014048,
+        "sessionVisits": 15,
+        "items": 8,
+        "messages": 1008,
+        "receipts": 1008
+      }
     },
     {
       "round": 3,
       "side": "baseline",
-      "scenarioHash": "9a35f899f3f9812cd98fcec59cf82e92ce581198077647698b81c7edd762a4d4",
-      "fixtureDigest": "b629282d9b2e100e9a8d2bd887caadebfeb83afd3a295b67b949d426b6e7fd1d",
-      "validation": [],
-      "samplesNs": [
-        7223750,
-        7127459,
-        6875584,
-        6743083,
-        7199917,
-        6727916,
-        7099209,
-        6555333,
-        6982958,
-        6626708
-      ],
-      "observations": {
-        "messageVisits": 2000,
-        "receiptVisits": 1002000,
-        "sessionVisits": 15,
-        "items": 0,
-        "messages": 1000,
-        "receipts": 1000
-      },
+      "scenarioHash": "eb503ff9710642e443b107aaf1b2fe4e55d9a127adbe7494419b8112cdf69b2e",
       "loadBefore": [
-        9.86376953125,
-        10.01025390625,
-        10.76318359375
+        18.05322265625,
+        13.58203125,
+        13.498046875
       ],
       "loadAfter": [
-        9.86376953125,
-        10.01025390625,
-        10.76318359375
+        18.05322265625,
+        13.58203125,
+        13.498046875
       ],
-      "elapsedMs": 202
+      "elapsedMs": 230,
+      "fixtureDigest": "e99d2cde1f0f2a937616bc6baec43e746fb3c8ef762ff0f8cea8a9b36e482dbf",
+      "validation": [],
+      "samplesNs": [
+        7532084,
+        7195958,
+        7347083,
+        7340458,
+        7072000,
+        7189708,
+        7423792,
+        8823542,
+        9868958,
+        7313708
+      ],
+      "observations": {
+        "messageVisits": 2016,
+        "receiptVisits": 1014048,
+        "sessionVisits": 15,
+        "items": 8,
+        "messages": 1008,
+        "receipts": 1008
+      }
     },
     {
       "round": 3,
       "side": "candidate",
-      "scenarioHash": "f880e77b3e7e68a46c8723f6582996d89a3052709f09dc8344b601acd27d98a5",
-      "fixtureDigest": "1e6181a0212edc9cf3202a3c850ec2a7f4c7a6e0f867de32712269b800e71eaf",
-      "validation": [],
-      "samplesNs": [
-        210140708,
-        209058208,
-        201737208,
-        193989042,
-        191601791,
-        191310666,
-        193708292,
-        191996542,
-        192385708,
-        193404375
-      ],
-      "observations": {
-        "messageVisits": 16000,
-        "receiptVisits": 64016000,
-        "sessionVisits": 15,
-        "items": 0,
-        "messages": 8000,
-        "receipts": 8000
-      },
+      "scenarioHash": "79274dbff63a8d5a3b900fd1ed8e62881815f3e26ab0bae9b3d0e38e42045c12",
       "loadBefore": [
-        9.86376953125,
-        10.01025390625,
-        10.76318359375
+        18.05322265625,
+        13.58203125,
+        13.498046875
       ],
       "loadAfter": [
-        8.814453125,
-        9.779296875,
-        10.671875
+        16.55517578125,
+        13.4130859375,
+        13.439453125
       ],
-      "elapsedMs": 7675
+      "elapsedMs": 9331,
+      "fixtureDigest": "fee97c20e2294de5f6f8cea792725670450d69e4baa3a608e4d12d15e42dd9c2",
+      "validation": [],
+      "samplesNs": [
+        441245291,
+        451792875,
+        290434209,
+        228415958,
+        261918417,
+        264312708,
+        233079791,
+        266285750,
+        265638375,
+        228025625
+      ],
+      "observations": {
+        "messageVisits": 16016,
+        "receiptVisits": 64112048,
+        "sessionVisits": 15,
+        "items": 8,
+        "messages": 8008,
+        "receipts": 8008
+      }
     },
     {
       "round": 3,
       "side": "baseline",
-      "scenarioHash": "f880e77b3e7e68a46c8723f6582996d89a3052709f09dc8344b601acd27d98a5",
-      "fixtureDigest": "1e6181a0212edc9cf3202a3c850ec2a7f4c7a6e0f867de32712269b800e71eaf",
-      "validation": [],
-      "samplesNs": [
-        199080167,
-        229961833,
-        208432917,
-        198044500,
-        195701250,
-        194295334,
-        194383458,
-        200757208,
-        198954416,
-        195358791
-      ],
-      "observations": {
-        "messageVisits": 16000,
-        "receiptVisits": 64016000,
-        "sessionVisits": 15,
-        "items": 0,
-        "messages": 8000,
-        "receipts": 8000
-      },
+      "scenarioHash": "79274dbff63a8d5a3b900fd1ed8e62881815f3e26ab0bae9b3d0e38e42045c12",
       "loadBefore": [
-        8.814453125,
-        9.779296875,
-        10.671875
+        16.55517578125,
+        13.4130859375,
+        13.439453125
       ],
       "loadAfter": [
-        7.77294921875,
-        9.52294921875,
-        10.56982421875
+        14.5439453125,
+        13.0859375,
+        13.32275390625
       ],
-      "elapsedMs": 7651
+      "elapsedMs": 9252,
+      "fixtureDigest": "fee97c20e2294de5f6f8cea792725670450d69e4baa3a608e4d12d15e42dd9c2",
+      "validation": [],
+      "samplesNs": [
+        452949584,
+        471359917,
+        294002417,
+        223156542,
+        274622167,
+        306948042,
+        242412208,
+        331479625,
+        283667125,
+        230937208
+      ],
+      "observations": {
+        "messageVisits": 16016,
+        "receiptVisits": 64112048,
+        "sessionVisits": 15,
+        "items": 8,
+        "messages": 8008,
+        "receipts": 8008
+      }
     },
     {
       "round": 4,
       "side": "baseline",
-      "scenarioHash": "9a35f899f3f9812cd98fcec59cf82e92ce581198077647698b81c7edd762a4d4",
-      "fixtureDigest": "b629282d9b2e100e9a8d2bd887caadebfeb83afd3a295b67b949d426b6e7fd1d",
-      "validation": [],
-      "samplesNs": [
-        6522792,
-        6518292,
-        6510500,
-        6551167,
-        7004792,
-        7087000,
-        7161125,
-        6742791,
-        7890542,
-        7665125
-      ],
-      "observations": {
-        "messageVisits": 2000,
-        "receiptVisits": 1002000,
-        "sessionVisits": 15,
-        "items": 0,
-        "messages": 1000,
-        "receipts": 1000
-      },
+      "scenarioHash": "eb503ff9710642e443b107aaf1b2fe4e55d9a127adbe7494419b8112cdf69b2e",
       "loadBefore": [
-        7.77294921875,
-        9.52294921875,
-        10.56982421875
+        14.5439453125,
+        13.0859375,
+        13.32275390625
       ],
       "loadAfter": [
-        7.77294921875,
-        9.52294921875,
-        10.56982421875
+        14.5439453125,
+        13.0859375,
+        13.32275390625
       ],
-      "elapsedMs": 196
+      "elapsedMs": 235,
+      "fixtureDigest": "e99d2cde1f0f2a937616bc6baec43e746fb3c8ef762ff0f8cea8a9b36e482dbf",
+      "validation": [],
+      "samplesNs": [
+        7246416,
+        7177792,
+        7291459,
+        7325750,
+        7128375,
+        7280292,
+        7759458,
+        10899959,
+        7243500,
+        7167083
+      ],
+      "observations": {
+        "messageVisits": 2016,
+        "receiptVisits": 1014048,
+        "sessionVisits": 15,
+        "items": 8,
+        "messages": 1008,
+        "receipts": 1008
+      }
     },
     {
       "round": 4,
       "side": "candidate",
-      "scenarioHash": "9a35f899f3f9812cd98fcec59cf82e92ce581198077647698b81c7edd762a4d4",
-      "fixtureDigest": "b629282d9b2e100e9a8d2bd887caadebfeb83afd3a295b67b949d426b6e7fd1d",
-      "validation": [],
-      "samplesNs": [
-        6421167,
-        6378958,
-        6542459,
-        6428625,
-        6420333,
-        6435958,
-        6504292,
-        6399583,
-        6402459,
-        6539500
-      ],
-      "observations": {
-        "messageVisits": 2000,
-        "receiptVisits": 1002000,
-        "sessionVisits": 15,
-        "items": 0,
-        "messages": 1000,
-        "receipts": 1000
-      },
+      "scenarioHash": "eb503ff9710642e443b107aaf1b2fe4e55d9a127adbe7494419b8112cdf69b2e",
       "loadBefore": [
-        7.77294921875,
-        9.52294921875,
-        10.56982421875
+        14.5439453125,
+        13.0859375,
+        13.32275390625
       ],
       "loadAfter": [
-        7.77294921875,
-        9.52294921875,
-        10.56982421875
+        14.5439453125,
+        13.0859375,
+        13.32275390625
       ],
-      "elapsedMs": 190
+      "elapsedMs": 230,
+      "fixtureDigest": "e99d2cde1f0f2a937616bc6baec43e746fb3c8ef762ff0f8cea8a9b36e482dbf",
+      "validation": [],
+      "samplesNs": [
+        7463416,
+        7631792,
+        7682875,
+        10402500,
+        8528041,
+        7199041,
+        7096458,
+        7551875,
+        7101625,
+        7086083
+      ],
+      "observations": {
+        "messageVisits": 2016,
+        "receiptVisits": 1014048,
+        "sessionVisits": 15,
+        "items": 8,
+        "messages": 1008,
+        "receipts": 1008
+      }
     },
     {
       "round": 4,
       "side": "baseline",
-      "scenarioHash": "f880e77b3e7e68a46c8723f6582996d89a3052709f09dc8344b601acd27d98a5",
-      "fixtureDigest": "1e6181a0212edc9cf3202a3c850ec2a7f4c7a6e0f867de32712269b800e71eaf",
-      "validation": [],
-      "samplesNs": [
-        200092208,
-        196494000,
-        195698333,
-        198057750,
-        194269584,
-        194531333,
-        193831708,
-        194943292,
-        196567750,
-        193105875
-      ],
-      "observations": {
-        "messageVisits": 16000,
-        "receiptVisits": 64016000,
-        "sessionVisits": 15,
-        "items": 0,
-        "messages": 8000,
-        "receipts": 8000
-      },
+      "scenarioHash": "79274dbff63a8d5a3b900fd1ed8e62881815f3e26ab0bae9b3d0e38e42045c12",
       "loadBefore": [
-        7.77294921875,
-        9.52294921875,
-        10.56982421875
+        14.5439453125,
+        13.0859375,
+        13.32275390625
       ],
       "loadAfter": [
-        7.87109375,
-        9.51416015625,
-        10.560546875
+        12.61474609375,
+        12.720703125,
+        13.18994140625
       ],
-      "elapsedMs": 7609
+      "elapsedMs": 9027,
+      "fixtureDigest": "fee97c20e2294de5f6f8cea792725670450d69e4baa3a608e4d12d15e42dd9c2",
+      "validation": [],
+      "samplesNs": [
+        450096000,
+        459685666,
+        305201416,
+        228226833,
+        283541250,
+        250623917,
+        229549750,
+        259546625,
+        263713500,
+        218309292
+      ],
+      "observations": {
+        "messageVisits": 16016,
+        "receiptVisits": 64112048,
+        "sessionVisits": 15,
+        "items": 8,
+        "messages": 8008,
+        "receipts": 8008
+      }
     },
     {
       "round": 4,
       "side": "candidate",
-      "scenarioHash": "f880e77b3e7e68a46c8723f6582996d89a3052709f09dc8344b601acd27d98a5",
-      "fixtureDigest": "1e6181a0212edc9cf3202a3c850ec2a7f4c7a6e0f867de32712269b800e71eaf",
-      "validation": [],
-      "samplesNs": [
-        201951291,
-        200656959,
-        193692375,
-        193021208,
-        196027542,
-        193123000,
-        193915041,
-        194942917,
-        194644875,
-        194494083
-      ],
-      "observations": {
-        "messageVisits": 16000,
-        "receiptVisits": 64016000,
-        "sessionVisits": 15,
-        "items": 0,
-        "messages": 8000,
-        "receipts": 8000
-      },
+      "scenarioHash": "79274dbff63a8d5a3b900fd1ed8e62881815f3e26ab0bae9b3d0e38e42045c12",
       "loadBefore": [
-        7.87109375,
-        9.51416015625,
-        10.560546875
+        12.61474609375,
+        12.720703125,
+        13.18994140625
       ],
       "loadAfter": [
-        7.55126953125,
-        9.396484375,
-        10.5068359375
+        11.1298828125,
+        12.39990234375,
+        13.0703125
       ],
-      "elapsedMs": 7571
+      "elapsedMs": 9401,
+      "fixtureDigest": "fee97c20e2294de5f6f8cea792725670450d69e4baa3a608e4d12d15e42dd9c2",
+      "validation": [],
+      "samplesNs": [
+        443924916,
+        448738917,
+        425016625,
+        442013542,
+        286966291,
+        224659833,
+        259510875,
+        268769208,
+        221177834,
+        254017166
+      ],
+      "observations": {
+        "messageVisits": 16016,
+        "receiptVisits": 64112048,
+        "sessionVisits": 15,
+        "items": 8,
+        "messages": 8008,
+        "receipts": 8008
+      }
     },
     {
       "round": 5,
       "side": "candidate",
-      "scenarioHash": "9a35f899f3f9812cd98fcec59cf82e92ce581198077647698b81c7edd762a4d4",
-      "fixtureDigest": "b629282d9b2e100e9a8d2bd887caadebfeb83afd3a295b67b949d426b6e7fd1d",
-      "validation": [],
-      "samplesNs": [
-        6453542,
-        6835959,
-        6549000,
-        6354000,
-        6312125,
-        6471375,
-        6415792,
-        6338958,
-        6477250,
-        6484958
-      ],
-      "observations": {
-        "messageVisits": 2000,
-        "receiptVisits": 1002000,
-        "sessionVisits": 15,
-        "items": 0,
-        "messages": 1000,
-        "receipts": 1000
-      },
+      "scenarioHash": "eb503ff9710642e443b107aaf1b2fe4e55d9a127adbe7494419b8112cdf69b2e",
       "loadBefore": [
-        7.55126953125,
-        9.396484375,
-        10.5068359375
+        11.1298828125,
+        12.39990234375,
+        13.0703125
       ],
       "loadAfter": [
-        7.55126953125,
-        9.396484375,
-        10.5068359375
+        11.1298828125,
+        12.39990234375,
+        13.0703125
       ],
-      "elapsedMs": 192
+      "elapsedMs": 237,
+      "fixtureDigest": "e99d2cde1f0f2a937616bc6baec43e746fb3c8ef762ff0f8cea8a9b36e482dbf",
+      "validation": [],
+      "samplesNs": [
+        7476833,
+        7328709,
+        7326125,
+        7341333,
+        7336875,
+        7177000,
+        7162500,
+        7337625,
+        9556875,
+        8158334
+      ],
+      "observations": {
+        "messageVisits": 2016,
+        "receiptVisits": 1014048,
+        "sessionVisits": 15,
+        "items": 8,
+        "messages": 1008,
+        "receipts": 1008
+      }
     },
     {
       "round": 5,
       "side": "baseline",
-      "scenarioHash": "9a35f899f3f9812cd98fcec59cf82e92ce581198077647698b81c7edd762a4d4",
-      "fixtureDigest": "b629282d9b2e100e9a8d2bd887caadebfeb83afd3a295b67b949d426b6e7fd1d",
-      "validation": [],
-      "samplesNs": [
-        6459833,
-        6448459,
-        6726708,
-        6394458,
-        6498583,
-        6422041,
-        6445583,
-        6362791,
-        6376459,
-        6395375
-      ],
-      "observations": {
-        "messageVisits": 2000,
-        "receiptVisits": 1002000,
-        "sessionVisits": 15,
-        "items": 0,
-        "messages": 1000,
-        "receipts": 1000
-      },
+      "scenarioHash": "eb503ff9710642e443b107aaf1b2fe4e55d9a127adbe7494419b8112cdf69b2e",
       "loadBefore": [
-        7.55126953125,
-        9.396484375,
-        10.5068359375
+        11.1298828125,
+        12.39990234375,
+        13.0703125
       ],
       "loadAfter": [
-        7.55126953125,
-        9.396484375,
-        10.5068359375
+        11.1298828125,
+        12.39990234375,
+        13.0703125
       ],
-      "elapsedMs": 189
+      "elapsedMs": 229,
+      "fixtureDigest": "e99d2cde1f0f2a937616bc6baec43e746fb3c8ef762ff0f8cea8a9b36e482dbf",
+      "validation": [],
+      "samplesNs": [
+        7415208,
+        7265166,
+        7359166,
+        8391417,
+        10467125,
+        7283083,
+        7226042,
+        7169042,
+        7163625,
+        7208541
+      ],
+      "observations": {
+        "messageVisits": 2016,
+        "receiptVisits": 1014048,
+        "sessionVisits": 15,
+        "items": 8,
+        "messages": 1008,
+        "receipts": 1008
+      }
     },
     {
       "round": 5,
       "side": "candidate",
-      "scenarioHash": "f880e77b3e7e68a46c8723f6582996d89a3052709f09dc8344b601acd27d98a5",
-      "fixtureDigest": "1e6181a0212edc9cf3202a3c850ec2a7f4c7a6e0f867de32712269b800e71eaf",
-      "validation": [],
-      "samplesNs": [
-        200822250,
-        193578709,
-        194146958,
-        194299875,
-        195243250,
-        199075709,
-        193697000,
-        193758125,
-        192845459,
-        200809833
-      ],
-      "observations": {
-        "messageVisits": 16000,
-        "receiptVisits": 64016000,
-        "sessionVisits": 15,
-        "items": 0,
-        "messages": 8000,
-        "receipts": 8000
-      },
+      "scenarioHash": "79274dbff63a8d5a3b900fd1ed8e62881815f3e26ab0bae9b3d0e38e42045c12",
       "loadBefore": [
-        7.55126953125,
-        9.396484375,
-        10.5068359375
+        11.1298828125,
+        12.39990234375,
+        13.0703125
       ],
       "loadAfter": [
-        7.3466796875,
-        9.3232421875,
-        10.47412109375
+        10.033203125,
+        12.123046875,
+        12.9638671875
       ],
-      "elapsedMs": 7531
+      "elapsedMs": 8946,
+      "fixtureDigest": "fee97c20e2294de5f6f8cea792725670450d69e4baa3a608e4d12d15e42dd9c2",
+      "validation": [],
+      "samplesNs": [
+        434801875,
+        445019458,
+        282114833,
+        220429541,
+        267686917,
+        259202542,
+        224453166,
+        264143958,
+        264541666,
+        216748291
+      ],
+      "observations": {
+        "messageVisits": 16016,
+        "receiptVisits": 64112048,
+        "sessionVisits": 15,
+        "items": 8,
+        "messages": 8008,
+        "receipts": 8008
+      }
     },
     {
       "round": 5,
       "side": "baseline",
-      "scenarioHash": "f880e77b3e7e68a46c8723f6582996d89a3052709f09dc8344b601acd27d98a5",
-      "fixtureDigest": "1e6181a0212edc9cf3202a3c850ec2a7f4c7a6e0f867de32712269b800e71eaf",
-      "validation": [],
-      "samplesNs": [
-        228195875,
-        199965584,
-        200989958,
-        199948000,
-        199250375,
-        193210125,
-        192974292,
-        194184208,
-        234750792,
-        222050500
-      ],
-      "observations": {
-        "messageVisits": 16000,
-        "receiptVisits": 64016000,
-        "sessionVisits": 15,
-        "items": 0,
-        "messages": 8000,
-        "receipts": 8000
-      },
+      "scenarioHash": "79274dbff63a8d5a3b900fd1ed8e62881815f3e26ab0bae9b3d0e38e42045c12",
       "loadBefore": [
-        7.3466796875,
-        9.3232421875,
-        10.47412109375
+        10.033203125,
+        12.123046875,
+        12.9638671875
       ],
       "loadAfter": [
-        7.5078125,
-        9.29541015625,
-        10.45068359375
+        9.6298828125,
+        12.00439453125,
+        12.9169921875
       ],
-      "elapsedMs": 7878
+      "elapsedMs": 9101,
+      "fixtureDigest": "fee97c20e2294de5f6f8cea792725670450d69e4baa3a608e4d12d15e42dd9c2",
+      "validation": [],
+      "samplesNs": [
+        451252375,
+        423137625,
+        290734333,
+        255789166,
+        273743833,
+        252869583,
+        263950709,
+        260546041,
+        260794167,
+        266400042
+      ],
+      "observations": {
+        "messageVisits": 16016,
+        "receiptVisits": 64112048,
+        "sessionVisits": 15,
+        "items": 8,
+        "messages": 8008,
+        "receipts": 8008
+      }
     },
     {
       "round": 6,
       "side": "baseline",
-      "scenarioHash": "9a35f899f3f9812cd98fcec59cf82e92ce581198077647698b81c7edd762a4d4",
-      "fixtureDigest": "b629282d9b2e100e9a8d2bd887caadebfeb83afd3a295b67b949d426b6e7fd1d",
-      "validation": [],
-      "samplesNs": [
-        6952166,
-        7013291,
-        7900833,
-        6626084,
-        7188083,
-        6904042,
-        6982125,
-        6550500,
-        6553250,
-        6474667
-      ],
-      "observations": {
-        "messageVisits": 2000,
-        "receiptVisits": 1002000,
-        "sessionVisits": 15,
-        "items": 0,
-        "messages": 1000,
-        "receipts": 1000
-      },
+      "scenarioHash": "eb503ff9710642e443b107aaf1b2fe4e55d9a127adbe7494419b8112cdf69b2e",
       "loadBefore": [
-        7.5078125,
-        9.29541015625,
-        10.45068359375
+        9.6298828125,
+        12.00439453125,
+        12.9169921875
       ],
       "loadAfter": [
-        7.5078125,
-        9.29541015625,
-        10.45068359375
+        8.9384765625,
+        11.8212890625,
+        12.8466796875
       ],
-      "elapsedMs": 197
+      "elapsedMs": 218,
+      "fixtureDigest": "e99d2cde1f0f2a937616bc6baec43e746fb3c8ef762ff0f8cea8a9b36e482dbf",
+      "validation": [],
+      "samplesNs": [
+        7368625,
+        7174750,
+        7141125,
+        7235875,
+        7048083,
+        7029541,
+        7193333,
+        7362709,
+        7077209,
+        7083792
+      ],
+      "observations": {
+        "messageVisits": 2016,
+        "receiptVisits": 1014048,
+        "sessionVisits": 15,
+        "items": 8,
+        "messages": 1008,
+        "receipts": 1008
+      }
     },
     {
       "round": 6,
       "side": "candidate",
-      "scenarioHash": "9a35f899f3f9812cd98fcec59cf82e92ce581198077647698b81c7edd762a4d4",
-      "fixtureDigest": "b629282d9b2e100e9a8d2bd887caadebfeb83afd3a295b67b949d426b6e7fd1d",
-      "validation": [],
-      "samplesNs": [
-        6376416,
-        6469125,
-        6540792,
-        6423125,
-        6464500,
-        6368250,
-        6580542,
-        6454417,
-        6345250,
-        6529125
-      ],
-      "observations": {
-        "messageVisits": 2000,
-        "receiptVisits": 1002000,
-        "sessionVisits": 15,
-        "items": 0,
-        "messages": 1000,
-        "receipts": 1000
-      },
+      "scenarioHash": "eb503ff9710642e443b107aaf1b2fe4e55d9a127adbe7494419b8112cdf69b2e",
       "loadBefore": [
-        7.5078125,
-        9.29541015625,
-        10.45068359375
+        8.9384765625,
+        11.8212890625,
+        12.8466796875
       ],
       "loadAfter": [
-        7.5078125,
-        9.29541015625,
-        10.45068359375
+        8.9384765625,
+        11.8212890625,
+        12.8466796875
       ],
-      "elapsedMs": 193
+      "elapsedMs": 216,
+      "fixtureDigest": "e99d2cde1f0f2a937616bc6baec43e746fb3c8ef762ff0f8cea8a9b36e482dbf",
+      "validation": [],
+      "samplesNs": [
+        7237958,
+        7140875,
+        7172417,
+        7100500,
+        7114917,
+        7259250,
+        7148333,
+        7375459,
+        7002458,
+        7038375
+      ],
+      "observations": {
+        "messageVisits": 2016,
+        "receiptVisits": 1014048,
+        "sessionVisits": 15,
+        "items": 8,
+        "messages": 1008,
+        "receipts": 1008
+      }
     },
     {
       "round": 6,
       "side": "baseline",
-      "scenarioHash": "f880e77b3e7e68a46c8723f6582996d89a3052709f09dc8344b601acd27d98a5",
-      "fixtureDigest": "1e6181a0212edc9cf3202a3c850ec2a7f4c7a6e0f867de32712269b800e71eaf",
-      "validation": [],
-      "samplesNs": [
-        197506791,
-        197299875,
-        194113708,
-        193295500,
-        192008375,
-        194246917,
-        194811875,
-        191810625,
-        193941458,
-        191008625
-      ],
-      "observations": {
-        "messageVisits": 16000,
-        "receiptVisits": 64016000,
-        "sessionVisits": 15,
-        "items": 0,
-        "messages": 8000,
-        "receipts": 8000
-      },
+      "scenarioHash": "79274dbff63a8d5a3b900fd1ed8e62881815f3e26ab0bae9b3d0e38e42045c12",
       "loadBefore": [
-        7.5078125,
-        9.29541015625,
-        10.45068359375
+        8.9384765625,
+        11.8212890625,
+        12.8466796875
       ],
       "loadAfter": [
-        7.146484375,
-        9.1904296875,
-        10.40673828125
+        8.462890625,
+        11.6748046875,
+        12.78857421875
       ],
-      "elapsedMs": 7628
+      "elapsedMs": 8541,
+      "fixtureDigest": "fee97c20e2294de5f6f8cea792725670450d69e4baa3a608e4d12d15e42dd9c2",
+      "validation": [],
+      "samplesNs": [
+        421142250,
+        426136833,
+        275261250,
+        213274500,
+        245259083,
+        247704083,
+        211792916,
+        247102041,
+        247983959,
+        210256166
+      ],
+      "observations": {
+        "messageVisits": 16016,
+        "receiptVisits": 64112048,
+        "sessionVisits": 15,
+        "items": 8,
+        "messages": 8008,
+        "receipts": 8008
+      }
     },
     {
       "round": 6,
       "side": "candidate",
-      "scenarioHash": "f880e77b3e7e68a46c8723f6582996d89a3052709f09dc8344b601acd27d98a5",
-      "fixtureDigest": "1e6181a0212edc9cf3202a3c850ec2a7f4c7a6e0f867de32712269b800e71eaf",
-      "validation": [],
-      "samplesNs": [
-        198927542,
-        192384584,
-        191870500,
-        192000584,
-        192726791,
-        192136375,
-        192012375,
-        193501250,
-        192115208,
-        193041292
-      ],
-      "observations": {
-        "messageVisits": 16000,
-        "receiptVisits": 64016000,
-        "sessionVisits": 15,
-        "items": 0,
-        "messages": 8000,
-        "receipts": 8000
-      },
+      "scenarioHash": "79274dbff63a8d5a3b900fd1ed8e62881815f3e26ab0bae9b3d0e38e42045c12",
       "loadBefore": [
-        7.146484375,
-        9.1904296875,
-        10.40673828125
+        8.462890625,
+        11.6748046875,
+        12.78857421875
       ],
       "loadAfter": [
-        6.8896484375,
-        9.068359375,
-        10.34912109375
+        13.4619140625,
+        12.6533203125,
+        13.123046875
       ],
-      "elapsedMs": 7545
+      "elapsedMs": 8899,
+      "fixtureDigest": "fee97c20e2294de5f6f8cea792725670450d69e4baa3a608e4d12d15e42dd9c2",
+      "validation": [],
+      "samplesNs": [
+        446497208,
+        454311042,
+        287911166,
+        224135209,
+        260931500,
+        262463416,
+        221522291,
+        267513583,
+        255932500,
+        226206083
+      ],
+      "observations": {
+        "messageVisits": 16016,
+        "receiptVisits": 64112048,
+        "sessionVisits": 15,
+        "items": 8,
+        "messages": 8008,
+        "receipts": 8008
+      }
     },
     {
       "round": 7,
       "side": "candidate",
-      "scenarioHash": "9a35f899f3f9812cd98fcec59cf82e92ce581198077647698b81c7edd762a4d4",
-      "fixtureDigest": "b629282d9b2e100e9a8d2bd887caadebfeb83afd3a295b67b949d426b6e7fd1d",
-      "validation": [],
-      "samplesNs": [
-        6453750,
-        6419417,
-        6528209,
-        6421375,
-        6406584,
-        6434500,
-        6531875,
-        6420042,
-        6374334,
-        6517000
-      ],
-      "observations": {
-        "messageVisits": 2000,
-        "receiptVisits": 1002000,
-        "sessionVisits": 15,
-        "items": 0,
-        "messages": 1000,
-        "receipts": 1000
-      },
+      "scenarioHash": "eb503ff9710642e443b107aaf1b2fe4e55d9a127adbe7494419b8112cdf69b2e",
       "loadBefore": [
-        6.8896484375,
-        9.068359375,
-        10.34912109375
+        13.4619140625,
+        12.6533203125,
+        13.123046875
       ],
       "loadAfter": [
-        6.8896484375,
-        9.068359375,
-        10.34912109375
+        13.4619140625,
+        12.6533203125,
+        13.123046875
       ],
-      "elapsedMs": 190
+      "elapsedMs": 218,
+      "fixtureDigest": "e99d2cde1f0f2a937616bc6baec43e746fb3c8ef762ff0f8cea8a9b36e482dbf",
+      "validation": [],
+      "samplesNs": [
+        7323833,
+        7120042,
+        7149583,
+        7188667,
+        7368917,
+        7241666,
+        7105833,
+        7246250,
+        7057000,
+        7237000
+      ],
+      "observations": {
+        "messageVisits": 2016,
+        "receiptVisits": 1014048,
+        "sessionVisits": 15,
+        "items": 8,
+        "messages": 1008,
+        "receipts": 1008
+      }
     },
     {
       "round": 7,
       "side": "baseline",
-      "scenarioHash": "9a35f899f3f9812cd98fcec59cf82e92ce581198077647698b81c7edd762a4d4",
-      "fixtureDigest": "b629282d9b2e100e9a8d2bd887caadebfeb83afd3a295b67b949d426b6e7fd1d",
-      "validation": [],
-      "samplesNs": [
-        6476750,
-        6518125,
-        6538375,
-        6519250,
-        6442333,
-        6522709,
-        6653875,
-        6496958,
-        6469250,
-        6521916
-      ],
-      "observations": {
-        "messageVisits": 2000,
-        "receiptVisits": 1002000,
-        "sessionVisits": 15,
-        "items": 0,
-        "messages": 1000,
-        "receipts": 1000
-      },
+      "scenarioHash": "eb503ff9710642e443b107aaf1b2fe4e55d9a127adbe7494419b8112cdf69b2e",
       "loadBefore": [
-        6.8896484375,
-        9.068359375,
-        10.34912109375
+        13.4619140625,
+        12.6533203125,
+        13.123046875
       ],
       "loadAfter": [
-        6.8896484375,
-        9.068359375,
-        10.34912109375
+        13.4619140625,
+        12.6533203125,
+        13.123046875
       ],
-      "elapsedMs": 192
+      "elapsedMs": 222,
+      "fixtureDigest": "e99d2cde1f0f2a937616bc6baec43e746fb3c8ef762ff0f8cea8a9b36e482dbf",
+      "validation": [],
+      "samplesNs": [
+        7248500,
+        7139042,
+        7414375,
+        7774166,
+        7419208,
+        7421958,
+        7119250,
+        7188042,
+        7473917,
+        7227792
+      ],
+      "observations": {
+        "messageVisits": 2016,
+        "receiptVisits": 1014048,
+        "sessionVisits": 15,
+        "items": 8,
+        "messages": 1008,
+        "receipts": 1008
+      }
     },
     {
       "round": 7,
       "side": "candidate",
-      "scenarioHash": "f880e77b3e7e68a46c8723f6582996d89a3052709f09dc8344b601acd27d98a5",
-      "fixtureDigest": "1e6181a0212edc9cf3202a3c850ec2a7f4c7a6e0f867de32712269b800e71eaf",
-      "validation": [],
-      "samplesNs": [
-        197456667,
-        192624375,
-        196528833,
-        194093250,
-        193509875,
-        193148708,
-        192773375,
-        192721791,
-        194333042,
-        192922792
-      ],
-      "observations": {
-        "messageVisits": 16000,
-        "receiptVisits": 64016000,
-        "sessionVisits": 15,
-        "items": 0,
-        "messages": 8000,
-        "receipts": 8000
-      },
+      "scenarioHash": "79274dbff63a8d5a3b900fd1ed8e62881815f3e26ab0bae9b3d0e38e42045c12",
       "loadBefore": [
-        6.8896484375,
-        9.068359375,
-        10.34912109375
+        13.4619140625,
+        12.6533203125,
+        13.123046875
       ],
       "loadAfter": [
-        6.578125,
-        8.96728515625,
-        10.3056640625
+        12.16064453125,
+        12.40087890625,
+        13.02783203125
       ],
-      "elapsedMs": 7482
+      "elapsedMs": 8850,
+      "fixtureDigest": "fee97c20e2294de5f6f8cea792725670450d69e4baa3a608e4d12d15e42dd9c2",
+      "validation": [],
+      "samplesNs": [
+        432543875,
+        433458834,
+        301863000,
+        217213333,
+        246578292,
+        250331625,
+        211830541,
+        253491708,
+        249401459,
+        209717042
+      ],
+      "observations": {
+        "messageVisits": 16016,
+        "receiptVisits": 64112048,
+        "sessionVisits": 15,
+        "items": 8,
+        "messages": 8008,
+        "receipts": 8008
+      }
     },
     {
       "round": 7,
       "side": "baseline",
-      "scenarioHash": "f880e77b3e7e68a46c8723f6582996d89a3052709f09dc8344b601acd27d98a5",
-      "fixtureDigest": "1e6181a0212edc9cf3202a3c850ec2a7f4c7a6e0f867de32712269b800e71eaf",
-      "validation": [],
-      "samplesNs": [
-        196318084,
-        192331166,
-        194689250,
-        192171958,
-        192197250,
-        193487500,
-        193218416,
-        193217750,
-        192701375,
-        192877541
-      ],
-      "observations": {
-        "messageVisits": 16000,
-        "receiptVisits": 64016000,
-        "sessionVisits": 15,
-        "items": 0,
-        "messages": 8000,
-        "receipts": 8000
-      },
+      "scenarioHash": "79274dbff63a8d5a3b900fd1ed8e62881815f3e26ab0bae9b3d0e38e42045c12",
       "loadBefore": [
-        6.578125,
-        8.96728515625,
-        10.3056640625
+        12.16064453125,
+        12.40087890625,
+        13.02783203125
       ],
       "loadAfter": [
-        6.28076171875,
-        8.82080078125,
-        10.2373046875
+        11.943359375,
+        12.3525390625,
+        13.00341796875
       ],
-      "elapsedMs": 7465
+      "elapsedMs": 9366,
+      "fixtureDigest": "fee97c20e2294de5f6f8cea792725670450d69e4baa3a608e4d12d15e42dd9c2",
+      "validation": [],
+      "samplesNs": [
+        470485083,
+        462739500,
+        313326416,
+        288073625,
+        265631792,
+        260671708,
+        263932750,
+        274737292,
+        260398458,
+        267340167
+      ],
+      "observations": {
+        "messageVisits": 16016,
+        "receiptVisits": 64112048,
+        "sessionVisits": 15,
+        "items": 8,
+        "messages": 8008,
+        "receipts": 8008
+      }
     },
     {
       "round": 8,
       "side": "baseline",
-      "scenarioHash": "9a35f899f3f9812cd98fcec59cf82e92ce581198077647698b81c7edd762a4d4",
-      "fixtureDigest": "b629282d9b2e100e9a8d2bd887caadebfeb83afd3a295b67b949d426b6e7fd1d",
-      "validation": [],
-      "samplesNs": [
-        6440708,
-        6428416,
-        6492584,
-        6444917,
-        6390416,
-        6476166,
-        6530709,
-        6432750,
-        6496292,
-        6509458
-      ],
-      "observations": {
-        "messageVisits": 2000,
-        "receiptVisits": 1002000,
-        "sessionVisits": 15,
-        "items": 0,
-        "messages": 1000,
-        "receipts": 1000
-      },
+      "scenarioHash": "eb503ff9710642e443b107aaf1b2fe4e55d9a127adbe7494419b8112cdf69b2e",
       "loadBefore": [
-        6.28076171875,
-        8.82080078125,
-        10.2373046875
+        11.943359375,
+        12.3525390625,
+        13.00341796875
       ],
       "loadAfter": [
-        6.28076171875,
-        8.82080078125,
-        10.2373046875
+        11.943359375,
+        12.3525390625,
+        13.00341796875
       ],
-      "elapsedMs": 189
+      "elapsedMs": 219,
+      "fixtureDigest": "e99d2cde1f0f2a937616bc6baec43e746fb3c8ef762ff0f8cea8a9b36e482dbf",
+      "validation": [],
+      "samplesNs": [
+        7229792,
+        7261791,
+        7451833,
+        7123209,
+        7142625,
+        7163042,
+        7268083,
+        7173834,
+        7242958,
+        7318500
+      ],
+      "observations": {
+        "messageVisits": 2016,
+        "receiptVisits": 1014048,
+        "sessionVisits": 15,
+        "items": 8,
+        "messages": 1008,
+        "receipts": 1008
+      }
     },
     {
       "round": 8,
       "side": "candidate",
-      "scenarioHash": "9a35f899f3f9812cd98fcec59cf82e92ce581198077647698b81c7edd762a4d4",
-      "fixtureDigest": "b629282d9b2e100e9a8d2bd887caadebfeb83afd3a295b67b949d426b6e7fd1d",
-      "validation": [],
-      "samplesNs": [
-        6547042,
-        6535375,
-        6555042,
-        6465542,
-        6456375,
-        6442834,
-        6614875,
-        6492666,
-        6427125,
-        6477084
-      ],
-      "observations": {
-        "messageVisits": 2000,
-        "receiptVisits": 1002000,
-        "sessionVisits": 15,
-        "items": 0,
-        "messages": 1000,
-        "receipts": 1000
-      },
+      "scenarioHash": "eb503ff9710642e443b107aaf1b2fe4e55d9a127adbe7494419b8112cdf69b2e",
       "loadBefore": [
-        6.28076171875,
-        8.82080078125,
-        10.2373046875
+        11.943359375,
+        12.3525390625,
+        13.00341796875
       ],
       "loadAfter": [
-        6.28076171875,
-        8.82080078125,
-        10.2373046875
+        11.943359375,
+        12.3525390625,
+        13.00341796875
       ],
-      "elapsedMs": 190
+      "elapsedMs": 219,
+      "fixtureDigest": "e99d2cde1f0f2a937616bc6baec43e746fb3c8ef762ff0f8cea8a9b36e482dbf",
+      "validation": [],
+      "samplesNs": [
+        8068792,
+        7369083,
+        7685583,
+        7538875,
+        7615875,
+        7166666,
+        7356792,
+        7138125,
+        7125000,
+        7270750
+      ],
+      "observations": {
+        "messageVisits": 2016,
+        "receiptVisits": 1014048,
+        "sessionVisits": 15,
+        "items": 8,
+        "messages": 1008,
+        "receipts": 1008
+      }
     },
     {
       "round": 8,
       "side": "baseline",
-      "scenarioHash": "f880e77b3e7e68a46c8723f6582996d89a3052709f09dc8344b601acd27d98a5",
-      "fixtureDigest": "1e6181a0212edc9cf3202a3c850ec2a7f4c7a6e0f867de32712269b800e71eaf",
-      "validation": [],
-      "samplesNs": [
-        197612208,
-        193833916,
-        194349458,
-        195109583,
-        193555500,
-        192647834,
-        193821333,
-        193218542,
-        193040292,
-        193082041
-      ],
-      "observations": {
-        "messageVisits": 16000,
-        "receiptVisits": 64016000,
-        "sessionVisits": 15,
-        "items": 0,
-        "messages": 8000,
-        "receipts": 8000
-      },
+      "scenarioHash": "79274dbff63a8d5a3b900fd1ed8e62881815f3e26ab0bae9b3d0e38e42045c12",
       "loadBefore": [
-        6.28076171875,
-        8.82080078125,
-        10.2373046875
+        11.943359375,
+        12.3525390625,
+        13.00341796875
       ],
       "loadAfter": [
-        6.1025390625,
-        8.6953125,
-        10.17578125
+        11.16357421875,
+        12.17529296875,
+        12.9326171875
       ],
-      "elapsedMs": 7579
+      "elapsedMs": 8886,
+      "fixtureDigest": "fee97c20e2294de5f6f8cea792725670450d69e4baa3a608e4d12d15e42dd9c2",
+      "validation": [],
+      "samplesNs": [
+        438064250,
+        400180209,
+        284732125,
+        250525833,
+        214001541,
+        254613833,
+        253710375,
+        253391375,
+        250948042,
+        246932333
+      ],
+      "observations": {
+        "messageVisits": 16016,
+        "receiptVisits": 64112048,
+        "sessionVisits": 15,
+        "items": 8,
+        "messages": 8008,
+        "receipts": 8008
+      }
     },
     {
       "round": 8,
       "side": "candidate",
-      "scenarioHash": "f880e77b3e7e68a46c8723f6582996d89a3052709f09dc8344b601acd27d98a5",
-      "fixtureDigest": "1e6181a0212edc9cf3202a3c850ec2a7f4c7a6e0f867de32712269b800e71eaf",
-      "validation": [],
-      "samplesNs": [
-        198828084,
-        193101708,
-        198177167,
-        193719334,
-        194836958,
-        203240958,
-        199743208,
-        199089583,
-        196738000,
-        198025458
-      ],
-      "observations": {
-        "messageVisits": 16000,
-        "receiptVisits": 64016000,
-        "sessionVisits": 15,
-        "items": 0,
-        "messages": 8000,
-        "receipts": 8000
-      },
+      "scenarioHash": "79274dbff63a8d5a3b900fd1ed8e62881815f3e26ab0bae9b3d0e38e42045c12",
       "loadBefore": [
-        6.1025390625,
-        8.6953125,
-        10.17578125
+        11.16357421875,
+        12.17529296875,
+        12.9326171875
       ],
       "loadAfter": [
-        5.85400390625,
-        8.6005859375,
-        10.13330078125
+        10.669921875,
+        12.05615234375,
+        12.8857421875
       ],
-      "elapsedMs": 7705
+      "elapsedMs": 8746,
+      "fixtureDigest": "fee97c20e2294de5f6f8cea792725670450d69e4baa3a608e4d12d15e42dd9c2",
+      "validation": [],
+      "samplesNs": [
+        451196125,
+        433369417,
+        281796958,
+        220568709,
+        253276583,
+        247530750,
+        220284625,
+        254031250,
+        249893917,
+        221822209
+      ],
+      "observations": {
+        "messageVisits": 16016,
+        "receiptVisits": 64112048,
+        "sessionVisits": 15,
+        "items": 8,
+        "messages": 8008,
+        "receipts": 8008
+      }
     },
     {
       "round": 9,
       "side": "candidate",
-      "scenarioHash": "9a35f899f3f9812cd98fcec59cf82e92ce581198077647698b81c7edd762a4d4",
-      "fixtureDigest": "b629282d9b2e100e9a8d2bd887caadebfeb83afd3a295b67b949d426b6e7fd1d",
-      "validation": [],
-      "samplesNs": [
-        6486166,
-        6441334,
-        6532416,
-        6499958,
-        6385916,
-        6462500,
-        6560500,
-        6414167,
-        6499125,
-        6503958
-      ],
-      "observations": {
-        "messageVisits": 2000,
-        "receiptVisits": 1002000,
-        "sessionVisits": 15,
-        "items": 0,
-        "messages": 1000,
-        "receipts": 1000
-      },
+      "scenarioHash": "eb503ff9710642e443b107aaf1b2fe4e55d9a127adbe7494419b8112cdf69b2e",
       "loadBefore": [
-        5.85400390625,
-        8.6005859375,
-        10.13330078125
+        10.669921875,
+        12.05615234375,
+        12.8857421875
       ],
       "loadAfter": [
-        5.85400390625,
-        8.6005859375,
-        10.13330078125
+        10.669921875,
+        12.05615234375,
+        12.8857421875
       ],
-      "elapsedMs": 191
+      "elapsedMs": 218,
+      "fixtureDigest": "e99d2cde1f0f2a937616bc6baec43e746fb3c8ef762ff0f8cea8a9b36e482dbf",
+      "validation": [],
+      "samplesNs": [
+        7423291,
+        7192084,
+        7247166,
+        7190250,
+        7194584,
+        7228041,
+        7145791,
+        7254958,
+        7094458,
+        7077000
+      ],
+      "observations": {
+        "messageVisits": 2016,
+        "receiptVisits": 1014048,
+        "sessionVisits": 15,
+        "items": 8,
+        "messages": 1008,
+        "receipts": 1008
+      }
     },
     {
       "round": 9,
       "side": "baseline",
-      "scenarioHash": "9a35f899f3f9812cd98fcec59cf82e92ce581198077647698b81c7edd762a4d4",
-      "fixtureDigest": "b629282d9b2e100e9a8d2bd887caadebfeb83afd3a295b67b949d426b6e7fd1d",
-      "validation": [],
-      "samplesNs": [
-        6447792,
-        6418292,
-        6540584,
-        6355417,
-        6406041,
-        6435875,
-        6494458,
-        6424959,
-        6337875,
-        6402708
-      ],
-      "observations": {
-        "messageVisits": 2000,
-        "receiptVisits": 1002000,
-        "sessionVisits": 15,
-        "items": 0,
-        "messages": 1000,
-        "receipts": 1000
-      },
+      "scenarioHash": "eb503ff9710642e443b107aaf1b2fe4e55d9a127adbe7494419b8112cdf69b2e",
       "loadBefore": [
-        5.85400390625,
-        8.6005859375,
-        10.13330078125
+        10.669921875,
+        12.05615234375,
+        12.8857421875
       ],
       "loadAfter": [
-        5.85400390625,
-        8.6005859375,
-        10.13330078125
+        10.669921875,
+        12.05615234375,
+        12.8857421875
       ],
-      "elapsedMs": 189
+      "elapsedMs": 223,
+      "fixtureDigest": "e99d2cde1f0f2a937616bc6baec43e746fb3c8ef762ff0f8cea8a9b36e482dbf",
+      "validation": [],
+      "samplesNs": [
+        7393333,
+        7181333,
+        7309500,
+        7152000,
+        7154958,
+        7231958,
+        7102958,
+        7282000,
+        7207167,
+        7492083
+      ],
+      "observations": {
+        "messageVisits": 2016,
+        "receiptVisits": 1014048,
+        "sessionVisits": 15,
+        "items": 8,
+        "messages": 1008,
+        "receipts": 1008
+      }
     },
     {
       "round": 9,
       "side": "candidate",
-      "scenarioHash": "f880e77b3e7e68a46c8723f6582996d89a3052709f09dc8344b601acd27d98a5",
-      "fixtureDigest": "1e6181a0212edc9cf3202a3c850ec2a7f4c7a6e0f867de32712269b800e71eaf",
-      "validation": [],
-      "samplesNs": [
-        199487125,
-        193953334,
-        193805750,
-        199592125,
-        216129625,
-        192779167,
-        192918000,
-        193249708,
-        194147958,
-        194121750
-      ],
-      "observations": {
-        "messageVisits": 16000,
-        "receiptVisits": 64016000,
-        "sessionVisits": 15,
-        "items": 0,
-        "messages": 8000,
-        "receipts": 8000
-      },
+      "scenarioHash": "79274dbff63a8d5a3b900fd1ed8e62881815f3e26ab0bae9b3d0e38e42045c12",
       "loadBefore": [
-        5.85400390625,
-        8.6005859375,
-        10.13330078125
+        10.669921875,
+        12.05615234375,
+        12.8857421875
       ],
       "loadAfter": [
-        5.7158203125,
-        8.4814453125,
-        10.07275390625
+        10.3583984375,
+        11.93994140625,
+        12.833984375
       ],
-      "elapsedMs": 7611
+      "elapsedMs": 9488,
+      "fixtureDigest": "fee97c20e2294de5f6f8cea792725670450d69e4baa3a608e4d12d15e42dd9c2",
+      "validation": [],
+      "samplesNs": [
+        457473166,
+        486512250,
+        322239000,
+        236888500,
+        262806834,
+        262629958,
+        221582416,
+        260470208,
+        257900791,
+        224578709
+      ],
+      "observations": {
+        "messageVisits": 16016,
+        "receiptVisits": 64112048,
+        "sessionVisits": 15,
+        "items": 8,
+        "messages": 8008,
+        "receipts": 8008
+      }
     },
     {
       "round": 9,
       "side": "baseline",
-      "scenarioHash": "f880e77b3e7e68a46c8723f6582996d89a3052709f09dc8344b601acd27d98a5",
-      "fixtureDigest": "1e6181a0212edc9cf3202a3c850ec2a7f4c7a6e0f867de32712269b800e71eaf",
-      "validation": [],
-      "samplesNs": [
-        201672625,
-        216156583,
-        225314792,
-        205284333,
-        199954708,
-        195162000,
-        217404875,
-        210663625,
-        210290625,
-        217066917
-      ],
-      "observations": {
-        "messageVisits": 16000,
-        "receiptVisits": 64016000,
-        "sessionVisits": 15,
-        "items": 0,
-        "messages": 8000,
-        "receipts": 8000
-      },
+      "scenarioHash": "79274dbff63a8d5a3b900fd1ed8e62881815f3e26ab0bae9b3d0e38e42045c12",
       "loadBefore": [
-        5.7158203125,
-        8.4814453125,
-        10.07275390625
+        10.3583984375,
+        11.93994140625,
+        12.833984375
       ],
       "loadAfter": [
-        5.498046875,
-        8.39013671875,
-        10.03125
+        9.83544921875,
+        11.77685546875,
+        12.76513671875
       ],
-      "elapsedMs": 7848
+      "elapsedMs": 9195,
+      "fixtureDigest": "fee97c20e2294de5f6f8cea792725670450d69e4baa3a608e4d12d15e42dd9c2",
+      "validation": [],
+      "samplesNs": [
+        445045917,
+        441799000,
+        286953917,
+        257223166,
+        257186417,
+        250720250,
+        214905417,
+        285550833,
+        284449333,
+        239138291
+      ],
+      "observations": {
+        "messageVisits": 16016,
+        "receiptVisits": 64112048,
+        "sessionVisits": 15,
+        "items": 8,
+        "messages": 8008,
+        "receipts": 8008
+      }
     }
   ],
-  "finishedAt": "2026-10-27T01:43:34.924Z"
+  "finishedAt": "2026-10-27T02:53:50.859Z"
 }
