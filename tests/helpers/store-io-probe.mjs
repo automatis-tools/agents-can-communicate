@@ -61,6 +61,8 @@ export function createStoreIoProbe(root, { trace = false } = {}) {
     patch(name, async (...args) => {
       const result = await original(...args);
       add(bucket(args[0]), name);
+      // How much a listing enumerated: one readdir of a long history costs more than one of a short one.
+      if (name === "readdir" && Array.isArray(result)) add(bucket(args[0]), "readdirEntries", result.length);
       if ((name === "rename" || name === "link") && bucket(args[1]) !== null) {
         const info = files.get(filename(args[0]));
         if (info !== undefined) {

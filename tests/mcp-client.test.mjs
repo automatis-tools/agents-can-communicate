@@ -1,9 +1,10 @@
 import assert from "node:assert/strict";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
 
+import { removeFixture } from "./helpers/fixture-cleanup.mjs";
 import { connectMcp } from "./helpers/mcp-client.mjs";
 
 async function client(t, source, options = {}) {
@@ -14,7 +15,9 @@ async function client(t, source, options = {}) {
   t.after(async () => {
     connected.child.kill("SIGKILL");
     await connected.closed;
-    await rm(root, { recursive: true, force: true });
+    // The root is the server's working directory and its descendant's. On Windows a
+    // process killed a moment ago can still hold it (EBUSY, windows-latest on #361).
+    await removeFixture(root);
   });
   return connected;
 }
