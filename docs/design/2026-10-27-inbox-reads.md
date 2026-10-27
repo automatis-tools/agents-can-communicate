@@ -28,9 +28,16 @@ each go stale at every write of the other, so the versions do not share a store:
   migrated, with `store_migration_required`.
 
 The migration, under the writer mutex: finishes decided journals, verifies every primary record
-and event, writes each receipt's message obligation into it (below), builds the complete
-`indexes/v2` cache, removes `indexes/v1`, and durably switches the identity last. A migration
-interrupted before the switch leaves a contract-7 store, and the next pass starts again.
+and event, writes the message obligation into each note its reader has retrieved (below), builds
+the complete `indexes/v2` cache, removes `indexes/v1`, and durably switches the identity last. A
+migration interrupted before the switch leaves a contract-7 store, and the next pass starts again.
+- Each rewritten receipt's bytes are flushed before it takes its name, as a transaction's are: a
+  receipt reader refuses a damaged record, so a crash must leave the old receipt or the new one.
+- `indexes/v1` moves out whole, and the sweep removes it a file at a time within each pass's
+  budget, since that pass runs inside a hook's store open.
+- `acc doctor --migrate-store` runs the newest installed generation, also one that waits to
+  activate. It refuses until the contract-8 runtime is active, as the automatic upgrade waits,
+  because a session admitted on the contract-7 runtime cannot read a migrated store.
 
 ## What changes
 
@@ -47,9 +54,11 @@ them:
 - `receiptsByRecipientState`: receipts by workspace, recipient and state, for the receipts that
   can still be listed. An acknowledged receipt never can, and neither can a note the reader has
   retrieved, so neither is in the index: its groups follow what is waiting, not the history. A
-  receipt keeps its message's obligation in `extensions.obligation` for this. The migration
-  writes it into every receipt, and a retrieval writes it into any receipt still without it. A
-  receipt without one stays in the index while retrieved, since it may still be listable.
+  receipt keeps its message's obligation in `extensions.obligation` for this. A new receipt has
+  it, the migration writes it into each note its reader has retrieved - the only receipt it takes
+  out of the index, 124 of 2,454 in the maintainer's 63 stores - and a retrieval writes it into
+  any receipt still without it. A receipt without one stays in the index while retrieved, since
+  it may still be listable.
 - `decisionsByTarget`: for each decision, one key per decision it replaces or withdraws. A
   decision's status depends on its whole group - the decisions it names and the ones that name
   it, to any distance, whoever they were addressed to. The page walks each group from the

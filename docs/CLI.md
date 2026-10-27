@@ -494,9 +494,11 @@ recovery details.
 `acc doctor --migrate-store` explicitly migrates the selected workspace from store
 contract 6 or 7 to 8, as ACC does by itself after an update. Stop old ACC clients and any
 direct library callers first. The command fences runtime admission and refuses live holders
-with an old or unknown contract. It preserves message records, writes each receipt's message
-obligation into it, prepares the message and inbox indexes, removes the contract-7 index cache,
-then changes the durable identity last. It neither installs a release nor restarts clients.
+with an old or unknown contract, and it waits until the runtime for contract 8 is active: run
+from a release that `acc update` downloaded but has not activated yet, it exits with code `5`.
+It preserves message records, writes the message obligation into each note its reader has
+retrieved, prepares the message and inbox indexes, removes the contract-7 index cache, then
+changes the durable identity last. It neither installs a release nor restarts clients.
 `--repair` is a separate operation and never changes the store contract; the two
 flags cannot be combined. Hooks leave an older identity unchanged and fail open
 with the migration remedy. Doctor JSON includes bounded `indexDiagnostics`; a cache

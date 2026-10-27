@@ -21,6 +21,9 @@ async function legacy(t, storeVersion = 6) {
     tx.put("message", "message_a", exactMessage());
     tx.put("receipt", "receipt_a", { schemaVersion: SCHEMA_VERSION, workspaceId: WS,
       messageId: "message_a", recipientParticipantId: "participant_a", state: "queued", updatedAt: NOW });
+    // A note its reader has retrieved: the one receipt the migration rewrites.
+    tx.put("receipt", "receipt_b", { schemaVersion: SCHEMA_VERSION, workspaceId: WS,
+      messageId: "message_a", recipientParticipantId: "participant_b", state: "retrieved", updatedAt: NOW });
   }, { kinds: ["message", "receipt"] });
   const identityFile = path.join(root, "protocol.json");
   const identity = { ...JSON.parse(await readFile(identityFile)), storeVersion };
@@ -32,17 +35,18 @@ const migrate = options => {
   assert.equal(typeof storage.migrateFilesystemStore, "function", "explicit migration implementation missing");
   return storage.migrateFilesystemStore(options);
 };
-const primaryBytes = async root => Promise.all(["message/message_a", "receipt/receipt_a"]
+const primaryBytes = async root => Promise.all(["message/message_a", "receipt/receipt_a", "receipt/receipt_b"]
   .map(name => readFile(path.join(root, "state", name + ".json"))));
 const CURRENT = storage.STORE_VERSION;
-// Contract 8 writes each receipt's message obligation into it (#306); nothing else changes.
-const receiptRecord = async root => JSON.parse(await readFile(path.join(root, "state/receipt/receipt_a.json"))).record;
+// Contract 8 writes the obligation into a note its reader has retrieved (#306); nothing else changes.
+const receiptRecord = async root => JSON.parse(await readFile(path.join(root, "state/receipt/receipt_b.json"))).record;
 async function sameRecords(root, before) {
-  const [message, receipt] = before, [messageAfter] = await primaryBytes(root);
+  const [message, queued, retrieved] = before, [messageAfter, queuedAfter] = await primaryBytes(root);
   assert.deepEqual(messageAfter, message);
+  assert.deepEqual(queuedAfter, queued);
   const { extensions, ...rest } = await receiptRecord(root);
   assert.deepEqual(extensions, { obligation: "none" });
-  const { extensions: none, ...original } = JSON.parse(receipt).record;
+  const { extensions: none, ...original } = JSON.parse(retrieved).record;
   assert.deepEqual(rest, original);
 }
 
@@ -74,8 +78,21 @@ test("a contract-7 store gains its receipts' obligations and a v2 cache, and its
   await sameRecords(f.root, before);
   await assert.rejects(stat(path.join(legacyCache, "cache.json")), { code: "ENOENT" });
   const opened = await storage.openFilesystemStore(f.options);
-  assert.deepEqual(await opened.transaction(tx => tx.lookup("receiptsByRecipientState", [WS, "participant_a", "queued"]),
-    { kinds: ["receipt"], exactKinds: ["receipt"] }), ["receipt_a"]);
+  const lookup = tuple => opened.transaction(tx => tx.lookup("receiptsByRecipientState", tuple),
+    { kinds: ["receipt"], exactKinds: ["receipt"] });
+  assert.deepEqual(await lookup([WS, "participant_a", "queued"]), ["receipt_a"]);
+  assert.deepEqual(await lookup([WS, "participant_b", "retrieved"]), [], "a retrieved note leaves the index");
+});
+
+// A receipt reader refuses a damaged record, so a rewritten receipt must never take its
+// name before its bytes are on disk: a crash then leaves the old receipt or the new one.
+test("the migration flushes each receipt it rewrites before the receipt takes its name", async t => {
+  const f = await legacy(t, 7);
+  const { measureTransactionIO } = await import("../../../tests/helpers/store-io-probe.mjs");
+  const measured = await measureTransactionIO(f.root, () => migrate(f.options));
+  assert.equal(measured.result.migrated, true);
+  assert.equal(measured.io["state:receipt/publications"], 1);
+  assert.equal(measured.io["state:receipt/publicationFlushes"], 1);
 });
 
 test("migration recovers decided version-six journal first", async t => {

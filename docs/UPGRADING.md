@@ -21,11 +21,12 @@ refreshes installed integrations while preserving their recorded delivery policy
 ACC moves each workspace's store from contract 7, or 6, to 8 by itself, right after an update
 activates a contract-8 runtime, in the same way as from 6 to 7 below. Contract 8 keeps two more
 indexes, so an inbox read loads the reader's own records instead of every message and receipt
-in the workspace (#306). The migration writes each receipt's message obligation into the receipt,
-builds the contract-8 index cache, removes the contract-7 cache, and replaces the store identity
-last. Message bytes, workspace identity and initialization time are preserved. A receipt gains
-only `extensions.obligation`, which no command or MCP tool shows. There is no reverse migration:
-ACC 0.10.0 to 0.12.x refuses a contract-8 store.
+in the workspace (#306). The migration writes the message obligation into each note its reader
+has retrieved, builds the contract-8 index cache, removes the contract-7 cache, and replaces the
+store identity last. Message bytes, workspace identity and initialization time are preserved,
+and so is every other receipt. Such a note's receipt gains only `extensions.obligation`, which
+no command or MCP tool shows. There is no reverse migration: ACC 0.10.0 to 0.12.x refuses a
+contract-8 store.
 
 - **Activation waits for older sessions.** A client session that started under 0.12.x or older
   holds contract 7 until it ends. `acc update` downloads the new release and reports that it is

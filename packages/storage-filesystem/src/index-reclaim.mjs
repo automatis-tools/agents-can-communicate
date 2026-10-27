@@ -98,7 +98,7 @@ export async function reclaimIndexPages(paths, { root, roots, limit = 512, deadl
   }
   if (doomed !== undefined) {
     const removed = await discard(doomed, root, budget - spent, deadlineAt);
-    reclaimed += removed.spent; spent += removed.spent;
+    reclaimed += removed.removed; spent += removed.spent;
     remaining ||= !removed.drained;
   }
   return checkpoint(remaining);
@@ -113,6 +113,10 @@ async function discardCache(root, collect) {
     const doomed = await detachDoomed(root);
     await condemn(directory, doomed);
     collect(directory, doomed);
+    // Prune is an explicit command, and it pays for the cache it invalidated now: left for
+    // the records' pass below, whose leftovers come first and are paid a file at a time,
+    // a cache larger than the budget would take that budget from the records every pass.
+    await discard(doomed, root, Infinity);
   } catch { /* Cache loss or refusal cannot fail a completed primary prune. */ }
 }
 

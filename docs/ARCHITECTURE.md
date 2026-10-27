@@ -246,8 +246,10 @@ two, `receiptsByRecipientState` (a recipient's receipts that can still be listed
 `decisionsByTarget` (the decisions that replace or withdraw a decision). An inbox read uses
 them to load only the reader's own records (#306). A receipt keeps its message's obligation in
 `extensions.obligation`, so the index can leave out a note its reader has retrieved; read
-surfaces never show that field. The 7-to-8 migration writes the obligation into every receipt,
-builds `indexes/v2` and removes `indexes/v1`; no contract-7 writer shares a contract-8 store.
+surfaces never show that field. The 7-to-8 migration writes the obligation into each retrieved
+note, the one receipt it takes out of the index; every other receipt gains it when its state next
+changes. The migration builds `indexes/v2` and removes `indexes/v1`; no contract-7 writer shares
+a contract-8 store.
 Content-addressed pages contain portable key tuples and record references, never message
 bodies. Each page is bounded by 32 entries and 64 KiB; radix branches have at most 16 children.
 An ID group of up to eight IDs is stored in its leaf entry; a larger one is a page, and one

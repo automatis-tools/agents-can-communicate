@@ -28,13 +28,19 @@ async function fixture(t, managed = true) {
   await store.transaction(tx => tx.put("message", "message_a", exactMessage({ workspaceId: descriptor.id })), { kinds: ["message"] });
   const identityFile = path.join(paths.root, "protocol.json");
   await writeFile(identityFile, JSON.stringify({ ...JSON.parse(await readFile(identityFile)), storeVersion: 6 }));
-  const manager = path.join(dataHome, "acc", "runtime"), generation = path.join(manager, "generations", "old");
-  const active = { root: generation, version: "0.9.0", storeVersion: 6 };
+  // The active runtime speaks this code's contract, as after the update that brought it;
+  // an older generation is what an older live holder still runs.
+  const manager = path.join(dataHome, "acc", "runtime");
+  const active = { root: path.join(manager, "generations", "current"), version: "0.13.0", storeVersion: STORE_VERSION };
+  const older = { root: path.join(manager, "generations", "old"), version: "0.9.0", storeVersion: 6 };
   const control = { schemaVersion: 1, active, pending: null, phase: "ready", auto: false,
     pin: null, checkedAt: null, home, targets: [], notice: null };
   if (managed) {
-    await mkdir(generation, { recursive: true });
-    await writeFile(path.join(generation, "package.json"), JSON.stringify({ name: "agents-can-communicate", version: "0.9.0", accStoreVersion: 6 }));
+    for (const runtime of [active, older]) {
+      await mkdir(runtime.root, { recursive: true });
+      await writeFile(path.join(runtime.root, "package.json"), JSON.stringify({ name: "agents-can-communicate",
+        version: runtime.version, accStoreVersion: runtime.storeVersion }));
+    }
     await writeControl(manager, control);
   }
   const runtime = { cwd: project, dataHome, clock, ids, gitProbe: async () => null,
@@ -53,9 +59,9 @@ async function fixture(t, managed = true) {
   const lease = async pid => {
     await mkdir(path.join(manager, "leases"), { recursive: true });
     await writeManagedJson(path.join(manager, "leases/lease_a.json"),
-      { schemaVersion: 1, token: "lease_a", pid, kind: "acc-mcp", runtime: active, createdAt: NOW });
+      { schemaVersion: 1, token: "lease_a", pid, kind: "acc-mcp", runtime: older, createdAt: NOW });
   };
-  return { root, manager, control, runtime, run, paths, native, lease, identityFile };
+  return { root, manager, control, older, runtime, run, paths, native, lease, identityFile };
 }
 const migrate = f => f.run(["doctor", "--migrate-store"], { managementOnly: true });
 
@@ -174,8 +180,23 @@ test("admission stays fenced through workspace migration", async t => {
     assert.equal(JSON.parse(await readFile(f.identityFile)).storeVersion, 6);
   } finally { release(); result = await migration; }
   assert.equal(result.code, EXIT.OK);
-  assert.equal((await acquireRuntime(f.manager)).runtime.storeVersion, 6,
+  const { version, storeVersion } = (await acquireRuntime(f.manager)).runtime;
+  assert.deepEqual({ version, storeVersion }, { version: f.control.active.version, storeVersion: STORE_VERSION },
     "migration does not install or activate another release");
+});
+
+// `acc doctor` runs the newest installed generation, also while it waits to activate. A
+// store it migrated then is one the active runtime, and every session admitted on it,
+// cannot read (review of #306).
+test("migration waits until the runtime that speaks the new contract is active", async t => {
+  const f = await fixture(t), before = await readFile(f.identityFile);
+  await writeControl(f.manager, { ...f.control, active: f.older, pending: f.control.active });
+  const result = await migrate(f);
+  assert.equal(result.code, EXIT.CONFLICT, JSON.stringify(result.body));
+  assert.match(result.body.error.message, /acc update/);
+  assert.deepEqual(await readFile(f.identityFile), before);
+  await writeControl(f.manager, f.control);
+  assert.equal((await migrate(f)).code, EXIT.OK);
 });
 
 // Plain doctor called a contract-6 store's identity unreadable and the store
