@@ -16,7 +16,9 @@ async function processTable() {
     const fields = line.trim().split(/\s+/);
     if (fields.length !== 4 || !fields.slice(0, 3).every(value => /^\d+$/.test(value))) throw terminationFailure();
     const [pid, parent, group] = fields.slice(0, 3).map(Number);
-    if (!pid || !group || table.has(pid)) throw terminationFailure();
+    // Linux kernel/system tasks can legitimately have PGID 0. Their rows
+    // belong in the global table; only owned topology requires a usable group.
+    if (!pid || table.has(pid)) throw terminationFailure();
     table.set(pid, { pid, parent, group, state: fields[3] });
   }
   return table;
@@ -53,7 +55,7 @@ export async function stopPushProcessTree(pid, { snapshot = processTable, kill =
         const current = related.get(previous.pid);
         if (!current || current.parent !== previous.parent || current.group !== previous.group) throw terminationFailure();
       }
-      if ([...related.values()].some(row => /Z/.test(row.state))) throw terminationFailure();
+      if ([...related.values()].some(row => !row.group || /Z/.test(row.state))) throw terminationFailure();
       frozen = [...related.values()].every(row => /T/.test(row.state));
       for (const row of related.values()) {
         owned.set(row.pid, row);

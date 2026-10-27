@@ -210,6 +210,10 @@ async function stubNpmPath(t, script = "#!/bin/sh\nexit 0\n") {
   t.after(() => rm(stub, { recursive: true, force: true }));
   await writeFile(path.join(stub, "npm"), script);
   await chmod(path.join(stub, "npm"), 0o755);
+  // The Node pre-push runner invokes npm through cmd.exe on Windows, which
+  // resolves npm.cmd rather than the extensionless script Git's sh can run.
+  // Keep one stub body and forward every npm argument, including -- --if-needed.
+  await writeFile(path.join(stub, "npm.cmd"), '@sh "%~dp0npm" %*\r\n');
   // Windows has no /usr/bin: git, and the sh and xargs the hook runs, are where
   // the machine's own PATH finds them, behind the stub.
   const system = process.platform === "win32"

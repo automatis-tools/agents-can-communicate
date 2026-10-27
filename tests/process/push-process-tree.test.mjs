@@ -2,7 +2,7 @@
 // Use the unchanged real helper and one hanging file, never the full ACC suite.
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
-import { readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import test from "node:test";
 import { pathToFileURL } from "node:url";
@@ -151,3 +151,49 @@ test("reparented members of the original owned group cannot remain suspended aft
   assert.ok(signals.some(([pid, signal]) => pid === 101 && signal === "SIGKILL"), "owned group member escaped discovery");
   assert.ok(signals.every(([pid]) => [-100, 100, 101].includes(pid)));
 });
+
+
+test("unrelated Linux PGID-zero rows do not prevent confirmed owned cancellation",
+  { timeout: 10000, skip: process.platform === "win32" }, async t => {
+    const f = await fixture(t);
+    const bin = path.join(f.base, "bin");
+    await mkdir(bin);
+    // Containers hide host kernel threads. Preserve the real process table and
+    // append one explicit kernel-style row to exercise the same parser boundary.
+    await writeFile(path.join(bin, "ps"), "#!/bin/sh\n/bin/ps \"$@\"\nprintf '2147483000 2 0 S\\n'\n", { mode: 0o755 });
+    const child = spawn(process.execPath, ["-e", "console.log('ready'); setInterval(()=>{},1000)"],
+      { detached: true, env: f.env, stdio: ["ignore", "pipe", "pipe"] });
+    const closed = new Promise(resolve => child.once("close", resolve));
+    await new Promise(resolve => child.stdout.once("data", resolve));
+    const previousPath = process.env.PATH;
+    const signals = [];
+    try {
+      process.env.PATH = `${bin}${path.delimiter}${previousPath}`;
+      const result = await stopPushProcessTree(child.pid, { kill: (pid, signal) => {
+        signals.push([pid, signal]); return process.kill(pid, signal);
+      } });
+      assert.equal(result, null, "an unrelated PGID-zero row refused confirmed owned termination");
+      await closed;
+      assert.equal(alive(child.pid), false);
+      assert.ok(signals.every(([pid]) => pid === child.pid || pid === -child.pid), "system or peer PID was signalled");
+    } finally {
+      process.env.PATH = previousPath;
+      try { process.kill(-child.pid, "SIGKILL"); } catch { /* Already terminated. */ }
+      await closed;
+    }
+  });
+
+for (const position of ["root", "child"]) {
+  test(`a zero process group in the owned ${position} remains unconfirmed`, async () => {
+    const signals = [];
+    let reads = 0;
+    const result = await stopPushProcessTree(100, {
+      snapshot: async () => ++reads === 1
+        ? table(row(100, 1, position === "root" ? 0 : 100), row(101, 100, position === "child" ? 0 : 101))
+        : table(),
+      kill: (pid, signal) => signals.push([pid, signal]), wait: async () => {},
+    });
+    assert.equal(result?.code, "PUSH_TERMINATION_UNCONFIRMED");
+    assert.deepEqual(signals, [[-100, "SIGSTOP"]], "uncertain owned group was signalled after discovery");
+  });
+}
