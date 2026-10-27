@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdir, mkdtemp, readdir, readFile, realpath, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readdir, readFile, readlink, realpath, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -15,6 +15,26 @@ import { planInstallation } from "../src/plan.mjs";
 
 const ALL = () => [createClaudeCodeAdapter(), createCodexAdapter(),
   createGeminiCliAdapter(), createKimiAdapter()];
+
+const PLAN_CONTEXT = { home: "/acc-plan-fixture/home", dataHome: "/acc-plan-fixture/data",
+  configDir: "/acc-plan-fixture/home", codexHome: "/acc-plan-fixture/home/.codex" };
+
+async function snapshot(root, relative = "") {
+  const entries = await readdir(path.join(root, relative), { withFileTypes: true });
+  const result = [];
+  for (const entry of entries.sort((a, b) => a.name.localeCompare(b.name))) {
+    const name = path.join(relative, entry.name);
+    if (entry.isDirectory()) {
+      result.push({ path: name, kind: "directory" }, ...await snapshot(root, name));
+    } else if (entry.isSymbolicLink()) {
+      result.push({ path: name, kind: "symlink", target: await readlink(path.join(root, name)) });
+    } else {
+      assert.equal(entry.isFile(), true, `unexpected filesystem entry: ${name}`);
+      result.push({ path: name, kind: "file", bytes: await readFile(path.join(root, name)) });
+    }
+  }
+  return result;
+}
 
 async function machine(t) {
   const home = await realpath(await mkdtemp(path.join(tmpdir(), "acc-inst-home-")));
@@ -41,8 +61,8 @@ const detected = (adapters, present) => adapters.map(adapter => ({
   present: present.includes(adapter.id), version: "1.0.0", installed: false,
   diagnostics: [], capabilities: adapter.capabilities, error: null }));
 
-test("a plan names exactly what it would touch, in a stable order", async t => {
-  const { context } = await machine(t);
+test("a plan names exactly what it would touch, in a stable order", () => {
+  const context = { ...PLAN_CONTEXT };
   const adapters = ALL();
 
   const plan = planInstallation({ adapters,
@@ -64,8 +84,8 @@ test("a plan names exactly what it would touch, in a stable order", async t => {
   }
 });
 
-test("a plan is deterministic, so two runs can be compared", async t => {
-  const { context } = await machine(t);
+test("a plan is deterministic, so two runs can be compared", () => {
+  const context = { ...PLAN_CONTEXT };
   const adapters = ALL();
   const of = () => JSON.stringify(planInstallation({ adapters,
     detected: detected(adapters, ["codex", "kimi", "gemini_cli"]), context }));
@@ -73,8 +93,8 @@ test("a plan is deterministic, so two runs can be compared", async t => {
   assert.equal(of(), of());
 });
 
-test("an absent client is skipped with the reason, not silently dropped", async t => {
-  const { context } = await machine(t);
+test("an absent client is skipped with the reason, not silently dropped", () => {
+  const context = { ...PLAN_CONTEXT };
   const adapters = ALL();
 
   const plan = planInstallation({ adapters, detected: detected(adapters, ["kimi"]),
@@ -87,15 +107,20 @@ test("an absent client is skipped with the reason, not silently dropped", async 
 
 test("a dry run touches nothing", async t => {
   const { home, dataHome, context } = await machine(t);
-  const adapters = ALL();
-  const before = await readdir(home);
+  const adapters = ALL().map(adapter => ({ ...adapter }));
+  const calls = adapters.flatMap(adapter => ["install", "uninstall"].map(method => ({
+    name: `${adapter.id}.${method}`, spy: t.mock.method(adapter, method) })));
+  const beforeHome = await snapshot(home);
+  const beforeDataHome = await snapshot(dataHome);
 
   const plan = planInstallation({ adapters,
     detected: detected(adapters, ["codex", "kimi"]), context });
   const result = await applyPlan({ plan, adapters, context, dataHome, dryRun: true });
 
   assert.equal(result.dryRun, true);
-  assert.deepEqual((await readdir(home)).sort(), before.sort());
+  for (const { name, spy } of calls) assert.equal(spy.mock.callCount(), 0, `${name} ran during dry run`);
+  assert.deepEqual(await snapshot(home), beforeHome, "dry run changed client configuration");
+  assert.deepEqual(await snapshot(dataHome), beforeDataHome, "dry run changed ACC data or ownership");
   assert.deepEqual((await loadOwnership({ dataHome })).installs, []);
 });
 
@@ -107,6 +132,9 @@ test("apply installs, and what it planned is what it wrote", async t => {
 
   const result = await applyPlan({ plan, adapters, context, dataHome });
 
+  assert.deepEqual(result.failed, [], "apply reported an adapter failure");
+  assert.deepEqual(result.operations.map(operation => operation.adapterId), ["codex", "kimi"],
+    "apply must report exactly the two planned adapters");
   // The drift this guards against: a plan that describes one thing while
   // install does another makes `--dry-run` a decoration.
   for (const operation of result.operations) {
@@ -244,8 +272,8 @@ test("unsupported adapters receive off and report durable fallback", async t => 
   assert.match(result.operations[0].diagnostics.join("\n"), /capture stopped/);
 });
 
-test("an unknown delivery policy is refused rather than treated as opt-in", async t => {
-  const { context } = await machine(t);
+test("an unknown delivery policy is refused rather than treated as opt-in", () => {
+  const context = { ...PLAN_CONTEXT };
   const adapters = ALL();
   assert.throws(() => planInstallation({ adapters, detected: detected(adapters, ["kimi"]),
     context, deliveryByAdapter: { kimi: "sometimes" } }), /unknown delivery policy/);
