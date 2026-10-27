@@ -88,11 +88,19 @@ export async function eventsAfter(fixture, side, cursor) {
   return visibleEvents((await openInstance(fixture, side)).store, cursor);
 }
 
-/** A digest of every record of these kinds, read through a fresh store: what a call must leave alone. */
+// The id each record kind is stored under.
+const RECORD_ID = { workspace: "workspaceId", participant: "participantId", session: "sessionId",
+  intent: "sessionId", claim: "claimId", message: "messageId" };
+
+/**
+ * A digest of every record of these kinds with its generation, read through a
+ * fresh store: what a call must leave alone. A rewrite with the same content is
+ * still a write, and the generation shows it.
+ */
 export async function stateDigest(fixture, side, kinds) {
   const { store } = await openInstance(fixture, side);
   return digest(await store.transaction(tx => kinds.map(kind => tx.list(kind)
-    .map(record => JSON.stringify(record)).sort()), { kinds }));
+    .map(record => JSON.stringify([record, tx.generationOf(kind, record[RECORD_ID[kind]])])).sort()), { kinds }));
 }
 
 /** A digest of what the records mean - sessions, messages, receipts and the event log - not their file layout. */

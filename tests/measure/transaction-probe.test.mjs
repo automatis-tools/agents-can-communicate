@@ -63,6 +63,18 @@ test("a read after a step stopped at its journal sees the decision, and commits 
   assert.match((await call(again, recordRead)).join("\n"), /returned .* queued, not .* offered/);
 });
 
+test("a read that sees the decision and leaves the stopped step to recovery passes", async t => {
+  // A read-only transaction may answer from the decided journal without finishing it;
+  // the next store that opens finishes it, and nothing is lost.
+  const value = await built(t, journal);
+  const readOnly = async built => {
+    const message = built.messages[built.next++];
+    built.target = message.messageId;
+    return { messageId: message.messageId, recipientParticipantId: "reader", state: built.states.get(message.messageId) };
+  };
+  for (let index = 0; index < 3; index++) assert.deepEqual(await call(value, readOnly), [], `call ${index}`);
+});
+
 test("every negative mutation for each operation fails validation", async t => {
   for (const scenario of [read, write, journal]) {
     const mutations = transaction.mutationsFor(scenario);

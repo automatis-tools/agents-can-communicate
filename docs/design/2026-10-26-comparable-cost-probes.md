@@ -33,13 +33,14 @@ A probe is a **scenario**, a **validator** and **observations**:
   directory enumerations and receipt visits. They never decide validity.
 
 Every call gets its own input, prepared outside the timed section: a copy of the attention
-snapshot, or a store instance opened as a hook process opens one. The store probes validate
+snapshot and its context, or a store instance opened as a hook process opens one. The store probes validate
 through a second instance opened after the call, so an answer kept in the measured instance's
 memory is checked against what the store holds. Opening a store finishes any journal left open,
 so before any other instance opens, a validator reads the events that the measured instance
 shows. A call that left its own work behind a journal shows fewer events than the store holds
 after recovery, and fails. Every other record kind - workspace, participants, sessions,
-intents, claims and messages - must be as it was after every call. A probe states how many calls
+intents, claims and messages - must be as it was after every call, generation included: a
+rewrite with the same content is still a write. A probe states how many calls
 a scenario allows. The runner refuses a scenario too small for its warm-up calls, samples and observed call
 before anything runs.
 
@@ -48,30 +49,37 @@ before anything runs.
 - Scenario: `ownRequests` sent by the measured participant, each to `fanout` recipients; an
   `acknowledgedShare` of their receipts acknowledged; an `offlineShare` of recipients offline;
   `inboundObligations` addressed to the measured participant, split between reply and
-  acknowledgement; and `witnesses`, 4 by default.
+  acknowledgement; `witnesses`, 4 by default; and `leftRule`, `limit` by default or `window`.
 - Witnesses are items that every scenario must return, whatever its shares: requests to a
   participant with no session, and pending inbound obligations. With them, each of eight
   recipients gets a request from the measured participant and a message left by another one:
-  - a closed session, a session past the unknown-pid floor, and one with a dead pid are offline:
-    the request is due as `recipient_unavailable` and the left message as
-    `left_for_ended_session`;
+  - a closed session, a session past the unknown-pid floor, one with a dead pid, and one with a
+    live pid past the 24-hour floor are offline: the request is due as `recipient_unavailable`
+    and the left message as `left_for_ended_session`;
   - a session silent past three heartbeat cadences is stale, with or without a live pid: the
     request is due, and the left message is not, because a stale recipient is still present;
   - a live pid that heartbeated recently is online, and so is a recipient with one online session
     beside a closed one, in either order: neither is due.
   So a computation that takes any session record for presence, lets one record of several
-  decide, or takes a live pid for online at any age fails. Witness ids carry a prefix of the
+  decide, or takes a live pid for online at any age fails.
+- Messages left for ended sessions show either of two rules, as `leftRule` picks, because one
+  snapshot cannot show both. With `limit`, eight fall within the week, some of them offered, and
+  the product reports the newest five less the one this session was already told about. With
+  `window`, four fall within the week and a fifth is older, so it would join them if the week
+  were ignored.
+- The remaining witnesses: a note to an absent participant, which asks nothing and is not due; a
+  decision and the decision that replaced it, of which only the second is due; and claims. A
+  peer's live claim on what this session means to touch is a `claim_conflict`, a lapsed one is
+  not; this session's live claim on what a peer means to touch is `claim_contended`, one that
+  only a done intent touches is not; and this session's expired claim is `claim_expired`. Witness ids carry a prefix of the
   scenario hash, so an answer computed for another fixture never matches, even one with the same
   seed. A scenario that expects nothing cannot tell useful work from a constant answer, and the
   validator refuses one.
 - Fixture: the snapshot `computeAttention` reads.
-- Validator: the exact expected attention items. Each pending receipt of a recipient with no
-  online session gives `recipient_unavailable`, each pending inbound obligation gives
-  `reply_required` or `acknowledgement_required`, and each witness message left for an offline
-  recipient gives `left_for_ended_session`, in ACC's priority order. Fully acknowledged history
-  gives nothing beyond the witnesses.
-- Observations: time per call; receipt and message visits, counted in the observed call
-  through proxies on the snapshot's own arrays. Work on a copy that the implementation makes is
+- Validator: the exact expected attention items, of every kind above, in ACC's priority order.
+  Fully acknowledged history gives nothing beyond the witnesses.
+- Observations: time per call; receipt and message visits, counted in the observed call, which
+  runs the code the child measures, through proxies on the snapshot's own arrays. Work on a copy that the implementation makes is
   not counted. `computeAttention` copies the messages first, so `messageVisits` counts that copy
   alone, twice the number of messages. A candidate that copied the receipts would count fewer
   receipt visits without doing less work.
@@ -82,15 +90,19 @@ before anything runs.
   the operation, either `exact` (one message by id) or `page` (`limit` items, 20 by default as in
   the product), and `mix`. With `mix`, obligations are spread over none, acknowledge and reply,
   each with its protocol kind (note, decision, question), and the reader's receipts are moved in
-  turn to queued, offered, retrieved and acknowledged through the product's own operations.
+  turn to queued, offered, retrieved and acknowledged through the product's own operations. The
+  mix also adds a decision and the decision that replaced it, as the newest two messages.
 - Fixture: a filesystem store built through the coordination service.
 - Validator, through a fresh store instance after each call:
-  - exact: the named message with its subject, body, kind and obligation; the reader's receipt
+  - exact: the named message with its subject, body, kind, obligation and decision status, since
+    an exact read may inspect a replaced decision; the reader's receipt
     for that message, in the state the read must leave (`retrieved`, or unchanged when already
     retrieved or acknowledged); the generation changed exactly when the state changed; and
     exactly one `message.retrieved` event for it when the state changed, none otherwise;
-  - page: the newest listable messages first, each with the reader's receipt for it and its
-    state; a cursor equal to the last item exactly when more remain; and a follow-up page from
+  - page: the newest listable messages first, a replaced decision left out, each with the
+    reader's receipt for it and its state, and a summary that gives the message's id, subject,
+    kind, obligation, sender, time, body size and decision status and leaves out its body,
+    recipients, artifacts and handoff; a cursor equal to the last item exactly when more remain; and a follow-up page from
     that cursor that continues the list. A page holds `limit` items, or every listable one,
     unless the next item would take the formatted page past the product's 12,000-byte budget.
     The follow-up page supplies that next item exactly as a page carries it, so the check
@@ -115,9 +127,11 @@ before anything runs.
   before a step is therefore wrong, and the history grows by one event for each read of a
   receipt that is not acknowledged.
 - `pendingJournal` stops each of those steps after its journal, as a crash would, and the measured
-  store is opened before the step. Its own read must finish the decided step and return the new
-  state. The step's event is then allowed once and is not counted as the read's commit. The
-  receipts cycle through queued, offered and retrieved, so every read has a step to stop.
+  store is opened before the step. Its read must return the decided state. It may finish the
+  stopped step, as the product does, or leave it to the next store that opens, as a read-only
+  transaction may: the step's event must exist exactly once after recovery, and is not counted as
+  the read's commit either way. The receipts cycle through queued, offered and retrieved, so
+  every read has a step to stop.
 - Validator: an exact receipt read returns the reader's receipt for the target in its current
   state and commits no event. A write must commit exactly one `message.offer_succeeded` event
   with the next sequence for its own message, which detects a skipped commit, a second commit and
@@ -134,14 +148,18 @@ Each probe ships mutations that wrap a correct implementation and break it in on
 - attention: drop one item, answer a constant empty list, skip unavailable recipients, duplicate
   the first item, answer from a stale fixture, reverse the order, take any session record for
   presence, let the last session record decide, take a live pid for online at any age, answer
-  for a fixture of another size with the same seed;
+  for a fixture of another size with the same seed. A test also breaks each rule the witnesses
+  show in the grouped computation below - replaced decisions, the 24-hour floor, notes, offered
+  left messages, the week, the limit of five, the noticed messages and the order of those two,
+  done intents and lapsed claims - and requires each to fail;
 - inbox exact: read the wrong message, skip the receipt transition, move the receipt without its
   event, return a summary for the body, move an unrelated receipt, return an extra item, return
   another message's receipt, create a receipt, leave the retrieval behind its journal, rewrite
   the message;
 - inbox page: drop the last item, return an empty page, advance receipts, reverse the order,
   return a garbage cursor, ignore receipt states, return one item fewer than fits (with a limit
-  of 1, the empty page), fill the page past the byte budget, rewrite a message;
+  of 1, the empty page), fill the page past the byte budget (and past the limit when the limit
+  ends it first), rewrite a message, carry the bodies, list a replaced decision;
 - transaction: commit on a read, return the wrong receipt, advance a receipt on a read, answer
   from the receipts as built, answer a constant state without reading, rewrite the message, read
   the record past a pending journal, skip a write's commit, commit twice, leave a write behind its
@@ -151,17 +169,20 @@ The test suite runs every mutation through the validator and requires each one t
 alternative implementations must pass: an attention computation that groups the receipts by
 message once and decides presence once per participant, as #305 may, and a transaction read of
 the receipt record outside a transaction when no journal is open. That shows the validators do
-not depend on the current algorithm.
+not depend on the current algorithm. So does a read that sees a pending journal's decision and
+leaves the stopped step to recovery.
 
 ## Comparable runs
 
 `node scripts/measure/run.mjs --probe <name> --set <key=value> --vary <key=a,b> --baseline <ref>
 --candidate <ref|worktree>` materializes each side, then alternates them. `--vary` can be
 repeated, and the scenarios are then every combination of the values, so scenarios to compare
-with each other run in one run:
+with each other run in one run. A scenario named twice is refused:
 - A side is a commit, exported with `git archive` and installed with `npm ci` into a temporary
   directory that is reused only after a completed install, or `worktree`, the current checkout
-  with its dirty state recorded.
+  with its dirty state recorded. A commit is exported and installed in a directory of the
+  runner's own and then renamed into place, so two runners never see or remove each other's
+  half-made tree.
 - Rounds alternate the order, baseline then candidate and then the reverse. Each side runs in a
   fresh process that builds its fixture, warms up, records its samples, validates every call, and
   observes one more call.

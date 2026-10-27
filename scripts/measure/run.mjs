@@ -11,7 +11,7 @@
 // A commit side needs git and tar on PATH and installs with npm.
 import { execFileSync, spawn } from "node:child_process";
 import { rmSync } from "node:fs";
-import { mkdir, mkdtemp, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
@@ -46,6 +46,8 @@ const axes = values.vary.map(pair).map(([key, list]) => list.split(",").map(valu
 const combinations = axes.reduce((all, axis) => all.flatMap(combination => axis.map(entry => [...combination, entry])), [[]]);
 const scenarios = combinations.map(combination => probe.scenario({ ...base, ...Object.fromEntries(combination) }))
   .map(scenario => ({ scenario, hash: digest(scenario) }));
+// Two equal scenarios would share their hash, and their children would pool in one comparison.
+if (new Set(scenarios.map(({ hash }) => hash)).size !== scenarios.length) refuse("--set and --vary name the same scenario twice");
 // Every call of a child, the observed one included, needs its own fixture record.
 const calls = settings.warmup + settings.samples + 1;
 for (const { scenario } of scenarios) {
@@ -81,18 +83,26 @@ async function materialize(label, ref) {
       dirty: git("status", "--porcelain", "--", ...MEASURED).length > 0, sourcesHash: await sourcesHash(repo) };
   }
   const commit = git("rev-parse", "--verify", `${ref}^{commit}`);
-  const root = path.join(os.tmpdir(), `acc-measure-${commit}`), ready = path.join(root, ".acc-measure-ready");
-  if (!await stat(ready).then(() => true, () => false)) {
-    // An interrupted export or install is started again, never reused.
-    await rm(root, { recursive: true, force: true, maxRetries: 5 });
-    await mkdir(root, { recursive: true });
-    const archive = path.join(root, "source.tar");
-    execFileSync("git", ["archive", "--format=tar", `--output=${archive}`, commit], { cwd: repo, env: gitEnv, stdio: "inherit" });
-    execFileSync("tar", ["-xf", archive, "-C", root], { stdio: "inherit" });
-    await rm(archive);
-    execFileSync("npm", ["ci", "--no-audit", "--no-fund"], { cwd: root, stdio: ["ignore", "ignore", "inherit"],
-      shell: process.platform === "win32" });
-    await writeFile(ready, `${commit}\n`);
+  const root = path.join(os.tmpdir(), `acc-measure-${commit}`), ready = root => path.join(root, ".acc-measure-ready");
+  const done = directory => stat(ready(directory)).then(() => true, () => false);
+  if (!await done(root)) {
+    // Exported and installed in a directory of this runner's own, then renamed into place:
+    // another runner exporting the same commit never sees, or removes, a half-made tree.
+    const staging = await mkdtemp(`${root}.staging-`);
+    try {
+      const archive = path.join(staging, "source.tar");
+      execFileSync("git", ["archive", "--format=tar", `--output=${archive}`, commit], { cwd: repo, env: gitEnv, stdio: "inherit" });
+      execFileSync("tar", ["-xf", archive, "-C", staging], { stdio: "inherit" });
+      await rm(archive);
+      execFileSync("npm", ["ci", "--no-audit", "--no-fund"], { cwd: staging, stdio: ["ignore", "ignore", "inherit"],
+        shell: process.platform === "win32" });
+      await writeFile(ready(staging), `${commit}\n`);
+      // A tree left by an interrupted older runner has no marker and is replaced.
+      if (!await done(root)) await rm(root, { recursive: true, force: true, maxRetries: 5 });
+      await rename(staging, root).catch(async error => { if (!await done(root)) throw error; });
+    } finally {
+      await rm(staging, { recursive: true, force: true, maxRetries: 5 });
+    }
   }
   return { label, ref, root, commit, dirty: false, sourcesHash: await sourcesHash(root) };
 }

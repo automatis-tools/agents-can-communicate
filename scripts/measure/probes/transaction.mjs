@@ -91,7 +91,9 @@ const capacity = value => value.messages;
 
 // Before each read, another process steps the target's receipt, so an answer kept
 // from before that step is wrong. With a pending journal the step stops after its
-// journal, and the measured store was opened before it: its own read must finish it.
+// journal, and the measured store was opened before it: its read must see the
+// decision. Finishing the step is the product's way; leaving it to the next store
+// that opens is a read-only one, and both are correct.
 async function prepare(built) {
   const { fixture, side, scenario } = built;
   if (scenario.operation === "write") return openInstance(fixture, side);
@@ -139,17 +141,18 @@ async function validate(built, result, input) {
   // What the measured store shows, before any other store opens and finishes a journal it left open.
   const { events } = await visibleEvents(input.store, built.eventCursor);
   const recovered = await eventsAfter(fixture, side, built.eventCursor), cursor = recovered.cursor;
-  if (recovered.events.length !== events.length) {
-    failures.push(`transaction: the call left ${recovered.events.length - events.length} event(s) behind an open journal`);
+  // The stopped step's event is the other writer's, whoever finishes it: the read or recovery.
+  const stopped = event => built.pending !== null && event.type === built.pending.event
+    && event.payload?.messageId === built.pending.messageId;
+  const left = recovered.events.length - events.length;
+  const leftOwn = recovered.events.slice(events.length).filter(event => !stopped(event)).length;
+  if (leftOwn > 0 || left < 0) {
+    failures.push(`transaction: the call left ${left} event(s) of its own behind an open journal`);
   }
-  // Finishing the stopped step publishes its event once; that is no commit of the read's.
-  const own = events.filter(event => {
-    const finished = built.pending && !built.pending.published && event.type === built.pending.event
-      && event.payload?.messageId === built.pending.messageId;
-    if (finished) built.pending.published = true;
-    return !finished;
-  });
-  if (built.pending && !built.pending.published) failures.push("transaction: the stopped step was never finished");
+  if (built.pending && recovered.events.filter(stopped).length !== 1) {
+    failures.push("transaction: the stopped step was lost or published twice");
+  }
+  const own = events.filter(event => !stopped(event));
   if (!write && own.length !== 0) failures.push(`transaction: a read committed ${own.length} event(s)`);
   if (write && own.length !== 1) failures.push(`transaction: a write committed ${own.length} events, not one`);
   if (write && own.length === 1) {
@@ -181,12 +184,13 @@ async function validate(built, result, input) {
   return failures;
 }
 
-async function observe(built) {
+// What one call touched, measured on a separate untimed call of the code the child measures.
+async function observe(built, run = operate) {
   const helper = path.resolve(import.meta.dirname, "..", "..", "..", "tests", "helpers", "store-io-probe.mjs");
   const { createStoreIoProbe } = await import(pathToFileURL(helper).href);
   const input = await prepare(built), probe = createStoreIoProbe(built.fixture.root);
   let measured;
-  try { measured = await probe.capture(() => operate(built, input)); } finally { probe.stop(); }
+  try { measured = await probe.capture(() => run(built, input)); } finally { probe.stop(); }
   const enumerations = Object.fromEntries(Object.entries(measured.io).filter(([key]) => /\/readdir(Entries)?$/.test(key)));
   return { failures: await validate(built, measured.result, input), events: built.events, stateReads: measured.stateReads,
     stateByKind: measured.stateByKind, readBytes: measured.readBytes, enumerations };
@@ -204,15 +208,16 @@ const readMutations = {
     const result = await operate(built, input);
     return { ...result, messageId: built.messages[built.next % built.messages.length].messageId };
   },
-  // Offers another message that is still queued, where a read must change nothing.
+  // Steps another message's receipt, where a read must change nothing, and returns that receipt.
   "advances-on-read": async () => async (built, input) => {
     const intended = built.messages[built.next++];
     built.target = intended.messageId;
-    const other = built.messages.find(item => item !== intended && built.states.get(item.messageId) === "queued");
-    const result = await input.service.recordOfferSucceeded(offer(built.fixture, other.messageId));
+    const other = built.messages.find(item => item !== intended && STEPS[built.states.get(item.messageId)]);
+    const step = STEPS[built.states.get(other.messageId)];
+    await step.run(input.service, built.fixture, other.messageId);
     // What the store now holds, so later steps start from it.
-    built.states.set(other.messageId, "offered");
-    return result;
+    built.states.set(other.messageId, step.next);
+    return input.service.readReceipt(offer(built.fixture, other.messageId));
   },
   // Answers from the receipts as first built, missing every step since.
   "stale-state": async operate => async (built, input) => {

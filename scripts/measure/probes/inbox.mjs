@@ -43,6 +43,22 @@ async function build(scenario, side) {
     const message = await fixture.service.sendMessage({ ...fixture.owner("sender"), ...sent });
     if (recipient === "reader") reader.push({ ...sent, messageId: message.messageId, sentAt: message.sentAt });
   }
+  if (scenario.mix) {
+    // The newest two: a decision, and the one that replaced it. A page lists only the
+    // second; an exact read of either returns it with its decision status. Read first.
+    const decision = { kind: "decision", obligation: "acknowledge", toParticipantIds: ["reader"] };
+    const first = { ...decision, clientMessageId: "client_decision_1", subject: "first decision", body: "Use port 7319" };
+    const second = { ...decision, clientMessageId: "client_decision_2", subject: "second decision", body: "Use port 7320" };
+    fixture.clock.advance(1_000);
+    const replaced = await fixture.service.sendMessage({ ...fixture.owner("sender"), ...first });
+    fixture.clock.advance(1_000);
+    const current = await fixture.service.sendMessage({ ...fixture.owner("sender"), ...second,
+      supersedes: [replaced.messageId] });
+    reader.unshift({ ...first, messageId: replaced.messageId, sentAt: replaced.sentAt, decision: "superseded" },
+      { ...second, messageId: current.messageId, sentAt: current.sentAt, decision: "current" });
+  }
+  // Every other decision is the current one of its own group.
+  for (const item of reader) if (item.kind === "decision") item.decision ??= "current";
   // Receipts the reader has already moved, through the product's own operations.
   // In turn, so every state appears; a reply-obligation message is never acknowledged without a reply.
   const STATES = ["queued", "offered", "retrieved", "acknowledged"];
@@ -82,6 +98,19 @@ async function operate(built, input) {
 
 const newestFirst = (a, b) => b.sentAt.localeCompare(a.sentAt) || b.messageId.localeCompare(a.messageId);
 const FIELDS = ["messageId", "subject", "body", "kind", "obligation"];
+// What a page item's summary must say of its message, and the peer payload it must leave out.
+const summaryFailures = (summary, item, index) => {
+  const failures = [], expected = { messageId: item.messageId, subject: item.subject, kind: item.kind,
+    obligation: item.obligation, sentAt: item.sentAt, fromParticipantId: "sender", bodyBytes: Buffer.byteLength(item.body) };
+  for (const [field, value] of Object.entries(expected)) {
+    if (summary?.[field] !== value) failures.push(`inbox page: item ${index} has ${field} ${JSON.stringify(summary?.[field])}`);
+  }
+  if (summary?.decisionStatus?.state !== item.decision) failures.push(`inbox page: item ${index} has decision ${summary?.decisionStatus?.state}`);
+  for (const field of ["body", "toParticipantIds", "artifacts", "handoff"]) {
+    if (summary !== null && typeof summary === "object" && field in summary) failures.push(`inbox page: item ${index} carries its ${field}`);
+  }
+  return failures;
+};
 // The published page contract: at most this many bytes of page JSON, formatted with two spaces.
 const PAGE_BYTES = 12_000;
 const pageBytes = value => Buffer.byteLength(JSON.stringify(value, null, 2));
@@ -126,6 +155,10 @@ async function validateExact(built, result, seen) {
     for (const field of FIELDS) {
       if (result[0].message?.[field] !== target[field]) failures.push(`inbox: returned ${field} ${JSON.stringify(result[0].message?.[field])}`);
     }
+    // An exact read may inspect a replaced decision, and says that it was replaced.
+    if (result[0].message?.decisionStatus?.state !== target.decision) {
+      failures.push(`inbox: returned decision ${result[0].message?.decisionStatus?.state}, not ${target.decision}`);
+    }
     const receipt = result[0].receipt;
     if (receipt?.messageId !== target.messageId || receipt?.recipientParticipantId !== "reader") {
       failures.push(`inbox: returned the receipt of ${receipt?.messageId} for ${receipt?.recipientParticipantId}`);
@@ -138,8 +171,8 @@ async function validateExact(built, result, seen) {
 
 async function validatePage(built, result, seen) {
   const failures = [], { scenario } = built;
-  const wanted = built.reader.filter(item => listable(built.receipts.get(built.side.receiptId(item.messageId, "reader"))?.state,
-    item.obligation)).sort(newestFirst);
+  const wanted = built.reader.filter(item => item.decision !== "superseded"
+    && listable(built.receipts.get(built.side.receiptId(item.messageId, "reader"))?.state, item.obligation)).sort(newestFirst);
   const items = Array.isArray(result?.items) ? result.items : [];
   const k = items.length, full = Math.min(scenario.limit, wanted.length);
   if (k > full || (wanted.length > 0 && k < 1)) failures.push(`inbox page: ${k} items for a limit of ${scenario.limit}`);
@@ -151,7 +184,7 @@ async function validatePage(built, result, seen) {
     if (failures.length === 0) failures.push("inbox page: items are out of order");
   } else {
     for (const [index, item] of items.entries()) {
-      if (item.message?.subject !== prefix[index].subject) failures.push(`inbox page: item ${index} has another subject`);
+      failures.push(...summaryFailures(item.message, prefix[index], index));
       const state = built.receipts.get(built.side.receiptId(prefix[index].messageId, "reader"))?.state;
       if (item.receipt?.messageId !== prefix[index].messageId || item.receipt?.recipientParticipantId !== "reader") {
         failures.push(`inbox page: item ${index} carries the receipt of ${item.receipt?.messageId}`);
@@ -181,12 +214,13 @@ async function validate(built, result, input) {
   return built.scenario.operation === "exact" ? validateExact(built, result, seen) : validatePage(built, result, seen);
 }
 
-async function observe(built) {
+// What one call touched, measured on a separate untimed call of the code the child measures.
+async function observe(built, run = operate) {
   const helper = path.resolve(import.meta.dirname, "..", "..", "..", "tests", "helpers", "store-io-probe.mjs");
   const { createStoreIoProbe } = await import(pathToFileURL(helper).href);
   const input = await prepare(built), probe = createStoreIoProbe(built.fixture.root);
   let measured;
-  try { measured = await probe.capture(() => operate(built, input)); } finally { probe.stop(); }
+  try { measured = await probe.capture(() => run(built, input)); } finally { probe.stop(); }
   const enumerations = Object.fromEntries(Object.entries(measured.io).filter(([key]) => /\/readdir(Entries)?$/.test(key)));
   return { failures: await validate(built, measured.result, input), stateReads: measured.stateReads,
     stateByKind: measured.stateByKind, readBytes: measured.readBytes, pageReads: measured.pageReads, enumerations };
@@ -229,7 +263,10 @@ const exactMutations = {
   "moves-unrelated": async operate => async (built, input) => {
     const result = await operate(built, input);
     const other = built.reader.slice(built.next).find(item => item.state === "queued" || item.state === "offered");
-    if (other) await input.service.readInbox({ ...built.fixture.owner("reader"), messageId: other.messageId });
+    if (other) {
+      await input.service.readInbox({ ...built.fixture.owner("reader"), messageId: other.messageId });
+      other.state = "retrieved";
+    }
     return result;
   },
   "extra-item": async operate => async (built, input) => { const result = await operate(built, input); return [...result, result[0]]; },
@@ -286,23 +323,48 @@ const pageMutations = {
   // Lists every message addressed to the reader, whatever its receipt says.
   "ignores-receipt-state": async () => async built => {
     const items = [...built.reader].sort(newestFirst).slice(0, built.scenario.limit)
-      .map(item => ({ message: { messageId: item.messageId, subject: item.subject },
-        receipt: { messageId: item.messageId, recipientParticipantId: "reader", state: "queued" } }));
+      .filter(item => item.decision !== "superseded")
+      .map(item => ({ message: { messageId: item.messageId, subject: item.subject, kind: item.kind,
+        obligation: item.obligation, sentAt: item.sentAt, fromParticipantId: "sender", bodyBytes: Buffer.byteLength(item.body),
+        ...(item.decision ? { decisionStatus: { state: item.decision } } : {}) },
+      receipt: { messageId: item.messageId, recipientParticipantId: "reader", state: "queued" } }));
     return { items, nextCursor: built.reader.length > items.length ? items.at(-1).message.messageId : null };
   },
-  // Fills the page to its limit, whatever the byte budget says.
+  // Keeps adding items past the byte budget, and past the limit when the limit ends the page
+  // first. Only a reader whose listable messages all fit the budget cannot show it.
   "over-budget": async operate => async (built, input) => {
     const result = await operate(built, input);
-    if (result.nextCursor === null || result.items.length >= built.scenario.limit) return result;
-    const rest = await input.service.listInbox({ ...built.fixture.owner("reader"),
-      limit: built.scenario.limit - result.items.length, cursor: result.nextCursor });
-    const items = [...result.items, ...rest.items];
-    return { items, nextCursor: rest.nextCursor === null ? null : items.at(-1).message.messageId };
+    const items = [...result.items];
+    let cursor = result.nextCursor;
+    while (cursor !== null && pageBytes({ items, nextCursor: cursor }) <= PAGE_BYTES) {
+      const more = await input.service.listInbox({ ...built.fixture.owner("reader"), limit: 1, cursor });
+      items.push(...more.items);
+      cursor = more.nextCursor;
+    }
+    return { items, nextCursor: cursor === null ? null : items.at(-1).message.messageId };
   },
   "rewrites-message": async operate => async (built, input) => {
     const result = await operate(built, input);
     await rewriteMessage(input.store, built.reader[0].messageId);
     return result;
+  },
+  // Carries each message's body in its summary, which discovery must leave out.
+  "leaks-body": async operate => async (built, input) => {
+    const result = await operate(built, input), bodies = new Map(built.reader.map(item => [item.messageId, item.body]));
+    return { ...result, items: result.items.map(item => ({ ...item, message: { ...item.message,
+      body: bodies.get(item.message.messageId) } })) };
+  },
+  // Lists a replaced decision too, as a page that ignored decision state would.
+  "replaced-decision": async operate => async (built, input) => {
+    const result = await operate(built, input);
+    const replaced = built.reader.find(item => item.decision === "superseded");
+    const receipt = built.receipts.get(built.side.receiptId(replaced.messageId, "reader"));
+    const item = { message: { messageId: replaced.messageId, subject: replaced.subject, kind: replaced.kind,
+      obligation: replaced.obligation, sentAt: replaced.sentAt, fromParticipantId: "sender",
+      bodyBytes: Buffer.byteLength(replaced.body), decisionStatus: { state: "superseded" } },
+    receipt: { messageId: replaced.messageId, recipientParticipantId: "reader", state: receipt.state } };
+    const items = [...result.items, item].sort((a, b) => newestFirst(a.message, b.message)).slice(0, built.scenario.limit);
+    return { items, nextCursor: result.nextCursor === null && items.length <= result.items.length ? null : items.at(-1).message.messageId };
   },
   // Always one item short of a full page, with a cursor that continues it; with
   // a limit of 1 that is the empty page.

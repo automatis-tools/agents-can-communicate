@@ -25,7 +25,7 @@ try {
   };
   for (let index = 0; index < warmup; index++) await call();
   for (let index = 0; index < samples; index++) samplesNs.push(Math.round((await call()) * 1e6));
-  const { failures: observed = [], ...rest } = await probe.observe(built);
+  const { failures: observed = [], ...rest } = await probe.observe(built, operate);
   note(observed);
   observations = rest;
 } catch (caught) {

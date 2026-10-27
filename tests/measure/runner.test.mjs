@@ -13,12 +13,22 @@ import { runProcess } from "../helpers/run-process.mjs";
 // suite export to keep fixture repositories off this checkout.
 const runner = path.resolve(import.meta.dirname, "..", "..", "scripts", "measure", "run.mjs");
 
+// The runner's own temporary directory, so what its children leave behind is its own,
+// whatever else runs on the machine.
+async function runnerTemp(t) {
+  const directory = await mkdtemp(path.join(tmpdir(), "acc-measure-tmp-"));
+  t.after(() => rm(directory, { recursive: true, force: true, maxRetries: 5 }));
+  return { directory, env: { GIT_DIR: "", TMPDIR: directory, TEMP: directory, TMP: directory } };
+}
+const childDirectories = async directory => (await readdir(directory)).filter(name => name.startsWith("acc-measure-child-"));
+
 async function measure(t, args) {
   const out = await mkdtemp(path.join(tmpdir(), "acc-measure-run-"));
   t.after(() => rm(out, { recursive: true, force: true }));
+  const temp = await runnerTemp(t);
   const child = await runProcess([runner, ...args, "--baseline", "worktree", "--candidate", "worktree",
-    "--out", out], { timeoutMs: 120_000, env: { GIT_DIR: "" } });
-  return { child, out, run: JSON.parse(await readFile(path.join(out, "run.json"), "utf8").catch(() => "null")),
+    "--out", out], { timeoutMs: 120_000, env: temp.env });
+  return { child, out, temp: temp.directory, run: JSON.parse(await readFile(path.join(out, "run.json"), "utf8").catch(() => "null")),
     report: await readFile(path.join(out, "report.md"), "utf8").catch(() => "") };
 }
 
@@ -83,22 +93,29 @@ test("a runner stopped by SIGINT ends its child and removes its directory",
   { skip: process.platform === "win32" && "Windows ends a process without running its signal handlers" }, async t => {
     const out = await mkdtemp(path.join(tmpdir(), "acc-measure-run-"));
     t.after(() => rm(out, { recursive: true, force: true }));
-    const children = async () => (await readdir(tmpdir())).filter(name => name.startsWith("acc-measure-child-"));
-    const before = await children();
+    const temp = await runnerTemp(t);
     const runnerProcess = spawn(process.execPath, [runner, "--probe", "attention", "--set", "ownRequests=3000",
       "--rounds", "4", "--samples", "200", "--baseline", "worktree", "--candidate", "worktree", "--out", out],
-    { env: { ...process.env, GIT_DIR: "" }, stdio: "ignore" });
+    { env: { ...process.env, ...temp.env }, stdio: "ignore" });
     const exited = once(runnerProcess, "exit");
     // Its first child has started once its directory exists.
-    for (const end = Date.now() + 60_000; (await children()).length === before.length;) {
+    for (const end = Date.now() + 60_000; (await childDirectories(temp.directory)).length === 0;) {
       assert.ok(Date.now() < end, "the runner never started a child");
       await new Promise(resolve => setTimeout(resolve, 50));
     }
     runnerProcess.kill("SIGINT");
     const [code] = await exited;
     assert.equal(code, 130);
-    assert.deepEqual((await children()).filter(name => !before.includes(name)), []);
+    assert.deepEqual(await childDirectories(temp.directory), []);
   });
+
+test("a scenario named twice is refused, since its children would pool", async t => {
+  const { child, run } = await measure(t, ["--probe", "attention", "--vary", "seed=1,1", "--rounds", "1",
+    "--samples", "1", "--warmup", "0"]);
+  assert.equal(child.code, 2, child.stdout);
+  assert.match(child.stderr, /name the same scenario twice/);
+  assert.equal(run, null);
+});
 
 test("a scenario too small for its calls is refused before anything runs", async t => {
   const { child, run } = await measure(t, ["--probe", "inbox", "--set", "operation=exact", "--set", "messages=3",
@@ -109,7 +126,7 @@ test("a scenario too small for its calls is refused before anything runs", async
 });
 
 test("a child that fails or overruns is recorded, the run is still written, and it is invalid", async t => {
-  const { child, run, report } = await measure(t, ["--probe", "attention", "--set", "ownRequests=20",
+  const { child, run, report, temp } = await measure(t, ["--probe", "attention", "--set", "ownRequests=20",
     "--rounds", "1", "--samples", "2", "--warmup", "1", "--timeout-ms", "1"]);
   assert.equal(child.code, 1, child.stdout);
   assert.equal(run.children.length, 2);
@@ -117,7 +134,7 @@ test("a child that fails or overruns is recorded, the run is still written, and 
   assert.match(report, /\*\*invalid\*\*/);
   assert.match(report, /timed out/);
   // Each child's temporary directory goes with it, killed or not.
-  assert.deepEqual((await readdir(tmpdir())).filter(name => name.startsWith("acc-measure-child-")), []);
+  assert.deepEqual(await childDirectories(temp), []);
 });
 
 test("a child that crashes records its cause and the failures it had already found", async t => {
