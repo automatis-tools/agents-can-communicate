@@ -2,6 +2,10 @@
 
 ## Unreleased — attention reads each receipt once
 
+- Explicit local documentation gates keep documentation receipts separate from full-suite
+  proof (#351). Compatibility and ref-policy tests retain real gate checks while avoiding
+  redundant fixture hook executions.
+
 - Attention no longer grows with the square of a session's own requests (#305). To find the
   recipients of a request who are not online, ACC filtered every receipt in the workspace once
   for each request the session had sent, also when every request was acknowledged. At 8,000
