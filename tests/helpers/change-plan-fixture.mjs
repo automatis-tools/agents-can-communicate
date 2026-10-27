@@ -4,13 +4,14 @@ import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
+import { cleanEnv } from "./push-fixture.mjs";
 export const run = promisify(execFile);
 export const source = path.resolve(import.meta.dirname, "../..");
 import * as planner from "../../scripts/change-plan.mjs";
 import * as gitModule from "../../scripts/change-plan-git.mjs";
 export const event = { kind: "push", ref: "refs/heads/topic" };
 export const git = async (repo, ...args) => (await run("git", ["-C", repo, ...args], {
-  env: { ...process.env, GIT_CONFIG_NOSYSTEM: "1", GIT_CONFIG_GLOBAL: process.platform === "win32" ? "NUL" : "/dev/null" },
+  env: cleanEnv(),
 })).stdout.trim();
 export async function put(repo, file, text = "export {};\n") {
   await mkdir(path.dirname(path.join(repo, file)), { recursive: true });

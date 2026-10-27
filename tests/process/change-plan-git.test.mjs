@@ -4,7 +4,7 @@ import { spawnSync } from "node:child_process";
 import { cp, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import test from "node:test";
-import { fixture as pushFixture, invokePush, refLine } from "../helpers/push-fixture.mjs";
+import { fixture as pushFixture, invokePush, refLine, cleanEnv } from "../helpers/push-fixture.mjs";
 import { run, source, event, git, put, commit, audit, fixture } from "../helpers/change-plan-fixture.mjs";
 import * as planner from "../../scripts/change-plan.mjs";
 import * as gitModule from "../../scripts/change-plan-git.mjs";
@@ -218,10 +218,10 @@ test("tracked symlink/type change cannot be classified as ordinary Markdown", as
 test("invalid UTF-8 Git filenames yield unavailable observation with a full fallback", async t => {
   const { repo, target } = await fixture(t);
   // Build the raw Git object: APFS refuses invalid UTF-8 filesystem names.
-  const existing = (await run("git", ["-C", repo, "ls-tree", "-z", target], { encoding: "buffer" })).stdout;
+  const existing = (await run("git", ["-C", repo, "ls-tree", "-z", target], { encoding: "buffer", env: cleanEnv() })).stdout;
   const blob = await git(repo, "rev-parse", `${target}:README.md`);
   const treeResult = spawnSync("git", ["-C", repo, "mktree", "-z"], { input: Buffer.concat([
-    existing, Buffer.from(`100644 blob ${blob}\t`), Buffer.from([0xff]), Buffer.from(".md\0")]), encoding: "utf8" });
+    existing, Buffer.from(`100644 blob ${blob}\t`), Buffer.from([0xff]), Buffer.from(".md\0")]), encoding: "utf8", env: cleanEnv() });
   assert.equal(treeResult.status, 0, treeResult.stderr);
   const next = await git(repo, "commit-tree", treeResult.stdout.trim(), "-p", target, "-m", "invalid filename");
   const { observePushPlans } = await import("../../scripts/change-plan-observation.mjs");

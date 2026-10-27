@@ -9,6 +9,7 @@ import test from "node:test";
 import { pathToFileURL } from "node:url";
 import { promisify } from "node:util";
 import { fixture, invokePush, refLine, repo } from "../helpers/push-fixture.mjs";
+import { runNpm } from "../helpers/npm-run.mjs";
 
 const run = promisify(execFile);
 async function replacementFixture(t, namespace = "refs/replace/") {
@@ -105,7 +106,7 @@ for (const namespace of ["refs/replace/", "refs/private-replacements/"]) {
     await writeFile(path.join(f.base, "replacement.txt"), "passing alias\n");
     const replacement = (await f.git(["hash-object", "-w", path.join(f.base, "replacement.txt")])).stdout.trim();
     await f.replace(original, replacement);
-    await run("npm", ["test"], { cwd: f.root, env: f.env }); // The alias really masks the runtime failure.
+    await runNpm(["test"], { cwd: f.root, env: f.env }); // The alias really masks the runtime failure.
     const result = await invokePush(f, refLine(tip));
     assert.notEqual(result.code, 0, "npm's own Git child still consumed a substituted blob");
     assert.match(result.stdout + result.stderr, /runtime Git object differs/);
