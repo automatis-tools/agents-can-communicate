@@ -1,0 +1,23 @@
+{
+  "schema": 1,
+  "documentation": [
+    "AGENTS.md",
+    "CHANGELOG.md",
+    "README.md",
+    "SECURITY.md"
+  ],
+  "documentationRoots": [
+    "docs",
+    "examples"
+  ],
+  "externalReaders": [
+    "tests/acceptance/package-links.test.mjs",
+    "tests/acceptance/packaging.test.mjs",
+    "tests/acceptance/recorded-candidate.test.mjs",
+    "tests/package-certification.test.mjs",
+    "tests/process/orchestration-is-absent.test.mjs",
+    "tests/process/session-resolution.test.mjs",
+    "tests/process/surface-coverage.test.mjs"
+  ],
+  "sourceDigest": "0916256ae37610b42d1e4854cbfca121072e1a6c30f1550c3e457ea622e1f013"
+}

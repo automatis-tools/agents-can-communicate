@@ -16,7 +16,7 @@ export function pushEnvironment() {
   return env;
 }
 export async function pushGit(repo, args) {
-  return (await run("git", ["-C", repo, ...args],
+  return (await run("git", ["--no-replace-objects", "-C", repo, ...args],
     { env: { ...pushEnvironment(), GIT_OPTIONAL_LOCKS: "0" }, maxBuffer: 64 * 1024 * 1024 })).stdout;
 }
 export function parsePushRefs(text, { objectFormat }) {
