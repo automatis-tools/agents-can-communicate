@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtemp, readFile, realpath, rm, stat, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, realpath, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -124,9 +124,55 @@ test("a cursor continues after the message it names has been acknowledged", asyn
 
 test("indexes/v1, as an older ACC keeps it, is neither read nor written", async t => {
   const f = await fixture(t);
+  // A cache as ACC 0.12 leaves it: two indexes, for a journal generation long gone, and roots
+  // that name no page. Reading it would fail; rewriting it would change its bytes.
   const legacy = path.join(f.root, "indexes", "v1", "cache.json");
-  await rm(legacy, { force: true });
-  await f.send("reader");
-  await f.service.listInbox({ ...owner(f.reader), limit: 5 });
-  await assert.rejects(stat(legacy), { code: "ENOENT" });
+  const bytes = `${JSON.stringify({ indexVersion: 1, workspaceId, journalGeneration: "0000000000000001",
+    roots: { messageByClientKey: "a".repeat(64), receiptsByMessage: "b".repeat(64) } })}\n`;
+  await mkdir(path.dirname(legacy), { recursive: true });
+  await writeFile(legacy, bytes);
+  const message = await f.send("reader", { kind: "question", obligation: "reply" });
+  const page = await f.service.listInbox({ ...owner(f.reader), limit: 5 });
+  assert.deepEqual(page.items.map(item => item.message.messageId), [message.messageId]);
+  await f.service.readInbox({ ...owner(f.reader), messageId: message.messageId });
+  assert.equal(await readFile(legacy, "utf8"), bytes);
+});
+
+test("a page never reads the notes the reader has already read", async t => {
+  const f = await fixture(t), probe = probeOf(t, f.root);
+  // A read note stays retrieved and is never listed again; nothing asks the reader to ack it.
+  for (let index = 0; index < 30; index++) {
+    const note = await f.send("reader");
+    await f.service.readInbox({ ...owner(f.reader), messageId: note.messageId });
+  }
+  const question = await f.send("reader", { kind: "question", obligation: "reply" });
+  await f.service.readInbox({ ...owner(f.reader), messageId: question.messageId });
+  for (let index = 0; index < 4; index++) await f.send("reader");
+  const page = await probe.capture(() => f.service.listInbox({ ...owner(f.reader), limit: 20 }));
+  // The four queued notes and the question read but not answered, and no read note.
+  assert.equal(page.result.items.length, 5);
+  assert.ok(page.result.items.some(item => item.message.messageId === question.messageId));
+  assert.ok(page.stateByKind.receipt <= 5, JSON.stringify(page.stateByKind));
+  assert.ok(page.stateByKind.message <= 5, JSON.stringify(page.stateByKind));
+});
+
+test("a decision's status comes from its whole group, and other groups are never read", async t => {
+  const f = await fixture(t), probe = probeOf(t, f.root);
+  let sent = 0;
+  const sendAs = (from, fields) => f.service.sendMessage({ ...owner(from), clientMessageId: `decision_${sent++}`,
+    kind: "decision", obligation: "acknowledge", body: "Use this", ...fields });
+  // Fifty unrelated decisions between the sender and someone else.
+  for (let index = 0; index < 50; index++) await sendAs(f.sender, { toParticipantIds: ["other"], subject: `elsewhere ${index}` });
+  // D0 is addressed to someone else only; D1, to the reader, replaces it; D2 replaces it too,
+  // so the group has two heads and D1 is conflicted although D2 never reached the reader.
+  const d0 = await sendAs(f.sender, { toParticipantIds: ["other"], subject: "root" });
+  const d1 = await sendAs(f.sender, { toParticipantIds: ["reader"], subject: "first branch", supersedes: [d0.messageId] });
+  await sendAs(f.sender, { toParticipantIds: [], subject: "second branch", supersedes: [d0.messageId] });
+  const page = await probe.capture(() => f.service.listInbox({ ...owner(f.reader), limit: 20 }));
+  const item = page.result.items.find(entry => entry.message.messageId === d1.messageId);
+  assert.equal(item.message.decisionStatus.state, "current");
+  assert.equal(item.message.decisionStatus.conflicted, true);
+  assert.equal(item.message.decisionStatus.headCount, 2);
+  // Its receipt, its message, and the two other decisions of its group: no unrelated decision.
+  assert.ok(page.stateByKind.message <= 3, JSON.stringify(page.stateByKind));
 });

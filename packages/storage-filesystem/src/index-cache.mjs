@@ -14,11 +14,12 @@ const references = page => page.type === "branch" ? page.children.map(([, hash])
 
 export function createIndexCache({ paths, root, workspaceId, publishOptions, loadPrimary }) {
   let diagnostic = [];
-  // The last tree rebuilt in memory, for the journal generation it describes. A cache
-  // that cannot be published - a read-only data home in a client sandbox - would
-  // otherwise read every primary record again for each lookup (#306). Message and
-  // receipt records change only through the journal, which moves the generation.
-  let rebuilt = null;
+  // The last tree rebuilt in memory that could not be published, for the journal
+  // generation it describes. A read-only data home in a client sandbox would otherwise
+  // read every primary record again for each lookup (#306). Message and receipt records
+  // change only through the journal, which moves the generation. A published tree is
+  // read from its pages, so it is not kept.
+  let unpublished = null;
   const note = (code, reason) => { diagnostic = [{ code, reason }]; };
   const tools = deadlineAt => {
     const io = createIndexIO({ paths, root, publishOptions: { ...publishOptions, deadlineAt } });
@@ -64,6 +65,16 @@ export function createIndexCache({ paths, root, workspaceId, publishOptions, loa
     } });
     const roots = {};
     for (const index of Object.keys(deltas)) roots[index] = await tree.apply(null, deltas[index]);
+    // Building copies pages on every route it changes; only the final tree is kept.
+    const reachable = new Map();
+    const keep = hash => {
+      if (hash === null || reachable.has(hash)) return;
+      reachable.set(hash, pages.get(hash));
+      for (const child of references(pages.get(hash))) keep(child);
+    };
+    for (const hash of Object.values(roots)) keep(hash);
+    pages.clear();
+    for (const [hash, page] of reachable) pages.set(hash, page);
     const manifest = { indexVersion: INDEX_VERSION, workspaceId, journalGeneration: active.generation, roots };
     const { io } = tools(deadlineAt);
     try {
@@ -79,12 +90,13 @@ export function createIndexCache({ paths, root, workspaceId, publishOptions, loa
       for (const hash of Object.values(roots)) await publish(hash);
       await publishManifest(io, manifest);
       note("index_rebuilt", "verified_primary");
+      return { manifest, tree, published: true };
     } catch (error) {
       if (!(error instanceof IndexCacheUnavailable)) throw error;
       note("index_unavailable", error.reason);
       if (required) throw error;
     }
-    return { manifest, tree };
+    return { manifest, tree, published: false };
   }
   async function lookup(index, tuple, { active, staged, deadlineAt, verify }) {
     assertIndexTuple(index, tuple);
@@ -98,10 +110,11 @@ export function createIndexCache({ paths, root, workspaceId, publishOptions, loa
     } catch (error) {
       if (!(error instanceof IndexCacheUnavailable)) throw error;
     }
-    if (rebuilt === null || rebuilt.generation !== active.generation || active.state !== "idle") {
-      rebuilt = { generation: active.generation, ...await rebuild(active, deadlineAt) };
-    }
-    ({ manifest, tree } = rebuilt);
+    if (unpublished === null || unpublished.generation !== active.generation || active.state !== "idle") {
+      const result = await rebuild(active, deadlineAt);
+      unpublished = result.published ? null : { generation: active.generation, ...result };
+      ({ manifest, tree } = result);
+    } else ({ manifest, tree } = unpublished);
     return select(await tree.lookup(manifest.roots[index], tuple));
 
     async function select(ids) {

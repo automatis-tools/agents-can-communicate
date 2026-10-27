@@ -133,6 +133,9 @@ export async function recordMessageInTransaction({ tx, session, input: raw, now,
       recipientParticipantId: participantId,
       state: "queued",
       updatedAt: now,
+      // Kept so the receipt index can leave out a note once it is read (#306). An
+      // extension, since a new receipt field would fail validation in an older ACC.
+      extensions: { obligation: message.obligation },
     }));
   }
   tx.append({ schemaVersion: SCHEMA_VERSION, eventId: ids.next("event"),

@@ -61,7 +61,26 @@ test("duplicate keys retain ordered ID groups", async () => {
   assert.deepEqual(await tree.lookup(root, tuple(0)), ids.sort((a, b) => a.localeCompare(b)));
   const next = await tree.apply(root, [{ tuple: tuple(0), id: "message_64", operation: "remove" }]);
   assert.deepEqual(await tree.lookup(next, tuple(0)), ids.filter(id => id !== "message_64"));
-  assert(published.some(({ page }) => page.type === "group" && page.next !== null));
+  // A group of more than 32 IDs branches on their digests; v2 groups never chain.
+  assert(published.some(({ page }) => page.type === "branch"));
+  assert(!published.some(({ page }) => page.type === "group" && page.next !== null));
+  bounded(published);
+});
+
+// #306: a pending-receipt group grows with a recipient's unread messages. Each change
+// copies the route to its ID, never the pages in front of it in a list.
+test("a large ID group changes along its route, not along its length", async () => {
+  const { tree, published } = memory();
+  const ids = Array.from({ length: 4000 }, (_, i) => `message_${String(i).padStart(5, "0")}`);
+  const shuffled = [...ids].sort((a, b) => sha(Buffer.from(a)).localeCompare(sha(Buffer.from(b))));
+  const root = await tree.apply(null, shuffled.map(id => add(tuple(0), id)));
+  assert.ok(published.length <= 8 * ids.length, `${published.length} pages written for ${ids.length} IDs`);
+  assert.deepEqual(await tree.lookup(root, tuple(0)), ids);
+  for (const [id, operation] of [["message_new", "put"], ["message_02000", "remove"]]) {
+    const before = published.length;
+    await tree.apply(root, [{ tuple: tuple(0), id, operation }]);
+    assert.ok(published.length - before <= 6, `${published.length - before} pages written to ${operation} one ID`);
+  }
   bounded(published);
 });
 
@@ -99,11 +118,22 @@ test("closed index definitions preserve tuple boundaries and exclude bodies", ()
   }
   assert.deepEqual(definitions.indexKeysFor("message", { workspaceId: "workspace_a", kind: "note",
     fromParticipantId: "participant_a", clientMessageId: "client_0", body: "PRIVATE_MESSAGE_BODY" }),
-  [{ index: "messageByClientKey", tuple: tuple(0) }, { index: "messagesByKind", tuple: ["workspace_a", "note"] }]);
-  assert.deepEqual(definitions.indexKeysFor("receipt", { workspaceId: "workspace_a", messageId: "message_a",
-    recipientParticipantId: "participant_b", state: "queued" }),
-  [{ index: "receiptsByMessage", tuple: ["workspace_a", "message_a"] },
-    { index: "receiptsByRecipientState", tuple: ["workspace_a", "participant_b", "queued"] }]);
+  [{ index: "messageByClientKey", tuple: tuple(0) }]);
+  // A decision is keyed once for each decision it replaces.
+  assert.deepEqual(definitions.indexKeysFor("message", { workspaceId: "workspace_a", kind: "decision",
+    fromParticipantId: "participant_a", clientMessageId: "client_0",
+    decisionChange: { action: "replace", messageIds: ["message_a", "message_b"] } }),
+  [{ index: "messageByClientKey", tuple: tuple(0) }, { index: "decisionsByTarget", tuple: ["workspace_a", "message_a"] },
+    { index: "decisionsByTarget", tuple: ["workspace_a", "message_b"] }]);
+  const receipt = (state, obligation) => definitions.indexKeysFor("receipt", { workspaceId: "workspace_a",
+    messageId: "message_a", recipientParticipantId: "participant_b", state,
+    ...(obligation === undefined ? {} : { extensions: { obligation } }) }).map(key => key.index);
+  assert.deepEqual(receipt("queued", "none"), ["receiptsByMessage", "receiptsByRecipientState"]);
+  // What can no longer be listed is left out; a receipt without its obligation is kept.
+  assert.deepEqual(receipt("acknowledged", "reply"), ["receiptsByMessage"]);
+  assert.deepEqual(receipt("retrieved", "none"), ["receiptsByMessage"]);
+  assert.deepEqual(receipt("retrieved", "reply"), ["receiptsByMessage", "receiptsByRecipientState"]);
+  assert.deepEqual(receipt("retrieved"), ["receiptsByMessage", "receiptsByRecipientState"]);
   assert.deepEqual(definitions.indexKeysFor("session", {}), []);
 });
 
@@ -119,7 +149,7 @@ test("real filesystem pages publish safely without flushing or following junctio
   const tree = trees.createIndexTree(io);
   const head = await tree.apply(null, [add(tuple(0), "message_a")]);
   const manifest = { indexVersion: ios.INDEX_VERSION, workspaceId: "workspace_a", journalGeneration: "0000000000000000",
-    roots: { messageByClientKey: head, messagesByKind: null, receiptsByMessage: null, receiptsByRecipientState: null } };
+    roots: { decisionsByTarget: null, messageByClientKey: head, receiptsByMessage: null, receiptsByRecipientState: null } };
   await io.writeManifest(manifest);
   assert.deepEqual(await io.readManifest(), manifest);
   assert.deepEqual(await tree.lookup(head, tuple(0)), ["message_a"]);

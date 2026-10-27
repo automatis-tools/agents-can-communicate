@@ -2,6 +2,7 @@ import { AccError, EXIT, SCHEMA_VERSION, advanceReceipt }
   from "@agents-can-communicate/protocol";
 
 import { receiptId, recordMessageInTransaction } from "./conversations.mjs";
+import { publicReceipt } from "./receipts.mjs";
 import { assertExactTransaction } from "./ports.mjs";
 import { messagePage, messageSummary } from "./message-pages.mjs";
 import { decisionView, isCurrentDecision } from "./decision-state.mjs";
@@ -78,21 +79,32 @@ export function createInboxService(ports, sessions) {
       ? receipt : null;
   }
 
-  // The messages of these receipts, each with its decision status. A decision's
-  // status depends on its whole group, so a decision brings every decision with it.
+  // The messages of these receipts, each with its decision status. A decision's status
+  // depends on its whole group - the decisions it names and the ones that name it, to
+  // any distance, whoever they were addressed to - so each group is walked in full and
+  // no other decision is read.
   async function messagesFor(tx, session, receipts) {
     const messages = new Map();
     for (const messageId of receipts.keys()) {
       const message = await tx.load("message", messageId);
       if (message !== null) messages.set(messageId, message);
     }
-    if (![...messages.values()].some(message => message.kind === "decision")) return messages;
-    const decisions = [];
-    for (const id of await tx.lookup("messagesByKind", [session.workspaceId, "decision"])) {
-      const decision = await tx.load("message", id);
-      if (decision !== null) decisions.push(decision);
+    const group = new Map([...messages.values()].filter(message => message.kind === "decision")
+      .map(message => [message.messageId, message]));
+    if (group.size === 0) return messages;
+    for (const pending = [...group.values()]; pending.length > 0;) {
+      const decision = pending.pop();
+      const named = decision.decisionChange?.messageIds ?? [];
+      const naming = await tx.lookup("decisionsByTarget", [session.workspaceId, decision.messageId]);
+      for (const id of [...named, ...naming]) {
+        if (group.has(id)) continue;
+        const neighbour = await tx.load("message", id);
+        if (neighbour?.kind !== "decision") continue;
+        group.set(id, neighbour);
+        pending.push(neighbour);
+      }
     }
-    const view = decisionView(decisions);
+    const view = decisionView([...group.values()]);
     return new Map([...messages].map(([id, message]) => [id, view(message)]));
   }
 
@@ -112,7 +124,7 @@ export function createInboxService(ports, sessions) {
       return messagePage([...messages.values()], input, {
         include: message => isCurrentDecision(message) && listable(message, receipts.get(message.messageId)),
         project: message => ({ message: messageSummary(message),
-          receipt: receipts.get(message.messageId) }),
+          receipt: publicReceipt(receipts.get(message.messageId)) }),
       });
     // Loaded by id or index, so the cost follows the reader's records, not the workspace (#306).
     }, { kinds: ["session", "message", "receipt"], exactKinds: ["session", "message", "receipt"] });
@@ -153,7 +165,8 @@ export function createInboxService(ports, sessions) {
       return selected.map(receipt => receipt.state === "acknowledged"
         ? { message: messages.get(receipt.messageId), receipt }
         : { ...advanceOwned(tx, session, receipt.messageId, "retrieved", now),
-          message: messages.get(receipt.messageId) });
+          message: messages.get(receipt.messageId) })
+        .map(item => ({ ...item, receipt: publicReceipt(item.receipt) }));
     // Loaded by id or index, so the cost follows the reader's records, not the workspace (#306).
     }, { kinds: ["session", "message", "receipt"], exactKinds: ["session", "message", "receipt"] });
   }
@@ -173,7 +186,7 @@ export function createInboxService(ports, sessions) {
           "this message requires a reply; use reply to answer, clarify, or decline",
           { messageId: input.messageId, obligation: message.obligation });
       }
-      return advanceOwned(tx, session, input.messageId, "acknowledged", now).receipt;
+      return publicReceipt(advanceOwned(tx, session, input.messageId, "acknowledged", now).receipt);
     }, { kinds: ["session", "message", "receipt"], exactKinds: ["session", "message", "receipt"] });
   }
 
@@ -201,7 +214,7 @@ export function createInboxService(ports, sessions) {
           handoff: null,
         } });
       const receipt = advanceOwned(tx, session, input.messageId, "acknowledged", now).receipt;
-      return { reply: recorded.message, receipt };
+      return { reply: recorded.message, receipt: publicReceipt(receipt) };
     }, { kinds: ["participant", "session", "message", "receipt"], exactKinds: ["message", "receipt"] });
   }
 

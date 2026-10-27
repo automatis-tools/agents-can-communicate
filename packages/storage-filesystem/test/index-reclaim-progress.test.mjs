@@ -151,14 +151,17 @@ test("progress publication adds no flush and an expired pass cannot delete a liv
 
 test("a lost pending page from an older root cannot permanently block automatic cleanup", async t => {
   const f = await fixture(t, 40);
-  // Six pages: every index root is visited, and leaves of the client-key index stay pending.
-  await reclaimIndexPages(f.store.paths, { root: f.root, limit: 6 });
-  const { pending } = JSON.parse(await readFile(f.checkpoint)).state;
+  // Small passes until a leaf of the client-key index waits for verification, whatever
+  // the other indexes' roots and groups cost the passes before it.
   let stale, key;
-  for (const hash of pending) {
-    const page = JSON.parse(await readFile(path.join(f.directory, hash + ".json")));
-    if (page.type === "leaf" && String(page.entries[0].tuple[2]).startsWith("client_")) {
-      stale = hash; key = page.entries[0].tuple[2]; break;
+  for (let pass = 0; pass < 40 && stale === undefined; pass++) {
+    await reclaimIndexPages(f.store.paths, { root: f.root, limit: 4 });
+    const { pending } = JSON.parse(await readFile(f.checkpoint)).state;
+    for (const hash of pending) {
+      const page = JSON.parse(await readFile(path.join(f.directory, hash + ".json")));
+      if (page.type === "leaf" && String(page.entries[0].tuple[2]).startsWith("client_")) {
+        stale = hash; key = page.entries[0].tuple[2]; break;
+      }
     }
   }
   assert(stale, "fixture pauses with a leaf pending verification");

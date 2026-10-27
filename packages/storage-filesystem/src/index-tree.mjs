@@ -13,40 +13,66 @@ export function createIndexTree({ readPage, writePage, digestTuple = digest }) {
     seen.add(hash);
     return readPage(hash);
   }
+  // A group is the set of record IDs under one tuple. Up to 32 IDs it is one group
+  // page; beyond that it branches on the digest of each ID, so a change copies only the
+  // route to that ID. Chained pages copied every page in front of the change, which made
+  // a group of 4000 cost 184,460 page writes to build (#306). Lookups return IDs in order.
+  const idDigest = id => createHash("sha256").update(id).digest("hex");
   async function groupLookup(root) {
     const ids = [], seen = new Set();
-    while (root !== null) {
-      const page = await read(root, seen);
-      if (page.type !== "group") fault("invalid_group_reference");
+    async function collect(hash, depth, prefix) {
+      const page = await read(hash, seen);
+      if (page.type === "branch") {
+        if (depth >= 64) fault("radix_depth_exceeded");
+        for (const [route, child] of page.children) await collect(child, depth + 1, prefix + route);
+        return;
+      }
+      if (page.type !== "group" || page.next !== null) fault("invalid_group_reference");
       for (const id of page.ids) {
-        if (ids.length && compare(ids.at(-1), id) >= 0) fault("duplicate_or_unordered_group");
+        if (!idDigest(id).startsWith(prefix)) fault("misrouted_group_id");
         ids.push(id);
       }
-      root = page.next;
     }
-    return ids;
+    await collect(root, 0, "");
+    return ids.sort(compare);
   }
-  async function groupUpdate(root, id, operation, seen = new Set()) {
+  async function groupPages(ids, depth) {
+    if (ids.length <= 32 || depth === 64) return writePage({ type: "group", ids: [...ids].sort(compare), next: null });
+    const routes = new Map();
+    for (const id of ids) {
+      const route = idDigest(id)[depth];
+      if (!routes.has(route)) routes.set(route, []);
+      routes.get(route).push(id);
+    }
+    const children = [];
+    for (const route of [...routes.keys()].sort()) children.push([route, await groupPages(routes.get(route), depth + 1)]);
+    return writePage({ type: "branch", children });
+  }
+  async function groupUpdate(root, id, operation, depth = 0, seen = new Set()) {
     if (root === null) return operation === "remove" ? null : writePage({ type: "group", ids: [id], next: null });
     const page = await read(root, seen);
-    if (page.type !== "group") fault("invalid_group_reference");
-    const position = page.ids.findIndex(found => compare(found, id) >= 0);
-    if (position === -1 && page.next !== null) {
-      const next = await groupUpdate(page.next, id, operation, seen);
-      return next === page.next ? root : writePage({ ...page, next });
+    if (page.type === "branch") {
+      if (depth >= 64) fault("radix_depth_exceeded");
+      const route = idDigest(id)[depth], old = page.children.find(([digit]) => digit === route)?.[1] ?? null;
+      const next = await groupUpdate(old, id, operation, depth + 1, seen);
+      if (next === old) return root;
+      const children = page.children.filter(([digit]) => digit !== route);
+      if (next !== null) children.push([route, next]);
+      children.sort(([a], [b]) => compare(a, b));
+      return children.length === 0 ? null : writePage({ type: "branch", children });
     }
-    const ids = [...page.ids], at = position === -1 ? ids.length : position;
-    if (ids[at] === id) {
+    if (page.type !== "group" || page.next !== null) fault("invalid_group_reference");
+    const ids = [...page.ids], at = ids.findIndex(found => compare(found, id) >= 0);
+    const position = at === -1 ? ids.length : at;
+    if (ids[position] === id) {
       if (operation === "put") return root;
-      ids.splice(at, 1);
+      ids.splice(position, 1);
     } else {
       if (operation === "remove") return root;
-      ids.splice(at, 0, id);
+      ids.splice(position, 0, id);
     }
-    if (ids.length === 0) return page.next;
-    if (ids.length <= 32) return writePage({ ...page, ids });
-    const next = await writePage({ type: "group", ids: ids.slice(16), next: page.next });
-    return writePage({ type: "group", ids: ids.slice(0, 16), next });
+    if (ids.length === 0) return null;
+    return groupPages(ids, depth);
   }
   function checkNode(page, depth, prefix) {
     if (page.type === "branch") {
