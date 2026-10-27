@@ -228,15 +228,30 @@ function receiptFile(kind, snapshot) {
   return path.join(directory, `${kind}-${snapshot.key}.json`);
 }
 
-export async function hasPassed(kind, snapshot) {
+// Diagnostics are additive: existing Boolean callers retain their policy,
+// including syntax-cache use in CI. The full-suite runner disables CI reuse.
+export async function receiptDecision(kind, snapshot, { now = Date.now(), ci = process.env.CI } = {}) {
+  if (ci) return { reused: false, reason: "ci-disabled" };
+  const file = receiptFile(kind, snapshot);
+  if (!file) return { reused: false, reason: "inputs-uncertain" };
   try {
-    const file = receiptFile(kind, snapshot);
-    if (!file) return false;
     const receipt = JSON.parse(await readFile(file, "utf8"));
-    const age = Date.now() - receipt.passedAt;
-    return receipt.version === VERSION && receipt.key === snapshot.key && receipt.kind === kind
-      && Number.isFinite(receipt.passedAt) && Number.isFinite(age) && age >= 0 && age < MAX_AGE;
-  } catch { return false; }
+    if (receipt === null || typeof receipt !== "object" || receipt.version !== VERSION || receipt.key !== snapshot.key || !Number.isFinite(receipt.passedAt)) {
+      return { reused: false, reason: "invalid" };
+    }
+    if (receipt.kind !== kind) return { reused: false, reason: "scope-mismatch" };
+    const age = now - receipt.passedAt;
+    if (!Number.isFinite(age) || age < 0) return { reused: false, reason: "invalid" };
+    if (age >= MAX_AGE) return { reused: false, reason: "expired" };
+    return { reused: true, reason: "hit" };
+  } catch (error) {
+    return { reused: false, reason: error.code === "ENOENT" ? "absent"
+      : error instanceof SyntaxError ? "invalid" : "inputs-uncertain" };
+  }
+}
+
+export async function hasPassed(kind, snapshot) {
+  return (await receiptDecision(kind, snapshot, { ci: false })).reused;
 }
 
 let cleaned = false;
