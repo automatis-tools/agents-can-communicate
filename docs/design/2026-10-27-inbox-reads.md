@@ -117,6 +117,17 @@ Cold, rebuilt and unavailable lookups read the whole workspace once, as every in
 contract 7. The saving is on the warm path. An exact read of anything but a decision makes no
 lookup at all.
 
+### Reading as a listing reads
+
+A listing reads sixteen records at once (#298). Records selected by id were first read one
+after another, so a page of a small inbox took twice as long as the listing it replaced (10.5 ms
+against 5.5 ms for 30 messages), and a cold page more than twice:
+- the records a lookup selects, the messages of a page and each step of a decision walk are read
+  sixteen at a time, in order;
+- a rebuild builds each tree in one pass from all its keys, the same tree, page for page, that
+  applying them one by one makes, which copied each page on a key's route again for every key;
+- a rebuild publishes the pages of one height together, each after all of its children.
+
 ## Measurement
 
 The #304 inbox probe gains `index`: `warm` (the default), `cold`, `rebuilt` or `unavailable`.

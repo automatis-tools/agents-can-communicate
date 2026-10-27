@@ -130,6 +130,29 @@ test("a forged group cannot answer: misrouted, chained, too deep or not a group"
   }
 });
 
+// A rebuild has every key at once and builds the tree in one pass (#306). It must be the
+// tree that applying the same keys one by one makes, page for page.
+test("a tree built at once is the tree its keys make one by one", async () => {
+  let seed = 7;
+  const next = () => (seed = (seed * 1103515245 + 12345) % 2 ** 31) / 2 ** 31;
+  for (let round = 0; round < 40; round += 1) {
+    const keys = 1 + Math.floor(next() * 120), count = Math.floor(next() * 900);
+    const puts = Array.from({ length: count }, () =>
+      add(tuple(Math.floor(next() ** 3 * keys)), `message_${Math.floor(next() * 5000)}`));
+    const built = memory(), applied = memory();
+    const root = await built.tree.build(puts);
+    assert.equal(root, await applied.tree.apply(null, puts), `round ${round}: ${count} puts over ${keys} keys`);
+    for (const [hash] of built.stored) assert.ok(applied.stored.has(hash), "every page built is one applying makes");
+    bounded(built.published);
+  }
+  const collided = memory(() => "f".repeat(64)), one = memory(() => "f".repeat(64));
+  const puts = Array.from({ length: 33 }, (_, i) => add(tuple(i), `message_${i}`));
+  assert.equal(await collided.tree.build(puts), await one.tree.apply(null, puts));
+  assert.equal(await memory().tree.build([]), null);
+  await assert.rejects(memory().tree.build([{ ...add(tuple(1), "message_a"), operation: "remove" }]),
+    { reason: "invalid_delta" });
+});
+
 test("full digest collisions remain separate", async () => {
   const { tree, published } = memory(() => "f".repeat(64));
   const root = await tree.apply(null, Array.from({ length: 33 }, (_, i) => add(tuple(i), `message_${i}`)));

@@ -4,6 +4,7 @@ import { assertPublicationDeadline } from "./deadline.mjs";
 import { createIndexIO, INDEX_VERSION } from "./index-io.mjs";
 import { createIndexTree } from "./index-tree.mjs";
 import { encodeIndexPage, IndexCacheUnavailable } from "./index-pages.mjs";
+import { LIST_READS } from "./state-reads.mjs";
 
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 const matches = (kind, record, index, tuple) => indexKeysFor(kind, record)
@@ -68,8 +69,8 @@ export function createIndexCache({ paths, root, workspaceId, publishOptions, loa
       const { hash } = encodeIndexPage(page); pages.set(hash, page); return hash;
     } });
     const roots = {};
-    for (const index of Object.keys(deltas)) roots[index] = await tree.apply(null, deltas[index]);
-    // Building copies pages on every route it changes; only the final tree is kept.
+    for (const index of Object.keys(deltas)) roots[index] = await tree.build(deltas[index]);
+    // Only pages the roots reach are kept and published.
     const reachable = new Map();
     const keep = hash => {
       if (hash === null || reachable.has(hash)) return;
@@ -83,15 +84,24 @@ export function createIndexCache({ paths, root, workspaceId, publishOptions, loa
     const { io } = tools(deadlineAt);
     try {
       // Publish only the final reachable tree, children before parents. The
-      // path copies made during a rebuild need never reach the filesystem.
-      const published = new Set();
-      async function publish(hash) {
-        if (hash === null || published.has(hash)) return;
-        const page = pages.get(hash);
-        for (const child of references(page)) await publish(child);
-        await io.writePage(page); published.add(hash);
+      // path copies made during a rebuild need never reach the filesystem. Pages of
+      // one height go a listing's worth at a time, every one after all of its children:
+      // one after another, a cold page read cost twice the listing it replaced (#306).
+      const heights = new Map();
+      const height = hash => {
+        if (!heights.has(hash)) {
+          heights.set(hash, 1 + Math.max(-1, ...references(pages.get(hash)).map(height)));
+        }
+        return heights.get(hash);
+      };
+      for (const hash of Object.values(roots)) if (hash !== null) height(hash);
+      const levels = [];
+      for (const [hash, level] of heights) (levels[level] ??= []).push(pages.get(hash));
+      for (const level of levels) {
+        for (let start = 0; start < level.length; start += LIST_READS) {
+          await Promise.all(level.slice(start, start + LIST_READS).map(page => io.writePage(page)));
+        }
       }
-      for (const hash of Object.values(roots)) await publish(hash);
       await publishManifest(io, manifest);
       note("index_rebuilt", "verified_primary");
       return { manifest, tree, published: true };
@@ -141,10 +151,15 @@ export function createIndexCache({ paths, root, workspaceId, publishOptions, loa
         if (entry.removed !== true && matches(kind, entry.record, index, tuple)) selected.add(entry.id);
       }
       const result = [];
-      // Match eager listJsonFiles ordering, including prefix IDs such as a/a-b.
-      for (const id of [...selected].sort((a, b) => `${a}.json`.localeCompare(`${b}.json`))) {
+      // Match eager listJsonFiles ordering, including prefix IDs such as a/a-b. Verified a
+      // listing's worth at a time: one record after another, a page of a small inbox took
+      // twice as long as the listing it replaced (#306).
+      const sorted = [...selected].sort((a, b) => `${a}.json`.localeCompare(`${b}.json`));
+      for (let start = 0; start < sorted.length; start += LIST_READS) {
         assertPublicationDeadline(deadlineAt);
-        if (await verify(id)) result.push(id);
+        const batch = sorted.slice(start, start + LIST_READS);
+        const found = await Promise.all(batch.map(id => verify(id)));
+        batch.forEach((id, position) => { if (found[position]) result.push(id); });
       }
       return result;
     }

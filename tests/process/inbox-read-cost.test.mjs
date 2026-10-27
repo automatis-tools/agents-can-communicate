@@ -211,3 +211,35 @@ test("a receipt written without its obligation gains it when it is retrieved", a
   assert.deepEqual(page.result.items, []);
   assert.equal(page.stateByKind.receipt ?? 0, 0, "the read note left the receipt index");
 });
+
+// The reader's records are read by id, and one at a time a page of a small inbox took twice
+// as long as the listing it replaced, which reads sixteen records at once (#298; measured for
+// #306: 10.5 ms against 5.5 ms for 30 messages). A page reads them as many at once, and no more.
+test("a page reads the reader's records sixteen at a time, as a listing does", async t => {
+  const f = await fixture(t);
+  for (let index = 0; index < 24; index++) await f.send("reader");
+  const { default: fs } = await import("node:fs/promises");
+  const { syncBuiltinESMExports } = await import("node:module");
+  const open = fs.open, records = path.join(f.root, "state");
+  let inFlight = 0, most = 0;
+  fs.open = async (...args) => {
+    const record = String(args[0]).startsWith(records + path.sep)
+      && /[\\/](message|receipt)[\\/]/.test(String(args[0]));
+    if (record) { inFlight += 1; most = Math.max(most, inFlight); }
+    try {
+      const handle = await open(...args);
+      if (record) {
+        const close = handle.close.bind(handle);
+        handle.close = async () => { try { return await close(); } finally { inFlight -= 1; } };
+      }
+      return handle;
+    } catch (error) { if (record) inFlight -= 1; throw error; }
+  };
+  syncBuiltinESMExports();
+  t.after(() => { fs.open = open; syncBuiltinESMExports(); });
+  const service = await f.reopen();
+  const page = await service.listInbox({ ...owner(f.reader), limit: 1 });
+  assert.equal(page.items.length, 1);
+  assert.ok(most > 1, `${most} record read(s) at once`);
+  assert.ok(most <= 16, `${most} record reads at once`);
+});

@@ -176,5 +176,26 @@ export function createIndexTree({ readPage, writePage, digestTuple = digest }) {
     }
     return root;
   }
-  return Object.freeze({ lookup, apply });
+  // The tree `apply(null, puts)` makes, built at once: a rebuild has every key, and applying
+  // them one by one copied each page on a key's route again for every key, 20 ms beside 300
+  // messages - two thirds of reading them (#306).
+  async function build(puts) {
+    const groups = new Map();
+    for (const { tuple, id, operation } of puts) {
+      assertPortableId(id, "index record ID");
+      if (operation !== "put") fault("invalid_delta");
+      const key = canonicalTuple(tuple);
+      if (!groups.has(key)) groups.set(key, { tuple, ids: new Set() });
+      groups.get(key).ids.add(id);
+    }
+    if (groups.size === 0) return null;
+    const entries = [];
+    for (const { tuple, ids } of groups.values()) {
+      const sorted = [...ids].sort(compare);
+      entries.push({ digest: assertPageHash(digestTuple(tuple)), tuple,
+        ids: sorted.length <= INLINE_GROUP_IDS ? sorted : await groupPages(sorted, 0) });
+    }
+    return split(entries, 0);
+  }
+  return Object.freeze({ lookup, apply, build });
 }

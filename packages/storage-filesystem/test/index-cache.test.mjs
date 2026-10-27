@@ -185,3 +185,36 @@ test("a cache that cannot be published is rebuilt once per journal generation, n
   await seed(store, "message_new", "client_new");
   assert.deepEqual(await lookup(store, "client_new"), ["message_new"]);
 });
+
+// A rebuild publishes the whole tree, and one page after another a cold page read cost
+// twice the listing it replaced (#306: 70 ms against 33 ms beside 300 messages). Pages of
+// one height go together, a listing's worth at a time, each after all of its children.
+test("a rebuild publishes the pages of one height together, each after its children", async t => {
+  const { root, store, manifestFile } = await fixture(t);
+  for (let i = 0; i < 120; i++) await seed(store, `message_${i}`, `client_${i}`);
+  await rm(manifestFile, { force: true });
+  await rm(path.join(root, INDEX_DIRECTORY, "pages"), { recursive: true, force: true });
+  const { default: fs } = await import("node:fs/promises");
+  const { syncBuiltinESMExports } = await import("node:module");
+  const pages = path.join(root, INDEX_DIRECTORY, "pages") + path.sep;
+  const originals = { open: fs.open, lstat: fs.lstat };
+  let inFlight = 0, most = 0;
+  for (const name of Object.keys(originals)) {
+    fs[name] = async (...args) => {
+      const page = String(args[0]).startsWith(pages);
+      if (page) { inFlight += 1; most = Math.max(most, inFlight); }
+      try { return await originals[name](...args); } finally { if (page) inFlight -= 1; }
+    };
+  }
+  syncBuiltinESMExports();
+  t.after(() => { Object.assign(fs, originals); syncBuiltinESMExports(); });
+  assert.deepEqual(await lookup(store, "client_7"), ["message_7"]);
+  Object.assign(fs, originals); syncBuiltinESMExports();
+  assert.equal(store.indexDiagnostics().at(-1)?.code, "index_rebuilt");
+  assert.ok(most > 1, `${most} page operation(s) at once`);
+  assert.ok(most <= 16, `${most} page operations at once`);
+  // Every page the manifest reaches is there, so the next process answers from the cache.
+  const reopened = await openFilesystemStore({ root, workspaceId: WS, clock: createFakeClock(NOW), ids: createFakeIds() });
+  assert.deepEqual(await lookup(reopened, "client_99"), ["message_99"]);
+  assert.notEqual(reopened.indexDiagnostics().at(-1)?.code, "index_rebuilt");
+});

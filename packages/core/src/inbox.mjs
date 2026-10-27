@@ -11,6 +11,16 @@ const listable = (message, receipt) => receipt.state === "queued" || receipt.sta
   || (receipt.state === "retrieved" && message.obligation !== "none");
 // Every state a listable receipt can be in; an acknowledged one never is.
 const PENDING = ["queued", "offered", "retrieved"];
+// Records loaded by id are read as many at once as a store listing reads (#298): one after
+// another, a page of a small inbox took twice as long as the listing it replaced (#306).
+const LOADS = 16;
+async function loadAll(tx, kind, ids) {
+  const records = [];
+  for (let start = 0; start < ids.length; start += LOADS) {
+    records.push(...await Promise.all(ids.slice(start, start + LOADS).map(id => tx.load(kind, id))));
+  }
+  return records;
+}
 
 export function createInboxService(ports, sessions) {
   const { store, clock, ids } = ports;
@@ -88,11 +98,10 @@ export function createInboxService(ports, sessions) {
   // any distance, whoever they were addressed to - so each group is walked in full and
   // no other decision is read.
   async function messagesFor(tx, session, receipts) {
-    const messages = new Map();
-    for (const messageId of receipts.keys()) {
-      const message = await tx.load("message", messageId);
-      if (message !== null) messages.set(messageId, message);
-    }
+    const messages = new Map(), ids = [...receipts.keys()];
+    (await loadAll(tx, "message", ids)).forEach((message, index) => {
+      if (message !== null) messages.set(ids[index], message);
+    });
     const group = new Map([...messages.values()].filter(message => message.kind === "decision")
       .map(message => [message.messageId, message]));
     if (group.size === 0) return messages;
@@ -100,13 +109,12 @@ export function createInboxService(ports, sessions) {
       const decision = pending.pop();
       const named = decision.decisionChange?.messageIds ?? [];
       const naming = await tx.lookup("decisionsByTarget", [session.workspaceId, decision.messageId]);
-      for (const id of [...named, ...naming]) {
-        if (group.has(id)) continue;
-        const neighbour = await tx.load("message", id);
-        if (neighbour?.kind !== "decision") continue;
-        group.set(id, neighbour);
+      const unseen = [...new Set([...named, ...naming])].filter(id => !group.has(id));
+      (await loadAll(tx, "message", unseen)).forEach((neighbour, index) => {
+        if (neighbour?.kind !== "decision") return;
+        group.set(unseen[index], neighbour);
         pending.push(neighbour);
-      }
+      });
     }
     const view = decisionView([...group.values()]);
     return new Map([...messages].map(([id, message]) => [id, view(message)]));
