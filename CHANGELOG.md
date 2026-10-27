@@ -1,5 +1,34 @@
 # Changelog
 
+## 0.12.2 — release candidate
+
+- A process that may not use ACC's state is told so (#316, #334). Before, when a client
+  sandbox or host policy denied ACC's data home, every command answered `runtime
+  unavailable; retry after the update or run acc update to recover`, and `acc doctor`
+  reported `unavailable_during_update`, while the runtime was ready and nothing was pending.
+  This was seen in ChatGPT Work Mode and in a Codex chat without ACC's rules file. Commands
+  now exit 4 with `reasonCode: state_access_denied`. They name the refused operation, say
+  whether it was a read or a write, state the real update state, and point to a process that
+  can use the data home. `acc doctor` reports `scope: runtime` and
+  `workspaceInspection: state_access_denied`. Hooks still fail open and name only the refused
+  code. A control record that points outside the runtime directory keeps the ordinary text,
+  and the launcher prints no path with control bytes.
+
+| Candidate artifact | Value |
+|---|---|
+| Built from | `16fd32fafdf92ed61768f20437930d2d296065e4` |
+| Tarball | `agents-can-communicate-0.12.2.tgz`, 621,659 bytes, 380 files |
+| sha256 | `d1fa01057ad07394bc60f76ca718d2268d6fac7a4c5802bc33f212e21db058c4` |
+
+The exact archive passed package verification and an upgrade from published 0.12.1. Its own
+updater activated this archive while the old MCP process stayed alive. It wrote a launcher set
+with the new module, and under a sandbox the stable CLI and hook named the refused write. With
+real Codex 0.164.0, a sandboxed chat without ACC's rules file was told that the write was
+refused, and with the rules file the chat sent and claimed. Separately packed source passed 25
+managed-update checks, and two real-client model-stub checks with Claude Code 2.1.311 and
+Codex 0.164.0. See [release evidence](docs/release-evidence/v0.12.2.md). This candidate is not
+published.
+
 ## Unreleased — a refused state write is named as such
 
 - When a client sandbox or host policy denies writes under ACC's data home, ACC now says so.
