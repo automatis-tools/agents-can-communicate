@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdtemp, readdir, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -84,4 +84,19 @@ test("a child that fails or overruns is recorded, the run is still written, and 
   assert.ok(run.children.every(item => /timed out/.test(item.error)), JSON.stringify(run.children));
   assert.match(report, /\*\*invalid\*\*/);
   assert.match(report, /timed out/);
+  // Each child's temporary directory goes with it, killed or not.
+  assert.deepEqual((await readdir(tmpdir())).filter(name => name.startsWith("acc-measure-child-")), []);
+});
+
+test("a child that crashes records its cause and the failures it had already found", async t => {
+  // Two messages per call run the fixture out on the third call.
+  const { child, run, report } = await measure(t, ["--probe", "inbox", "--set", "operation=exact", "--set", "messages=4",
+    "--set", "backlog=0", "--rounds", "1", "--samples", "2", "--warmup", "1", "--fsync", "skipped",
+    "--candidate-mutation", "wrong-message"]);
+  assert.equal(child.code, 1, child.stdout);
+  const candidate = run.children.find(item => item.side === "candidate");
+  assert.match(candidate.error, /candidate child failed: TypeError/);
+  assert.ok(candidate.validation.length > 0, JSON.stringify(candidate));
+  assert.equal(run.children.find(item => item.side === "baseline").error, undefined);
+  assert.match(report, /candidate child failed/);
 });

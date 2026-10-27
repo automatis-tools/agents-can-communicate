@@ -4,7 +4,8 @@ import test from "node:test";
 import transaction from "../../scripts/measure/probes/transaction.mjs";
 
 // #304 for #307: history grows independently of the records read. A read
-// commits nothing; a write commits exactly one event with the next sequence.
+// commits nothing and sees the receipt as another process just left it; a
+// write commits exactly one event with the next sequence.
 const repo = path.resolve(import.meta.dirname, "..", "..");
 const read = transaction.scenario({ messages: 6, events: 40, operation: "read", seed: 5 });
 const write = transaction.scenario({ messages: 6, events: 40, operation: "write", seed: 5 });
@@ -30,9 +31,18 @@ test("the fixture holds the messages and at least the events the scenario names"
 
 test("a read returns the receipt's state and commits no event", async t => {
   const value = await built(t, read);
-  for (let index = 0; index < 3; index++) {
+  assert.deepEqual(new Set(value.states.values()), new Set(["queued", "offered", "retrieved", "acknowledged"]));
+  for (let index = 0; index < 5; index++) {
     assert.deepEqual(await call(value), [], `call ${index}`);
   }
+  // Each read met a receipt that another process had stepped since the fixture was built.
+  assert.notDeepEqual([...value.states], [...value.initial]);
+});
+
+test("a read of the receipt record outside a transaction is correct without an open journal", async t => {
+  const value = await built(t, read);
+  const recordRead = await transaction.recordRead(transaction.operate, { side: value.side, scenario: read });
+  for (let index = 0; index < 4; index++) assert.deepEqual(await call(value, recordRead), [], `call ${index}`);
 });
 
 test("a write commits exactly one event, with the next sequence", async t => {
@@ -42,10 +52,13 @@ test("a write commits exactly one event, with the next sequence", async t => {
   }
 });
 
-test("a read after a write stopped at its journal sees the decision, and commits nothing of its own", async t => {
+test("a read after a step stopped at its journal sees the decision, and commits nothing of its own", async t => {
   const value = await built(t, journal);
-  for (let index = 0; index < 8; index++) assert.deepEqual(await call(value), [], `call ${index}`);
-  assert.equal(value.pending.published, true, "the decided event was published once");
+  for (let index = 0; index < 6; index++) assert.deepEqual(await call(value), [], `call ${index}`);
+  // The same read outside a transaction misses each decision.
+  const again = await built(t, journal);
+  const recordRead = await transaction.recordRead(transaction.operate, { side: again.side, scenario: journal });
+  assert.match((await call(again, recordRead)).join("\n"), /returned .* queued, not .* offered/);
 });
 
 test("every negative mutation for each operation fails validation", async t => {

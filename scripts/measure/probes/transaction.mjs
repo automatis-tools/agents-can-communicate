@@ -2,15 +2,13 @@
 // while ordinary writes add events. Every call opens its own store, and the
 // validator reads the published log back through another: a read commits
 // nothing, and a write commits one event with the next sequence.
-import { readdir } from "node:fs/promises";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { digest } from "../probe-kit.mjs";
-import { eventsAfter, loadStoreSide, openInstance, openStoreFixture, primaryDigest, receiptStates }
+import { eventsAfter, loadStoreSide, openInstance, openStoreFixture, primaryDigest, receiptStates, WORKSPACE }
   from "../store-fixture.mjs";
 
-// `pendingJournal` leaves one decided write unpublished, as a crash after its
-// journal would: every read of that message must still see the decision.
+// `pendingJournal` stops each read's step behind its journal, as a crash would.
 const defaults = { messages: 30, events: 100, operation: "read", pendingJournal: false, seed: 1 };
 // What the product publishes for a successful offer.
 const OFFER_EVENT = "message.offer_succeeded";
@@ -23,12 +21,32 @@ function scenario(input = {}) {
   if (!["read", "write"].includes(value.operation)) throw new Error("transaction operation is read or write");
   if (typeof value.pendingJournal !== "boolean") throw new Error("transaction pendingJournal is true or false");
   if (value.pendingJournal && value.operation !== "read") throw new Error("a pending journal is measured by reads");
-  if (value.messages < (value.pendingJournal ? 2 : 1)) throw new Error("transaction needs messages");
+  if (value.messages < 1) throw new Error("transaction needs messages");
   return value;
 }
 
-const eventCount = async root => (await readdir(path.join(root, "events")).catch(() => []))
-  .filter(name => name.endsWith(".json")).length;
+const offer = (fixture, messageId) => ({ messageId, recipientParticipantId: "reader",
+  targetSessionId: fixture.sessions.reader.sessionId, targetGeneration: fixture.sessions.reader.generation,
+  transport: "next-turn", adapterId: "probe", clientVersion: "1.0.0" });
+// The one transition each state allows the reader, through the product's own operations.
+const STEPS = {
+  queued: { next: "offered", event: OFFER_EVENT,
+    run: (service, fixture, messageId) => service.recordOfferSucceeded(offer(fixture, messageId)) },
+  offered: { next: "retrieved", event: "message.retrieved",
+    run: (service, fixture, messageId) => service.readInbox({ ...fixture.owner("reader"), messageId }) },
+  retrieved: { next: "acknowledged", event: "message.acknowledged",
+    run: (service, fixture, messageId) => service.acknowledgeMessage({ ...fixture.owner("reader"), messageId }) },
+};
+
+// Events counted through the store's own log, never its file layout.
+async function countEvents(store, counter) {
+  for (;;) {
+    const page = await store.eventsSince(WORKSPACE, counter.cursor, 500);
+    if (page.events.length === 0) return counter.count;
+    counter.count += page.events.length;
+    counter.cursor = page.cursor;
+  }
+}
 
 async function build(scenario, side) {
   const fixture = await openStoreFixture(side, ["sender", "reader"], "transaction");
@@ -39,61 +57,91 @@ async function build(scenario, side) {
       toParticipantIds: ["reader"], kind: "note", obligation: "none", subject: `message ${index}`,
       body: "Same measured fixture" }));
   }
+  // A read meets receipts in every state it can step from, so no single answer fits.
+  // A write offers each message once, so its receipts all start queued.
+  const cycle = scenario.operation === "write" ? ["queued"]
+    : scenario.pendingJournal ? ["queued", "offered", "retrieved"] : ["queued", "offered", "retrieved", "acknowledged"];
+  const states = new Map();
+  for (const [index, message] of messages.entries()) {
+    const wanted = cycle[index % cycle.length];
+    for (let state = "queued"; state !== wanted; state = STEPS[state].next) {
+      fixture.clock.advance(1_000);
+      await STEPS[state].run(fixture.service, fixture, message.messageId);
+    }
+    states.set(message.messageId, wanted);
+  }
   // History that grows without touching a message or a receipt.
-  for (let round = 0; await eventCount(fixture.root) < scenario.events; round++) {
+  const counter = { cursor: null, count: 0 };
+  for (let round = 0; await countEvents(fixture.store, counter) < scenario.events; round++) {
     fixture.clock.advance(1_000);
     await fixture.service.setIntent({ ...fixture.owner("sender"), summary: `history ${round}`, mode: "edit" });
   }
-  const offer = message => ({ messageId: message.messageId, recipientParticipantId: "reader",
-    targetSessionId: fixture.sessions.reader.sessionId, targetGeneration: fixture.sessions.reader.generation,
-    transport: "next-turn", adapterId: "probe", clientVersion: "1.0.0" });
-  const states = new Map(messages.map(message => [message.messageId, "queued"]));
-  const built = { scenario, side, fixture, messages, offer, next: 0, target: null, states, pending: null,
-    events: await eventCount(fixture.root), digest: await primaryDigest(fixture, side) };
+  const built = { scenario, side, fixture, messages, next: 0, target: null, states, initial: new Map(states),
+    pending: null, moved: null, events: counter.count, digest: await primaryDigest(fixture, side) };
   built.eventCursor = (await eventsAfter(fixture, side, null)).cursor;
-  if (scenario.pendingJournal) {
-    // The first message, so the first read is the one that has to see the decision.
-    const last = messages[0], crash = async point => { if (point === "after-journal") throw new Error("probe crash"); };
-    const { service } = await openInstance(fixture, side, { failAt: crash });
-    await service.recordOfferSucceeded(offer(last)).then(() => { throw new Error("the write did not stop at its journal"); },
-      error => { if (error.message !== "probe crash") throw error; });
-    states.set(last.messageId, "offered");
-    built.pending = { messageId: last.messageId, published: false };
-  }
   built.receipts = await receiptStates(fixture, side);
   return built;
 }
 
-const capacity = value => value.operation === "write" ? value.messages : Infinity;
-const prepare = async built => openInstance(built.fixture, built.side);
+// Every read targets a message not read before, and every write one not offered before.
+const capacity = value => value.messages;
+
+// Before each read, another process steps the target's receipt, so an answer kept
+// from before that step is wrong. With a pending journal the step stops after its
+// journal, and the measured store was opened before it: its own read must finish it.
+async function prepare(built) {
+  const { fixture, side, scenario } = built;
+  if (scenario.operation === "write") return openInstance(fixture, side);
+  const message = built.messages[built.next];
+  if (message === undefined) throw new Error("the transaction scenario has fewer messages than reads");
+  const step = STEPS[built.states.get(message.messageId)];
+  built.moved = null;
+  if (scenario.pendingJournal) {
+    const measured = await openInstance(fixture, side);
+    fixture.clock.advance(1_000);
+    const crash = async point => { if (point === "after-journal") throw new Error("probe crash"); };
+    const { service } = await openInstance(fixture, side, { failAt: crash });
+    await step.run(service, fixture, message.messageId).then(() => { throw new Error("the step did not stop at its journal"); },
+      error => { if (error.message !== "probe crash") throw error; });
+    built.states.set(message.messageId, step.next);
+    built.pending = { messageId: message.messageId, event: step.event, published: false };
+    built.moved = { id: side.receiptId(message.messageId, "reader"), state: step.next };
+    return measured;
+  }
+  if (step !== undefined) {
+    fixture.clock.advance(1_000);
+    await step.run((await openInstance(fixture, side)).service, fixture, message.messageId);
+    built.states.set(message.messageId, step.next);
+    built.receipts = await receiptStates(fixture, side);
+    built.eventCursor = (await eventsAfter(fixture, side, built.eventCursor)).cursor;
+  }
+  return openInstance(fixture, side);
+}
 
 async function operate(built, input) {
-  if (built.scenario.operation === "read") {
-    const message = built.messages[built.next++ % built.messages.length];
-    built.target = message.messageId;
-    return input.service.readReceipt(built.offer(message));
-  }
-  // Each write offers a message not offered before, so each commits a transition.
   const message = built.messages[built.next++];
-  if (message === undefined) throw new Error("the transaction scenario has fewer messages than writes");
+  if (message === undefined) throw new Error("the transaction scenario has fewer messages than calls");
   built.target = message.messageId;
-  return input.service.recordOfferSucceeded(built.offer(message));
+  if (built.scenario.operation === "read") return input.service.readReceipt(offer(built.fixture, message.messageId));
+  // Each write offers a message not offered before, so each commits a transition.
+  return input.service.recordOfferSucceeded(offer(built.fixture, message.messageId));
 }
 
 async function validate(built, result) {
   const failures = [], { fixture, side } = built, write = built.scenario.operation === "write";
   const expected = write ? "offered" : built.states.get(built.target);
-  if (result?.messageId !== built.target || result?.state !== expected) {
+  if (result?.messageId !== built.target || result?.recipientParticipantId !== "reader" || result?.state !== expected) {
     failures.push(`transaction: returned ${result?.messageId} ${result?.state}, not ${built.target} ${expected}`);
   }
   const { events, cursor } = await eventsAfter(fixture, side, built.eventCursor);
-  // Finishing the decided write publishes its event once; that is no commit of the read's.
+  // Finishing the stopped step publishes its event once; that is no commit of the read's.
   const own = events.filter(event => {
-    const finished = built.pending && !built.pending.published && event.type === OFFER_EVENT
+    const finished = built.pending && !built.pending.published && event.type === built.pending.event
       && event.payload?.messageId === built.pending.messageId;
     if (finished) built.pending.published = true;
     return !finished;
   });
+  if (built.pending && !built.pending.published) failures.push("transaction: the stopped step was never finished");
   if (!write && own.length !== 0) failures.push(`transaction: a read committed ${own.length} event(s)`);
   if (write && own.length !== 1) failures.push(`transaction: a write committed ${own.length} events, not one`);
   if (write && own.length === 1) {
@@ -104,16 +152,19 @@ async function validate(built, result) {
       failures.push(`transaction: the event is ${event.type} for ${event.payload?.messageId}`);
     }
   }
-  const now = await receiptStates(fixture, side), moved = side.receiptId(built.target, "reader");
+  const now = await receiptStates(fixture, side);
+  const moved = write ? { id: side.receiptId(built.target, "reader"), state: "offered" } : built.moved;
   for (const [id, before] of built.receipts) {
     const after = now.get(id);
-    if (id === moved && write) {
-      if (after?.state !== "offered") failures.push(`transaction: ${before.messageId} is ${after?.state}, not offered`);
+    if (id === moved?.id) {
+      if (after?.state !== moved.state) failures.push(`transaction: ${before.messageId} is ${after?.state}, not ${moved.state}`);
     } else if (after?.state !== before.state || after?.generation !== before.generation) {
       failures.push(`transaction: an unrelated receipt for ${before.messageId} changed`);
     }
   }
+  for (const id of now.keys()) if (!built.receipts.has(id)) failures.push(`transaction: receipt ${id} appeared`);
   if (write) built.states.set(built.target, "offered");
+  built.pending = null;
   built.receipts = now;
   built.eventCursor = cursor;
   return failures;
@@ -144,13 +195,29 @@ const readMutations = {
   },
   // Offers a message that is still queued, where a read must change nothing.
   "advances-on-read": async () => async (built, input) => {
+    built.next += 1;
     const message = built.messages.find(item => built.states.get(item.messageId) === "queued");
     built.target = message.messageId;
-    return input.service.recordOfferSucceeded(built.offer(message));
+    return input.service.recordOfferSucceeded(offer(built.fixture, message.messageId));
   },
-  // Answers from the receipts as first built, missing what was decided since.
-  "stale-state": async operate => async (built, input) => ({ ...await operate(built, input),
-    state: built.pending ? "queued" : "offered" }),
+  // Answers from the receipts as first built, missing every step since.
+  "stale-state": async operate => async (built, input) => {
+    const result = await operate(built, input);
+    return { ...result, state: built.initial.get(built.target) };
+  },
+  // Answers without reading the store at all.
+  "constant-state": async () => async built => {
+    const message = built.messages[built.next++];
+    built.target = message.messageId;
+    return { messageId: message.messageId, recipientParticipantId: "reader", state: "queued" };
+  },
+};
+// Reads the receipt record as it lies on disk, outside any transaction. Without
+// an open journal that is a correct read; with one, it misses the decision.
+const recordRead = async () => async (built, input) => {
+  const message = built.messages[built.next++];
+  built.target = message.messageId;
+  return input.store.stateRecord(WORKSPACE, "receipt", built.side.receiptId(message.messageId, "reader"));
 };
 const writeMutations = {
   // Reports a transition that was never committed.
@@ -168,11 +235,12 @@ const writeMutations = {
     const intended = built.messages[built.next], other = built.messages[built.next + 1];
     built.next += 2;
     built.target = intended.messageId;
-    return input.service.recordOfferSucceeded(built.offer(other));
+    return input.service.recordOfferSucceeded(offer(built.fixture, other.messageId));
   },
 };
 
 export default { name: "transaction", scenario, hash: value => digest(scenario(value)), load: loadStoreSide, build,
-  capacity, prepare, operate, validate, observe,
-  mutationsFor: value => value.operation === "read" ? readMutations : writeMutations,
+  capacity, prepare, operate, validate, observe, recordRead,
+  mutationsFor: value => value.operation === "write" ? writeMutations
+    : value.pendingJournal ? { ...readMutations, "skips-journal": recordRead } : readMutations,
   dispose: built => built.fixture.dispose() };

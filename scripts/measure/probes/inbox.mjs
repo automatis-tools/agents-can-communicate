@@ -79,6 +79,9 @@ async function operate(built, input) {
 
 const newestFirst = (a, b) => b.sentAt.localeCompare(a.sentAt) || b.messageId.localeCompare(a.messageId);
 const FIELDS = ["messageId", "subject", "body", "kind", "obligation"];
+// The published page contract: at most this many bytes of page JSON, formatted with two spaces.
+const PAGE_BYTES = 12_000;
+const pageBytes = value => Buffer.byteLength(JSON.stringify(value, null, 2));
 
 // Receipts and events after a call, against what the call may change.
 async function storeChanges(built, moved) {
@@ -91,6 +94,7 @@ async function storeChanges(built, moved) {
       failures.push(`inbox: receipt for ${before.messageId} was ${expected === before.state ? "rewritten" : "not rewritten"}`);
     }
   }
+  for (const id of now.keys()) if (!built.receipts.has(id)) failures.push(`inbox: receipt ${id} appeared`);
   const { events, cursor } = await eventsAfter(built.fixture, built.side, built.eventCursor);
   const wanted = moved && moved.state !== built.receipts.get(moved.id)?.state ? 1 : 0;
   if (events.length !== wanted) failures.push(`inbox: the call published ${events.length} event(s), not ${wanted}`);
@@ -112,7 +116,10 @@ async function validateExact(built, result) {
     for (const field of FIELDS) {
       if (result[0].message?.[field] !== target[field]) failures.push(`inbox: returned ${field} ${JSON.stringify(result[0].message?.[field])}`);
     }
-    if (result[0].receipt?.state !== after) failures.push(`inbox: the returned receipt is ${result[0].receipt?.state}, not ${after}`);
+    const receipt = result[0].receipt;
+    if (receipt?.messageId !== target.messageId || receipt?.recipientParticipantId !== "reader") {
+      failures.push(`inbox: returned the receipt of ${receipt?.messageId} for ${receipt?.recipientParticipantId}`);
+    } else if (receipt.state !== after) failures.push(`inbox: the returned receipt is ${receipt.state}, not ${after}`);
   }
   failures.push(...await storeChanges(built, { id, state: after }));
   target.state = after;
@@ -124,9 +131,8 @@ async function validatePage(built, result) {
   const wanted = built.reader.filter(item => listable(built.receipts.get(built.side.receiptId(item.messageId, "reader"))?.state,
     item.obligation)).sort(newestFirst);
   const items = Array.isArray(result?.items) ? result.items : [];
-  const k = items.length;
-  // A page may end early at the product's byte budget; it is always the newest prefix.
-  if (wanted.length > 0 && (k < 1 || k > scenario.limit)) failures.push(`inbox page: ${k} items for a limit of ${scenario.limit}`);
+  const k = items.length, full = Math.min(scenario.limit, wanted.length);
+  if (k > full || (wanted.length > 0 && k < 1)) failures.push(`inbox page: ${k} items for a limit of ${scenario.limit}`);
   const ids = items.map(item => item.message?.messageId);
   const prefix = wanted.slice(0, k);
   if (ids.join() !== prefix.map(item => item.messageId).join()) {
@@ -136,7 +142,9 @@ async function validatePage(built, result) {
     for (const [index, item] of items.entries()) {
       if (item.message?.subject !== prefix[index].subject) failures.push(`inbox page: item ${index} has another subject`);
       const state = built.receipts.get(built.side.receiptId(prefix[index].messageId, "reader"))?.state;
-      if (item.receipt?.state !== state) failures.push(`inbox page: item ${index} reports ${item.receipt?.state}, not ${state}`);
+      if (item.receipt?.messageId !== prefix[index].messageId || item.receipt?.recipientParticipantId !== "reader") {
+        failures.push(`inbox page: item ${index} carries the receipt of ${item.receipt?.messageId}`);
+      } else if (item.receipt.state !== state) failures.push(`inbox page: item ${index} reports ${item.receipt.state}, not ${state}`);
     }
   }
   const cursor = k < wanted.length ? wanted[k - 1]?.messageId ?? null : null;
@@ -145,7 +153,13 @@ async function validatePage(built, result) {
     // The cursor continues where this page ended.
     const { service } = await openInstance(built.fixture, built.side);
     const following = await service.listInbox({ ...built.fixture.owner("reader"), limit: 1, cursor });
-    if (following.items[0]?.message?.messageId !== wanted[k].messageId) failures.push("inbox page: the cursor does not continue the page");
+    const [next] = following.items;
+    if (next?.message?.messageId !== wanted[k].messageId) failures.push("inbox page: the cursor does not continue the page");
+    // A page holds `limit` items, or every listable one, unless the next would take it
+    // past the byte budget: measured with the next item exactly as a page carries it.
+    else if (k < full && pageBytes({ ...result, items: [...items, next], nextCursor: next.message.messageId }) <= PAGE_BYTES) {
+      failures.push(`inbox page: ${k} items where ${k + 1} fit the ${PAGE_BYTES}-byte page`);
+    }
   }
   return [...failures, ...await storeChanges(built, null)];
 }
@@ -177,7 +191,8 @@ const exactMutations = {
   "skip-transition": async () => async built => {
     const target = built.reader[built.next++];
     built.target = target;
-    return [{ message: full(target), receipt: { state: "retrieved" } }];
+    return [{ message: full(target),
+      receipt: { messageId: target.messageId, recipientParticipantId: "reader", state: "retrieved" } }];
   },
   // Moves the receipt but publishes no event for it.
   "no-event": async () => async (built, input) => {
@@ -201,6 +216,20 @@ const exactMutations = {
     return result;
   },
   "extra-item": async operate => async (built, input) => { const result = await operate(built, input); return [...result, result[0]]; },
+  // The right message with the receipt of another one in the same state.
+  "foreign-receipt": async operate => async (built, input) => {
+    const [item] = await operate(built, input);
+    const other = (await receiptStates(built.fixture, built.side)).values()
+      .find(receipt => receipt.messageId !== built.target.messageId && receipt.state === item.receipt.state);
+    return [{ ...item, receipt: { ...item.receipt, messageId: other.messageId, recipientParticipantId: other.recipient } }];
+  },
+  // Writes a message to the reader while reading one, so a receipt appears.
+  "creates-receipt": async operate => async (built, input) => {
+    const result = await operate(built, input);
+    await input.service.sendMessage({ ...built.fixture.owner("sender"), clientMessageId: `extra_${built.next}`,
+      toParticipantIds: ["reader"], kind: "note", obligation: "none", subject: "extra", body: "extra" });
+    return result;
+  },
 };
 const pageMutations = {
   "drops-last": async operate => async (built, input) => {
@@ -223,8 +252,16 @@ const pageMutations = {
   // Lists every message addressed to the reader, whatever its receipt says.
   "ignores-receipt-state": async () => async built => {
     const items = [...built.reader].sort(newestFirst).slice(0, built.scenario.limit)
-      .map(item => ({ message: { messageId: item.messageId, subject: item.subject }, receipt: { state: "queued" } }));
+      .map(item => ({ message: { messageId: item.messageId, subject: item.subject },
+        receipt: { messageId: item.messageId, recipientParticipantId: "reader", state: "queued" } }));
     return { items, nextCursor: built.reader.length > items.length ? items.at(-1).message.messageId : null };
+  },
+  // Always one item short of a full page, with a cursor that continues it.
+  "short-page": async operate => async (built, input) => {
+    const result = await operate(built, input);
+    if (result.items.length < 2) return { ...result, items: [], nextCursor: null };
+    const items = result.items.slice(0, -1);
+    return { ...result, items, nextCursor: items.at(-1).message.messageId };
   },
 };
 

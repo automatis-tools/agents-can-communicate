@@ -51,6 +51,16 @@ test("every negative mutation for each operation fails validation", async t => {
   }
 });
 
+test("a page the byte budget ends early passes, and one item fewer than fits fails", async t => {
+  const scenario = inbox.scenario({ messages: 120, backlog: 0, operation: "page", limit: 100, seed: 5 });
+  const value = await built(t, scenario);
+  const input = await inbox.prepare(value), result = await inbox.operate(value, input);
+  assert.ok(result.items.length < scenario.limit, `${result.items.length} items: the budget never ended the page`);
+  assert.deepEqual(await inbox.validate(value, result), []);
+  const short = await inbox.mutationsFor(scenario)["short-page"](inbox.operate, { side: value.side, scenario });
+  assert.match((await call(value, short)).join(), /items where .* fit the 12000-byte page/);
+});
+
 test("observations report primary reads beside a valid call", async t => {
   const value = await built(t, exact);
   const observed = await inbox.observe(value);

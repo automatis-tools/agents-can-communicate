@@ -31,12 +31,28 @@ test("fully acknowledged history stays quiet beside the witnesses every scenario
   const side = await attention.load(repo);
   const quiet = await attention.build(attention.scenario({ ...scenario, acknowledgedShare: 1 }), side);
   assert.deepEqual(quiet.expected.map(item => item.sourceId).filter(id => !id.includes("witness")), []);
-  assert.equal(quiet.expected.length, 2 * scenario.witnesses);
+  // Two per witness, and one for each of the four unavailable presences.
+  assert.equal(quiet.expected.length, 2 * scenario.witnesses + 4);
   assert.deepEqual(await attention.validate(quiet, await attention.operate(quiet)), []);
   for (const [name, mutate] of Object.entries(attention.mutations)) {
     const failures = await attention.validate(quiet, await (await mutate(attention.operate, { side, scenario: quiet.scenario }))(quiet));
     assert.notDeepEqual(failures, [], `${name} passed on quiet history`);
   }
+});
+
+test("a session record alone is no presence: closed, silent, expired and dead-pid recipients are due", async () => {
+  const side = await attention.load(repo);
+  const built = await attention.build(scenario, side);
+  const presence = built.expected.filter(item => item.sourceId.includes("presence")).map(item => item.detail).sort();
+  assert.deepEqual(presence, ["peer_closed", "peer_dead_pid", "peer_expired", "peer_stale"]);
+});
+
+test("witnesses carry the scenario, so another size with the same seed expects other items", async () => {
+  const side = await attention.load(repo);
+  const one = await attention.build(scenario, side);
+  const other = await attention.build(attention.scenario({ ...scenario, ownRequests: scenario.ownRequests + 1 }), side);
+  const witnesses = value => value.expected.filter(item => item.sourceId.includes("witness")).map(item => item.sourceId);
+  assert.equal(witnesses(one).filter(id => witnesses(other).includes(id)).length, 0);
 });
 
 test("a scenario that expects nothing is refused, since a constant answer would pass it", async () => {

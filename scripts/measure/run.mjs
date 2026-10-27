@@ -100,30 +100,41 @@ const nodeOptions = [...(process.env.NODE_OPTIONS ?? "").split(/\s+/).filter(Boo
   .filter((token, index, tokens) => !token.includes("test-skip-fsync") && !(token === "--import" && tokens[index + 1]?.includes("test-skip-fsync")));
 if (values.fsync === "skipped") nodeOptions.push("--import", skip);
 
-function child(sideName, entry) {
+async function child(sideName, entry) {
   const input = { probe: values.probe, root: sides[sideName].root, scenario: entry.scenario,
     samples: settings.samples, warmup: settings.warmup,
     mutation: sideName === "candidate" ? values["candidate-mutation"] : undefined };
+  // Its own temporary directory, removed here: a killed child cleans nothing up itself.
+  const scratch = await mkdtemp(path.join(os.tmpdir(), "acc-measure-child-"));
   const loadBefore = os.loadavg(), started = performance.now();
   const ended = fields => ({ loadBefore, loadAfter: os.loadavg(), elapsedMs: Math.round(performance.now() - started), ...fields });
-  return new Promise(resolve => {
+  const outcome = await new Promise(resolve => {
     const process_ = spawn(process.execPath, [path.join(import.meta.dirname, "child.mjs"), JSON.stringify(input)],
-      { env: { ...process.env, NODE_OPTIONS: nodeOptions.join(" "), ACC_NO_UPDATE_CHECK: "1" }, stdio: ["ignore", "pipe", "pipe"] });
+      { env: { ...process.env, NODE_OPTIONS: nodeOptions.join(" "), ACC_NO_UPDATE_CHECK: "1",
+        TMPDIR: scratch, TEMP: scratch, TMP: scratch }, stdio: ["ignore", "pipe", "pipe"] });
     let stdout = "", stderr = "", timedOut = false;
     const timer = setTimeout(() => { timedOut = true; process_.kill("SIGKILL"); }, settings.timeoutMs);
     process_.stdout.on("data", chunk => { stdout += chunk; });
     process_.stderr.on("data", chunk => { stderr += chunk; });
-    const failed = error => resolve(ended({ fixtureDigest: null, validation: [], samplesNs: [], observations: {}, error }));
+    const parsed = () => { try { return JSON.parse(stdout.trim().split("\n").at(-1)); } catch { return null; } };
+    const failed = (error, partial = {}) => resolve(ended({ fixtureDigest: null, validation: [], samplesNs: [],
+      observations: {}, ...partial, error }));
+    // Node ends an uncaught error with its version line, so the cause is further up.
+    const tail = () => stderr.trim().split("\n").slice(-20).join("\n");
     process_.on("error", error => { clearTimeout(timer); failed(`${sideName} child did not start: ${error.message}`); });
     // `close`, not `exit`: stdout may still be open when the process has exited.
     process_.on("close", code => {
       clearTimeout(timer);
+      const result = parsed();
       if (timedOut) return failed(`${sideName} child timed out after ${settings.timeoutMs} ms`);
-      if (code !== 0) return failed(`${sideName} child exited ${code}: ${stderr.trim().split("\n").at(-1) ?? ""}`);
-      try { resolve(ended(JSON.parse(stdout.trim().split("\n").at(-1)))); }
-      catch { failed(`${sideName} child printed no result`); }
+      if (result?.error !== undefined) return failed(`${sideName} child failed: ${result.error}`, result);
+      if (code !== 0) return failed(`${sideName} child exited ${code}: ${tail()}`, result ?? {});
+      if (result === null) return failed(`${sideName} child printed no result: ${tail()}`);
+      resolve(ended(result));
     });
   });
+  await rm(scratch, { recursive: true, force: true, maxRetries: 5 });
+  return outcome;
 }
 
 const cpus = os.cpus();

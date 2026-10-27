@@ -21,7 +21,10 @@ that the candidate still does the useful work.
 A probe is a **scenario**, a **validator** and **observations**:
 - The scenario is a deterministic description: sizes, mixes and a seed. Its hash is the SHA-256
   of its canonical JSON. Each side builds its own fixture from the scenario with its own code,
-  and records a digest of the primary records that the fixture holds.
+  and records a digest of the primary records that the fixture holds. A store fixture's digest
+  is taken from the records read through the side's own store API: sessions by participant,
+  messages, receipts, and each event's sequence, type, actor and payload. A changed file layout
+  leaves it unchanged. A change to what the records say makes the sides incomparable.
 - The validator decides from the scenario alone whether an outcome is the useful work, never
   from the implementation's internals. It checks results, fanout, receipt transitions and
   committed or uncommitted work. It never checks traversal counts.
@@ -43,16 +46,24 @@ before anything runs.
   `inboundObligations` addressed to the measured participant, split between reply and
   acknowledgement; and `witnesses`, 4 by default.
 - Witnesses are items that every scenario must return, whatever its shares: requests to a
-  participant with no session, and pending inbound obligations. Their ids carry the seed, so an
-  answer computed for another fixture never matches. A scenario that expects nothing cannot tell
-  useful work from a constant answer, and the validator refuses one.
+  participant with no session, and pending inbound obligations. With them come requests to one
+  recipient in each presence the product tells apart: a closed session, one silent for more than
+  three heartbeat cadences, one past the unknown-pid floor, one with a dead pid, and one with a
+  live pid. The first four are due as `recipient_unavailable`, and the last is not, so a
+  computation that takes any session record for presence fails. Witness ids carry a prefix of
+  the scenario hash, so an answer computed for another fixture never matches, even one with the
+  same seed. A scenario that expects nothing cannot tell useful work from a constant answer, and
+  the validator refuses one.
 - Fixture: the snapshot `computeAttention` reads.
 - Validator: the exact expected attention items. Each pending receipt of an offline recipient
   gives `recipient_unavailable`, and each pending inbound obligation gives `reply_required` or
   `acknowledgement_required`, in ACC's priority order. Fully acknowledged history gives nothing
   beyond the witnesses.
-- Observations: time per call; receipt and message visits, counted in one separate untimed call
-  through proxies on the snapshot arrays.
+- Observations: time per call; receipt and message visits, counted in the observed call
+  through proxies on the snapshot's own arrays. Work on a copy that the implementation makes is
+  not counted. `computeAttention` copies the messages first, so `messageVisits` counts that copy
+  alone, twice the number of messages. A candidate that copied the receipts would count fewer
+  receipt visits without doing less work.
 
 ### Inbox (#306)
 
@@ -63,15 +74,17 @@ before anything runs.
   turn to queued, offered, retrieved and acknowledged through the product's own operations.
 - Fixture: a filesystem store built through the coordination service.
 - Validator, through a fresh store instance after each call:
-  - exact: the named message with its subject, body, kind and obligation; its receipt in the
-    state the read must leave (`retrieved`, or unchanged when already retrieved or acknowledged);
-    the generation changed exactly when the state changed; and exactly one `message.retrieved`
-    event for it when the state changed, none otherwise;
-  - page: the newest listable messages first, between one and `limit` of them, since a page may
-    end early at the product's byte budget; each item's receipt state; a cursor equal to the last
-    item exactly when more remain; a follow-up page from that cursor that continues the list; and
-    no receipt, generation or event changed.
-  In both cases every other receipt keeps its state and generation.
+  - exact: the named message with its subject, body, kind and obligation; the reader's receipt
+    for that message, in the state the read must leave (`retrieved`, or unchanged when already
+    retrieved or acknowledged); the generation changed exactly when the state changed; and
+    exactly one `message.retrieved` event for it when the state changed, none otherwise;
+  - page: the newest listable messages first, each with the reader's receipt for it and its
+    state; a cursor equal to the last item exactly when more remain; and a follow-up page from
+    that cursor that continues the list. A page holds `limit` items, or every listable one,
+    unless the next item would take the formatted page past the product's 12,000-byte budget.
+    The follow-up page supplies that next item exactly as a page carries it, so the check
+    measures the page the product would have built. No receipt, generation or event changes.
+  In both cases every other receipt keeps its state and generation, and no receipt appears.
 - Each exact call reads a message not read before, so the scenario allows `messages` calls.
 - Observations: primary reads by kind, bytes read, index page reads, and directory enumerations,
   from the existing store I/O probe; time per call.
@@ -82,27 +95,40 @@ before anything runs.
   `write`), and `pendingJournal`.
 - Fixture: a filesystem store with that many messages and that many published events, the events
   made by ordinary writes.
-- `pendingJournal` stops one decided offer after its journal, as a crash would. Every read of that
-  message must return `offered`. A store may finish the decided write while it serves a read; its
-  `message.offer_succeeded` event is then allowed once and is not counted as the read's commit.
-- Validator: an exact receipt read returns the receipt's state and commits no event. A write must
-  commit exactly one `message.offer_succeeded` event with the next sequence for its own message,
-  which detects a skipped commit, a second commit and an invalid order. No unrelated receipt
-  changes in either case.
-- Each write offers a message not offered before, so a write scenario allows `messages` calls.
+- The history is counted through the store's event log, never its file layout.
+- A read fixture holds the reader's receipts in every state it can step from: queued, offered,
+  retrieved and acknowledged, in turn. Before each read, outside the timed section, another store
+  instance steps the target's receipt once through the product's own operations: an offer, a
+  retrieval or an acknowledgement. An answer kept from before that step is therefore wrong, and
+  the history grows by one event per read.
+- `pendingJournal` stops each of those steps after its journal, as a crash would, and the measured
+  store is opened before the step. Its own read must finish the decided step and return the new
+  state. The step's event is then allowed once and is not counted as the read's commit. The
+  receipts cycle through queued, offered and retrieved, so every read has a step to stop.
+- Validator: an exact receipt read returns the reader's receipt for the target in its current
+  state and commits no event. A write must commit exactly one `message.offer_succeeded` event
+  with the next sequence for its own message, which detects a skipped commit, a second commit and
+  an invalid order. No unrelated receipt changes, and no receipt appears, in either case.
+- Reading the receipt record outside a transaction is a correct read without an open journal,
+  and the tests pass it as one. With a pending journal, the same read misses the decision and
+  fails.
+- Each call targets a message not read or offered before, so a scenario allows `messages` calls.
 - Observations: event directory enumerations, primary reads and time per call.
 
 ## Negative mutations
 
 Each probe ships mutations that wrap a correct implementation and break it in one way:
 - attention: drop one item, answer a constant empty list, skip unavailable recipients, duplicate
-  the first item, answer from a stale fixture, reverse the order;
+  the first item, answer from a stale fixture, reverse the order, take any session record for
+  presence, answer for a fixture of another size with the same seed;
 - inbox exact: read the wrong message, skip the receipt transition, move the receipt without its
-  event, return a summary for the body, move an unrelated receipt, return an extra item;
+  event, return a summary for the body, move an unrelated receipt, return an extra item, return
+  another message's receipt, create a receipt;
 - inbox page: drop the last item, return an empty page, advance receipts, reverse the order,
-  return a garbage cursor, ignore receipt states;
+  return a garbage cursor, ignore receipt states, return one item fewer than fits;
 - transaction: commit on a read, return the wrong receipt, advance a receipt on a read, answer
-  from stale state, skip a write's commit, commit twice, write to the wrong target.
+  from the receipts as built, answer a constant state without reading, read the record past a
+  pending journal, skip a write's commit, commit twice, write to the wrong target.
 
 The test suite runs every mutation through the validator and requires each one to fail. A correct
 alternative implementation, such as attention with receipts grouped by message, must pass. That
@@ -119,7 +145,10 @@ shows the validator does not depend on the current algorithm.
   fresh process that builds its fixture, warms up, records its samples, validates every call, and
   observes one more call.
 - A child that fails, or overruns `--timeout-ms` (15 minutes by default) and is killed, is
-  recorded with its error. The run continues and is still written.
+  recorded with its error. A child that fails prints the error's stack with the samples and
+  validation failures it had gathered. The run continues and is still written.
+- Each child gets its own temporary directory, which the runner removes when the child ends,
+  killed or not.
 - The run records:
   - each side's commit, its dirty state and a hash of what it runs: package sources, the package
     manifests, the lockfile and `bin/`;
@@ -129,8 +158,8 @@ shows the validator does not depend on the current algorithm.
   - the load average before and after each child;
   - the durability setting, real `fsync` by default, and the `NODE_OPTIONS` the children got;
   - every raw sample.
-- A run whose sides validate differently, whose child failed, or whose fixture digests differ when
-  the format is unchanged, is reported as invalid rather than compared.
+- A run whose sides validate differently, whose child failed, or whose fixture digests differ is
+  reported as invalid rather than compared.
 
 ## Reports
 

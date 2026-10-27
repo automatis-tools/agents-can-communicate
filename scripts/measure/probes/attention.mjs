@@ -11,6 +11,8 @@ const PENDING = ["queued", "offered", "retrieved"];
 
 // Witnesses are items every scenario must return, whatever its shares: a
 // scenario that expects nothing cannot tell useful work from a constant answer.
+// With them come requests to one recipient in each presence the product tells
+// apart, so a computation that takes any session record for presence fails.
 const defaults = { ownRequests: 100, fanout: 2, acknowledgedShare: 0.5, offlineShare: 0.5,
   inboundObligations: 20, witnesses: 4, seed: 1 };
 
@@ -28,8 +30,19 @@ function scenario(input = {}) {
 
 const load = async root => import(pathToFileURL(path.join(root, "packages", "core", "src", "attention.mjs")).href);
 
-const session = (participantId, now) => ({ sessionId: `session_${participantId}`, participantId,
-  state: "open", heartbeatAt: now, heartbeatCadenceMs: 60_000, pid: null });
+const session = (participantId, now, fields = {}) => ({ sessionId: `session_${participantId}`, participantId,
+  state: "open", heartbeatAt: now, heartbeatCadenceMs: 60_000, pid: null, ...fields });
+const ago = minutes => new Date(Date.parse(NOW) - minutes * 60_000).toISOString();
+const LIVE_PID = 4242, DEAD_PID = 4343;
+// Recipient, session and whether a request to it is due: closed, silent past three
+// cadences, past the unknown-pid floor, and a dead pid are unavailable; a live pid is not.
+const PRESENCE = [
+  ["peer_closed", { state: "closed" }, true],
+  ["peer_stale", { heartbeatAt: ago(5) }, true],
+  ["peer_expired", { heartbeatAt: ago(31) }, true],
+  ["peer_dead_pid", { pid: DEAD_PID }, true],
+  ["peer_live_pid", { pid: LIVE_PID, heartbeatAt: ago(2) }, false],
+];
 
 // Build the snapshot computeAttention reads, and the items it must return.
 async function build(scenario, side) {
@@ -68,10 +81,21 @@ async function build(scenario, side) {
         sourceId: messageId, detail: null });
     }
   }
+  // Named by the whole scenario, so an answer computed for another fixture never matches.
+  const tag = digest(scenario).slice(0, 12);
+  if (scenario.witnesses > 0) {
+    for (const [index, [recipient, fields, due]] of PRESENCE.entries()) {
+      sessions.push(session(recipient, NOW, fields));
+      const messageId = `message_witness_presence_${tag}_${pad(index)}`;
+      messages.push({ messageId, kind: "request", obligation: "reply", fromParticipantId: ME,
+        toParticipantIds: [recipient], subject: `presence ${recipient}`, sentAt: sentAt(-100 - index) });
+      receipts.push({ messageId, recipientParticipantId: recipient, state: "offered" });
+      if (due) expected.push({ kind: "recipient_unavailable", sourceId: messageId, detail: recipient });
+    }
+  }
   for (let index = 0; index < scenario.witnesses; index++) {
-    // Named by the seed too, so another fixture's answer never matches this one's.
-    const outbound = `message_witness_out_${scenario.seed}_${pad(index)}`;
-    const inbound = `message_witness_in_${scenario.seed}_${pad(index)}`;
+    const outbound = `message_witness_out_${tag}_${pad(index)}`;
+    const inbound = `message_witness_in_${tag}_${pad(index)}`;
     messages.push({ messageId: outbound, kind: "request", obligation: "reply", fromParticipantId: ME,
       toParticipantIds: [absent], subject: `witness ${index}`, sentAt: sentAt(-1 - index) });
     receipts.push({ messageId: outbound, recipientParticipantId: absent, state: "queued" });
@@ -86,7 +110,7 @@ async function build(scenario, side) {
   }
   const snapshot = { sessions, messages, receipts, claims: [], intents: [] };
   return { scenario, side, snapshot, expected, digest: digest(snapshot),
-    context: { session: sessions[0], participantId: ME, now: NOW, pidIsAlive: () => true } };
+    context: { session: sessions[0], participantId: ME, now: NOW, pidIsAlive: pid => pid !== DEAD_PID } };
 }
 
 // Each call gets its own copy, made outside the timed call, as each hook process
@@ -143,6 +167,15 @@ const mutations = {
     return async () => stale;
   },
   "reversed-order": async operate => async (built, input) => (await operate(built, input)).reverse(),
+  // Takes any session record for presence, whatever its state, heartbeat or pid.
+  "presence-ignored": async operate => async (built, input = prepare(built)) => operate(built,
+    { snapshot: { ...input.snapshot, sessions: input.snapshot.sessions.map(item => ({ ...item, state: "open",
+      heartbeatAt: NOW, pid: null })) } }),
+  // The answer for a fixture with the same seed and one more request.
+  "other-size": async (operate, { side, scenario }) => {
+    const other = await operate(await build({ ...scenario, ownRequests: scenario.ownRequests + 1 }, side));
+    return async () => other;
+  },
 };
 
 export default { name: "attention", scenario, hash: value => digest(scenario(value)), load, build, prepare,
