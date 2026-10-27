@@ -2,6 +2,7 @@
 // Copy imports independently of the hook's compatibility list to expose omissions.
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 import { createGatePlan, sourceDigest } from "../../scripts/change-plan.mjs";
 import { readTree } from "../../scripts/change-plan-git.mjs";
 import { fixture, invokePush, repo } from "./push-fixture.mjs";
@@ -67,6 +68,7 @@ export async function pushDocsFixture(t) {
     await mkdir(path.dirname(path.join(trusted, file)), { recursive: true });
     await writeFile(path.join(trusted, file), await readFile(path.join(f.root, file)));
   }
+  const { supportsSelection } = await import(pathToFileURL(path.join(trusted, "scripts/push-selection.mjs")));
   const audit = async () => {
     await f.git(["add", "-A"]);
     const tree = (await f.git(["write-tree"])).stdout.trim();
@@ -82,6 +84,6 @@ export async function pushDocsFixture(t) {
     baseCommit: facts.base, event: { kind: "push", ref: facts.ref.remoteRef } });
   const records = async name => (await readFile(controls[name], "utf8").catch(() => ""))
     .trim().split("\n").filter(Boolean).map(line => name === "packs" ? line : JSON.parse(line));
-  return { ...f, write, audit, baseCommit, targetCommit, planForRef, records,
+  return { ...f, write, audit, baseCommit, targetCommit, planForRef, records, supportsSelection,
     invoke: input => invokePush(f, input, path.join(trusted, "scripts/validate-push.mjs")) };
 }

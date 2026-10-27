@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { mkdir, readFile, realpath } from "node:fs/promises";
 import path from "node:path";
 import test from "node:test";
+import { validateGatePlan } from "../../scripts/change-plan.mjs";
 import { parsePushRefs, resolvePushTrees } from "../../scripts/push-targets.mjs";
 import { pushDocsFixture } from "../helpers/push-docs-fixture.mjs";
 import { refLine } from "../helpers/push-fixture.mjs";
@@ -36,19 +37,24 @@ test("ordinary docs refs execute their docs selection, exact package smoke and d
   assert.equal((await f.records("runtime")).length, 1);
 });
 
-test("main, release, no-base and code refs execute full actual-target sentinels", async t => {
+test("main, release, no-base and code refs require full; main executes the actual target", async t => {
   const f = await pushDocsFixture(t);
-  for (const [name, base] of [["main", f.baseCommit], ["release/next", f.baseCommit], ["new-docs", undefined]]) {
-    const result = await f.invoke(refLine(f.targetCommit, name, base)); passed(result);
-    assert.match(result.stdout, /running actual target's full test suite/);
-    assert.ok((await f.records("runtime")).length > 0);
-    assert.equal((await f.records("smoke")).length, 0);
-  }
   await f.write("module.mjs", "export const code = true;\n");
   const code = await f.commit("code change");
+  for (const [target, name, base] of [[f.targetCommit, "main", f.baseCommit],
+    [f.targetCommit, "release/next", f.baseCommit], [f.targetCommit, "new-docs", undefined],
+    [code, "docs", f.targetCommit]]) {
+    const [classified] = await resolvePushTrees(f.root, refs([refLine(target, name, base)]), { planForRef: f.planForRef });
+    assert.equal(classified.commit, target, name);
+    assert.equal(classified.requiredScope, "full", name);
+    assert.equal(classified.plan.targetCommit, target, name);
+    await validateGatePlan(classified.plan, { repo: f.root });
+  }
   const before = (await f.records("runtime")).length;
-  passed(await f.invoke(refLine(code, "docs", f.targetCommit)));
+  const result = await f.invoke(refLine(f.targetCommit, "main", f.baseCommit)); passed(result);
+  assert.match(result.stdout, /running actual target's full test suite/);
   assert.equal((await f.records("runtime")).length, before + 1);
+  assert.equal((await f.records("smoke")).length, 0);
 });
 
 for (const reverse of [false, true]) {
@@ -137,26 +143,31 @@ test("historical selection runner executes full without unknown flags", async t 
 
 test("changed selection, cache, process and package helpers restore the actual full suite", async t => {
   const f = await pushDocsFixture(t);
+  assert.equal(await f.supportsSelection(f.root), true, "unmodified independent trusted fixture");
   for (const file of ["scripts/test-selection.mjs", "scripts/gate-cache.mjs", "scripts/push-process-tree.mjs",
     "tests/helpers/packed-template.mjs", "scripts/verify-package.mjs"]) {
     const original = await f.read(file);
     await f.write(file, `${original}\n// historical helper contract\n`);
     await f.audit(); const base = await f.commit("historical helper");
     await f.write("README.md", `# after ${file}\n`); const target = await f.commit("helper target docs");
-    const before = (await f.records("runtime")).length;
     const [classified] = await resolvePushTrees(f.root, refs([refLine(target, "docs", base)]), { planForRef: f.planForRef });
     assert.equal(classified.requiredScope, "docs", file);
-    const result = await f.invoke(refLine(target, "docs", base)); passed(result);
-    assert.equal((await f.records("runtime")).length, before + 1, file);
-    assert.equal((await f.records("smoke")).length, 0, file);
+    assert.equal(await f.supportsSelection(f.root), false, file);
+    if (file === "scripts/test-selection.mjs") {
+      const before = (await f.records("runtime")).length;
+      const result = await f.invoke(refLine(target, "docs", base)); passed(result);
+      assert.equal((await f.records("runtime")).length, before + 1, file);
+      assert.equal((await f.records("smoke")).length, 0, file);
+      assert.match(result.stdout, /running actual target's full test suite/);
+    }
     await f.write(file, original);
   }
   await f.remove("scripts/verify-package.mjs");
   await f.audit(); const base = await f.commit("missing historical verifier");
   await f.write("README.md", "# after missing verifier\n"); const target = await f.commit("missing verifier docs");
-  const before = (await f.records("runtime")).length;
-  passed(await f.invoke(refLine(target, "docs", base)));
-  assert.equal((await f.records("runtime")).length, before + 1);
+  const [classified] = await resolvePushTrees(f.root, refs([refLine(target, "docs", base)]), { planForRef: f.planForRef });
+  assert.equal(classified.requiredScope, "docs", "missing verifier");
+  assert.equal(await f.supportsSelection(f.root), false, "missing verifier");
 });
 
 // This runs the actual hook/runner/npm pipeline. Native Windows remains a CI
