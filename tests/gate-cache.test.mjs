@@ -243,3 +243,43 @@ test("transient installed dependency membership changes the observation stamp", 
     before = after;
   }
 });
+
+// A reason collapsing to false hides whether re-execution was needed or reuse
+// failed. Mutations of each branch must identify its own on-disk control.
+test("receipt decisions distinguish hit, absent, expiry, invalid, scope and uncertain inputs", async t => {
+  assert.equal(typeof cache.receiptDecision, "function", "receipt decision diagnostic is missing");
+  const { fingerprint } = await repository(t);
+  const snapshot = await fingerprint();
+  assert.deepEqual(await cache.receiptDecision("tests", null, { ci: false }), { reused: false, reason: "inputs-uncertain" });
+  assert.deepEqual(await cache.receiptDecision("tests", snapshot, { ci: false }), { reused: false, reason: "absent" });
+  await cache.savePassed("tests", snapshot);
+  const file = path.join(tmpdir(), `acc-development-gates-${process.getuid?.() ?? "user"}`, `tests-${snapshot.key}.json`);
+  const receipt = JSON.parse(await readFile(file, "utf8"));
+  assert.deepEqual(await cache.receiptDecision("tests", snapshot, { now: receipt.passedAt, ci: false }), { reused: true, reason: "hit" });
+  assert.deepEqual(await cache.receiptDecision("tests", snapshot, { now: receipt.passedAt + 86_400_000, ci: false }),
+    { reused: false, reason: "expired" });
+  await writeFile(file, "{broken");
+  assert.deepEqual(await cache.receiptDecision("tests", snapshot, { ci: false }), { reused: false, reason: "invalid" });
+  for (const bad of [null, { ...receipt, passedAt: "123" }, { ...receipt, version: 999 }, { ...receipt, key: "0".repeat(64) }]) {
+    await writeFile(file, JSON.stringify(bad));
+    assert.deepEqual(await cache.receiptDecision("tests", snapshot, { ci: false }), { reused: false, reason: "invalid" });
+  }
+  await writeFile(file, JSON.stringify({ ...receipt, kind: "syntax" }));
+  assert.deepEqual(await cache.receiptDecision("tests", snapshot, { ci: false }), { reused: false, reason: "scope-mismatch" });
+});
+
+test("receipt diagnostics explain CI-disabled without changing Boolean cache callers", async t => {
+  assert.equal(typeof cache.receiptDecision, "function", "receipt decision diagnostic is missing");
+  const { fingerprint } = await repository(t);
+  const snapshot = await fingerprint();
+  await cache.savePassed("tests", snapshot);
+  const previous = process.env.CI;
+  process.env.CI = "1";
+  try {
+    assert.deepEqual(await cache.receiptDecision("tests", snapshot), { reused: false, reason: "ci-disabled" });
+    assert.equal(await cache.hasPassed("tests", snapshot), true, "Boolean cache API changed its existing policy");
+  } finally {
+    if (previous === undefined) delete process.env.CI;
+    else process.env.CI = previous;
+  }
+});

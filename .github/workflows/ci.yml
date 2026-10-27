@@ -50,6 +50,17 @@ jobs:
           GIT_DIR: ''
           GIT_WORK_TREE: ''
 
+      - name: Preserve timing diagnostics
+        continue-on-error: true
+        if: ${{ always() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: test-timings-${{ matrix.os }}-node-${{ matrix.node }}-full
+          path: |
+            ${{ runner.temp }}/acc-test-timings.jsonl
+            ${{ runner.temp }}/acc-test-timings.jsonl.manifest.json
+          if-no-files-found: warn
+
   windows-shards:
     name: windows-latest · node 24 · shard ${{ matrix.shard }}
     runs-on: windows-latest
@@ -60,6 +71,11 @@ jobs:
         # Deterministic partitions of the runner's complete discovery; no path
         # filters or hand-maintained test lists can silently exclude a file.
         shard: ['1/2', '2/2']
+        include:
+          - shard: '1/2'
+            artifact: '1-of-2'
+          - shard: '2/2'
+            artifact: '2-of-2'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
@@ -84,6 +100,17 @@ jobs:
           ACC_TEST_FORCE_EXIT: '1'
           GIT_DIR: ''
           GIT_WORK_TREE: ''
+
+      - name: Preserve timing diagnostics
+        continue-on-error: true
+        if: ${{ always() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: test-timings-windows-latest-node-24-shard-${{ matrix.artifact }}
+          path: |
+            ${{ runner.temp }}/acc-test-timings.jsonl
+            ${{ runner.temp }}/acc-test-timings.jsonl.manifest.json
+          if-no-files-found: warn
 
   windows-test:
     # Retain the existing required check name; cancellation/skips cannot make
