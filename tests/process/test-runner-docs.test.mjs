@@ -9,7 +9,7 @@ const passed = result => assert.equal(result.code, 0, result.stdout + result.std
 test("validated docs executes only its selection and exact package smoke; list has no execution effects", async t => {
   const f = await scopedRunnerFixture(t);
   const listed = await f.docs(["--list"]); passed(listed);
-  assert.match(listed.stdout, /tests\/docs\/probe.test.mjs/); assert.doesNotMatch(listed.stdout, /runtime.test.mjs/);
+  assert.match(listed.stdout.replaceAll("\\", "/"), /tests\/docs\/probe.test.mjs/); assert.doesNotMatch(listed.stdout, /runtime.test.mjs/);
   assert.equal(await f.count("packs"), 0); assert.equal(await f.count("smoke"), 0);
   const result = await f.docs(); passed(result); assert.match(result.stdout, /documentation subset passed: 8 of 9 files/);
   assert.equal(await f.count("docs"), 1); assert.equal(await f.count("runtime"), 0);

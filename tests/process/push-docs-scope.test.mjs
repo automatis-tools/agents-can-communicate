@@ -12,7 +12,9 @@ const passed = result => assert.equal(result.code, 0, result.stdout + result.std
 const refs = lines => parsePushRefs(lines.join("\n"), { objectFormat: "sha1" });
 
 test("ordinary docs refs execute their docs selection, exact package smoke and docs-only reuse", async t => {
-  const f = await pushDocsFixture(t);
+  const parentCI = process.env.CI;
+  const f = await pushDocsFixture(t, { ci: false });
+  assert.equal(process.env.CI, parentCI, "local fixture changed parent CI");
   const input = refLine(f.targetCommit, "docs", f.baseCommit);
   const first = await f.invoke(input); passed(first);
   assert.match(first.stdout, /documentation subset passed: 8 of 9 files/);
@@ -35,6 +37,31 @@ test("ordinary docs refs execute their docs selection, exact package smoke and d
   // A docs proof cannot satisfy this identical tree's full main request.
   passed(await f.invoke(refLine(f.targetCommit, "main", f.baseCommit)));
   assert.equal((await f.records("runtime")).length, 1);
+});
+
+// Removing the runner's CI fingerprint guard must fail the no-proof assertions.
+test("CI docs refs execute twice without persisting full or docs proof", async t => {
+  const parentCI = process.env.CI;
+  const f = await pushDocsFixture(t, { ci: true });
+  const diagnostic = path.join(f.base, "ci-diagnostic.json");
+  f.env.ACC_GATE_DIAGNOSTIC = diagnostic;
+  const input = refLine(f.targetCommit, "docs", f.baseCommit);
+  for (let count = 1; count <= 2; count++) {
+    const result = await f.invoke(input); passed(result);
+    assert.match(result.stdout, /--selection-plan .+ --if-needed/);
+    assert.match(result.stdout, /test gate receipt: ci-disabled/);
+    assert.doesNotMatch(result.stdout, /test gate receipt after run:/);
+    const report = JSON.parse(await readFile(diagnostic, "utf8"));
+    assert.deepEqual(report.receiptDecision, { reused: false, reason: "ci-disabled" });
+    assert.equal(Object.hasOwn(report, "inputDigest"), false, "CI computed a reusable proof fingerprint");
+    assert.deepEqual(report.events.filter(event => event.event === "fingerprint").map(event => event.result), ["ci-disabled"]);
+    assert.equal(report.events.some(event => event.event === "receipt-persistence"), false, "CI attempted proof persistence");
+    assert.equal((await f.records("docs")).length, count);
+    assert.equal((await f.records("runtime")).length, 0);
+    assert.equal((await f.records("smoke")).length, count);
+    assert.equal((await f.records("packs")).length, count);
+    assert.equal(process.env.CI, parentCI, "CI fixture changed parent CI");
+  }
 });
 
 test("main, release, no-base and code refs require full; main executes the actual target", async t => {

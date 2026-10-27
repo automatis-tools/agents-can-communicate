@@ -7,8 +7,13 @@ import { createGatePlan, sourceDigest } from "../../scripts/change-plan.mjs";
 import { readTree } from "../../scripts/change-plan-git.mjs";
 import { fixture, invokePush, repo } from "./push-fixture.mjs";
 
-export async function pushDocsFixture(t) {
+export async function pushDocsFixture(t, { ci } = {}) {
   const f = await fixture(t);
+  // Only this private child environment changes; the outer CI job stays intact.
+  if (ci !== undefined) {
+    for (const key of Object.keys(f.env)) if (key.toUpperCase() === "CI") delete f.env[key];
+    if (ci) f.env.CI = "1";
+  }
   const write = async (file, bytes) => {
     await mkdir(path.dirname(path.join(f.root, file)), { recursive: true });
     await writeFile(path.join(f.root, file), bytes);
