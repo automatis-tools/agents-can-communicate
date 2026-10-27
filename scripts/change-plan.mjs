@@ -113,16 +113,20 @@ export async function createGatePlan({ repo, targetCommit, baseCommit, event }) 
     ancestryVerified = true;
     changes = parseRawChanges(await gitBytes(repo, ["diff", "--raw", "-z", "--no-ext-diff", "--no-textconv",
       "--find-renames", "--find-copies-harder", "-l0", base.commit, target.commit, "--"]));
-    // Copy detection chooses one best source. Identical non-doc alternatives make
-    // a docs-only origin ambiguous even when Git chooses a documentation source.
+    // Copy detection chooses one best source. An edited source or an identical
+    // non-doc alternative cannot establish a documentation-only origin.
     const baseEntries = await readTree(repo, base.tree);
     const nonDocs = new Set(baseEntries.filter(entry => !documentationPath(entry.path)
       || entry.mode !== "100644").map(entry => entry.oid));
     const targetBlobs = new Map(entries.map(entry => [entry.path, entry.oid]));
     const baseBlobs = new Map(baseEntries.map(entry => [entry.path, entry.oid]));
-    copyOriginAmbiguous = changes.some(change => ["A", "C", "R"].includes(change.status)
-      && documentationPath(change.newPath) && (nonDocs.has(targetBlobs.get(change.newPath))
-        || (["C", "R"].includes(change.status) && nonDocs.has(baseBlobs.get(change.oldPath)))));
+    copyOriginAmbiguous = changes.some(change => {
+      if (!["A", "C", "R"].includes(change.status) || !documentationPath(change.newPath)) return false;
+      const targetOid = targetBlobs.get(change.newPath);
+      const sourceOid = baseBlobs.get(change.oldPath);
+      return nonDocs.has(targetOid) || (["C", "R"].includes(change.status)
+        && (!sourceOid || !targetOid || sourceOid !== targetOid || nonDocs.has(sourceOid)));
+    });
     if (copyOriginAmbiguous) reasons.push("copy-origin-ambiguous");
     complete = true;
   } catch { reasons.push("history-incomplete"); }

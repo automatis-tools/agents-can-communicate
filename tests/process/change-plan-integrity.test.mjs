@@ -72,10 +72,57 @@ test("ambiguous identical copy sources cannot hide a package boundary", async t 
   assert.equal((await createGatePlan({ repo, baseCommit: base, targetCommit: target, event })).scope, "full");
 });
 
+test("equal-similarity edited copy sources cannot hide a package boundary", async t => {
+  const { repo } = await fixture(t);
+  const common = Array.from({ length: 20 }, (_, index) =>
+    `shared source line ${index}: repeatable long phrase for rename similarity`).join("\n");
+  await put(repo, "docs/source.md", `${common}\nsource variation A\n`);
+  await put(repo, "packages/example/README.md", `${common}\nsource variation B\n`);
+  await audit(repo);
+  const base = await commit(repo);
+  await put(repo, "docs/copied.md", `${common}\nsource variation C\n`);
+  const target = await commit(repo);
+  const oid = (commit, file) => git(repo, "rev-parse", `${commit}:${file}`);
+  const identities = await Promise.all([oid(base, "docs/source.md"), oid(base, "packages/example/README.md"),
+    oid(target, "docs/copied.md")]);
+  assert.equal(new Set(identities).size, 3, "all source and target blobs must be distinct");
+  const diff = (...paths) => git(repo, "diff", "--raw", "-z", "--find-renames", "--find-copies-harder",
+    "-l0", base, target, "--", ...paths);
+  const docs = await diff("docs/source.md", "docs/copied.md");
+  const packageSource = await diff("packages/example/README.md", "docs/copied.md");
+  const selected = await diff();
+  const score = raw => raw.match(/ C(\d{3})\0/)?.[1];
+  assert.ok(score(docs), "Git must detect the edited documentation source");
+  assert.equal(score(packageSource), score(docs), "both sources must have equal Git similarity");
+  assert.match(selected, / C\d{3}\0docs\/source\.md\0docs\/copied\.md\0/,
+    "full Git diff must select the documentation source");
+  const plan = await createGatePlan({ repo, baseCommit: base, targetCommit: target, event });
+  assert.equal(plan.scope, "full", "a selected edited copy needs full validation despite its documentation path");
+  assert.ok(plan.reasons.includes("copy-origin-ambiguous"));
+});
+
+test("Git C100 after line reordering is not byte-identical documentation", async t => {
+  const { repo } = await fixture(t);
+  const lines = Array.from({ length: 25 }, (_, index) =>
+    `reorderable long documentation line ${String(index).padStart(2, "0")}: common content repeated enough for Git`);
+  await put(repo, "docs/source.md", `${lines.join("\n")}\n`);
+  await audit(repo);
+  const base = await commit(repo);
+  await put(repo, "docs/copied.md", `${[...lines].reverse().join("\n")}\n`);
+  const target = await commit(repo);
+  const raw = await git(repo, "diff", "--raw", "-z", "--find-copies-harder", "-l0", base, target, "--");
+  assert.match(raw, / C100\0docs\/source\.md\0docs\/copied\.md\0/);
+  assert.notEqual(await git(repo, "rev-parse", `${base}:docs/source.md`),
+    await git(repo, "rev-parse", `${target}:docs/copied.md`));
+  const plan = await createGatePlan({ repo, baseCommit: base, targetCommit: target, event });
+  assert.equal(plan.scope, "full");
+  assert.ok(plan.reasons.includes("copy-origin-ambiguous"));
+});
+
 
 for (const operation of ["copy", "rename"]) {
   for (const ambiguous of [true, false]) {
-    test(`edited ${operation} with ${ambiguous ? "ambiguous" : "unambiguous"} source retains its policy`, async t => {
+    test(`edited ${operation} with ${ambiguous ? "ambiguous" : "unambiguous"} source requires full validation`, async t => {
       const { repo } = await fixture(t);
       const content = Array.from({ length: 20 }, (_, index) => `copy source line ${index}: unchanged document content`).join("\n");
       await put(repo, "docs/source.md", content);
@@ -89,8 +136,27 @@ for (const operation of ["copy", "rename"]) {
       assert.match(raw, /[CR]093\0docs\/source\.md\0docs\/copied\.md\0/,
         "fixture must exercise Git's edited documentation-source choice");
       const plan = await createGatePlan({ repo, baseCommit: base, targetCommit: target, event });
-      assert.equal(plan.scope, ambiguous ? "full" : "docs");
-      assert.equal(plan.reasons.includes("copy-origin-ambiguous"), ambiguous);
+      assert.equal(plan.scope, "full");
+      assert.ok(plan.reasons.includes("copy-origin-ambiguous"));
     });
   }
+}
+
+for (const operation of ["copy", "rename"]) {
+  test(`byte-identical documentation ${operation} remains docs-only`, async t => {
+    const { repo } = await fixture(t);
+    const content = Array.from({ length: 20 }, (_, index) => `identical documentation line ${index}`).join("\n");
+    await put(repo, "docs/source.md", content);
+    await audit(repo);
+    const base = await commit(repo);
+    await put(repo, "docs/copied.md", content);
+    if (operation === "rename") await rm(path.join(repo, "docs/source.md"));
+    const target = await commit(repo);
+    const raw = await git(repo, "diff", "--raw", "-z", "--find-renames", "--find-copies-harder",
+      "-l0", base, target, "--");
+    assert.match(raw, new RegExp(` ${operation === "copy" ? "C" : "R"}100\\0docs/source\\.md\\0docs/copied\\.md\\0`));
+    const plan = await createGatePlan({ repo, baseCommit: base, targetCommit: target, event });
+    assert.equal(plan.scope, "docs");
+    assert.ok(!plan.reasons.includes("copy-origin-ambiguous"));
+  });
 }
