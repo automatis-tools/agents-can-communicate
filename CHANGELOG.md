@@ -20,9 +20,9 @@
 
 | Development artifact | Value |
 |---|---|
-| Built from | `d65c9ac801ece46dc00c59c3108e7d67afc953c9` |
-| Tarball | `agents-can-communicate-0.12.2.tgz`, 627,901 bytes, 380 files |
-| sha256 | `a30407e9a95ea41292f1ad949cb4190baee4062c9812135ab91f82fe3a62a2b4` |
+| Built from | `4a869ce7b60d718f2a1e273d594d487b74f88883` |
+| Tarball | `agents-can-communicate-0.12.2.tgz`, 627,984 bytes, 380 files |
+| sha256 | `4cc393f5d624156366ce49e69ef5641c73bc13b17a6ebda3136f9524a05b5f91` |
 
 The exact archive passed package verification. See
 [development evidence](docs/release-evidence/unreleased-inbox-reads.md).

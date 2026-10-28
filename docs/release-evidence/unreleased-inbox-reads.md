@@ -73,7 +73,10 @@ Only 40 of its 1,311 receipts are rewritten. Before the review, every receipt wa
 
 `node scripts/measure/run.mjs --probe inbox` compared two sides under the same conditions:
 - the baseline, `main` at `0eb0d3d3` before this change, exported and installed apart;
-- the candidate, this branch at `d65c9ac8`, exported and installed apart.
+- the candidate, this branch at `d65c9ac8`, exported and installed apart. The later commit
+  `4a869ce7` loads a page's receipts through the same batched loader as its messages. The
+  lookup that selects them had read them sixteen at a time already, so the reads are the same:
+  400 pending receipts are 400 file reads, each once, at most sixteen at once, before and after.
 
 The fixture held 30 messages to the reader, mixing notes, questions and decisions in every
 receipt state, beside a backlog of 0 or 270 messages to another participant. Exact reads each
@@ -140,9 +143,9 @@ evidence. Each report has them, with the load around each child in its `run.json
 
 ## Package
 
-`node scripts/verify-package.mjs` built `agents-can-communicate-0.12.2.tgz` from `d65c9ac8`:
-627,901 bytes, 380 entries, sha256
-`a30407e9a95ea41292f1ad949cb4190baee4062c9812135ab91f82fe3a62a2b4`. It passed package
+`node scripts/verify-package.mjs` built `agents-can-communicate-0.12.2.tgz` from `4a869ce7`:
+627,984 bytes, 380 entries, sha256
+`4cc393f5d624156366ce49e69ef5641c73bc13b17a6ebda3136f9524a05b5f91`. It passed package
 verification, including doctor, a workspace without Git, and install with uninstall.
 
 ## Limits
