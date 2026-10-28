@@ -30,7 +30,13 @@ test('the composite publishes proof only from the production test-driver step', 
   assert.ok(install && steps.indexOf(install) < steps.indexOf(driver));
   assert.match(source, /uses: actions\/setup-node@820762786026740c76f36085b0efc47a31fe5020/);
   assert.equal(scalar(source, 'node-version'), "'24'");
-  for (const step of steps.filter(s => /\brun:/.test(s))) assert.ok(['bash', 'pwsh'].includes(scalar(step, 'shell')));
+  for (const step of [install, driver]) {
+    const selector = scalar(step, 'shell');
+    for (const [os, want] of [['Windows', 'pwsh'], ['Linux', 'bash'], ['macOS', 'bash']]) {
+      const actual = selector.startsWith('${{') ? evaluate(selector, { runner: { os } }) : selector;
+      assert.equal(actual, want, `${os}: ${scalar(step, 'run')} must retain its native shell`);
+    }
+  }
   const upload = steps.find(s => s.includes('uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a'));
   assert.ok(upload && steps.indexOf(upload) > steps.indexOf(driver));
   assert.equal(scalar(upload, 'continue-on-error'), 'true');

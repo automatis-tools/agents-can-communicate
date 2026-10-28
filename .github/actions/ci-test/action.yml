@@ -21,7 +21,7 @@ runs:
       with:
         node-version: '24'
     - name: Install
-      shell: bash
+      shell: ${{ runner.os == 'Windows' && 'pwsh' || 'bash' }}
       run: npm ci
     # Keep fixture writes on the measured Windows local disk.
     - name: Temporary files on the local disk
@@ -34,7 +34,7 @@ runs:
         "TMP=$dir" >> $env:GITHUB_ENV
     - name: Execute and verify tests
       id: test
-      shell: bash
+      shell: ${{ runner.os == 'Windows' && 'pwsh' || 'bash' }}
       run: node scripts/ci-validation.mjs test
       env:
         CI: 'true'
