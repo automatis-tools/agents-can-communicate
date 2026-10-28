@@ -11,6 +11,11 @@ import { runHook } from "../src/runner.mjs";
 import { posixTransportTest as test } from "../../../tests/helpers/platform-scope.mjs";
 
 const exec = promisify(execFile);
+// A hook process ends within its own budget, 5 s, whatever its optional diagnostics do. The
+// 3 s these processes had was tighter than that promise, and a machine at a load average of
+// 40 to 59 ran a hook past it with nothing held open (2026-10-28). Still short of the 9 s
+// diagnostic write below, which a hook held open by it would reach.
+const HOOK_PROCESS_MS = 8_000;
 const binary = path.resolve(import.meta.dirname, "../../../bin/acc.mjs");
 const claudeCodeAdapter = createClaudeCodeAdapter();
 
@@ -190,7 +195,7 @@ test("a diagnostic write past a quarter second is still recorded", async t => {
   `);
   const child = exec(process.execPath, ["--import", preload,
     path.resolve(import.meta.dirname, "../../../bin/acc-hook.mjs"), "claude_code"], {
-    cwd: path.join(m.home, "project"), timeout: 3000,
+    cwd: path.join(m.home, "project"), timeout: HOOK_PROCESS_MS,
     env: { HOME: m.home, ACC_DATA_HOME: m.dataHome, ACC_NO_UPDATE_CHECK: "1", PATH: "",
       GIT_DIR: "", GIT_WORK_TREE: "" },
   });
@@ -220,7 +225,7 @@ test("slow diagnostic I/O cannot hold the hook process open or replace its owner
   `);
   const child = exec(process.execPath, ["--import", preload,
     path.resolve(import.meta.dirname, "../../../bin/acc-hook.mjs"), "claude_code"], {
-    cwd: path.join(m.home, "project"), timeout: 3000,
+    cwd: path.join(m.home, "project"), timeout: HOOK_PROCESS_MS,
     env: { HOME: m.home, ACC_DATA_HOME: m.dataHome, ACC_NO_UPDATE_CHECK: "1", PATH: "",
       GIT_DIR: "", GIT_WORK_TREE: "" },
   });
@@ -261,7 +266,7 @@ test("slow diagnostic I/O cannot hold the hook process open or replace its owner
       diagnosticWorkers, stdout: result.stdout }));
   `);
   const nearDeadline = JSON.parse((await exec(process.execPath, ["--import", preload, driver], {
-    cwd: path.join(m.home, "project"), timeout: 3000,
+    cwd: path.join(m.home, "project"), timeout: HOOK_PROCESS_MS,
     env: { HOME: m.home, ACC_DATA_HOME: m.dataHome, ACC_NO_UPDATE_CHECK: "1", PATH: "",
       GIT_DIR: "", GIT_WORK_TREE: "" },
   })).stdout);
