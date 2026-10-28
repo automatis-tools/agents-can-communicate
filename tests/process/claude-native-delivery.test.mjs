@@ -5,9 +5,11 @@ import net from "node:net";
 import path from "node:path";
 
 import { createClaudeCodeAdapter } from "@agents-can-communicate/adapter-claude-code";
+import { createCoordinationService } from "@agents-can-communicate/core";
 import { createKimiAdapter } from "@agents-can-communicate/adapter-kimi";
 import { createDeliveryRouter } from "@agents-can-communicate/delivery-router";
 import { readInstalledLivePolicy, recordInstall } from "@agents-can-communicate/installer";
+import { openFilesystemStore } from "@agents-can-communicate/storage-filesystem";
 
 import { runHook } from "../../packages/hook-runner/src/runner.mjs";
 import { posixTransportTest as test } from "../helpers/platform-scope.mjs";
@@ -63,14 +65,20 @@ async function place(t) {
   const peer = await runHook({ adapterId: "kimi", adapters: { kimi: createKimiAdapter() }, dataHome,
     readProcessTable: async () => new Map(), probeClientVersion: async () => null,
     payload: { hook_event_name: "SessionStart", session_id: "kimi-peer", cwd: project } });
-  const recipientId = (await peer.service.locateSession(receiver.accSessionId)).record.participantId;
-  const router = createDeliveryRouter({ service: peer.service, adapters: { claude_code: claude },
+  // The peer's later commands have their own lifetime. The service returned
+  // by runHook retains that one startup hook's absolute five-second deadline.
+  const { clock, ids, store: hookStore } = peer.service;
+  const store = await openFilesystemStore({ root: hookStore.root,
+    workspaceId: hookStore.workspaceId, clock, ids });
+  const service = createCoordinationService({ store, clock, ids });
+  const recipientId = (await service.locateSession(receiver.accSessionId)).record.participantId;
+  const router = createDeliveryRouter({ service, adapters: { claude_code: claude },
     clock: { now: () => new Date().toISOString() }, platform: "darwin-arm64",
     readLivePolicy: ({ adapter }) => readInstalledLivePolicy({ dataHome, adapterId: adapter.id }) });
-  const ask = (clientMessageId, body) => peer.service.sendMessage({ sessionId: peer.accSessionId,
+  const ask = (clientMessageId, body) => service.sendMessage({ sessionId: peer.accSessionId,
     generation: peer.generation, clientMessageId, toParticipantIds: [recipientId], kind: "question",
     obligation: "reply", subject: "Port", body, artifacts: [], inReplyTo: null, handoff: null });
-  return { receiver, peer, router, ask, recipientId, frames, claudeHook };
+  return { receiver, peer, service, router, ask, recipientId, frames, claudeHook };
 }
 
 const settle = () => new Promise(resolve => setTimeout(resolve, 50));
@@ -89,8 +97,16 @@ test("a peer's question wakes the Claude session and arrives with its next turn"
   const frame = JSON.parse(f.frames[0]);
   assert.match(frame.message.content, new RegExp(`new peer message ${question.messageId} `));
   assert.equal(f.frames[0].includes("SYSTEM"), false, "a peer byte reached the wake");
-  assert.equal((await f.peer.service.readReceipt({ messageId: question.messageId,
-    recipientParticipantId: f.recipientId })).state, "queued");
+  // Observation belongs to the sender's later command, after its startup
+  // hook has ended. Cross that hook's deadline without a five-second sleep.
+  const now = Date.now;
+  const elapsed = t.mock.method(Date, "now", () => Math.max(now(), f.peer.deadlineAt + 1));
+  try {
+    assert.equal((await f.service.readReceipt({ messageId: question.messageId,
+      recipientParticipantId: f.recipientId })).state, "queued");
+  } finally {
+    elapsed.mock.restore();
+  }
 
   // The wake makes Claude Code run UserPromptSubmit; this is that hook.
   const turn = await f.claudeHook("UserPromptSubmit", { prompt: frame.message.content });
@@ -98,13 +114,13 @@ test("a peer's question wakes the Claude session and arrives with its next turn"
   assert.match(turn.stdout, /untrusted peer message/);
   assert.match(turn.stdout, /Which port does the API use\?/);
   await turn.commitOffers();
-  assert.equal((await f.peer.service.readReceipt({ messageId: question.messageId,
+  assert.equal((await f.service.readReceipt({ messageId: question.messageId,
     recipientParticipantId: f.recipientId })).state, "offered");
 });
 
 test("a note under the actionable policy stays in the inbox and wakes nothing", async t => {
   const f = await place(t);
-  const note = await f.peer.service.sendMessage({ sessionId: f.peer.accSessionId,
+  const note = await f.service.sendMessage({ sessionId: f.peer.accSessionId,
     generation: f.peer.generation, clientMessageId: "client_note", toParticipantIds: [f.recipientId],
     kind: "note", obligation: "none", subject: "FYI", body: "lunch", artifacts: [], inReplyTo: null,
     handoff: null });
