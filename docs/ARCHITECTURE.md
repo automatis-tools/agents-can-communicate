@@ -120,7 +120,10 @@ workspace.
 
 The filesystem store is the durable source of truth. Every meaningful mutation updates
 materialised records and appends an immutable event in one transaction. Sequence ids sort
-lexically, so a cursor is simply the last sequence returned.
+lexically, so a cursor is simply the last sequence returned. A transaction finds the next
+sequence when it commits an event or a journal, under the writer mutex, and gives it to its
+events in the order they were appended; the event `tx.append` returns carries it from then on.
+A transaction that only reads never lists the event log (#307).
 
 Workspace discovery checks an explicit config first, then the Git common directory, then
 the plain directory. Multiple worktrees share a workspace id while each session records

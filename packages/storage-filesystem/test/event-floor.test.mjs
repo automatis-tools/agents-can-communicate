@@ -25,11 +25,11 @@ async function store(t) {
 async function appendEvents(opened, count) {
   const sequences = [];
   for (let index = 0; index < count; index += 1) {
-    await opened.transaction(async tx => {
-      sequences.push(tx.append({ schemaVersion: SCHEMA_VERSION, eventId: `event_${index}`,
-        workspaceId: WORKSPACE, actorSessionId: "session_a", type: "intent.published",
-        occurredAt: NOW, payload: { mode: "edit", state: "active" } }).sequence);
-    }, { kinds: [] });
+    // The event tx.append returns has its sequence once the transaction commits (#307).
+    const appended = await opened.transaction(async tx => tx.append({ schemaVersion: SCHEMA_VERSION,
+      eventId: `event_${index}`, workspaceId: WORKSPACE, actorSessionId: "session_a", type: "intent.published",
+      occurredAt: NOW, payload: { mode: "edit", state: "active" } }), { kinds: [] });
+    sequences.push(appended.sequence);
   }
   return sequences;
 }

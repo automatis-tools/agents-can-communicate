@@ -161,9 +161,9 @@ export async function openFilesystemStore({ root, clock, ids, workspaceId, failA
       // Reads are loaded once per transaction so get, list, and the generation
       // that put() compares against all describe the same instant.
       const loaded = await loadStateEnvelopes(paths, { root }, eager);
+      // The next sequence is found when the transaction commits an event or a journal:
+      // found here, it listed the whole event log for every transaction, reads too (#307).
       const events = [];
-      let sequence = await nextSequence(paths, root);
-      const firstSequence = pad(sequence);
       const view = createTransactionView({ kinds, exactKinds, loaded, ids,
         loadEnvelope: (kind, id) => {
           assertPublicationDeadline(deadlineAt);
@@ -184,12 +184,12 @@ export async function openFilesystemStore({ root, clock, ids, workspaceId, failA
               return true;
             } });
         },
+        // Checked as appended; the sequence it is given when the transaction commits.
         appendEvent(event) {
-          const stamped = { ...event, sequence: pad(sequence) };
-          sequence += 1;
-          validateRecord("event", stamped);
-          events.push(stamped);
-          return stamped;
+          const { sequence: unassigned, ...fields } = event;
+          validateRecord("event", { ...fields, sequence: pad(1) });
+          events.push(fields);
+          return fields;
         } });
       const { tx, staged } = view;
       let result;
@@ -200,26 +200,15 @@ export async function openFilesystemStore({ root, clock, ids, workspaceId, failA
       }
       await view.finish();
       const deltas = indexCache.prepareDeltas(loaded, staged);
-
-      // Events are published before state records on purpose: the event log is
-      // the authority, and a crash between the two is the window the journal
-      // ceiling in eventsSince has to hide.
-      const publications = [
-        ...events.map(event => ({
-          path: publicationPath(root, eventPath(paths, event.sequence)),
-          bytes: encode(event),
-          replace: false,
-        })),
-        ...[...staged.values()].map(entry => (entry.removed === true
-          ? stateDeletionPublication(paths, root, entry.kind, entry.id, entry.generation,
-            statePath(paths, entry.kind, entry.id))
-          : {
-            path: publicationPath(root, statePath(paths, entry.kind, entry.id)),
-            bytes: encode(stateEnvelope(entry.kind, entry.id, entry.generation, entry.record)),
-            replace: true,
-          })),
-      ];
-      if (publications.length === 0) return result;
+      const records = [...staged.values()].map(entry => (entry.removed === true
+        ? stateDeletionPublication(paths, root, entry.kind, entry.id, entry.generation,
+          statePath(paths, entry.kind, entry.id))
+        : {
+          path: publicationPath(root, statePath(paths, entry.kind, entry.id)),
+          bytes: encode(stateEnvelope(entry.kind, entry.id, entry.generation, entry.record)),
+          replace: true,
+        }));
+      if (events.length === 0 && records.length === 0) return result;
 
       // One record replaced and nothing appended - a session's heartbeat, every
       // turn - needs no journal to appear at once: the rename replaces it
@@ -232,10 +221,39 @@ export async function openFilesystemStore({ root, clock, ids, workspaceId, failA
       if (events.length === 0 && staged.size === 1 && only.removed !== true
         && !["message", "receipt"].includes(only.kind) && before.state === "idle") {
         assertPublicationDeadline(deadlineAt);
-        await publishAtomic(statePath(paths, only.kind, only.id), publications[0].bytes,
+        await publishAtomic(statePath(paths, only.kind, only.id), records[0].bytes,
           { ...publishOptions, replace: true, deadlineAt });
         return result;
       }
+
+      // Under the writer mutex, as when it was found before the callback ran, so no
+      // other writer can take the same sequence. The events take it in the order they
+      // were appended, and the objects tx.append returned carry it from here on.
+      assertPublicationDeadline(deadlineAt);
+      let sequence = await nextSequence(paths, root);
+      const firstSequence = pad(sequence);
+      // Every sequence this transaction takes, not only its first, stays where adding one
+      // still changes the value: past it two events would share a name (review of #307).
+      if (BigInt(sequence) + BigInt(events.length) - 1n > BigInt(Number.MAX_SAFE_INTEGER)) {
+        throw new AccError(EXIT.DATA, "event sequence is exhausted",
+          { first: firstSequence, events: events.length });
+      }
+      for (const appended of events) {
+        appended.sequence = pad(sequence);
+        sequence += 1;
+        validateRecord("event", appended);
+      }
+      // Events are published before state records on purpose: the event log is
+      // the authority, and a crash between the two is the window the journal
+      // ceiling in eventsSince has to hide.
+      const publications = [
+        ...events.map(appended => ({
+          path: publicationPath(root, eventPath(paths, appended.sequence)),
+          bytes: encode(appended),
+          replace: false,
+        })),
+        ...records,
+      ];
 
       // Preparation is still cancellable. The active journal's atomic
       // publication decides the write; roll-forward must then finish even if
