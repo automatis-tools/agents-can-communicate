@@ -5,7 +5,7 @@
 // the suite, and the two CLI modes the Lint job runs.
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
-import { chmod, mkdir, mkdtemp, readFile, realpath, rm, stat, utimes, writeFile } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, readFile, rm, stat, utimes, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -211,16 +211,25 @@ async function stubNpmEnv(t, script = "#!/bin/sh\nexit 0\n") {
   t.after(() => rm(stub, { recursive: true, force: true }));
   await writeFile(path.join(stub, "npm"), script);
   await chmod(path.join(stub, "npm"), 0o755);
-  // Production Windows starts Node/npm-cli directly. Intercept only that
-  // command in owned child processes and dispatch the same POSIX recorder.
+  // Model both query and final execution with a private real npm bin package.
+  // The tracked discovery probe still runs; no real project npm can fall through.
+  const npmRoot = path.join(stub, "fixture-npm");
+  await mkdir(npmRoot);
+  const cli = path.join(npmRoot, "npm-cli.js");
+  await writeFile(path.join(npmRoot, "package.json"), JSON.stringify({ name: "npm", bin: { npm: "npm-cli.js" } }));
+  await writeFile(cli, `if (process.argv[2] === '--version') console.log('1.0.0');
+    else {
+      const result = require('node:child_process').spawnSync('sh',
+        [${JSON.stringify(editorCommand(path.join(stub, "npm")))}, ...process.argv.slice(2)], {stdio:'inherit'});
+      process.exitCode = result.status ?? 1;
+    }`);
   // Synchronize named ESM imports because push-targets imports spawn directly.
   const preload = path.join(stub, "npm-recorder.cjs");
   await writeFile(preload, `const childProcess = require('node:child_process');
-    const path = require('node:path');
     const spawn = childProcess.spawn;
     childProcess.spawn = function(file, args, options) {
-      if (file === process.execPath && path.basename(args?.[0] ?? '') === 'npm-cli.js') {
-        return spawn('sh', [${JSON.stringify(editorCommand(path.join(stub, "npm")))}, ...args.slice(1)], options);
+      if (args?.[0] === '/d' && args?.[4] === 'npm --version --offline --update-notifier=false --logs-max=0 --color=false') {
+        return spawn(process.execPath, [${JSON.stringify(cli)}, '--version', '--offline', '--update-notifier=false', '--logs-max=0', '--color=false'], options);
       }
       return spawn(file, args, options);
     };
@@ -230,20 +239,19 @@ async function stubNpmEnv(t, script = "#!/bin/sh\nexit 0\n") {
   const system = process.platform === "win32"
     ? (process.env.PATH ?? process.env.Path ?? "").split(path.delimiter) : ["/usr/bin", "/bin"];
   return { PATH: [stub, path.dirname(process.execPath), ...system].join(path.delimiter),
+    ComSpec: process.env.ComSpec ?? (process.platform === "win32" ? process.env.COMSPEC : "/bin/sh"),
     NODE_OPTIONS: [process.env.NODE_OPTIONS, `--require=${JSON.stringify(editorCommand(preload))}`].filter(Boolean).join(" ") };
 }
 
-// Exercise the real spawn boundary in Windows Node/npm-cli form on every host:
-// the old PATH-only proxy launched real npm instead of the fixture recorder.
-test("the npm recorder handles Node/npm-cli without changing semantic argv", async t => {
+// Exercise both fixed discovery and final Node/npm-cli on every host.
+// The private recorder must never run real project npm tests or packs.
+test("the npm recorder handles discovery and Node/npm-cli without changing semantic argv", async t => {
   const { root, env } = await scratch(t, await stubNpmEnv(t, `#!/bin/sh\nprintf '<%s>\\n' "$@"\n`));
-  const npm = await realpath(path.join(path.dirname(process.execPath),
-    process.platform === "win32" ? "node_modules/npm/bin/npm-cli.js" : "npm"));
   const command = pathToFileURL(path.join(repo, "scripts/push-targets.mjs")).href;
   const args = ["test", "--", "--selection-plan", "owned path & (literal) %x% !y! ^.json", "--if-needed"];
   const result = await attempt(process.execPath, ["--input-type=module", "-e",
     `import {runPushCommand} from ${JSON.stringify(command)};
-     await runPushCommand(process.execPath, ${JSON.stringify([npm, ...args])}, {cwd:process.cwd()});`], { cwd: root, env });
+     await runPushCommand("npm", ${JSON.stringify(args)}, {cwd:process.cwd(),platform:"win32"});`], { cwd: root, env });
   assert.equal(result.code, 0, result.stdout + result.stderr);
   assert.equal(result.stdout, args.map(arg => `<${arg}>\n`).join(""));
 });

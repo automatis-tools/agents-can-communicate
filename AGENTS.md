@@ -73,6 +73,14 @@ only when the target's test script and scoped runner contract match the trusted 
 including imported selection, cache, process and package helpers. Historical or changed contracts
 run their own full suite. Ignored executable inputs or dirty target bytes require an isolated checkout.
 
+On Windows, pre-push discovers the selected npm forwarding shim with a fixed offline
+version query. A tracked Node preload records its actual Node/npm bin pair; validation
+then runs that pair with shell-free arguments and the original environment. Discovery
+requires Node `--import` support. Wrappers that suppress preloads fail explicitly;
+wrappers that change tools or transient environment by command are not guaranteed equivalent.
+Discovery has a ten-second deadline and a combined 64 KiB output/result limit. Forced
+interruption retains owned probe, selection and checkout resources for recovery.
+
 `scripts/validation-impact.json` records `sourceDigest` for all non-documentation Git entries except the manifest itself.
 Code, helper, test or configuration drift requires full execution until a deliberate documentation-reader audit refreshes that pin.
 Review external documentation readers and dynamic test discovery before updating the pin. The planner never refreshes it automatically.

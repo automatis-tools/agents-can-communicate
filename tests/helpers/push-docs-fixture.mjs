@@ -38,7 +38,7 @@ export async function pushDocsFixture(t, { ci } = {}) {
     }
   };
   for (const file of ["scripts/validate-push.mjs", "scripts/check-commit-attribution.mjs", "scripts/check-syntax.mjs",
-    "scripts/run-tests.mjs", "scripts/test-skip-fsync.mjs",
+    "scripts/run-tests.mjs", "scripts/test-skip-fsync.mjs", "scripts/push-npm-probe.mjs",
     "scripts/test-file-watchdog.mjs", "scripts/test-timing-reporter.mjs"]) await copy(file);
   const controls = Object.fromEntries(["docs", "runtime", "smoke", "packs"]
     .map(name => [name, path.join(f.base, name)]));

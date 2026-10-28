@@ -4,9 +4,9 @@ import { createHash } from "node:crypto";
 import { mkdtemp, realpath, rm } from "node:fs/promises";
 import { homedir, tmpdir } from "node:os";
 import path from "node:path";
-import { createRequire } from "node:module";
 import { promisify } from "node:util";
 import { pathToFileURL } from "node:url";
+import { resolveWindowsNpm } from "./push-npm.mjs";
 import { checkoutMatchesCommit } from "./push-tree-check.mjs";
 import { stopPushProcessTree, terminationFailure } from "./push-process-tree.mjs";
 
@@ -123,27 +123,45 @@ export async function resolvePushTrees(repo, refs, { planForRef } = {}) {
 // Never expose command environment or checkout paths.
 // Optional executor/platform overrides are solely a command-boundary test seam;
 // production always uses native spawn/platform and fixed taskkill arguments.
-export function runPushCommand(file, args, { cwd, signal, input, quiet = false,
+export async function runPushCommand(file, args, { cwd, signal, input, quiet = false,
   platform = process.platform, spawnCommand = spawn, env = {} } = {}) {
+  if (signal?.aborted) throw Error("push validation interrupted");
+  const commandEnv = { ...pushEnvironment(), ...env };
+  if (platform === "win32") {
+    // Windows environment names are case insensitive. Last supplied spelling
+    // wins, so an explicit Path override cannot lose to inherited PATH.
+    const names = new Map();
+    for (const key of Object.keys(commandEnv)) {
+      const previous = names.get(key.toUpperCase());
+      if (previous) delete commandEnv[previous];
+      names.set(key.toUpperCase(), key);
+    }
+    if (file === "npm") {
+      const executor = await resolveWindowsNpm({ cwd, env: commandEnv, signal,
+        launch: (command, argv, options) => runRawPushCommand(command, argv,
+          { ...options, platform, spawnCommand }) });
+      file = executor.file;
+      args = [...executor.prefixArgs, ...args];
+    }
+  }
+  if (signal?.aborted) throw Error("push validation interrupted");
+  return runRawPushCommand(file, args, { cwd, signal, input, quiet, platform, spawnCommand, env: commandEnv });
+}
+
+function runRawPushCommand(file, args, { cwd, signal, input, quiet, platform, spawnCommand, env: commandEnv, onOutput }) {
   return new Promise((resolve, reject) => {
     if (signal?.aborted) { reject(Error("push validation interrupted")); return; }
     const windows = platform === "win32";
-    const commandEnv = { ...pushEnvironment(), ...env };
-    if (windows && file === "npm") {
-      // Resolve the installed npm package without asking cmd.exe to parse argv.
-      const search = Object.entries(commandEnv).find(([key]) => key.toUpperCase() === "PATH")?.[1] ?? "";
-      const manifest = createRequire(import.meta.url).resolve("npm/package.json", {
-        paths: [path.dirname(process.execPath), ...search.split(path.delimiter).filter(Boolean)],
-      });
-      args = [path.join(path.dirname(manifest), "bin", "npm-cli.js"), ...args];
-      file = process.execPath;
-    }
     const child = spawnCommand(file, args, { cwd, env: commandEnv, detached: !windows,
       shell: false, stdio: ["pipe", "pipe", "pipe"] });
     let stdout = "";
     let stderr = "";
     let cancellation = Promise.resolve();
+    let cancelling = false;
     const abort = () => {
+      if (cancelling) return;
+      cancelling = true;
+      signal?.removeEventListener("abort", abort);
       if (windows) {
         cancellation = new Promise(resolve => {
           if (!Number.isInteger(child.pid) || child.pid <= 0) { resolve(terminationFailure()); return; }
@@ -165,9 +183,13 @@ export function runPushCommand(file, args, { cwd, signal, input, quiet = false,
       });
     };
     signal?.addEventListener("abort", abort, { once: true });
-    child.stdout.on("data", bytes => { stdout += bytes; });
-    child.stderr.on("data", bytes => { stderr += bytes; });
-    child.once("error", error => { signal?.removeEventListener("abort", abort); reject(error); });
+    child.stdout.on("data", bytes => { onOutput?.(bytes); if (!signal?.aborted) stdout += bytes; });
+    child.stderr.on("data", bytes => { onOutput?.(bytes); if (!signal?.aborted) stderr += bytes; });
+    child.once("error", error => {
+      signal?.removeEventListener("abort", abort);
+      // An error after cancellation must not outrun the owned-tree result.
+      if (!cancelling) reject(error);
+    });
     child.once("close", async code => {
       signal?.removeEventListener("abort", abort);
       const terminationError = await cancellation;
@@ -187,7 +209,8 @@ export function runPushCommand(file, args, { cwd, signal, input, quiet = false,
       else resolve();
     });
     child.stdin.on("error", () => {});
-    child.stdin.end(input);
+    if (signal?.aborted) abort();
+    else child.stdin.end(input);
   });
 }
 

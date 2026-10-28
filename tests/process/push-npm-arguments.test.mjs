@@ -1,58 +1,42 @@
-// Reintroducing npm's Windows shell boundary exposes filenames to cmd parsing.
+// Real shim selection and exact data argv catch the old package lookup and shell mutation.
 import assert from "node:assert/strict";
-import { EventEmitter } from "node:events";
-import { mkdir, mkdtemp, realpath, rm, writeFile } from "node:fs/promises";
+import { existsSync } from "node:fs";
 import path from "node:path";
-import { tmpdir } from "node:os";
-import { PassThrough } from "node:stream";
 import test from "node:test";
 import { runPushCommand } from "../../scripts/push-targets.mjs";
+import { windowsNpmFixture } from "../helpers/windows-npm-fixture.mjs";
 
-const cwd = path.resolve(import.meta.dirname, "../..");
-
-test("Windows npm preserves selection filenames as shell-free argv", async t => {
-  // A native Windows Node installation carries npm beside node.exe. On other
-  // hosts, give the Windows command seam that installed-package layout via PATH.
-  const installed = await mkdtemp(path.join(tmpdir(), "acc-npm-arguments-"));
-  t.after(() => rm(installed, { recursive: true, force: true }));
-  const prefix = path.join(installed, "npm path & (owned)");
-  const packageRoot = path.join(prefix, "node_modules/npm");
-  await mkdir(path.join(packageRoot, "bin"), { recursive: true });
-  await writeFile(path.join(packageRoot, "package.json"), '{"name":"npm","version":"1.0.0"}');
-  await writeFile(path.join(packageRoot, "bin/npm-cli.js"), "// controlled npm entry\n");
-  const cli = await realpath(process.platform === "win32"
-    ? path.join(path.dirname(process.execPath), "node_modules/npm/bin/npm-cli.js")
-    : path.join(packageRoot, "bin/npm-cli.js"));
-  const pathKey = Object.keys(process.env).find(key => key.toUpperCase() === "PATH") ?? "PATH";
+const cwd = process.cwd();
+test("Windows npm selects external forwarding shim and preserves shell-free argv", async t => {
+  const f = await windowsNpmFixture(t);
+  const sentinel = path.join(f.root, "shell-side-effect");
   const args = ["test", "--", "--selection-plan",
-    'C:\\Users\\Jane Doe\\AppData\\Local\\Temp\\plan & (owned) %PATH% !literal! ^data\\selection.json', "--if-needed"];
-  let call;
-  await runPushCommand("npm", args, { cwd, quiet: true, platform: "win32", env: { [pathKey]: prefix, ACC_NPM_ARGUMENT_CONTROL: "preserved" },
-    spawnCommand: (file, passed, options) => {
-      call = { file, args: passed, options };
-      const child = Object.assign(new EventEmitter(), { pid: 12345,
-        stdin: new PassThrough(), stdout: new PassThrough(), stderr: new PassThrough() });
-      queueMicrotask(() => child.emit("close", 0));
-      return child;
-    } });
-  assert.equal(call.file, process.execPath, "npm must execute its JavaScript CLI through Node");
-  assert.deepEqual(call.args, [cli, ...args], "selection filename must remain one unchanged argument");
-  assert.equal(call.options.shell, false, "shell parsing must never interpret npm arguments");
-  assert.equal(call.options.cwd, cwd);
-  assert.equal(call.options.env.ACC_NPM_ARGUMENT_CONTROL, "preserved");
+    'C:\\Users\\Jane Doe\\plan & (owned) %PATH% !literal! ^data\\selection.json', ` & echo injected > "${sentinel}" &`, "--if-needed"];
+  await runPushCommand("npm", args, { cwd: f.cwd, quiet: true, platform: "win32", env: f.env, spawnCommand: f.launch });
+  const records = await f.records();
+  assert.equal(records.length, 2, "fixed version query and validation run exactly once each");
+  assert.deepEqual(records[0].args, ["--version", "--offline", "--update-notifier=false", "--logs-max=0", "--color=false"]);
+  assert.deepEqual(records[1].args, args);
+  for (const record of records) { assert.equal(record.label, "first"); assert.equal(record.node, f.node); assert.equal(record.cwd, f.cwd); }
+  assert.equal(records[1].env.NODE_OPTIONS, f.env.NODE_OPTIONS);
+  assert.equal(records[1].env.ACC_NPM_MARKER, "original");
+  assert.equal(records[1].env.ACC_ORIGINAL_PRELOAD, "ran");
+  assert.equal(records[1].env.ACC_PUSH_NPM_PROBE, undefined);
+  assert.equal(existsSync(sentinel), false, "argv must not execute a shell side effect");
+  assert.equal(f.calls.at(-1).file, f.node);
+  assert.deepEqual(f.calls.at(-1).args, [f.clis[0], ...args]);
 });
 
 test("already cancelled npm commands never launch a child", async () => {
-  const controller = new AbortController();
-  controller.abort();
+  const controller = new AbortController(); controller.abort();
   let launched = false;
-  await assert.rejects(runPushCommand("npm", ["test"], { cwd, signal: controller.signal,
+  await assert.rejects(runPushCommand("npm", ["test"], { cwd, platform: "win32", signal: controller.signal,
     spawnCommand: () => { launched = true; throw Error("unexpected spawn"); } }), /push validation interrupted/);
   assert.equal(launched, false);
 });
 
-test("npm spawn errors retain the command error", async () => {
+test("ordinary spawn errors retain the command error", async () => {
   const denied = Object.assign(Error("spawn denied"), { code: "EACCES" });
-  await assert.rejects(runPushCommand("npm", ["test"], { cwd,
+  await assert.rejects(runPushCommand("npm", ["test"], { cwd, platform: "darwin",
     spawnCommand: () => { throw denied; } }), error => error === denied);
 });
