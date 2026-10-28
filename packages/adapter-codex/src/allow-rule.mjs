@@ -2,7 +2,7 @@ import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 /**
- * The rule that lets ACC's coordination commands run without an approval.
+ * The rule that allows ACC's participant commands when the runtime honors it.
  *
  * Codex asks before a command that wants to leave its sandbox, and with
  * `approvals_reviewer = "auto_review"` a model reviews that request instead of
@@ -12,17 +12,21 @@ import path from "node:path";
  * same user on the same machine; from then on the session told every peer it
  * could not share project details.
  *
- * Codex loads every `*.rules` file in `$CODEX_HOME/rules`, and a command a
- * `prefix_rule` allows needs no approval, so no reviewer sees it. This file is
- * ACC's own, so uninstall can take it back whole. It allows the wrapper the skill
- * names, and only the commands a participant runs: install, uninstall, update and
- * config still ask.
+ * Codex loads `*.rules` files from its active config layers. An installed rule
+ * is not proof that a model, managed policy or explicit escalation skips review.
+ * This file allows only the participant commands through ACC's wrapper.
  */
 export const RULES_FILE = "agents-can-communicate.rules";
 export const PARTICIPANT_COMMANDS = Object.freeze(["work", "claim", "release", "message",
   "request", "inbox", "reply", "ack", "status", "sync", "finish"]);
 
 const HEADER = "# Written by ACC (agents-can-communicate).";
+const NOTE = ["# ACC's participant commands are allowed where Codex honors this rule.",
+  "# Runtime approval remains subject to the active model and permission policy.",
+  "# ACC uses local state and the user's own sessions. `acc uninstall` removes this file."];
+const LEGACY_NOTE = ["# ACC's coordination commands run without an approval prompt or auto-review:",
+  "# every peer is another AI session of the same user on this machine, and ACC",
+  "# keeps messages in its own store here. `acc uninstall` removes this file."];
 // A path a Starlark string literal holds as it is. Anything else gets no rule.
 const PLAIN_PATH = /^[^"\\\r\n\t]+$/;
 
@@ -35,13 +39,11 @@ export const rulesPath = codexHome => path.join(codexHome, "rules", RULES_FILE);
  */
 export const ruleApplies = hostPlatform => hostPlatform !== "win32";
 
-export function allowRuleText(cliShim) {
+function ruleText(cliShim, note) {
   const commands = PARTICIPANT_COMMANDS.map(command => JSON.stringify(command)).join(", ");
   return [
     HEADER,
-    "# ACC's coordination commands run without an approval prompt or auto-review:",
-    "# every peer is another AI session of the same user on this machine, and ACC",
-    "# keeps messages in its own store here. `acc uninstall` removes this file.",
+    ...note,
     "prefix_rule(",
     `    pattern = [${JSON.stringify(cliShim)}, [${commands}]],`,
     '    decision = "allow",',
@@ -49,6 +51,8 @@ export function allowRuleText(cliShim) {
     "",
   ].join("\n");
 }
+
+export const allowRuleText = cliShim => ruleText(cliShim, NOTE);
 
 async function current(file) {
   try {
@@ -69,7 +73,8 @@ export function accGenerated(text) {
   const named = /pattern = \[("(?:[^"\\]|\\.)*")/.exec(text ?? "");
   if (named === null) return false;
   try {
-    return text === allowRuleText(JSON.parse(named[1]));
+    const shim = JSON.parse(named[1]);
+    return text === allowRuleText(shim) || text === ruleText(shim, LEGACY_NOTE);
   } catch {
     return false;
   }
@@ -96,7 +101,7 @@ export async function writeAllowRule({ codexHome, cliShim, hostPlatform }) {
   if (existing === text) return { file: null, diagnostics: [] };
   await mkdir(path.dirname(file), { recursive: true });
   await writeFile(file, text);
-  return { file, diagnostics: [`added ${file}: ACC's coordination commands run without an approval prompt`] };
+  return { file, diagnostics: [`added ${file}: ACC participant command rule installed; runtime approval remains unverified`] };
 }
 
 /**
@@ -116,8 +121,9 @@ export async function inspectAllowRule({ codexHome, cliShim, hostPlatform }) {
   if (!ruleApplies(hostPlatform) || !PLAIN_PATH.test(cliShim)) return { state: "none", diagnostic: null };
   const file = rulesPath(codexHome);
   const existing = await current(file);
-  if (existing === allowRuleText(cliShim)) {
-    return { state: "allowed", diagnostic: `ACC commands run without an approval prompt: ${file} allows them` };
+  if (existing === allowRuleText(cliShim) || existing === ruleText(cliShim, LEGACY_NOTE)) {
+    return { state: "allowed", diagnostic: `ACC command rule installed: ${file}; runtime approval remains unverified `
+      + "for the active model, permission policy and explicit escalation" };
   }
   if (existing !== null && !existing.startsWith(HEADER)) {
     return { state: "foreign", diagnostic: `${file} is not ACC's; Codex asks before each escalated ACC command` };

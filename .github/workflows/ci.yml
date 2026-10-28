@@ -261,8 +261,8 @@ jobs:
         run: |
           claude --version
           codex --version
-      - name: Hooks, attachment and next-turn delivery through real clients
-        run: node --test tests/acceptance/real-clients-stub.test.mjs
+      - name: Hooks, delivery and command approval through real clients
+        run: node --test tests/acceptance/real-clients-stub.test.mjs tests/acceptance/codex-command-approval.test.mjs
         env:
           ACC_REAL_CLIENTS: '1'
           GIT_DIR: ''

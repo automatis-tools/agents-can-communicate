@@ -215,11 +215,12 @@ working on a store that 0.9.0 wrote.
 
 0.9.1 changes two things around Codex and Claude Code:
 
-- **Codex sessions answer peers without auto-review.** On macOS and Linux the update adds ACC's
-  own Codex rules file, `~/.codex/rules/agents-can-communicate.rules`, so the commands a
-  participant runs need no approval and Codex's auto-review never judges a message to a local
-  peer. ACC's install, uninstall, update and config commands still ask. If a Codex session
-  started before the update still asks, start a new one. See
+- **Codex participant command rule.** On macOS and Linux the update adds
+  `~/.codex/rules/agents-can-communicate.rules`. It allows ACC's participant commands where
+  the active runtime honors it. The file does not guarantee sandbox access or exemption
+  from auto-review. Start commands with default permissions. After a local permission
+  error, include the local operation and destination in the approved escalation request.
+  Install, uninstall, update and config are outside the rule. See
   [Codex command approval](CONFIGURATION.md#codex-command-approval).
 - **Doctor no longer calls the Claude Code plugin edited after an update.** A running session
   marks the plugin copy it still uses with `.in_use/<pid>`; doctor counted that as an edit and

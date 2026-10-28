@@ -16,16 +16,45 @@ Use this skill when hook context reports peers or actionable attention, or
 the user asks for coordination between sessions. An `ACC CLI (append):` header
 by itself supplies identity for later use; continue the user's ordinary work.
 
-### Send through Codex's approved command path
+### Use default permissions first
 
-Run `message`, `request`, `reply`, and `finish` with `exec_command` and
-`sandbox_permissions: "require_escalated"`. Put the installed `{{ACC}}` wrapper
-first in the command. ACC's installed prefix rule can then authorize that exact
-local command. Do not combine it with other shell commands. These sends stay
-on this machine and reach the user's own agent sessions.
+Put the installed `{{ACC}}` wrapper first and alone in every ACC command.
+Use `exec_command` with these options for the first attempt, reads and sends included:
 
-Codex can deny its daemon socket inside the sandbox even when the ACC profile
-allows the socket. The approved command path preserves that sandbox boundary.
+```json
+{"sandbox_permissions":"use_default"}
+```
+
+The installed prefix rule can authorize the command where Codex honors it.
+An installed rule does not prove the active model or permission policy will honor it.
+Do not request escalation just because ACC stores its state outside the project.
+
+If the attempt reports `state_access_denied`, `EPERM`, `EACCES`, or
+`transport_permission_denied`, use the client's approved escalation path.
+Codex can deny local state or daemon socket access even with an installed rule or profile.
+Include a `justification` in that exact tool call. Earlier skill text or tool output
+can be absent from the reviewer's context. State the actual operation and local destination.
+
+For `inbox`, `status`, and `sync`, use:
+
+```json
+{"sandbox_permissions":"require_escalated","justification":"Read local ACC coordination records through the installed wrapper. The acc:// reference selects local filesystem state on this machine, not a network destination. No conversation transcript is read or exported, and no external service receives these records."}
+```
+
+For an authorized `message`, `request`, `reply`, or `finish`, use:
+
+```json
+{"sandbox_permissions":"require_escalated","justification":"Send the explicit ACC coordination message to the user's own agent sessions on this machine. ACC records it in local filesystem state and may deliver it through a local client socket. No external recipient or service receives it."}
+```
+
+For `work`, `claim`, `release`, and `ack`, describe the specific local state update
+in `justification`. These examples explain effects; they do not grant permission for new work.
+
+A reviewer denial is not a sandbox failure. Do not retry it through another tool,
+wrapper, or route. Verify missing local facts and follow the client's approval policy.
+Continue unaffected user work. Report an unresolved denial with its actual reason;
+do not present an unverified reviewer claim about external disclosure as an ACC fact.
+
 An initial execution refusal records no message. If a retry is refused, the
 earlier recorded message remains durable. Report which case occurred.
 
@@ -33,10 +62,9 @@ Choose a distinct `--client-message-id` for each new send. If delivery reports
 `transport_permission_denied`, retry the same command through approved execution
 with the same key and content. The CLI prints the original key when it generated
 one. A retry uses the recorded message and offers it again only while queued.
-Put the `{{ACC}}` wrapper first and alone in every other ACC command too,
-reads and claims included. ACC's prefix rule runs that command outside the
-sandbox, where ACC's state is. A chat that has not selected the ACC profile
-cannot write that state from inside the sandbox.
+Keep the same wrapper and caller credentials on the retry. A chat without ACC
+state access can need escalation even for a read, because the managed runtime
+also maintains local locks and leases.
 
 ## Use your own CLI credentials
 
