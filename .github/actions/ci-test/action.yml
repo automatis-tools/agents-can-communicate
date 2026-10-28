@@ -1,0 +1,60 @@
+name: CI test worker
+description: Execute one fixed CI test role and publish verified completion proof
+inputs:
+  route:
+    description: Authenticated compact CI route
+    required: true
+  worker:
+    description: Fixed test worker ID
+    required: true
+  artifact:
+    description: Diagnostic artifact name for this worker
+    required: true
+outputs:
+  proof:
+    description: Verified production test completion proof
+    value: ${{ steps.test.outputs.proof }}
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+      with:
+        node-version: '24'
+    - name: Install
+      shell: ${{ runner.os == 'Windows' && 'pwsh' || 'bash' }}
+      run: npm ci
+    # Keep fixture writes on the measured Windows local disk.
+    - name: Temporary files on the local disk
+      if: runner.os == 'Windows'
+      shell: pwsh
+      run: |
+        $dir = Join-Path $env:RUNNER_TEMP 'tmp'
+        New-Item -ItemType Directory -Force $dir | Out-Null
+        "TEMP=$dir" >> $env:GITHUB_ENV
+        "TMP=$dir" >> $env:GITHUB_ENV
+    - name: Execute and verify tests
+      id: test
+      shell: ${{ runner.os == 'Windows' && 'pwsh' || 'bash' }}
+      run: node scripts/ci-validation.mjs test
+      env:
+        CI: 'true'
+        CI_ROUTE: ${{ inputs.route }}
+        CI_WORKER: ${{ inputs.worker }}
+        ACC_TEST_TIMEOUT_MS: '300000'
+        ACC_TEST_FILE_TIMEOUT_MS: '600000'
+        ACC_TEST_TIMINGS: ${{ runner.temp }}/acc-test-timings.jsonl
+        ACC_TEST_FORCE_EXIT: ${{ runner.os == 'Windows' && '1' || '' }}
+        GIT_DIR: ''
+        GIT_WORK_TREE: ''
+    - name: Preserve timing and routing diagnostics
+      continue-on-error: true
+      if: ${{ always() }}
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      with:
+        name: ${{ github.run_attempt == 1 && inputs.artifact || format('{0}-attempt-{1}', inputs.artifact, github.run_attempt) }}
+        path: |
+          ${{ runner.temp }}/acc-test-timings.jsonl
+          ${{ runner.temp }}/acc-test-timings.jsonl.manifest.json
+          ${{ runner.temp }}/acc-ci-plan.json
+          ${{ runner.temp }}/acc-ci-proof.json
+        if-no-files-found: warn

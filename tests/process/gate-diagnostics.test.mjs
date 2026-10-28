@@ -200,19 +200,23 @@ test("corrupt or unavailable optional timing metadata preserves the real batch r
   }
 });
 
-test("workflow diagnostic upload failure is isolated while artifacts remain unconditional and distinct", async () => {
-  const names = [];
-  for (const workflow of ["ci", "release"]) {
-    const source = await readFile(path.join(repo, ".github/workflows", `${workflow}.yml`), "utf8");
-    const uploads = source.split(/^      - /m).filter(step => step.includes("uses: actions/upload-artifact@")
-      && step.includes("acc-test-timings.jsonl"));
-    assert.equal(uploads.length, workflow === "ci" ? 2 : 1);
-    for (const upload of uploads) {
-      const optional = upload.match(/^        continue-on-error: (.+)$/m)?.[1];
-      assert.equal(optional, "true", "failed diagnostic delivery would fail the required job");
-      assert.match(upload, /^        if: \$\{\{ always\(\) \}\}$/m);
-      names.push(upload.match(/^          name: (.+)$/m)?.[1]);
-    }
-  }
-  assert.equal(new Set(names).size, 3);
+// CI upload policy is checked at its actual composite consumer by
+// tests/acceptance/ci-worker-action.test.mjs. Worker artifact inputs belong to
+// tests/acceptance/ci-workflow-routing.test.mjs. Release still uploads here.
+test("Release timing upload remains optional and unconditional with distinct artifacts", async () => {
+  const source = await readFile(path.join(repo, ".github/workflows/release.yml"), "utf8");
+  const uploads = source.split(/^      - /m).filter(step => step.includes("uses: actions/upload-artifact@"));
+  const timings = uploads.filter(step => step.includes("acc-test-timings.jsonl"));
+  assert.equal(timings.length, 1, "Release must preserve its timing diagnostic upload");
+  const upload = timings[0];
+  assert.equal(upload.match(/^        continue-on-error: (.+)$/m)?.[1], "true",
+    "failed diagnostic delivery would fail the Release job");
+  const expression = upload.match(/^        if: (.+)$/m)?.[1];
+  // Without a status function, Actions implicitly adds success(), even for true.
+  assert.match(expression ?? "", /^\$\{\{\s*always\(\)\s*\}\}$/,
+    "Release diagnostics must explicitly run after failed validation");
+  const names = uploads.map(step => step.match(/^          name: (.+)$/m)?.[1]);
+  assert.ok(names.length > timings.length, "Release must also preserve its candidate artifact");
+  assert.ok(names.every(name => typeof name === "string" && name.length > 0));
+  assert.equal(new Set(names).size, names.length, "Release diagnostics collide with another artifact");
 });

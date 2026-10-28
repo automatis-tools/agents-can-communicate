@@ -12,121 +12,228 @@ concurrency:
 # Actions are pinned to immutable commit SHAs. A moving tag is a dependency
 # somebody else can change after review.
 jobs:
-  test:
-    name: ${{ matrix.os }} · node ${{ matrix.node }}
-    runs-on: ${{ matrix.os }}
-    timeout-minutes: 30
-    strategy:
-      fail-fast: false
-      matrix:
-        # Linux and macOS each run the whole suite; Windows runs its exhaustive
-        # partition below. Every platform remains required.
-        os: ['ubuntu-latest', 'macos-latest']
-        node: ['24']
+  plan:
+    name: Plan validation
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      route: ${{ steps.route.outputs.route }}
+      scope: ${{ steps.route.outputs.scope }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: ${{ matrix.node }}
-
-      - name: Install
-        run: npm ci
-
-      # No syntax step: the Lint workflow checks every tracked .mjs once, and
-      # here it held each job's tests back by 14-40 s (2026-10-06).
-
-      - name: Tests
-        # Discovery belongs to the runner, independent of shell expansion.
-        run: npm test
-        env:
-          # Test and file deadlines fail by name, including leaked workers.
-          ACC_TEST_TIMEOUT_MS: '300000'
-          ACC_TEST_FILE_TIMEOUT_MS: '600000'
-          ACC_TEST_TIMINGS: ${{ runner.temp }}/acc-test-timings.jsonl
-          # Git exports these into every child process. The suite spawns git in
-          # temporary fixture repositories, and inheriting them makes those
-          # commands operate on this checkout instead. This repository has been
-          # damaged by exactly that once.
-          GIT_DIR: ''
-          GIT_WORK_TREE: ''
-
-      - name: Preserve timing diagnostics
-        continue-on-error: true
-        if: ${{ always() }}
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: test-timings-${{ matrix.os }}-node-${{ matrix.node }}-full
-          path: |
-            ${{ runner.temp }}/acc-test-timings.jsonl
-            ${{ runner.temp }}/acc-test-timings.jsonl.manifest.json
-          if-no-files-found: warn
-
-  windows-shards:
-    name: windows-latest · node 24 · shard ${{ matrix.shard }}
-    runs-on: windows-latest
-    timeout-minutes: 30
-    strategy:
-      fail-fast: false
-      matrix:
-        # Deterministic partitions of the runner's complete discovery; no path
-        # filters or hand-maintained test lists can silently exclude a file.
-        shard: ['1/2', '2/2']
-        include:
-          - shard: '1/2'
-            artifact: '1-of-2'
-          - shard: '2/2'
-            artifact: '2-of-2'
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+          fetch-depth: 0
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: '24'
-      - run: npm ci
-      # Preserve the measured local-disk fixture placement: remote C: flushes
-      # exceeded hook deadlines (windows-latest, 2026-10-02).
-      - name: Temporary files on the local disk
-        shell: pwsh
-        run: |
-          $dir = Join-Path $env:RUNNER_TEMP 'tmp'
-          New-Item -ItemType Directory -Force $dir | Out-Null
-          "TEMP=$dir" >> $env:GITHUB_ENV
-          "TMP=$dir" >> $env:GITHUB_ENV
-      - name: Tests
-        run: npm test -- --shard ${{ matrix.shard }}
-        env:
-          ACC_TEST_TIMEOUT_MS: '300000'
-          ACC_TEST_FILE_TIMEOUT_MS: '600000'
-          ACC_TEST_TIMINGS: ${{ runner.temp }}/acc-test-timings.jsonl
-          ACC_TEST_FORCE_EXIT: '1'
-          GIT_DIR: ''
-          GIT_WORK_TREE: ''
-
-      - name: Preserve timing diagnostics
+      - name: Authenticate event and plan validation
+        id: route
+        run: node scripts/ci-validation.mjs plan
+      - name: Record authenticated route
         continue-on-error: true
-        if: ${{ always() }}
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: test-timings-windows-latest-node-24-shard-${{ matrix.artifact }}
-          path: |
-            ${{ runner.temp }}/acc-test-timings.jsonl
-            ${{ runner.temp }}/acc-test-timings.jsonl.manifest.json
-          if-no-files-found: warn
+        run: node --input-type=module -e "console.log('CI_ROUTE=' + process.env.CI_ROUTE)"
+        env:
+          CI_ROUTE: ${{ steps.route.outputs.route }}
 
-  windows-test:
-    # Retain the existing required check name; cancellation/skips cannot make
-    # this aggregate green when a partition has not passed.
-    name: windows-latest · node 24
-    needs: windows-shards
+  full-linux:
+    name: ubuntu-latest · node 24 · full
+    needs: plan
+    if: needs.plan.outputs.scope == 'full'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    outputs:
+      proof: ${{ steps.test.outputs.proof }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/ci-test
+        id: test
+        with:
+          route: ${{ needs.plan.outputs.route }}
+          worker: full-linux
+          artifact: test-timings-ubuntu-latest-node-24-full
+
+  full-macos:
+    name: macos-latest · node 24 · full
+    needs: plan
+    if: needs.plan.outputs.scope == 'full'
+    runs-on: macos-latest
+    timeout-minutes: 30
+    outputs:
+      proof: ${{ steps.test.outputs.proof }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/ci-test
+        id: test
+        with:
+          route: ${{ needs.plan.outputs.route }}
+          worker: full-macos
+          artifact: test-timings-macos-latest-node-24-full
+
+  full-windows-1:
+    name: windows-latest · node 24 · shard 1/2
+    needs: plan
+    if: needs.plan.outputs.scope == 'full'
+    runs-on: windows-latest
+    timeout-minutes: 30
+    outputs:
+      proof: ${{ steps.test.outputs.proof }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/ci-test
+        id: test
+        with:
+          route: ${{ needs.plan.outputs.route }}
+          worker: full-windows-1
+          artifact: test-timings-windows-latest-node-24-shard-1-of-2
+
+  full-windows-2:
+    name: windows-latest · node 24 · shard 2/2
+    needs: plan
+    if: needs.plan.outputs.scope == 'full'
+    runs-on: windows-latest
+    timeout-minutes: 30
+    outputs:
+      proof: ${{ steps.test.outputs.proof }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/ci-test
+        id: test
+        with:
+          route: ${{ needs.plan.outputs.route }}
+          worker: full-windows-2
+          artifact: test-timings-windows-latest-node-24-shard-2-of-2
+
+  docs-linux:
+    name: ubuntu-latest · node 24 · docs
+    needs: plan
+    if: needs.plan.outputs.scope == 'docs'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    outputs:
+      proof: ${{ steps.test.outputs.proof }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/ci-test
+        id: test
+        with:
+          route: ${{ needs.plan.outputs.route }}
+          worker: docs-linux
+          artifact: test-timings-ubuntu-latest-node-24-docs
+
+  docs-macos:
+    name: macos-latest · node 24 · docs
+    needs: plan
+    if: needs.plan.outputs.scope == 'docs'
+    runs-on: macos-latest
+    timeout-minutes: 30
+    outputs:
+      proof: ${{ steps.test.outputs.proof }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/ci-test
+        id: test
+        with:
+          route: ${{ needs.plan.outputs.route }}
+          worker: docs-macos
+          artifact: test-timings-macos-latest-node-24-docs
+
+  docs-windows:
+    name: windows-latest · node 24 · docs
+    needs: plan
+    if: needs.plan.outputs.scope == 'docs'
+    runs-on: windows-latest
+    timeout-minutes: 30
+    outputs:
+      proof: ${{ steps.test.outputs.proof }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/ci-test
+        id: test
+        with:
+          route: ${{ needs.plan.outputs.route }}
+          worker: docs-windows
+          artifact: test-timings-windows-latest-node-24-docs
+
+  linux-test:
+    name: ubuntu-latest · node 24
+    needs: [plan, full-linux, docs-linux]
     if: ${{ always() }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Require both Windows partitions
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24'
+      - name: Require exact platform execution proof
+        run: node scripts/ci-validation.mjs aggregate
         env:
-          SHARD_RESULT: ${{ needs['windows-shards'].result }}
-        run: node --input-type=module -e "if (process.env.SHARD_RESULT !== 'success') process.exit(1)"
+          CI_ROUTE: ${{ needs.plan.outputs.route }}
+          CI_PLATFORM: linux
+          CI_NEEDS: ${{ toJSON(needs) }}
+
+  macos-test:
+    name: macos-latest · node 24
+    needs: [plan, full-macos, docs-macos]
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24'
+      - name: Require exact platform execution proof
+        run: node scripts/ci-validation.mjs aggregate
+        env:
+          CI_ROUTE: ${{ needs.plan.outputs.route }}
+          CI_PLATFORM: darwin
+          CI_NEEDS: ${{ toJSON(needs) }}
+
+  windows-test:
+    name: windows-latest · node 24
+    needs: [plan, full-windows-1, full-windows-2, docs-windows]
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24'
+      - name: Require exact platform execution proof
+        run: node scripts/ci-validation.mjs aggregate
+        env:
+          CI_ROUTE: ${{ needs.plan.outputs.route }}
+          CI_PLATFORM: win32
+          CI_NEEDS: ${{ toJSON(needs) }}
 
   real-clients:
+    needs: plan
+    if: ${{ always() }}
+    env:
+      CI_ROUTE: ${{ needs.plan.outputs.route }}
+      CI_WORKER: real-clients-${{ matrix.os }}
     name: real clients · ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
@@ -138,9 +245,13 @@ jobs:
         os: [ubuntu-latest, windows-latest]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: '24'
+      - name: Authenticate planned auxiliary worker
+        run: node scripts/ci-validation.mjs preflight
       - run: npm ci
       - name: Install the clients
         # Deliberately check current vendor compatibility on both platforms.
@@ -167,8 +278,15 @@ jobs:
           ACC_REAL_CLIENTS: '1'
           GIT_DIR: ''
           GIT_WORK_TREE: ''
+      - name: Recheck auxiliary worker inputs
+        run: node scripts/ci-validation.mjs preflight
 
   package:
+    needs: plan
+    if: ${{ always() }}
+    env:
+      CI_ROUTE: ${{ needs.plan.outputs.route }}
+      CI_WORKER: package-${{ matrix.os }}
     name: package · ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 10
@@ -179,10 +297,14 @@ jobs:
         os: [ubuntu-latest, macos-latest, windows-latest]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: '24'
 
+      - name: Authenticate planned auxiliary worker
+        run: node scripts/ci-validation.mjs preflight
       - run: npm ci
 
       - name: Pack and verify the tarball
@@ -192,3 +314,5 @@ jobs:
         # present there, so an unbundled package imports fine until someone else
         # installs it.
         run: node scripts/verify-package.mjs
+      - name: Recheck auxiliary worker inputs
+        run: node scripts/ci-validation.mjs preflight

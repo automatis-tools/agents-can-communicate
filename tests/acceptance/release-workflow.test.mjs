@@ -71,8 +71,11 @@ test("the release workflow creates its pack destination before npm writes there"
 
 test("release and CI pass bounded test deadlines to the real runner plan", async () => {
   for (const name of ["ci", "release"]) {
-    const workflow = await readFile(path.join(repo, ".github", "workflows", `${name}.yml`), "utf8");
-    const testSteps = [...workflow.matchAll(/(?:^        |^      - )run: npm test[^\n]*\n        env:\n((?:          .+\n)+)/gm)];
+    const workflow = name === "ci"
+      ? await readFile(path.join(repo, ".github/actions/ci-test/action.yml"), "utf8")
+      : await readFile(path.join(repo, ".github", "workflows", `${name}.yml`), "utf8");
+    const normalized = name === "ci" ? workflow.replace(/^/gm, "  ") : workflow;
+    const testSteps = [...normalized.matchAll(/(?:^        |^      - )run: (?:npm test|node scripts\/ci-validation\.mjs test)[^\n]*\n        env:\n((?:          .+\n)+)/gm)];
     assert.ok(testSteps.length > 0, `${name} has no test environment`);
     for (const [, block] of testSteps) {
       const env = { ...process.env };
