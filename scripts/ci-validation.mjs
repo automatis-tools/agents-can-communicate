@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 // A deliberately small boundary: reauthenticate policy, execute, then publish.
+import { appendFileSync, rmSync } from 'node:fs';
 import { appendFile, lstat, readFile, realpath, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { createCiRoute, verifyCiRoute, verifyCiInputs, ciWorker } from './ci-plan.mjs';
@@ -66,19 +67,28 @@ async function main() {
   }
   const controller = new AbortController();
   const interrupt = () => controller.abort();
+  let published = false;
   process.on('SIGINT', interrupt); process.on('SIGTERM', interrupt);
   try {
     await runPushCommand(process.execPath, args, { cwd: repo, signal: controller.signal,
       env: { ACC_TEST_TIMINGS: paths['acc-test-timings.jsonl'], ACC_GATE_DIAGNOSTIC: paths['acc-test-timings.jsonl.manifest.json'] } });
     if (controller.signal.aborted) fail();
     const manifest = JSON.parse(await readFile(paths['acc-test-timings.jsonl.manifest.json'],'utf8'));
+    if (controller.signal.aborted) fail();
     const proof = verifyCiTestManifest({ manifest, route, plan, worker: role.id, nodeVersion: process.version });
     await verifyCiInputs(repo, route.targetCommit);
+    if (controller.signal.aborted) fail();
     await writeFile(paths['acc-ci-proof.json'], JSON.stringify(proof), { mode: 0o600 });
-    await publish('proof', proof);
+    if (controller.signal.aborted) fail();
+    // Terminal handoff: no await separates the last cancellation check, owned
+    // selection cleanup and successful job publication. Later signals do not
+    // retroactively revoke this completed handoff; success has no async cleanup.
+    rmSync(paths['acc-ci-selection.json'], { force: true });
+    appendFileSync(output, `proof=${JSON.stringify(proof)}\n`);
+    published = true;
   } finally {
     process.off('SIGINT', interrupt); process.off('SIGTERM', interrupt);
-    if (!controller.signal.aborted) await rm(paths['acc-ci-selection.json'], { force: true });
+    if (!published && !controller.signal.aborted) await rm(paths['acc-ci-selection.json'], { force: true });
   }
 }
 try { await main(); }

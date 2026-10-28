@@ -1,12 +1,13 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { ciRunnerFixture } from '../helpers/ci-runner-fixture.mjs';
+import { ciRunnerFixture, postRunInterruption } from '../helpers/ci-runner-fixture.mjs';
 
 test('production CLI executes docs, exact smoke, then proof', async t => {
   const f = await ciRunnerFixture(t);
   const plan = await f.invoke('plan'); assert.equal(plan.code, 0, plan.stderr);
   const result = await f.invoke('test', { CI_ROUTE: plan.outputs.route, CI_WORKER: f.worker });
   assert.equal(result.code, 0, result.stderr);
+  assert.equal((await readdir(f.temporary)).includes('acc-ci-selection.json'),false);
   assert.equal((await f.records('docs')).length, 1);
   assert.equal((await f.records('runtime')).length, 0);
   assert.equal((await f.records('smoke')).length, 1);
@@ -189,3 +190,21 @@ test('CLI refuses hard-linked output before publishing its plan',async t=>{
   assert.notEqual(result.code,0);
   assert.equal(await f.read('README.md'),'# after\n');
 });
+
+
+for(const [phase,signal] of [['manifest','SIGTERM'],['audit','SIGTERM'],['proof','SIGINT']]) {
+  test(`post-run ${phase} interruption ${signal} cannot publish worker proof`,{skip:process.platform==='win32'},async t=>{
+    const f=await ciRunnerFixture(t);
+    const p=await f.invoke('plan'); assert.equal(p.code,0,p.stderr);
+    const injection=await postRunInterruption(f,phase,signal);
+    const result=await f.invoke('test',{CI_ROUTE:p.outputs.route,CI_WORKER:f.worker,NODE_OPTIONS:injection.NODE_OPTIONS});
+    const observed=JSON.parse(await readFile(injection.marker,'utf8').catch(()=>{assert.fail(JSON.stringify(result));}));
+    assert.deepEqual(observed,{phase,signal,listeners:1},'real signal must reach the installed production handler');
+    assert.equal((await f.records('docs')).length,1);
+    assert.equal((await f.records('smoke')).length,1);
+    const manifest=JSON.parse(await readFile(path.join(f.temporary,'acc-test-timings.jsonl.manifest.json'),'utf8'));
+    assert.equal(manifest.events.at(-1).result,'passed','runner must finish before this interruption');
+    noProof(result);
+    assert.equal((await readdir(f.temporary)).includes('acc-ci-selection.json'),true,'interruption retains the owned selection');
+  });
+}

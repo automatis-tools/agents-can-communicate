@@ -55,3 +55,45 @@ export async function ciRunnerFixture(t, { scope = 'docs', runnerSuffix = '', ru
       return result;
     } };
 }
+
+// Private preload preserves the actual I/O and delivers an observed real signal
+// at the chosen post-run await. Production has no test hook or altered bytes.
+export async function postRunInterruption(f, phase, signal) {
+  const marker = path.join(f.base,`interrupted-${phase}-${signal}.json`);
+  const preload = path.join(f.base,`interrupt-${phase}-${signal}.mjs`);
+  await writeFile(preload,`
+    import fs from 'node:fs/promises';
+    import path from 'node:path';
+    import {syncBuiltinESMExports} from 'node:module';
+    const read=fs.readFile, write=fs.writeFile;
+    const driver=process.argv[1]?.endsWith('/scripts/ci-validation.mjs') && process.argv[2]==='test';
+    let delivered=false;
+    async function interrupt() {
+      if(delivered) return;
+      delivered=true;
+      const listeners=process.listenerCount(${JSON.stringify(signal)});
+      const received=new Promise(resolve=>process.once(${JSON.stringify(signal)},resolve));
+      const deadline=setTimeout(()=>{},10000); // Signal watchers alone do not keep Node alive.
+      try { process.kill(process.pid,${JSON.stringify(signal)}); await received; }
+      finally { clearTimeout(deadline); }
+      await write(${JSON.stringify(marker)},JSON.stringify({phase:${JSON.stringify(phase)},signal:${JSON.stringify(signal)},listeners}));
+    }
+    fs.readFile=async (...args)=>{
+      const value=await read(...args);
+      const name=path.basename(String(args[0]));
+      const atManifest=${JSON.stringify(phase)}==='manifest' && name==='acc-test-timings.jsonl.manifest.json';
+      const atAudit=${JSON.stringify(phase)}==='audit' && name==='README.md'
+        && await fs.stat(path.join(process.env.RUNNER_TEMP,'acc-test-timings.jsonl.manifest.json')).then(()=>true,()=>false);
+      if(driver && (atManifest || atAudit)) await interrupt();
+      return value;
+    };
+    fs.writeFile=async (...args)=>{
+      const value=await write(...args);
+      if(driver && ${JSON.stringify(phase)}==='proof' && path.basename(String(args[0]))==='acc-ci-proof.json') await interrupt();
+      return value;
+    };
+    syncBuiltinESMExports();
+  `);
+  const { pathToFileURL } = await import('node:url');
+  return { marker, NODE_OPTIONS: `${f.env.NODE_OPTIONS ?? ''} --import=${pathToFileURL(preload).href}`.trim() };
+}
