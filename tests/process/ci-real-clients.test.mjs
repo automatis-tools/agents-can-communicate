@@ -7,6 +7,7 @@ import { access, mkdir, mkdtemp, readFile, realpath, rm, writeFile } from "node:
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
+import { pathToFileURL } from "node:url";
 import { promisify } from "node:util";
 import { npmCli } from "../../packages/cli/src/managed-runtime/download.mjs";
 
@@ -72,7 +73,7 @@ process.stderr.write(value.stderr??'');process.exitCode=value.code??0; }
     return spawn(process.execPath, [program, role, ...forwarded], options);
   } };
   const invoke = async (context = {}, deps = {}) => {
-    const { runRealClients } = await import(driver);
+    const { runRealClients } = await import(pathToFileURL(driver).href);
     const code = await runRealClients({ cwd: root, evidenceDir, env, ...context }, { ...dependencies, ...deps });
     const report = JSON.parse(await readFile(path.join(evidenceDir, "compatibility.json"), "utf8"));
     return { code, report, phases: Object.fromEntries(report.phases.map(phase => [phase.id, phase])) };
