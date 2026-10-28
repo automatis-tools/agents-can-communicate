@@ -1,5 +1,27 @@
 # Changelog
 
+## Unreleased — reads without the event log
+
+- A transaction that only reads no longer lists the event log (#307). Every transaction found
+  the next event sequence before it ran, by listing every event file, so each hook's reads grew
+  with the workspace's history. A transaction now finds the sequence when it commits an event
+  or a journal, still under the writer mutex. Beside 10,000 events, a receipt read lists no
+  event file instead of 10,011 and takes 6.5 ms instead of 28.8 ms, about what it takes beside
+  100. A write still lists the log once, when it commits. A store whose sequence is exhausted
+  now refuses only the writes that need one, and a transaction whose last sequence would pass
+  the safe range publishes nothing, where two of its events could before share a name.
+
+| Development artifact | Value |
+|---|---|
+| Built from | `60bc92db4c47afeafc726544d59e1f1fb06643a5` |
+| Tarball | `agents-can-communicate-0.12.2.tgz`, 628,383 bytes, 380 files |
+| sha256 | `2683bdca07d20209cb7595672b38fdf409774ef8afae1888ff627b7d318e63e1` |
+
+The exact archive passed package verification. See
+[development evidence](docs/release-evidence/unreleased-readonly-sequence.md).
+This is not a published release; the package version remains `0.12.2`.
+The earlier candidate and release records below retain their original provenance.
+
 ## Unreleased — inbox reads without the backlog
 
 - An inbox read no longer reads the workspace's backlog (#306). An exact read and a page listed
