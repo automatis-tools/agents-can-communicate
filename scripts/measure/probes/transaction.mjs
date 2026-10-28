@@ -11,6 +11,8 @@ import { eventsAfter, loadStoreSide, openInstance, openStoreFixture, primaryDige
 
 // `pendingJournal` stops each read's step behind its journal, as a crash would.
 const defaults = { messages: 30, events: 100, operation: "read", pendingJournal: false, seed: 1 };
+// How many history events one fixture transaction appends.
+const HISTORY_BATCH = 250;
 // What the product publishes for a successful offer.
 const OFFER_EVENT = "message.offer_succeeded";
 // Every kind a measured call must leave as it was: it may move one receipt and append events.
@@ -73,11 +75,22 @@ async function build(scenario, side) {
     }
     states.set(message.messageId, wanted);
   }
-  // History that grows without touching a message or a receipt.
+  // History that grows without touching a message or a receipt: intent events, a few hundred
+  // to a transaction. One write each, 1,000 events took 205 s to build on a loaded Mac, and the
+  // scenario needs 10,000 in every child (#307).
   const counter = { cursor: null, count: 0 };
-  for (let round = 0; await countEvents(fixture.store, counter) < scenario.events; round++) {
-    fixture.clock.advance(1_000);
-    await fixture.service.setIntent({ ...fixture.owner("sender"), summary: `history ${round}`, mode: "edit" });
+  const [{ schemaVersion }] = (await fixture.store.eventsSince(WORKSPACE, null, 1)).events;
+  for (let have = await countEvents(fixture.store, counter); have < scenario.events;
+    have = await countEvents(fixture.store, counter)) {
+    const count = Math.min(HISTORY_BATCH, scenario.events - have);
+    await fixture.store.transaction(tx => {
+      for (let index = 0; index < count; index++) {
+        fixture.clock.advance(1_000);
+        tx.append({ schemaVersion, eventId: fixture.ids.next("event"), workspaceId: WORKSPACE,
+          actorSessionId: fixture.sessions.sender.sessionId, type: "intent.published",
+          occurredAt: fixture.clock.now(), payload: { mode: "edit", state: "active" } });
+      }
+    }, { kinds: [] });
   }
   const built = { scenario, side, fixture, messages, next: 0, target: null, states, initial: new Map(states),
     pending: null, moved: null, events: counter.count, digest: await primaryDigest(fixture, side),
