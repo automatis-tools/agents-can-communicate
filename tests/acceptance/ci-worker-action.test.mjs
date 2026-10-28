@@ -34,7 +34,8 @@ test('the composite publishes proof only from the production test-driver step', 
   const upload = steps.find(s => s.includes('uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a'));
   assert.ok(upload && steps.indexOf(upload) > steps.indexOf(driver));
   assert.equal(scalar(upload, 'continue-on-error'), 'true');
-  assert.equal(evaluate(scalar(upload, 'if'), { always: () => true }), true);
+  // A bare true still inherits Actions' implicit success() status check.
+  assert.match(scalar(upload, 'if'), /^\$\{\{\s*always\(\)\s*\}\}$/);
   const name = scalar(upload, 'name');
   for (const [attempt, want] of [[1, 'timing-full'], [2, 'timing-full-attempt-2'], [3, 'timing-full-attempt-3']]) {
     const actual = evaluate(name, { inputs: { artifact: 'timing-full' }, github: { run_attempt: attempt },

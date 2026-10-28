@@ -6,7 +6,6 @@ import path from "node:path";
 import test from "node:test";
 import { pathToFileURL } from "node:url";
 import { promisify } from "node:util";
-import vm from "node:vm";
 import { removeFixture } from "../helpers/fixture-cleanup.mjs";
 
 const run = promisify(execFile);
@@ -213,9 +212,9 @@ test("Release timing upload remains optional and unconditional with distinct art
   assert.equal(upload.match(/^        continue-on-error: (.+)$/m)?.[1], "true",
     "failed diagnostic delivery would fail the Release job");
   const expression = upload.match(/^        if: (.+)$/m)?.[1];
-  assert.ok(expression, "Release diagnostics must run after failed validation");
-  assert.equal(vm.runInNewContext(expression.replace(/^\$\{\{|\}\}$/g, ""),
-    { always: () => true, success: () => false }), true);
+  // Without a status function, Actions implicitly adds success(), even for true.
+  assert.match(expression ?? "", /^\$\{\{\s*always\(\)\s*\}\}$/,
+    "Release diagnostics must explicitly run after failed validation");
   const names = uploads.map(step => step.match(/^          name: (.+)$/m)?.[1]);
   assert.ok(names.length > timings.length, "Release must also preserve its candidate artifact");
   assert.ok(names.every(name => typeof name === "string" && name.length > 0));

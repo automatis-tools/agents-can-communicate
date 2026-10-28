@@ -184,6 +184,9 @@ for (const scope of ["docs", "full"]) test(`actual aggregate CLI fails closed fo
   const source = await workflow("ci");
   for (const [id, platform, , workers] of lanes) {
     const block = job(source, id);
+    // Raw expression evaluation omits Actions' default success() status check.
+    assert.match(scalar(block, "if"), /^\$\{\{\s*always\(\)\s*\}\}$/,
+      `${id} must explicitly run after failed or skipped dependencies`);
     const needs = successfulNeeds(route, plan, workers);
     const scheduledNeeds = Object.fromEntries(list(block, "needs").map(key => [key, needs[key]]));
     const input = { route, plan, runAttempt: "1", platform: scalar(block, "CI_PLATFORM"), needs: scheduledNeeds };
@@ -224,6 +227,8 @@ test("package and client matrices preserve their workloads and authenticate befo
     assert.deepEqual(scalar(block, "os").slice(1, -1).split(/,\s*/), platforms);
     assert.equal(scalar(block, "fail-fast"), "false");
     assert.equal(scalar(block, "needs"), "plan");
+    assert.match(scalar(block, "if"), /^\$\{\{\s*always\(\)\s*\}\}$/,
+      `${id} must explicitly authenticate after planner failure`);
     assert.equal(condition(block, { always: () => true, success: () => false }), true);
     assert.equal(scalar(block, "node-version"), "'24'");
     const preflights = [...block.matchAll(/run: node scripts\/ci-validation\.mjs preflight/g)];
