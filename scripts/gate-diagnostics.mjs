@@ -7,7 +7,7 @@ import { promisify } from "node:util";
 
 const run = promisify(execFile);
 const reasons = new Set(["hit", "absent", "expired", "invalid", "inputs-uncertain", "ci-disabled", "scope-mismatch"]);
-const events = new Set(["fingerprint", "cache-lookup", "packed-template", "batch-execution", "cleanup", "total", "receipt-persistence"]);
+const events = new Set(["fingerprint", "cache-lookup", "packed-template", "package-smoke", "batch-execution", "cleanup", "total", "receipt-persistence"]);
 const results = new Set(["passed", "failed", "reused", "available", "inputs-uncertain", "ci-disabled", "hit", "absent",
   "expired", "invalid", "scope-mismatch", "fingerprint-changed", "observation-changed", "eligible", "ineligible", "saved", "unavailable"]);
 const nonnegative = value => typeof value === "number" && Number.isFinite(value) && value >= 0;

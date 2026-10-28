@@ -1,15 +1,30 @@
 // Resolve every ref's content/history facts before conservatively joining trees.
 import { execFile, spawn } from "node:child_process";
+import { createHash } from "node:crypto";
 import { mkdtemp, realpath, rm } from "node:fs/promises";
 import { homedir, tmpdir } from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
 import { pathToFileURL } from "node:url";
+import { resolveWindowsNpm } from "./push-npm.mjs";
 import { checkoutMatchesCommit } from "./push-tree-check.mjs";
 import { stopPushProcessTree, terminationFailure } from "./push-process-tree.mjs";
 
 const run = promisify(execFile);
 const zero = oid => /^0+$/.test(oid);
+const canonical = value => Array.isArray(value) ? value.map(canonical)
+  : value && typeof value === "object" ? Object.fromEntries(Object.keys(value).sort().map(key => [key, canonical(value[key])])) : value;
+function planMatchesRef(plan, { commit, tree, ref }) {
+  if (plan?.schema !== 1 || !["docs", "full"].includes(plan.scope)
+    || plan.targetCommit !== commit || plan.targetTree !== tree || !Array.isArray(plan.reasons)
+    || !Array.isArray(plan.selectedFiles) || !plan.selectedFiles.length) return false;
+  for (const [prefix, value] of [["event:", "push"], ["ref:", ref.remoteRef]]) {
+    const facts = plan.reasons.filter(reason => typeof reason === "string" && reason.startsWith(prefix));
+    if (facts.length !== 1 || facts[0] !== `${prefix}${value}`) return false;
+  }
+  const { planDigest, ...body } = plan;
+  return planDigest === createHash("sha256").update(JSON.stringify(canonical(body))).digest("hex");
+}
 export function pushEnvironment() {
   const env = { ...process.env };
   for (const key of Object.keys(env)) if (/^GIT_(DIR|WORK_TREE|INDEX_FILE|COMMON_DIR|OBJECT_DIRECTORY|ALTERNATE_OBJECT_DIRECTORIES|PREFIX|QUARANTINE_PATH)$/i.test(key)) delete env[key];
@@ -34,7 +49,7 @@ export function parsePushRefs(text, { objectFormat }) {
     return { localRef, localOid, remoteRef, remoteOid };
   });
 }
-export async function resolvePushTrees(repo, refs) {
+export async function resolvePushTrees(repo, refs, { planForRef } = {}) {
   const resolved = [];
   for (const ref of refs) {
     try { await pushGit(repo, ["check-ref-format", ref.remoteRef]); }
@@ -48,8 +63,8 @@ export async function resolvePushTrees(repo, refs) {
     } catch { throw Error(`unresolved pushed commit ${ref.localOid}`); }
     let ancestryVerified = true;
     let complete = true;
+    let base = null;
     if (!zero(ref.remoteOid)) {
-      let base;
       try { base = (await pushGit(repo, ["rev-parse", "--verify", `${ref.remoteOid}^{commit}`])).trim(); }
       catch { throw Error(`unresolved remote base ${ref.remoteOid}`); }
       try { await pushGit(repo, ["merge-base", "--is-ancestor", base, commit]); }
@@ -60,9 +75,26 @@ export async function resolvePushTrees(repo, refs) {
       try { await pushGit(repo, ["diff-tree", "--root", "--raw", "--no-commit-id", "-r", commit]); }
       catch { complete = false; }
     }
-    const requiredScope = ref.remoteRef.startsWith("refs/heads/measure/") && complete && ancestryVerified
+    let requiredScope = ref.remoteRef.startsWith("refs/heads/measure/") && complete && ancestryVerified
       ? "measurement-only" : "full";
-    resolved.push({ commit, tree, refs: [ref], requiredScope, checkout: "isolated" });
+    const facts = { ref, commit, tree, base, complete, ancestryVerified };
+    let plan = null;
+    if (requiredScope !== "measurement-only" && planForRef) {
+      try {
+        const proposed = await planForRef(facts);
+        // The injected planner validates immutable facts; still bind its output
+        // to this original ref/base before allowing a weaker docs requirement.
+        if (planMatchesRef(proposed, facts)) {
+          plan = proposed;
+          if (proposed.scope === "docs" && base && complete && ancestryVerified
+            && proposed.reasons.includes(`base-commit:${base}`)
+            && ref.remoteRef.startsWith("refs/heads/") && ref.remoteRef !== "refs/heads/main"
+            && !/^refs\/heads\/release(?:[/-]|$)/.test(ref.remoteRef)) requiredScope = "docs";
+        }
+      } catch { /* Planner uncertainty retains full execution. */ }
+    }
+    resolved.push({ commit, tree, refs: [ref], refPlans: [{ ...facts, requiredScope, plan }],
+      requiredScope, plan, checkout: "isolated" });
   }
   const joined = new Map();
   const rank = { "measurement-only": 0, docs: 1, full: 2 };
@@ -71,7 +103,13 @@ export async function resolvePushTrees(repo, refs) {
     if (!previous) joined.set(target.tree, target);
     else {
       previous.refs.push(...target.refs);
-      if (rank[target.requiredScope] > rank[previous.requiredScope]) previous.requiredScope = target.requiredScope;
+      previous.refPlans.push(...target.refPlans);
+      if (rank[target.requiredScope] > rank[previous.requiredScope]) {
+        // Representative commit and plan are one fact, never mixed across refs.
+        previous.commit = target.commit;
+        previous.plan = target.plan;
+        previous.requiredScope = target.requiredScope;
+      }
     }
   }
   for (const target of joined.values()) {
@@ -85,41 +123,73 @@ export async function resolvePushTrees(repo, refs) {
 // Never expose command environment or checkout paths.
 // Optional executor/platform overrides are solely a command-boundary test seam;
 // production always uses native spawn/platform and fixed taskkill arguments.
-export function runPushCommand(file, args, { cwd, signal, input, quiet = false,
-  platform = process.platform, spawnCommand = spawn } = {}) {
+export async function runPushCommand(file, args, { cwd, signal, input, quiet = false,
+  platform = process.platform, spawnCommand = spawn, env = {} } = {}) {
+  if (signal?.aborted) throw Error("push validation interrupted");
+  const inheritedEnv = pushEnvironment();
+  let commandEnv = { ...inheritedEnv, ...env };
+  if (platform === "win32") {
+    // Fold each layer in order: explicit overrides beat inherited spellings,
+    // and the last spelling within a layer wins. POSIX keeps exact-case spread.
+    const names = new Map();
+    for (const layer of [inheritedEnv, env]) {
+      for (const [key, value] of Object.entries(layer)) names.set(key.toUpperCase(), [key, value]);
+    }
+    commandEnv = Object.fromEntries(names.values());
+    if (file === "npm") {
+      const executor = await resolveWindowsNpm({ cwd, env: commandEnv, signal,
+        launch: (command, argv, options) => runRawPushCommand(command, argv,
+          { ...options, platform, spawnCommand }) });
+      file = executor.file;
+      args = [...executor.prefixArgs, ...args];
+    }
+  }
+  if (signal?.aborted) throw Error("push validation interrupted");
+  return runRawPushCommand(file, args, { cwd, signal, input, quiet, platform, spawnCommand, env: commandEnv });
+}
+
+function runRawPushCommand(file, args, { cwd, signal, input, quiet, platform, spawnCommand, env: commandEnv, onOutput }) {
   return new Promise((resolve, reject) => {
     if (signal?.aborted) { reject(Error("push validation interrupted")); return; }
     const windows = platform === "win32";
-    const child = spawnCommand(file, args, { cwd, env: pushEnvironment(), detached: !windows,
-      shell: windows && file === "npm", stdio: ["pipe", "pipe", "pipe"] });
+    const child = spawnCommand(file, args, { cwd, env: commandEnv, detached: !windows,
+      shell: false, stdio: ["pipe", "pipe", "pipe"] });
     let stdout = "";
     let stderr = "";
     let cancellation = Promise.resolve();
+    let cancelling = false;
     const abort = () => {
+      if (cancelling) return;
+      cancelling = true;
+      signal?.removeEventListener("abort", abort);
       if (windows) {
         cancellation = new Promise(resolve => {
           if (!Number.isInteger(child.pid) || child.pid <= 0) { resolve(terminationFailure()); return; }
           let killer;
           try { killer = spawnCommand("taskkill", ["/pid", String(child.pid), "/t", "/f"], { stdio: "ignore" }); }
           catch { resolve(terminationFailure()); return; }
-          killer.once("error", () => resolve(terminationFailure()));
-          killer.once("close", code => resolve(code === 0 ? null : terminationFailure()));
+          const timeout = setTimeout(() => { killer.unref?.(); resolve(terminationFailure()); }, 2000);
+          killer.once("error", () => { clearTimeout(timeout); resolve(terminationFailure()); });
+          killer.once("close", code => { clearTimeout(timeout); resolve(code === 0 ? null : terminationFailure()); });
         });
       }
       else cancellation = stopPushProcessTree(child.pid);
-      // A denied kill may leave the child alive indefinitely. Report it now,
-      // release our handles, and let the checkout owner retain its directory.
+      // Teardown completion, not inherited pipe closure, bounds cancellation.
+      // The checkout owner retains interrupted resources even after confirmed kills.
       cancellation.then(error => {
-        if (!error) return;
         child.unref?.();
         for (const stream of [child.stdin, child.stdout, child.stderr]) stream.destroy();
-        reject(error);
+        reject(error ?? Error("push validation interrupted"));
       });
     };
     signal?.addEventListener("abort", abort, { once: true });
-    child.stdout.on("data", bytes => { stdout += bytes; });
-    child.stderr.on("data", bytes => { stderr += bytes; });
-    child.once("error", error => { signal?.removeEventListener("abort", abort); reject(error); });
+    child.stdout.on("data", bytes => { onOutput?.(bytes); if (!signal?.aborted) stdout += bytes; });
+    child.stderr.on("data", bytes => { onOutput?.(bytes); if (!signal?.aborted) stderr += bytes; });
+    child.once("error", error => {
+      signal?.removeEventListener("abort", abort);
+      // An error after cancellation must not outrun the owned-tree result.
+      if (!cancelling) reject(error);
+    });
     child.once("close", async code => {
       signal?.removeEventListener("abort", abort);
       const terminationError = await cancellation;
@@ -139,7 +209,8 @@ export function runPushCommand(file, args, { cwd, signal, input, quiet = false,
       else resolve();
     });
     child.stdin.on("error", () => {});
-    child.stdin.end(input);
+    if (signal?.aborted) abort();
+    else child.stdin.end(input);
   });
 }
 

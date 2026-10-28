@@ -30,3 +30,11 @@ test("invalid, repeated, unknown and empty shard selections fail before packing"
     assert.match(result.stderr, /shard|argument|empty|if-needed/);
   }
 });
+
+
+test("selection plans require one non-flag file and cannot combine with shards", async () => {
+  for (const args of [["--selection-plan"], ["--selection-plan", ""], ["--selection-plan", "--list"],
+    ["--selection-plan", "a", "--selection-plan", "b"], ["--selection-plan", "a", "--shard", "1/1"]]) {
+    await assert.rejects(run(process.execPath, [runner, "--list", ...args], { cwd: repo }), /selection-plan|argument/);
+  }
+});
