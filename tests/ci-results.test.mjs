@@ -32,7 +32,7 @@ function sample(scope = 'docs', platform = 'linux', shard = null) {
     targetCommit: route.targetCommit, targetTree: route.targetTree, planDigest: plan.planDigest, scope,
     platform, node: 'v24.4.0', shard, fileCount: files.length, filesDigest: digest(files),
     concurrency: identity.concurrency, fsyncMode: 'real', packageSmoke: scope === 'docs' };
-  return { route, plan, worker, nodeVersion: 'v24.4.0', manifest, proof };
+  return { route, plan, worker, runAttempt: '1', nodeVersion: 'v24.4.0', manifest, proof };
 }
 const clone = value => structuredClone(value);
 for (const [scope, platform, shard] of [['docs','linux',null], ['docs','darwin',null], ['docs','win32',null],
@@ -87,7 +87,7 @@ function aggregate(scope, platform) {
     needs[name] = { result: active ? 'success' : 'skipped', outputs: active ? {
       proof: JSON.stringify(sample(scope, platform, part).proof) } : {} };
   }
-  return { route: s.route, plan: s.plan, platform, needs };
+  return { route: s.route, plan: s.plan, platform, needs, runAttempt: '1' };
 }
 for (const scope of ['docs','full']) for (const platform of ['linux','darwin','win32']) {
   test(`aggregate accepts exact ${scope} ${platform} membership`, () => verifyCiAggregate(aggregate(scope, platform)));
@@ -118,3 +118,45 @@ for (const [key, value] of Object.entries({ workerId: 'docs-macos', routeDigest:
     a.needs['docs-linux'].outputs.proof = JSON.stringify(p); assert.throws(() => verifyCiAggregate(a));
   });
 }
+
+function proofAttempt(a, worker, attempt) {
+  const proof = JSON.parse(a.needs[worker].outputs.proof);
+  a.needs[worker].outputs.proof = JSON.stringify({ ...proof, runAttempt: attempt, routeDigest: ciRouteDigest(a.route) });
+}
+test('manifest proof records actual worker attempt without changing planner lineage', () => {
+  const s = sample();
+  assert.deepEqual(verifyCiTestManifest({ ...s, runAttempt: '2' }), { ...s.proof, runAttempt: '2' });
+  for (const runAttempt of ['0', '01', '-1', '1.5', '1\n', 1, null, undefined]) {
+    assert.throws(() => verifyCiTestManifest({ ...s, runAttempt }));
+  }
+  s.route.runAttempt = '2';
+  assert.throws(() => verifyCiTestManifest({ ...s, runAttempt: '1' }));
+});
+test('aggregate accepts retained successes and mixed Windows attempts without relabeling', () => {
+  const a = aggregate('full', 'win32');
+  a.runAttempt = '3';
+  proofAttempt(a, 'full-windows-2', '2');
+  const before = clone(a);
+  verifyCiAggregate(a);
+  assert.deepEqual(a, before);
+});
+test('aggregate bounds proof and current attempts exactly, including beyond Number precision', () => {
+  const a = aggregate('full', 'win32');
+  a.route.runAttempt = '9007199254740993';
+  a.runAttempt = '9007199254740994';
+  a.needs.plan.outputs.route = JSON.stringify(a.route);
+  proofAttempt(a, 'full-windows-1', '9007199254740993');
+  proofAttempt(a, 'full-windows-2', '9007199254740994');
+  verifyCiAggregate(a);
+  for (const attempt of ['9007199254740992', '9007199254740995', '0', '01', '-1', '1.5', '1\n', 1, null, undefined]) {
+    const broken = clone(a); proofAttempt(broken, 'full-windows-1', attempt);
+    assert.throws(() => verifyCiAggregate(broken), `invalid proof attempt ${attempt}`);
+  }
+  const future = aggregate('docs', 'linux');
+  future.runAttempt = '9007199254740992';
+  proofAttempt(future, 'docs-linux', '9007199254740993');
+  assert.throws(() => verifyCiAggregate(future), 'adjacent future attempt must not round down');
+  for (const runAttempt of ['9007199254740992', '9007199254740993', '0', '01', '1\n', 1, null, undefined]) {
+    assert.throws(() => verifyCiAggregate({ ...a, runAttempt }), `invalid aggregate attempt ${runAttempt}`);
+  }
+});

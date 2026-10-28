@@ -186,7 +186,7 @@ for (const scope of ["docs", "full"]) test(`actual aggregate CLI fails closed fo
     const block = job(source, id);
     const needs = successfulNeeds(route, plan, workers);
     const scheduledNeeds = Object.fromEntries(list(block, "needs").map(key => [key, needs[key]]));
-    const input = { route, plan, platform: scalar(block, "CI_PLATFORM"), needs: scheduledNeeds };
+    const input = { route, plan, runAttempt: "1", platform: scalar(block, "CI_PLATFORM"), needs: scheduledNeeds };
     assert.equal(input.platform, platform);
     assert.doesNotThrow(() => verifyCiAggregate(input));
     const invoke = async n => f.invoke("aggregate", { CI_ROUTE: planned.outputs.route,

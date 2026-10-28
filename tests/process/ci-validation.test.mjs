@@ -39,7 +39,7 @@ test('full CLI executes unscoped discovery with no docs smoke or receipt reuse',
 test('CLI rejects unauthenticated context and wrong roles before any execution', async t => {
   const f=await ciRunnerFixture(t); const p=await f.invoke('plan'); assert.equal(p.code,0,p.stderr);
   const base={ CI_ROUTE:p.outputs.route,CI_WORKER:f.worker };
-  for (const overrides of [{CI_ROUTE:'{}'}, {GITHUB_RUN_ID:'2'}, {GITHUB_RUN_ATTEMPT:'2'},
+  for (const overrides of [{CI_ROUTE:'{}'}, {GITHUB_RUN_ID:'2'}, {GITHUB_RUN_ATTEMPT:'0'},
     {GITHUB_EVENT_NAME:'push'}, {GITHUB_REF:'refs/heads/main'}, {CI_WORKER:'full-linux'},
     {CI_WORKER:'package-macos-latest'}, {CI_WORKER:'unknown'}, {NODE_TEST_CONTEXT:'child-v8'},
     {RUNNER_TEMP:''}, {RUNNER_TEMP:f.root}, {GITHUB_OUTPUT:path.join(f.root,'README.md')}, {CI:''}]) {
@@ -122,7 +122,7 @@ test('production aggregate CLI requires exact proofs and fresh event identity',a
   const proof=JSON.parse(r.outputs.proof); proof.filesDigest='d'.repeat(64);
   needs[f.worker].outputs.proof=JSON.stringify(proof);
   noProof(await f.invoke('aggregate',{...env,CI_NEEDS:JSON.stringify(needs)}));
-  noProof(await f.invoke('aggregate',{...env,GITHUB_RUN_ATTEMPT:'2'}));
+  assert.equal((await f.invoke('aggregate',{...env,GITHUB_RUN_ATTEMPT:'2'})).code,0);
   assert.equal(proof.routeDigest,ciRouteDigest(JSON.parse(p.outputs.route)));
 });
 
@@ -208,3 +208,70 @@ for(const [phase,signal] of [['manifest','SIGTERM'],['audit','SIGTERM'],['proof'
     assert.equal((await readdir(f.temporary)).includes('acc-ci-selection.json'),true,'interruption retains the owned selection');
   });
 }
+
+for (const scope of ['docs', 'full']) test(`retained planner runs real ${scope} retry and aggregate-only retry`, async t => {
+  const f = await ciRunnerFixture(t, { scope });
+  const p = await f.invoke('plan'); assert.equal(p.code, 0, p.stderr);
+  const route = JSON.parse(p.outputs.route); assert.equal(route.runAttempt, '1');
+  const suffix = { linux: 'ubuntu-latest', darwin: 'macos-latest', win32: 'windows-latest' }[process.platform];
+  const auxiliary = await f.invoke('preflight', { CI_ROUTE: p.outputs.route,
+    CI_WORKER: `package-${suffix}`, GITHUB_RUN_ATTEMPT: '2' });
+  assert.equal(auxiliary.code, 0, auxiliary.stderr);
+  let last;
+  for (const attempt of ['1', '2']) {
+    last = await f.invoke('test', { CI_ROUTE: p.outputs.route, CI_WORKER: f.worker, GITHUB_RUN_ATTEMPT: attempt });
+    assert.equal(last.code, 0, last.stderr);
+    const proof = JSON.parse(last.outputs.proof);
+    assert.equal(proof.runAttempt, attempt);
+    assert.equal(proof.routeDigest, ciRouteDigest(route));
+    assert.equal((await f.records('packs')).length, Number(attempt));
+    assert.equal((await f.records('smoke')).length, scope === 'docs' ? Number(attempt) : 0);
+    assert.equal((await f.records(scope === 'docs' ? 'docs' : 'runtime')).length, Number(attempt));
+  }
+  // Native full Windows has a second partition; the explicit mixed-shard test covers its aggregate.
+  if (scope === 'full' && process.platform === 'win32') return;
+  const native = { linux: 'linux', darwin: 'macos', win32: 'windows' }[process.platform];
+  const excluded = scope === 'full' ? [`docs-${native}`] : process.platform === 'win32'
+    ? ['full-windows-1', 'full-windows-2'] : [`full-${native}`];
+  const needs = { plan: { result: 'success', outputs: { route: p.outputs.route } },
+    [f.worker]: { result: 'success', outputs: { proof: last.outputs.proof } },
+    ...Object.fromEntries(excluded.map(id => [id, { result: 'skipped', outputs: {} }])) };
+  const env = { CI_ROUTE: p.outputs.route, CI_PLATFORM: process.platform, CI_NEEDS: JSON.stringify(needs), GITHUB_RUN_ATTEMPT: '3' };
+  const result = await f.invoke('aggregate', env); assert.equal(result.code, 0, result.stderr);
+  assert.equal((await f.records('packs')).length, 2, 'aggregate retry must not repeat package or tests');
+  assert.equal((await f.records(scope === 'docs' ? 'docs' : 'runtime')).length, 2);
+  for (const overrides of [{ GITHUB_RUN_ID: '999' }, { GITHUB_RUN_ATTEMPT: '1' },
+    { GITHUB_EVENT_NAME: 'workflow_dispatch' }, { CI_ROUTE: JSON.stringify({ ...route, runAttempt: '4' }) }]) {
+    noProof(await f.invoke('aggregate', { ...env, ...overrides }));
+  }
+});
+
+import { createHash } from 'node:crypto';
+test('production aggregate CLI accepts mixed Windows success attempts under one retained planner', async t => {
+  const f = await ciRunnerFixture(t, { scope: 'full' });
+  const p = await f.invoke('plan', { GITHUB_RUN_ATTEMPT: '2' }); assert.equal(p.code, 0, p.stderr);
+  const route = JSON.parse(p.outputs.route);
+  const plan = JSON.parse(await readFile(path.join(f.temporary, 'acc-ci-plan.json'), 'utf8'));
+  const needs = { plan: { result: 'success', outputs: { route: p.outputs.route } }, 'docs-windows': { result: 'skipped', outputs: {} } };
+  // Synthetic Windows completion input exercises the real aggregate CLI on every host, not native Windows execution.
+  for (const [part, runAttempt] of [[1, '2'], [2, '3']]) {
+    const files = plan.selectedFiles.filter((_, i) => i % 2 === part - 1);
+    const proof = { schema: 1, workerId: `full-windows-${part}`, routeDigest: ciRouteDigest(route), runId: '1234',
+      runAttempt, targetCommit: route.targetCommit, targetTree: route.targetTree, planDigest: route.planDigest,
+      scope: 'full', platform: 'win32', node: 'v24.4.0', shard: `${part}/2`, fileCount: files.length,
+      filesDigest: createHash('sha256').update(JSON.stringify(files)).digest('hex'), concurrency: 3, fsyncMode: 'real', packageSmoke: false };
+    needs[proof.workerId] = { result: 'success', outputs: { proof: JSON.stringify(proof) } };
+  }
+  const invoke = (n, attempt = '3') => f.invoke('aggregate', { CI_ROUTE: p.outputs.route, CI_PLATFORM: 'win32',
+    CI_NEEDS: JSON.stringify(n), GITHUB_RUN_ATTEMPT: attempt });
+  assert.equal((await invoke(needs)).code, 0);
+  assert.equal((await invoke(needs, '4')).code, 0, 'aggregate-only retry retains both successful shard attempts');
+  for (const patch of [{ runAttempt: '1' }, { runAttempt: '4' }, { runId: '999' }, { workerId: 'full-windows-2' },
+    { targetCommit: 'f'.repeat(40) }, { routeDigest: 'f'.repeat(64) }]) {
+    const broken = structuredClone(needs);
+    const proof = JSON.parse(broken['full-windows-1'].outputs.proof);
+    broken['full-windows-1'].outputs.proof = JSON.stringify({ ...proof, ...patch });
+    noProof(await invoke(broken));
+  }
+  assert.equal((await f.records('packs')).length, 0);
+});

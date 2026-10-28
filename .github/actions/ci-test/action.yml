@@ -51,7 +51,7 @@ runs:
       if: ${{ always() }}
       uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
       with:
-        name: ${{ inputs.artifact }}
+        name: ${{ github.run_attempt == 1 && inputs.artifact || format('{0}-attempt-{1}', inputs.artifact, github.run_attempt) }}
         path: |
           ${{ runner.temp }}/acc-test-timings.jsonl
           ${{ runner.temp }}/acc-test-timings.jsonl.manifest.json

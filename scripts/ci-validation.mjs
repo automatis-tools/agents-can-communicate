@@ -48,7 +48,7 @@ async function main() {
     return;
   }
   if (mode === 'aggregate') {
-    verifyCiAggregate({ route, plan, platform: env.CI_PLATFORM, needs: JSON.parse(env.CI_NEEDS) });
+    verifyCiAggregate({ route, plan, platform: env.CI_PLATFORM, needs: JSON.parse(env.CI_NEEDS), runAttempt: env.GITHUB_RUN_ATTEMPT });
     return;
   }
   const role = ciWorker(env.CI_WORKER);
@@ -75,7 +75,7 @@ async function main() {
     if (controller.signal.aborted) fail();
     const manifest = JSON.parse(await readFile(paths['acc-test-timings.jsonl.manifest.json'],'utf8'));
     if (controller.signal.aborted) fail();
-    const proof = verifyCiTestManifest({ manifest, route, plan, worker: role.id, nodeVersion: process.version });
+    const proof = verifyCiTestManifest({ manifest, route, plan, worker: role.id, nodeVersion: process.version, runAttempt: env.GITHUB_RUN_ATTEMPT });
     await verifyCiInputs(repo, route.targetCommit);
     if (controller.signal.aborted) fail();
     await writeFile(paths['acc-ci-proof.json'], JSON.stringify(proof), { mode: 0o600 });

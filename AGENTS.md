@@ -110,15 +110,21 @@ CI=1 node --test tests/process/push-docs-scope.test.mjs tests/process/test-runne
 
 CI authenticates the event and exact checkout, then uses the shared planner to choose full or
 documentation workers. Linux, macOS and Windows required checks always validate exact worker
-membership and fresh execution proof, including planned failures and excluded workers. Ordinary
+membership and verified execution proof, including planned failures and excluded workers. Ordinary
 Markdown-only PRs with the audited reader pin run the complete documentation profile and exact
 packed-template smoke on each platform. Source changes, audit drift, uncertain plans, main pushes
 and release contexts require full execution. CI never reuses local suite receipts. Package and
 real-client checks retain their platform coverage and validate inputs before and after execution.
 Full Windows workers run the exhaustive `--shard 1/2` and `2/2` partitions; documentation uses
 one complete Windows worker. Required proof comes from the successful test driver, independently
-checked against the recomputed plan, not from optional diagnostic artifacts. Native CI observations
-are needed to measure the resulting runtime; scoped success never proves full-suite success.
+checked against the recomputed plan, not from optional diagnostic artifacts.
+
+Partial reruns can retain successful GitHub dependency results from the same immutable run and
+planner lineage. Each worker proof records its actual execution attempt, bounded by the planner
+and current aggregate attempts. First-attempt timing artifact names stay stable. Retry uploads
+add an attempt suffix and remain optional.
+
+Native CI observations are needed to measure the resulting runtime; scoped success never proves full-suite success.
 `--list` can inspect a shard without packing. Test files have a ten-minute process deadline
 (`ACC_TEST_FILE_TIMEOUT_MS`) in addition to the five-minute default per-test deadline
 (`ACC_TEST_TIMEOUT_MS`), so leaked handles cannot silently hold a gate forever. The runner

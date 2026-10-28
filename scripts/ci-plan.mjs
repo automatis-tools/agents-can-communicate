@@ -88,6 +88,10 @@ export async function createCiRoute({ repo, env, event }) {
 export async function verifyCiRoute({ repo, env, event, route }) {
   if (!route || route.schema !== 1 || Buffer.byteLength(serialize(route)) > 8192) throw Error("ci-route-unsupported");
   const expected = await createCiRoute({ repo, env, event });
-  if (serialize(route) !== serialize(expected.route)) throw Error("ci-route-mismatch");
-  return expected;
+  // A successful planner may survive a partial rerun. Keep its lineage in the
+  // digest while reauthenticating every immutable field against this execution.
+  if (!positive(route.runAttempt) || BigInt(route.runAttempt) > BigInt(expected.route.runAttempt)) throw Error("ci-route-mismatch");
+  const retained = Object.freeze({ ...expected.route, runAttempt: route.runAttempt });
+  if (serialize(route) !== serialize(retained)) throw Error("ci-route-mismatch");
+  return { route: retained, plan: expected.plan };
 }

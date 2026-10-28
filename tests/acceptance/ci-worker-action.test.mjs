@@ -35,7 +35,13 @@ test('the composite publishes proof only from the production test-driver step', 
   assert.ok(upload && steps.indexOf(upload) > steps.indexOf(driver));
   assert.equal(scalar(upload, 'continue-on-error'), 'true');
   assert.equal(evaluate(scalar(upload, 'if'), { always: () => true }), true);
-  assert.equal(scalar(upload, 'name'), '${{ inputs.artifact }}');
+  const name = scalar(upload, 'name');
+  for (const [attempt, want] of [[1, 'timing-full'], [2, 'timing-full-attempt-2'], [3, 'timing-full-attempt-3']]) {
+    const actual = evaluate(name, { inputs: { artifact: 'timing-full' }, github: { run_attempt: attempt },
+      format: (pattern, artifact, number) => pattern.replace('{0}', artifact).replace('{1}', String(number)) });
+    assert.equal(actual, want);
+  }
+  assert.doesNotMatch(upload, /overwrite: true/);
   for (const file of ['acc-test-timings.jsonl', 'acc-test-timings.jsonl.manifest.json', 'acc-ci-plan.json', 'acc-ci-proof.json']) {
     assert.ok(upload.includes(`\${{ runner.temp }}/${file}\n`));
   }

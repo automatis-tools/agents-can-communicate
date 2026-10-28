@@ -39,7 +39,7 @@ test("foreign event context cannot reuse a correctly hashed route", async t => {
   const otherTree = await git(f.repo, "rev-parse", `${f.head}^{tree}`);
   const foreign = await git(f.repo, "commit-tree", otherTree, "-p", f.base, "-m", "foreign identity");
   const changes = [
-    { env: { ...f.env, GITHUB_RUN_ID: "1235" } }, { env: { ...f.env, GITHUB_RUN_ATTEMPT: "2" } },
+    { env: { ...f.env, GITHUB_RUN_ID: "1235" } },
     { env: { ...f.env, GITHUB_EVENT_NAME: "workflow_dispatch" } },
     { env: { ...f.env, GITHUB_REF: "refs/pull/18/merge" }, event: { ...f.event, number: 18, pull_request: { ...f.event.pull_request, number: 18 } } },
     { event: { ...f.event, pull_request: { ...f.event.pull_request, base: { sha: f.head } } } },
@@ -162,4 +162,19 @@ test("push payload conflicts fail while absent or zero previous identities stay 
     assert.equal(route.baseCommit, before === "0".repeat(40) ? before : null);
     assert.equal(route.headCommit, null);
   }
+});
+
+// Equality here would break ordinary retained-planner retries; Number would lose bounds.
+test("retained planner keeps its lineage on later attempts with exact decimal bounds", async t => {
+  const f = await ciFixture(t);
+  const planner = "9007199254740992";
+  const { route, plan } = await ci.createCiRoute({ ...f, env: { ...f.env, GITHUB_RUN_ATTEMPT: planner } });
+  const env = { ...f.env, GITHUB_RUN_ATTEMPT: "9007199254740993" };
+  assert.deepEqual(await ci.verifyCiRoute({ ...f, env, route }), { route, plan });
+  for (const attempt of ["9007199254740994", "0", "01", "-1", "1.5", "1\n", 1, null, undefined]) {
+    await assert.rejects(ci.verifyCiRoute({ ...f, env, route: { ...route, runAttempt: attempt } }));
+  }
+  await assert.rejects(ci.verifyCiRoute({ ...f, env: { ...env, GITHUB_RUN_ATTEMPT: "9007199254740991" }, route }));
+  await assert.rejects(ci.verifyCiRoute({ ...f, env: { ...env, GITHUB_RUN_ATTEMPT: planner },
+    route: { ...route, runAttempt: "9007199254740993" } }));
 });

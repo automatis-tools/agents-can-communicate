@@ -9,26 +9,28 @@ const object = value => value !== null && typeof value === 'object' && !Array.is
 const keys = (value, expected) => object(value) && same(Object.keys(value).sort(), [...expected].sort());
 const hash = files => createHash('sha256').update(JSON.stringify(files)).digest('hex');
 const nonnegative = n => typeof n === 'number' && Number.isFinite(n) && n >= 0;
+const positive = value => typeof value === 'string' && /^[1-9][0-9]*$/.test(value);
 const node24 = version => typeof version === 'string' && /^v24\.\d+\.\d+$/.test(version);
 const relative = file => typeof file === 'string' && /^(tests|packages)\/.+\.test\.mjs$/.test(file)
   && !file.includes('\\') && !file.includes(':') && file.split('/').every(p => p && p !== '.' && p !== '..');
-function expectedProof({ route, plan, worker, nodeVersion }) {
+function expectedProof({ route, plan, worker, nodeVersion, runAttempt }) {
   const role = ciWorker(typeof worker === 'string' ? worker : worker?.id);
-  if (role.kind !== 'test' || role.scope !== route?.scope || plan?.scope !== route.scope || !node24(nodeVersion)
+  if (!positive(route?.runAttempt) || !positive(runAttempt) || BigInt(runAttempt) < BigInt(route.runAttempt)
+    || role.kind !== 'test' || role.scope !== route?.scope || plan?.scope !== route.scope || !node24(nodeVersion)
     || !['targetCommit','targetTree','planDigest','selectionDigest','discoveryDigest'].every(k => route[k] === plan[k])
     || !Array.isArray(plan.selectedFiles) || !plan.selectedFiles.length || !plan.selectedFiles.every(relative)
     || !same(plan.selectedFiles, [...new Set(plan.selectedFiles)].sort())) fail();
   const shard = role.shard ? { part: Number(role.shard[0]), count: 2 } : null;
   const files = shardFiles(plan.selectedFiles, shard);
   const proof = { schema: 1, workerId: role.id, routeDigest: ciRouteDigest(route), runId: route.runId,
-    runAttempt: route.runAttempt, targetCommit: route.targetCommit, targetTree: route.targetTree,
+    runAttempt, targetCommit: route.targetCommit, targetTree: route.targetTree,
     planDigest: route.planDigest, scope: role.scope, platform: role.platform, node: nodeVersion,
     shard: role.shard, fileCount: files.length, filesDigest: hash(files),
     concurrency: role.platform === 'win32' ? 3 : 4, fsyncMode: 'real', packageSmoke: role.scope === 'docs' };
   return { role, files, proof };
 }
-export function verifyCiTestManifest({ manifest, route, plan, worker, nodeVersion }) {
-  const { files, proof } = expectedProof({ route, plan, worker, nodeVersion });
+export function verifyCiTestManifest({ manifest, route, plan, worker, nodeVersion, runAttempt }) {
+  const { files, proof } = expectedProof({ route, plan, worker, nodeVersion, runAttempt });
   if (!keys(manifest, ['schema','events','files','receiptDecision','resultCounts']) || manifest.schema !== 1
     || !keys(manifest.receiptDecision, ['reused','reason']) || manifest.receiptDecision.reused !== false
     || manifest.receiptDecision.reason !== 'ci-disabled' || !Array.isArray(manifest.files)
@@ -65,9 +67,10 @@ export function verifyCiTestManifest({ manifest, route, plan, worker, nodeVersio
     || manifest.events.at(-1).event !== 'total') fail();
   return proof;
 }
-export function verifyCiAggregate({ route, plan, platform, needs }) {
+export function verifyCiAggregate({ route, plan, platform, needs, runAttempt }) {
   const workers = platformTestWorkers(platform);
-  if (!keys(needs, ['plan', ...workers]) || needs.plan?.result !== 'success') fail();
+  if (!positive(route?.runAttempt) || !positive(runAttempt) || BigInt(runAttempt) < BigInt(route.runAttempt)
+    || !keys(needs, ['plan', ...workers]) || needs.plan?.result !== 'success') fail();
   let actualRoute;
   try { actualRoute = JSON.parse(needs.plan.outputs.route); } catch { fail(); }
   if (ciRouteDigest(actualRoute) !== ciRouteDigest(route)) fail();
@@ -81,7 +84,10 @@ export function verifyCiAggregate({ route, plan, platform, needs }) {
     if (job?.result !== 'success') fail();
     let proof;
     try { proof = JSON.parse(job.outputs.proof); } catch { fail(); }
-    const expected = expectedProof({ route, plan, worker, nodeVersion: proof?.node }).proof;
+    // Only current successful needs may carry an older execution. Never relabel
+    // it; the proof still names its worker attempt and particular planner digest.
+    if (!positive(proof?.runAttempt) || BigInt(proof.runAttempt) > BigInt(runAttempt)) fail();
+    const expected = expectedProof({ route, plan, worker, nodeVersion: proof.node, runAttempt: proof.runAttempt }).proof;
     if (!keys(proof, Object.keys(expected)) || !Object.entries(expected).every(([k,v]) => proof[k] === v)) fail();
   }
 }
