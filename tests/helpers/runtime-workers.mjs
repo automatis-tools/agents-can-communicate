@@ -48,8 +48,9 @@ export async function runtimeWorkersQuiet(dataHome, {
   const running = async () => {
     if (process.platform === "win32") return false;
     try {
+      // The deadline must terminate our own inspector even if it ignores TERM.
       const { stdout } = await inspect(() => run("ps", ["-Ao", "args="],
-        strict ? { timeout: Math.max(1, end - Date.now()) } : {}));
+        strict ? { timeout: Math.max(1, end - Date.now()), killSignal: "SIGKILL" } : {}));
       return stdout.split("\n").some(line => names.some(name => line.includes(name)));
     } catch (error) {
       if (strict) throw new Error(`Cannot inspect runtime workers: ${error.message}`, { cause: error });

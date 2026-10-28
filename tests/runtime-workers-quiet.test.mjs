@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFile, spawn } from "node:child_process";
-import { lstat, mkdir, mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/promises";
+import { lstat, mkdir, mkdtemp, readFile, realpath, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -117,7 +117,7 @@ test("strict inspection rejects a filesystem error instead of calling it unlocke
   const home = await dataHome(t);
   await mkdir(path.join(home, "acc"));
   await writeFile(path.join(home, "acc", "runtime"), "not a directory");
-  await assert.rejects(runtimeWorkersQuiet(home, { strict: true, timeoutMs: 100 }), /ENOTDIR/);
+  await assert.rejects(runtimeWorkersQuiet(home, { strict: true, timeoutMs: 5_000 }), /ENOTDIR/);
 });
 
 test("strict inspection rejects an unavailable process inspector", posixOnly, async t => {
@@ -126,7 +126,7 @@ test("strict inspection rejects an unavailable process inspector", posixOnly, as
   const result = await promisify(execFile)(process.execPath, ["--input-type=module", "-e", `
     import { runtimeWorkersQuiet } from ${JSON.stringify(helper)};
     try {
-      await runtimeWorkersQuiet(process.argv[1], { strict: true, timeoutMs: 100 });
+      await runtimeWorkersQuiet(process.argv[1], { strict: true, timeoutMs: 5_000 });
       process.exitCode = 2;
     } catch (error) { console.log(error.message); }
   `, home], { env: { ...process.env, PATH: home }, timeout: 5_000 });
@@ -148,4 +148,58 @@ test("a verification failure remains primary when cleanup inspection also fails"
   const retained = /workspace retained at (.+?): Cannot inspect/.exec(failure.stderr)[1];
   assert.equal(path.dirname(retained), home);
   assert.equal((await lstat(retained)).isDirectory(), true);
+});
+
+test("strict inspection cannot keep its caller alive by ignoring SIGTERM", posixOnly, async t => {
+  const home = await dataHome(t);
+  const inspector = path.join(home, "ps");
+  const helper = new URL("./helpers/runtime-workers.mjs", import.meta.url).href;
+  await symlink(process.execPath, path.join(home, "node"));
+  await writeFile(inspector, `#!/usr/bin/env node
+    const { writeFileSync } = require("node:fs");
+    process.on("SIGTERM", () => writeFileSync(process.argv[1] + ".term", "ignored"));
+    writeFileSync(process.argv[1] + ".pid", String(process.pid));
+    setInterval(() => {}, 1_000);
+  `, { mode: 0o755 });
+  let outcome;
+  try {
+    outcome = await promisify(execFile)(process.execPath, ["--input-type=module", "-e", `
+      import { runtimeWorkersQuiet } from ${JSON.stringify(helper)};
+      try {
+        await runtimeWorkersQuiet(process.argv[1], { strict: true, timeoutMs: 1_500 });
+        process.exitCode = 2;
+      } catch (error) { console.log("rejected: " + error.message); }
+    `, home], { env: { ...process.env, PATH: home }, timeout: 4_000, killSignal: "SIGKILL" })
+      .catch(error => error);
+    // The pid record is written after the real inspector installs its TERM handler.
+    assert.match(await readFile(inspector + ".pid", "utf8"), /^\d+$/);
+    if (outcome.killed) assert.equal(await readFile(inspector + ".term", "utf8"), "ignored");
+    assert.equal(outcome.killed, undefined, "inspector kept its caller alive beyond the outer deadline");
+    assert.match(outcome.stdout, /rejected: .*runtime workers/i);
+  } finally {
+    // A mutant can strand this child after its caller is killed. Verify its
+    // unique executable path before killing only this test-owned inspector.
+    const pid = Number(await readFile(inspector + ".pid", "utf8").catch(error => {
+      if (error.code !== "ENOENT") throw error;
+      return "0";
+    }));
+    if (pid > 0) {
+      const ownedInspectorAlive = async () => {
+        const { stdout } = await promisify(execFile)("/bin/ps", ["-p", String(pid), "-o", "args="],
+          { timeout: 1_000, killSignal: "SIGKILL" }).catch(error => {
+          if (error.code !== 1) throw error;
+          return { stdout: "" };
+        });
+        return stdout.includes(inspector);
+      };
+      if (await ownedInspectorAlive()) {
+        try { process.kill(pid, "SIGKILL"); } catch (error) { if (error.code !== "ESRCH") throw error; }
+        const deadline = Date.now() + 1_000;
+        while (await ownedInspectorAlive()) {
+          assert.ok(Date.now() < deadline, "owned inspector survived cleanup");
+          await pause(25);
+        }
+      }
+    }
+  }
 });
