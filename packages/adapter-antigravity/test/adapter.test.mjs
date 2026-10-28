@@ -19,22 +19,6 @@ test("only what a capture in this package shows is declared true", () => {
       "lifecycle.sessionStart"]);
 });
 
-test("the capabilities this client does not have stay false", () => {
-  const { capabilities } = createAntigravityAdapter();
-
-  // No tool event loads, so there is nothing to guard. The Gemini CLI adapter
-  // has guards.beforeWrite and this one must not inherit it.
-  assert.equal(capabilities.guards.beforeWrite, false);
-  assert.equal(capabilities.guards.beforeShell, false);
-  assert.equal(capabilities.guards.beforeRead, false);
-  // SessionEnd is accepted into the config and never fires.
-  assert.equal(capabilities.lifecycle.sessionEnd, false);
-  assert.equal(capabilities.lifecycle.heartbeat, false);
-  // The agent answers a pushed message with the ordinary acc reply; no native
-  // reply route was captured.
-  assert.equal(capabilities.delivery.replyRoute, false);
-});
-
 test("1.2.7 and everything after it is certified; only an older client is not", () => {
   // Decided 2026-09-21 for this client and 2026-09-22 for every adapter: a
   // capture records where a behaviour was observed, so it applies forward -
