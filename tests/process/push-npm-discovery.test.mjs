@@ -237,3 +237,34 @@ for (const mode of ["ordinary", "forced"]) {
     t.diagnostic(result.stderr.trim());
   });
 }
+
+
+// Object spread can overwrite an inherited key without moving its position.
+// A separate child controls the inherited spelling without changing this worker.
+test("environment layers preserve Windows override order and POSIX case", async t => {
+  const target = pathToFileURL(path.resolve(import.meta.dirname, "../../scripts/push-targets.mjs")).href;
+  const cases = [
+    ["win32", "Path", { PATH: "first", Path: "last" }, { Path: "last" }],
+    ["win32", "PATH", { Path: "first", PATH: "last" }, { PATH: "last" }],
+    ["win32", "PATH", { Path: "explicit & (value) %keep% !keep! ^value" }, { Path: "explicit & (value) %keep% !keep! ^value" }],
+    ["win32", "Path", { PATH: "explicit" }, { PATH: "explicit" }],
+    ["darwin", "Path", { PATH: "first", Path: "last" }, { Path: "last", PATH: "first" }],
+    ["darwin", "PATH", { Path: "first", PATH: "last" }, { PATH: "last", Path: "first" }],
+  ];
+  for (const [platform, inherited, overrides, expected] of cases) {
+    await t.test(`${platform} inherited ${inherited}, overrides ${Object.keys(overrides).join(" then ")}`, async () => {
+      const env = Object.fromEntries(Object.entries(process.env).filter(([key]) => key.toUpperCase() !== "PATH"));
+      env[inherited] = "inherited";
+      const script = `import {runPushCommand} from ${JSON.stringify(target)};
+        import {EventEmitter} from 'node:events'; import {PassThrough} from 'node:stream';
+        await runPushCommand(process.execPath,[],{cwd:process.cwd(),quiet:true,
+          platform:${JSON.stringify(platform)},env:${JSON.stringify(overrides)},spawnCommand:(file,args,options)=>{
+            console.log(JSON.stringify(Object.fromEntries(Object.entries(options.env).filter(([key])=>key.toUpperCase()==='PATH'))));
+            const child=Object.assign(new EventEmitter(),{pid:12345,stdin:new PassThrough(),stdout:new PassThrough(),stderr:new PassThrough()});
+            queueMicrotask(()=>child.emit('close',0)); return child;
+          }});`;
+      const result = await promisify(execFile)(process.execPath, ["--input-type=module", "-e", script], { env });
+      assert.deepEqual(JSON.parse(result.stdout), expected);
+    });
+  }
+});

@@ -126,16 +126,16 @@ export async function resolvePushTrees(repo, refs, { planForRef } = {}) {
 export async function runPushCommand(file, args, { cwd, signal, input, quiet = false,
   platform = process.platform, spawnCommand = spawn, env = {} } = {}) {
   if (signal?.aborted) throw Error("push validation interrupted");
-  const commandEnv = { ...pushEnvironment(), ...env };
+  const inheritedEnv = pushEnvironment();
+  let commandEnv = { ...inheritedEnv, ...env };
   if (platform === "win32") {
-    // Windows environment names are case insensitive. Last supplied spelling
-    // wins, so an explicit Path override cannot lose to inherited PATH.
+    // Fold each layer in order: explicit overrides beat inherited spellings,
+    // and the last spelling within a layer wins. POSIX keeps exact-case spread.
     const names = new Map();
-    for (const key of Object.keys(commandEnv)) {
-      const previous = names.get(key.toUpperCase());
-      if (previous) delete commandEnv[previous];
-      names.set(key.toUpperCase(), key);
+    for (const layer of [inheritedEnv, env]) {
+      for (const [key, value] of Object.entries(layer)) names.set(key.toUpperCase(), [key, value]);
     }
+    commandEnv = Object.fromEntries(names.values());
     if (file === "npm") {
       const executor = await resolveWindowsNpm({ cwd, env: commandEnv, signal,
         launch: (command, argv, options) => runRawPushCommand(command, argv,
