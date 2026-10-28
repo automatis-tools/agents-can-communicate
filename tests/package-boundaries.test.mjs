@@ -3,7 +3,8 @@
 // and - deliberately - on a target that does not exist or holds no modules, so
 // the test cannot pass vacuously while the package is still empty.
 import assert from "node:assert/strict";
-import { readdir, readFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
+import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
@@ -52,8 +53,8 @@ function specifiers(source) {
   return [...found];
 }
 
-export async function scanImports(packageDirectory) {
-  const directory = path.join(repoRoot, packageDirectory);
+export async function scanImports(packageDirectory, root = repoRoot) {
+  const directory = path.join(root, packageDirectory);
   let files;
   try {
     files = await moduleFiles(directory);
@@ -67,7 +68,7 @@ export async function scanImports(packageDirectory) {
 
   const violations = [];
   for (const file of files) {
-    const relative = path.relative(repoRoot, file);
+    const relative = path.relative(root, file);
     const source = await readFile(file, "utf8");
     // Import rules constrain what ships. Tests are not shipped and legitimately
     // reach the repository's shared helpers, so they are held to the vocabulary
@@ -102,25 +103,85 @@ test("protocol stays free of vendor and project vocabulary", async () => {
   assert.deepEqual(violations, []);
 });
 
-test("the scanner refuses to pass on a missing or empty target", async () => {
-  assert.deepEqual(await scanImports("packages/does-not-exist"),
-    [{ file: "packages/does-not-exist", detail: "package directory does not exist" }]);
+async function fixtureRoot(t, modules = {}) {
+  const root = await mkdtemp(path.join(os.tmpdir(), "acc-boundaries-"));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  for (const [relative, source] of Object.entries(modules)) {
+    const file = path.join(root, relative);
+    await mkdir(path.dirname(file), { recursive: true });
+    await writeFile(file, source);
+  }
+  return root;
+}
+
+test("the scanner reports a missing package directory", async t => {
+  const root = await fixtureRoot(t);
+  assert.deepEqual(await scanImports("fixture", root),
+    [{ file: "fixture", detail: "package directory does not exist" }]);
 });
 
-test("import rules apply to shipped source, vocabulary rules apply everywhere", async () => {
-  // A src module reaching into the repository root must still be a violation,
-  // so the narrower scope above cannot be mistaken for switching the rule off.
-  const violations = await scanImports("packages/core");
-  assert.deepEqual(violations, []);
-  assert.equal(FORBIDDEN_SPECIFIERS.some(rule => rule.pattern.test("../../../tests/x.mjs")), true);
+test("the scanner reports an existing directory with no modules", async t => {
+  const root = await fixtureRoot(t, {
+    "fixture/src/README.md": "No source modules yet.\n",
+    "fixture/node_modules/vendor/index.mjs": "export const value = 1;\n",
+  });
+  assert.deepEqual(await scanImports("fixture", root),
+    [{ file: "fixture", detail: "package directory contains no modules" }]);
 });
 
-test("the scanner detects a forbidden specifier and Papercut vocabulary", async () => {
-  // Guards the guard: the storage adapter is allowed to exist, but if the
-  // scanner were pointed at a tree that genuinely violates the rules it must
-  // report them rather than returning an empty list.
-  const source = 'import { execFile } from "node:child_process";\nconst bus = "PW2_AGENT_BUS_DIR";\n';
-  assert.deepEqual(specifiers(source), ["node:child_process"]);
-  assert.equal(FORBIDDEN_SPECIFIERS.some(rule => rule.pattern.test("node:child_process")), true);
-  assert.equal(FORBIDDEN_TOKENS.some(rule => rule.pattern.test(source)), true);
+test("the scanner permits source imports and exempts test imports", async t => {
+  const root = await fixtureRoot(t, {
+    "fixture/src/nested/valid.mjs": `
+      import { readFile } from "node:fs/promises";
+      import "../../shared.mjs";
+      await import("@agents-can-communicate/protocol");
+    `,
+    "fixture/test/imports.mjs": `
+      import { execFile } from "node:child_process";
+      import "child_process";
+      import "adapter-example";
+      await import("./prototype/worker.mjs");
+      import "../../../tests/helper.mjs";
+    `,
+    "fixture/src/ignored.js": 'import "node:child_process"; const name = "PW2_papercut-warzone";',
+    "fixture/src/notes.txt": 'import "adapter-example"; const name = "PW2_papercut-warzone";',
+    "fixture/src/node_modules/vendor/index.mjs": 'import "node:child_process"; const name = "PW2_papercut-warzone";',
+  });
+  assert.deepEqual(await scanImports("fixture", root), []);
+});
+
+test("the scanner reports forbidden source imports in sorted nested-file order", async t => {
+  const root = await fixtureRoot(t, {
+    "fixture/src/z.mjs": `
+      import { execFile } from "node:child_process";
+      import "child_process";
+      await import("../../../tests/helper.mjs");
+    `,
+    "fixture/src/nested/a.mjs": `
+      import "adapter-example";
+      await import("./prototype/worker.mjs");
+    `,
+  });
+  assert.deepEqual(await scanImports("fixture", root), [
+    { file: path.join("fixture", "src", "nested", "a.mjs"), detail: "./prototype/worker.mjs imports the Papercut prototype" },
+    { file: path.join("fixture", "src", "nested", "a.mjs"), detail: "adapter-example imports a harness adapter" },
+    { file: path.join("fixture", "src", "z.mjs"), detail: "../../../tests/helper.mjs reaches outside its package" },
+    { file: path.join("fixture", "src", "z.mjs"), detail: "child_process spawns processes" },
+    { file: path.join("fixture", "src", "z.mjs"), detail: "node:child_process spawns processes" },
+  ]);
+});
+
+test("the scanner reports all vocabulary rules in source and test modules", async t => {
+  const root = await fixtureRoot(t, {
+    "fixture/src/vocabulary.mjs": 'export const name = "PW2_PaPeRcUt-WaRzOnE";\n',
+    "fixture/test/vocabulary.mjs": 'export const name = "PW2_PaPeRcUt-WaRzOnE";\n',
+  });
+  assert.deepEqual(await scanImports("fixture", root), [
+    { file: path.join("fixture", "src", "vocabulary.mjs"), detail: "Papercut environment variable" },
+    { file: path.join("fixture", "src", "vocabulary.mjs"), detail: "Papercut project name" },
+    { file: path.join("fixture", "src", "vocabulary.mjs"), detail: "Papercut repository name" },
+    { file: path.join("fixture", "test", "vocabulary.mjs"), detail: "Papercut environment variable" },
+    { file: path.join("fixture", "test", "vocabulary.mjs"), detail: "Papercut project name" },
+    { file: path.join("fixture", "test", "vocabulary.mjs"), detail: "Papercut repository name" },
+  ]);
 });
