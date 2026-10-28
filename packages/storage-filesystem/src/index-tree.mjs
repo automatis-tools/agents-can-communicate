@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { assertPortableId } from "@agents-can-communicate/protocol";
-import { assertPageHash, canonicalTuple, IndexCacheUnavailable } from "./index-pages.mjs";
+import { assertPageHash, canonicalTuple, INLINE_GROUP_IDS, IndexCacheUnavailable } from "./index-pages.mjs";
 
 const compare = (a, b) => a.localeCompare(b);
 const keyOf = entry => canonicalTuple(entry.tuple);
@@ -13,40 +13,66 @@ export function createIndexTree({ readPage, writePage, digestTuple = digest }) {
     seen.add(hash);
     return readPage(hash);
   }
+  // A group is the set of record IDs under one tuple. Up to 32 IDs it is one group
+  // page; beyond that it branches on the digest of each ID, so a change copies only the
+  // route to that ID. Chained pages copied every page in front of the change, which made
+  // a group of 4000 cost 184,460 page writes to build (#306). Lookups return IDs in order.
+  const idDigest = id => createHash("sha256").update(id).digest("hex");
   async function groupLookup(root) {
     const ids = [], seen = new Set();
-    while (root !== null) {
-      const page = await read(root, seen);
-      if (page.type !== "group") fault("invalid_group_reference");
+    async function collect(hash, depth, prefix) {
+      const page = await read(hash, seen);
+      if (page.type === "branch") {
+        if (depth >= 64) fault("radix_depth_exceeded");
+        for (const [route, child] of page.children) await collect(child, depth + 1, prefix + route);
+        return;
+      }
+      if (page.type !== "group" || page.next !== null) fault("invalid_group_reference");
       for (const id of page.ids) {
-        if (ids.length && compare(ids.at(-1), id) >= 0) fault("duplicate_or_unordered_group");
+        if (!idDigest(id).startsWith(prefix)) fault("misrouted_group_id");
         ids.push(id);
       }
-      root = page.next;
     }
-    return ids;
+    await collect(root, 0, "");
+    return ids.sort(compare);
   }
-  async function groupUpdate(root, id, operation, seen = new Set()) {
+  async function groupPages(ids, depth) {
+    if (ids.length <= 32 || depth === 64) return writePage({ type: "group", ids: [...ids].sort(compare), next: null });
+    const routes = new Map();
+    for (const id of ids) {
+      const route = idDigest(id)[depth];
+      if (!routes.has(route)) routes.set(route, []);
+      routes.get(route).push(id);
+    }
+    const children = [];
+    for (const route of [...routes.keys()].sort()) children.push([route, await groupPages(routes.get(route), depth + 1)]);
+    return writePage({ type: "branch", children });
+  }
+  async function groupUpdate(root, id, operation, depth = 0, seen = new Set()) {
     if (root === null) return operation === "remove" ? null : writePage({ type: "group", ids: [id], next: null });
     const page = await read(root, seen);
-    if (page.type !== "group") fault("invalid_group_reference");
-    const position = page.ids.findIndex(found => compare(found, id) >= 0);
-    if (position === -1 && page.next !== null) {
-      const next = await groupUpdate(page.next, id, operation, seen);
-      return next === page.next ? root : writePage({ ...page, next });
+    if (page.type === "branch") {
+      if (depth >= 64) fault("radix_depth_exceeded");
+      const route = idDigest(id)[depth], old = page.children.find(([digit]) => digit === route)?.[1] ?? null;
+      const next = await groupUpdate(old, id, operation, depth + 1, seen);
+      if (next === old) return root;
+      const children = page.children.filter(([digit]) => digit !== route);
+      if (next !== null) children.push([route, next]);
+      children.sort(([a], [b]) => compare(a, b));
+      return children.length === 0 ? null : writePage({ type: "branch", children });
     }
-    const ids = [...page.ids], at = position === -1 ? ids.length : position;
-    if (ids[at] === id) {
+    if (page.type !== "group" || page.next !== null) fault("invalid_group_reference");
+    const ids = [...page.ids], at = ids.findIndex(found => compare(found, id) >= 0);
+    const position = at === -1 ? ids.length : at;
+    if (ids[position] === id) {
       if (operation === "put") return root;
-      ids.splice(at, 1);
+      ids.splice(position, 1);
     } else {
       if (operation === "remove") return root;
-      ids.splice(at, 0, id);
+      ids.splice(position, 0, id);
     }
-    if (ids.length === 0) return page.next;
-    if (ids.length <= 32) return writePage({ ...page, ids });
-    const next = await writePage({ type: "group", ids: ids.slice(16), next: page.next });
-    return writePage({ type: "group", ids: ids.slice(0, 16), next });
+    if (ids.length === 0) return null;
+    return groupPages(ids, depth);
   }
   function checkNode(page, depth, prefix) {
     if (page.type === "branch") {
@@ -75,7 +101,8 @@ export function createIndexTree({ readPage, writePage, digestTuple = digest }) {
         root = page.next;
       }
     }
-    return idsRoot === null ? [] : groupLookup(idsRoot);
+    if (idsRoot === null) return [];
+    return Array.isArray(idsRoot) ? [...idsRoot] : groupLookup(idsRoot);
   }
   const leaf = (entries, next = null) => writePage({ type: "leaf",
     entries: [...entries].sort((a, b) => compare(keyOf(a), keyOf(b))), next });
@@ -98,11 +125,22 @@ export function createIndexTree({ readPage, writePage, digestTuple = digest }) {
     for (const route of [...routes.keys()].sort()) children.push([route, await split(routes.get(route), depth + 1)]);
     return writePage({ type: "branch", children });
   }
+  // A small group lives in its leaf entry and moves to a page when it outgrows it; a page
+  // stays a page, so a group near the limit does not flip with every change.
+  async function groupChange(ids, id, operation) {
+    if (!Array.isArray(ids)) return groupUpdate(ids, id, operation);
+    const next = ids.filter(found => found !== id);
+    if (operation === "put") next.push(id);
+    next.sort(compare);
+    if (next.length === ids.length && next.every((found, i) => found === ids[i])) return ids;
+    if (next.length === 0) return null;
+    return next.length <= INLINE_GROUP_IDS ? next : groupPages(next, 0);
+  }
   async function update(root, tuple, id, operation, depth = 0, prefix = "", seen = new Set()) {
     const hash = assertPageHash(digestTuple(tuple)), key = canonicalTuple(tuple);
     if (root === null) {
       if (operation === "remove") return null;
-      return leaf([{ digest: hash, tuple, ids: await groupUpdate(null, id, operation) }]);
+      return leaf([{ digest: hash, tuple, ids: [id] }]);
     }
     const page = await read(root, seen); checkNode(page, depth, prefix);
     if (page.type === "branch") {
@@ -116,7 +154,7 @@ export function createIndexTree({ readPage, writePage, digestTuple = digest }) {
     }
     const entries = [...page.entries], at = entries.findIndex(entry => keyOf(entry) === key);
     if (at !== -1) {
-      const ids = await groupUpdate(entries[at].ids, id, operation);
+      const ids = await groupChange(entries[at].ids, id, operation);
       if (ids === entries[at].ids) return root;
       if (ids === null) entries.splice(at, 1);
       else entries[at] = { ...entries[at], ids };
@@ -127,7 +165,7 @@ export function createIndexTree({ readPage, writePage, digestTuple = digest }) {
       return next === page.next ? root : leaf(entries, next);
     }
     if (operation === "remove") return root;
-    entries.push({ digest: hash, tuple, ids: await groupUpdate(null, id, operation) });
+    entries.push({ digest: hash, tuple, ids: [id] });
     return split(entries, depth);
   }
   async function apply(root, deltas) {
@@ -138,5 +176,26 @@ export function createIndexTree({ readPage, writePage, digestTuple = digest }) {
     }
     return root;
   }
-  return Object.freeze({ lookup, apply });
+  // The tree `apply(null, puts)` makes, built at once: a rebuild has every key, and applying
+  // them one by one copied each page on a key's route again for every key, 20 ms beside 300
+  // messages - two thirds of reading them (#306).
+  async function build(puts) {
+    const groups = new Map();
+    for (const { tuple, id, operation } of puts) {
+      assertPortableId(id, "index record ID");
+      if (operation !== "put") fault("invalid_delta");
+      const key = canonicalTuple(tuple);
+      if (!groups.has(key)) groups.set(key, { tuple, ids: new Set() });
+      groups.get(key).ids.add(id);
+    }
+    if (groups.size === 0) return null;
+    const entries = [];
+    for (const { tuple, ids } of groups.values()) {
+      const sorted = [...ids].sort(compare);
+      entries.push({ digest: assertPageHash(digestTuple(tuple)), tuple,
+        ids: sorted.length <= INLINE_GROUP_IDS ? sorted : await groupPages(sorted, 0) });
+    }
+    return split(entries, 0);
+  }
+  return Object.freeze({ lookup, apply, build });
 }

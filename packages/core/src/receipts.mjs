@@ -10,6 +10,18 @@ import { receiptId } from "./conversations.mjs";
 export const REPEAT_OFFER_AFTER_MS = 15 * 60 * 1000;
 
 /**
+ * The receipt as ACC shows it. The obligation a receipt keeps for the receipt index
+ * (#306) is ACC's own bookkeeping, so no read surface carries it, and a receipt with
+ * nothing else in `extensions` shows none, as before.
+ */
+export function publicReceipt(receipt) {
+  if (receipt?.extensions?.obligation === undefined) return receipt;
+  const { obligation, ...extensions } = receipt.extensions;
+  const { extensions: kept, ...rest } = receipt;
+  return Object.keys(extensions).length > 0 ? { ...rest, extensions } : rest;
+}
+
+/**
  * How and when a transport accepted this receipt's message, if anyone recorded it.
  *
  * Kept in `extensions` because a new receipt field would fail validation in an
@@ -112,10 +124,10 @@ export function createReceiptService(ports) {
   const { store, clock, ids } = ports;
 
   async function readReceipt(input) {
-    return store.transaction(async tx => {
+    return publicReceipt(await store.transaction(async tx => {
       await loadReceipt(tx, input);
       return requireReceipt(tx, input.messageId, input.recipientParticipantId).receipt;
-    }, { kinds: ["message", "receipt"], exactKinds: ["message", "receipt"] });
+    }, { kinds: ["message", "receipt"], exactKinds: ["message", "receipt"] }));
   }
 
   async function recordOfferSucceeded(input) {
@@ -125,7 +137,7 @@ export function createReceiptService(ports) {
         { messageId: input.messageId, transport: input.transport });
     }
     const now = clock.now();
-    return store.transaction(async tx => {
+    return publicReceipt(await store.transaction(async tx => {
       await loadReceipt(tx, input);
       await tx.load("session", input.targetSessionId);
       const id = receiptId(input.messageId, input.recipientParticipantId);
@@ -165,7 +177,7 @@ export function createReceiptService(ports) {
       success({});
       return offered;
     }, { kinds: ["session", "message", "receipt"],
-      exactKinds: ["session", "message", "receipt"], deadlineAt: input.deadlineAt });
+      exactKinds: ["session", "message", "receipt"], deadlineAt: input.deadlineAt }));
   }
 
   async function recordOfferFailed(input) {

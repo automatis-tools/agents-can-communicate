@@ -8,6 +8,7 @@ import { openFilesystemStore } from "../src/store.mjs";
 import { readActiveJournal } from "../src/active-journal.mjs";
 import { createMemoryStore, createFakeClock, createFakeIds } from "../../../tests/helpers/memory-store.mjs";
 import { exactMessage, EXACT_NOW as NOW, EXACT_WORKSPACE as WS } from "../../../tests/helpers/exact-transaction-contract.mjs";
+import { INDEX_DIRECTORY } from "../src/index-io.mjs";
 
 const key = client => [WS, "participant_a", client];
 const exact = { kinds: ["message", "receipt"], exactKinds: ["message", "receipt"] };
@@ -23,7 +24,7 @@ async function fixture(t, failAt) {
   t.after(() => rm(root, { recursive: true, force: true }));
   const store = await openFilesystemStore({ root, workspaceId: WS,
     clock: createFakeClock(NOW), ids: createFakeIds(), failAt });
-  return { root, store, manifestFile: path.join(root, "indexes/v1/cache.json") };
+  return { root, store, manifestFile: path.join(root, INDEX_DIRECTORY, "cache.json") };
 }
 
 test("generic indexed writes advance authority", async t => {
@@ -130,7 +131,7 @@ test("wrong epochs, workspace and corrupt pages rebuild from verified primary", 
     assert.equal(store.indexDiagnostics().at(-1)?.code, "index_rebuilt");
   }
   const manifest = JSON.parse(await readFile(manifestFile));
-  await writeFile(path.join(root, "indexes/v1/pages", manifest.roots.messageByClientKey + ".json"), "corrupt cache");
+  await writeFile(path.join(root, INDEX_DIRECTORY, "pages", manifest.roots.messageByClientKey + ".json"), "corrupt cache");
   assert.deepEqual(await lookup(store), ["message_a"]);
   assert.equal(store.indexDiagnostics().at(-1)?.code, "index_rebuilt");
 });
@@ -144,7 +145,7 @@ test("unsafe cache directories allow verified fallback without writes through a 
   await seed(store, "message_b", "client_b");
   assert.deepEqual(await lookup(store, "client_b"), ["message_b"]);
   assert.equal(store.indexDiagnostics().at(-1)?.code, "index_unavailable");
-  await assert.rejects(readFile(path.join(outside, "v1/cache.json")), { code: "ENOENT" });
+  await assert.rejects(readFile(path.join(outside, path.basename(INDEX_DIRECTORY), "cache.json")), { code: "ENOENT" });
   // Fallback is not a corruption catch around authoritative records.
   await writeFile(path.join(root, "state/message/message_a.json"), "corrupt primary");
   await assert.rejects(lookup(store), { code: EXIT.DATA });
@@ -159,4 +160,61 @@ test("a retained handle recovers a decided writer before trusting its old cache"
   await assert.rejects(seed(store, "message_b", "client_b"), /decided writer died/);
   assert.deepEqual(await lookup(store, "client_b"), ["message_b"]);
   assert.equal((await store.stateRecord(WS, "message", "message_b")).clientMessageId, "client_b");
+});
+
+// #306: a data home a client sandbox keeps read-only cannot take the cache, and a page
+// makes four lookups. Each must not read every primary record again.
+test("a cache that cannot be published is rebuilt once per journal generation, not per lookup", async t => {
+  const { createStoreIoProbe } = await import("../../../tests/helpers/store-io-probe.mjs");
+  const { root, store, manifestFile } = await fixture(t,
+    async point => { if (point === "before-index-manifest") throw new Error("read-only cache"); });
+  for (let i = 0; i < 20; i++) await seed(store, `message_${i}`, `client_${i}`);
+  await rm(manifestFile, { force: true });
+  const probe = createStoreIoProbe(root);
+  t.after(() => probe.stop());
+  const once = await probe.capture(() => lookup(store, "client_3"));
+  const fourTimes = await probe.capture(() => store.transaction(async tx => {
+    for (const client of ["client_1", "client_2", "client_5", "client_7"]) await tx.lookup("messageByClientKey", key(client));
+  }, exact));
+  assert.deepEqual(once.result, ["message_3"]);
+  assert.equal(store.indexDiagnostics().at(-1)?.code, "index_unavailable");
+  await assert.rejects(readFile(manifestFile), { code: "ENOENT" });
+  // The rebuilt tree is kept for this generation: four lookups read only what they select.
+  assert.ok(fourTimes.stateReads <= 4, `${fourTimes.stateReads} primary reads for four lookups`);
+  // A write moves the generation, and the next lookup rebuilds and finds it.
+  await seed(store, "message_new", "client_new");
+  assert.deepEqual(await lookup(store, "client_new"), ["message_new"]);
+});
+
+// A rebuild publishes the whole tree, and one page after another a cold page read cost
+// twice the listing it replaced (#306: 70 ms against 33 ms beside 300 messages). Pages of
+// one height go together, a listing's worth at a time, each after all of its children.
+test("a rebuild publishes the pages of one height together, each after its children", async t => {
+  const { root, store, manifestFile } = await fixture(t);
+  for (let i = 0; i < 120; i++) await seed(store, `message_${i}`, `client_${i}`);
+  await rm(manifestFile, { force: true });
+  await rm(path.join(root, INDEX_DIRECTORY, "pages"), { recursive: true, force: true });
+  const { default: fs } = await import("node:fs/promises");
+  const { syncBuiltinESMExports } = await import("node:module");
+  const pages = path.join(root, INDEX_DIRECTORY, "pages") + path.sep;
+  const originals = { open: fs.open, lstat: fs.lstat };
+  let inFlight = 0, most = 0;
+  for (const name of Object.keys(originals)) {
+    fs[name] = async (...args) => {
+      const page = String(args[0]).startsWith(pages);
+      if (page) { inFlight += 1; most = Math.max(most, inFlight); }
+      try { return await originals[name](...args); } finally { if (page) inFlight -= 1; }
+    };
+  }
+  syncBuiltinESMExports();
+  t.after(() => { Object.assign(fs, originals); syncBuiltinESMExports(); });
+  assert.deepEqual(await lookup(store, "client_7"), ["message_7"]);
+  Object.assign(fs, originals); syncBuiltinESMExports();
+  assert.equal(store.indexDiagnostics().at(-1)?.code, "index_rebuilt");
+  assert.ok(most > 1, `${most} page operation(s) at once`);
+  assert.ok(most <= 16, `${most} page operations at once`);
+  // Every page the manifest reaches is there, so the next process answers from the cache.
+  const reopened = await openFilesystemStore({ root, workspaceId: WS, clock: createFakeClock(NOW), ids: createFakeIds() });
+  assert.deepEqual(await lookup(reopened, "client_99"), ["message_99"]);
+  assert.notEqual(reopened.indexDiagnostics().at(-1)?.code, "index_rebuilt");
 });

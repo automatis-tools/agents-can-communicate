@@ -14,6 +14,13 @@ export async function runStoreMigration({ options, context, runtime }) {
       if (control !== null && control.phase !== "ready") {
         throw new AccError(EXIT.CONFLICT, "runtime admission is not ready; finish the update before store migration");
       }
+      // `acc doctor` runs the newest installed generation, also one still waiting to
+      // activate. A store it migrated then is one the active runtime, and every session
+      // admitted on it, cannot read (review of #306); the automatic upgrade waits the same way.
+      if (control !== null && control.active?.storeVersion !== STORE_VERSION) {
+        throw new AccError(EXIT.CONFLICT, `the runtime for store contract ${STORE_VERSION} is not active yet; `
+          + "run acc update once older sessions have ended, and ACC migrates the store itself");
+      }
       const blockers = await listActivationBlockers(manager, { incomingStoreVersion: STORE_VERSION,
         ignorePid: process.pid, strictNative: true });
       if (blockers.length > 0) {

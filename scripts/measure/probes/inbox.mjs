@@ -1,6 +1,7 @@
 // Exact and paged inbox access (#306). Every call opens its own store, as a
 // hook process does, and the validator reads back through another fresh one:
 // the message that came back, the receipt that moved, the event it published.
+import { readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { digest, multisetFailures, random, shuffle } from "../probe-kit.mjs";
@@ -8,7 +9,11 @@ import { eventsAfter, loadStoreSide, openInstance, openStoreFixture, primaryDige
   visibleEvents } from "../store-fixture.mjs";
 
 // `limit` 20 is the product's default page; `mix` spreads obligations and receipt states.
-const defaults = { messages: 30, backlog: 30, operation: "exact", limit: 20, mix: true, seed: 1 };
+// `index` is the path a lookup takes through the `indexes/v2` cache (#306): `warm` finds a
+// valid cache, `cold` finds none, `rebuilt` finds one a writer left behind, and `unavailable`
+// cannot publish the cache it rebuilds. A side that keeps no such cache is unaffected.
+const defaults = { messages: 30, backlog: 30, operation: "exact", limit: 20, mix: true, index: "warm", seed: 1 };
+const INDEX_PATHS = ["warm", "cold", "rebuilt", "unavailable"];
 const OBLIGATIONS = ["none", "acknowledge", "reply"];
 // The message kind each obligation belongs to in the protocol.
 const KIND = { none: "note", acknowledge: "decision", reply: "question" };
@@ -22,6 +27,7 @@ function scenario(input = {}) {
   }
   if (!["exact", "page"].includes(value.operation)) throw new Error("inbox operation is exact or page");
   if (typeof value.mix !== "boolean") throw new Error("inbox mix is true or false");
+  if (!INDEX_PATHS.includes(value.index)) throw new Error(`inbox index is ${INDEX_PATHS.join(", ")}`);
   if (value.messages < 1 || value.limit < 1 || value.limit > 500) throw new Error("inbox needs messages and a limit of 1..500");
   return value;
 }
@@ -84,8 +90,22 @@ async function build(scenario, side) {
 }
 
 const capacity = value => value.operation === "exact" ? value.messages : Infinity;
+// Puts the index cache in the state the scenario names, before the measured store opens.
+async function indexPath(built) {
+  const manifest = path.join(built.fixture.root, "indexes", "v2", "cache.json");
+  const { index } = built.scenario;
+  if (index === "cold" || index === "unavailable") await rm(manifest, { force: true });
+  if (index === "rebuilt") {
+    const value = await readFile(manifest, "utf8").then(JSON.parse, error => { if (error.code === "ENOENT") return null; throw error; });
+    if (value !== null) await writeFile(manifest, `${JSON.stringify({ ...value, journalGeneration: "0000000000000001" })}\n`);
+  }
+  return index === "unavailable"
+    ? { failAt: async point => { if (point === "before-index-manifest") throw new Error("probe: the cache cannot be published"); } }
+    : {};
+}
+
 async function prepare(built) {
-  const input = await openInstance(built.fixture, built.side);
+  const input = await openInstance(built.fixture, built.side, await indexPath(built));
   // Every record written from here on is the measured call's.
   built.generations = built.fixture.ids.count("generation");
   return input;

@@ -10,22 +10,29 @@ import { exactMessage, EXACT_WORKSPACE as WS, EXACT_NOW as NOW }
   from "../../../tests/helpers/exact-transaction-contract.mjs";
 import { runProcess } from "../../../tests/helpers/run-process.mjs";
 import { createStoreIoProbe } from "../../../tests/helpers/store-io-probe.mjs";
+import { SCHEMA_VERSION } from "@agents-can-communicate/protocol";
+import { INDEX_DIRECTORY } from "../src/index-io.mjs";
 
 const exact = { kinds: ["message"], exactKinds: ["message"] };
 const lookup = (store, key) => store.transaction(
   tx => tx.lookup("messageByClientKey", [WS, "participant_a", key]), exact);
-async function fixture(t, count = 600) {
+async function fixture(t, count = 600, { receipts = 0 } = {}) {
   const root = await realpath(await mkdtemp(path.join(tmpdir(), "acc-index-progress-")));
   t.after(() => rm(root, { recursive: true, force: true }));
   const clock = createFakeClock(NOW), ids = createFakeIds();
   const store = await openFilesystemStore({ root, workspaceId: WS, clock, ids });
   await store.transaction(tx => {
-    for (let i = 0; i < count; i++) tx.put("message", `message_${i}`, exactMessage({
-      messageId: `message_${i}`, threadId: `message_${i}`, clientMessageId: `client_${i}` }));
-  }, { kinds: ["message"] });
+    for (let i = 0; i < count; i++) {
+      tx.put("message", `message_${i}`, exactMessage({
+        messageId: `message_${i}`, threadId: `message_${i}`, clientMessageId: `client_${i}` }));
+      // More receipts than a leaf entry holds, so each message's group is a page of its own.
+      for (let r = 0; r < receipts; r++) tx.put("receipt", `receipt_${i}_${r}`, { schemaVersion: SCHEMA_VERSION,
+        workspaceId: WS, messageId: `message_${i}`, recipientParticipantId: `participant_${r}`, state: "queued", updatedAt: NOW });
+    }
+  }, { kinds: ["message", "receipt"] });
   await lookup(store, "client_0");
-  return { root, store, directory: path.join(root, "indexes/v1/pages"),
-    checkpoint: path.join(root, "indexes/v1/reclaim.json") };
+  return { root, store, directory: path.join(root, INDEX_DIRECTORY, "pages"),
+    checkpoint: path.join(root, INDEX_DIRECTORY, "reclaim.json") };
 }
 async function change(f, key, id = "message_0") {
   await f.store.transaction(async tx => {
@@ -34,7 +41,7 @@ async function change(f, key, id = "message_0") {
   }, exact);
 }
 async function livePages(f) {
-  const manifest = JSON.parse(await readFile(path.join(f.root, "indexes/v1/cache.json")));
+  const manifest = JSON.parse(await readFile(path.join(f.root, INDEX_DIRECTORY, "cache.json")));
   const pages = new Map(), pending = Object.values(manifest.roots).filter(Boolean);
   while (pending.length) {
     const hash = pending.pop();
@@ -42,7 +49,7 @@ async function livePages(f) {
     const bytes = await readFile(path.join(f.directory, hash + ".json")), page = JSON.parse(bytes);
     pages.set(hash, bytes);
     pending.push(...(page.type === "branch" ? page.children.map(([, child]) => child)
-      : page.type === "leaf" ? [...page.entries.map(e => e.ids), page.next].filter(Boolean)
+      : page.type === "leaf" ? [...page.entries.map(e => e.ids).filter(ids => typeof ids === "string"), page.next].filter(Boolean)
         : [page.next].filter(Boolean)));
   }
   return pages;
@@ -52,7 +59,8 @@ async function preserve(f, pages) {
 }
 
 test("automatic store opens in fresh processes eventually reclaim a graph larger than one pass", async t => {
-  const f = await fixture(t);
+  // About 750 live pages: more than one pass reads, as the test needs.
+  const f = await fixture(t, 400, { receipts: 9 });
   await change(f, "changed");
   const live = await livePages(f), before = await readdir(f.directory);
   assert(live.size > 512, "fixture exceeds the automatic maintenance budget");
@@ -114,7 +122,7 @@ test("damaged or unsafe progress restarts verification and never deletes unverif
   const before = (await readdir(f.directory)).sort();
   const value = JSON.parse(await readFile(f.checkpoint));
   value.state.pending = [];
-  value.state.visited = Object.values(JSON.parse(await readFile(path.join(f.root, "indexes/v1/cache.json"))).roots).filter(Boolean);
+  value.state.visited = Object.values(JSON.parse(await readFile(path.join(f.root, INDEX_DIRECTORY, "cache.json"))).roots).filter(Boolean);
   value.state.cursor = null;
   await writeFile(f.checkpoint, JSON.stringify(value));
   const repaired = await reclaimIndexPages(f.store.paths, { root: f.root, limit: 16 });
@@ -150,12 +158,18 @@ test("progress publication adds no flush and an expired pass cannot delete a liv
 
 test("a lost pending page from an older root cannot permanently block automatic cleanup", async t => {
   const f = await fixture(t, 40);
-  await reclaimIndexPages(f.store.paths, { root: f.root, limit: 4 });
-  const { pending } = JSON.parse(await readFile(f.checkpoint)).state;
+  // Small passes until a leaf of the client-key index waits for verification, whatever
+  // the other indexes' roots and groups cost the passes before it.
   let stale, key;
-  for (const hash of pending) {
-    const page = JSON.parse(await readFile(path.join(f.directory, hash + ".json")));
-    if (page.type === "leaf") { stale = hash; key = page.entries[0].tuple[2]; break; }
+  for (let pass = 0; pass < 40 && stale === undefined; pass++) {
+    await reclaimIndexPages(f.store.paths, { root: f.root, limit: 4 });
+    const { pending } = JSON.parse(await readFile(f.checkpoint)).state;
+    for (const hash of pending) {
+      const page = JSON.parse(await readFile(path.join(f.directory, hash + ".json")));
+      if (page.type === "leaf" && String(page.entries[0].tuple[2]).startsWith("client_")) {
+        stale = hash; key = page.entries[0].tuple[2]; break;
+      }
+    }
   }
   assert(stale, "fixture pauses with a leaf pending verification");
   const [id] = await lookup(f.store, key);

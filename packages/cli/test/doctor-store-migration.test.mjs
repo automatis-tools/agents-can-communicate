@@ -5,7 +5,7 @@ import path from "node:path";
 import { tmpdir } from "node:os";
 import test from "node:test";
 import { EXIT, SCHEMA_VERSION } from "@agents-can-communicate/protocol";
-import { openFilesystemStore } from "@agents-can-communicate/storage-filesystem";
+import { openFilesystemStore, STORE_VERSION } from "@agents-can-communicate/storage-filesystem";
 import { main } from "../src/main.mjs";
 import { parseArgs } from "../src/args.mjs";
 import { discoverWorkspace } from "../src/workspace-discovery.mjs";
@@ -28,13 +28,19 @@ async function fixture(t, managed = true) {
   await store.transaction(tx => tx.put("message", "message_a", exactMessage({ workspaceId: descriptor.id })), { kinds: ["message"] });
   const identityFile = path.join(paths.root, "protocol.json");
   await writeFile(identityFile, JSON.stringify({ ...JSON.parse(await readFile(identityFile)), storeVersion: 6 }));
-  const manager = path.join(dataHome, "acc", "runtime"), generation = path.join(manager, "generations", "old");
-  const active = { root: generation, version: "0.9.0", storeVersion: 6 };
+  // The active runtime speaks this code's contract, as after the update that brought it;
+  // an older generation is what an older live holder still runs.
+  const manager = path.join(dataHome, "acc", "runtime");
+  const active = { root: path.join(manager, "generations", "current"), version: "0.13.0", storeVersion: STORE_VERSION };
+  const older = { root: path.join(manager, "generations", "old"), version: "0.9.0", storeVersion: 6 };
   const control = { schemaVersion: 1, active, pending: null, phase: "ready", auto: false,
     pin: null, checkedAt: null, home, targets: [], notice: null };
   if (managed) {
-    await mkdir(generation, { recursive: true });
-    await writeFile(path.join(generation, "package.json"), JSON.stringify({ name: "agents-can-communicate", version: "0.9.0", accStoreVersion: 6 }));
+    for (const runtime of [active, older]) {
+      await mkdir(runtime.root, { recursive: true });
+      await writeFile(path.join(runtime.root, "package.json"), JSON.stringify({ name: "agents-can-communicate",
+        version: runtime.version, accStoreVersion: runtime.storeVersion }));
+    }
     await writeControl(manager, control);
   }
   const runtime = { cwd: project, dataHome, clock, ids, gitProbe: async () => null,
@@ -53,9 +59,9 @@ async function fixture(t, managed = true) {
   const lease = async pid => {
     await mkdir(path.join(manager, "leases"), { recursive: true });
     await writeManagedJson(path.join(manager, "leases/lease_a.json"),
-      { schemaVersion: 1, token: "lease_a", pid, kind: "acc-mcp", runtime: active, createdAt: NOW });
+      { schemaVersion: 1, token: "lease_a", pid, kind: "acc-mcp", runtime: older, createdAt: NOW });
   };
-  return { root, manager, control, runtime, run, paths, native, lease, identityFile };
+  return { root, manager, control, older, runtime, run, paths, native, lease, identityFile };
 }
 const migrate = f => f.run(["doctor", "--migrate-store"], { managementOnly: true });
 
@@ -69,14 +75,14 @@ test("migration dispatch locates v6 state without opening a v7 service", async t
   assert.equal(result.code, EXIT.OK, JSON.stringify(result.body));
   assert.equal(result.body.data.migrated, true);
   assert.equal(result.body.data.fromVersion, 6);
-  assert.equal(JSON.parse(await readFile(f.identityFile)).storeVersion, 7);
+  assert.equal(JSON.parse(await readFile(f.identityFile)).storeVersion, STORE_VERSION);
   assert.equal((await f.run(["status"], { managementOnly: true })).code, EXIT.DATA);
 });
 
 test("an unmanaged install uses the same data-home admission fence", async t => {
   const f = await fixture(t, false), result = await f.run(["doctor", "--migrate-store"]);
   assert.equal(result.code, EXIT.OK, JSON.stringify(result.body));
-  assert.equal(result.body.data.toVersion, 7);
+  assert.equal(result.body.data.toVersion, STORE_VERSION);
 });
 
 test("a cache fault is a separate diagnostic after a recorded CLI send", async t => {
@@ -147,11 +153,11 @@ for (const harness of ["mcp", "cli"]) {
     const bindings = path.join(f.paths.root, "bindings"); await mkdir(bindings, { recursive: true });
     await writeFile(path.join(bindings, createHash("sha256").update(nativeId).digest("hex").slice(0, 32) + ".json"),
       JSON.stringify({ schemaVersion: 1, harnessSessionId: nativeId, accSessionId: "session_mcp", generation: "generation_mcp" }));
-    if (harness === "mcp") assert.deepEqual(await listActivationBlockers(f.manager, { incomingStoreVersion: 7 }), [],
+    if (harness === "mcp") assert.deepEqual(await listActivationBlockers(f.manager, { incomingStoreVersion: STORE_VERSION }), [],
       "inactive legacy MCP continuity must not become an unknown native hold during a later activation");
     const result = await migrate(f);
     assert.equal(result.code, harness === "mcp" ? EXIT.OK : EXIT.CONFLICT, JSON.stringify(result.body));
-    assert.equal(JSON.parse(await readFile(f.identityFile)).storeVersion, harness === "mcp" ? 7 : 6);
+    assert.equal(JSON.parse(await readFile(f.identityFile)).storeVersion, harness === "mcp" ? STORE_VERSION : 6);
   });
 }
 
@@ -174,8 +180,23 @@ test("admission stays fenced through workspace migration", async t => {
     assert.equal(JSON.parse(await readFile(f.identityFile)).storeVersion, 6);
   } finally { release(); result = await migration; }
   assert.equal(result.code, EXIT.OK);
-  assert.equal((await acquireRuntime(f.manager)).runtime.storeVersion, 6,
+  const { version, storeVersion } = (await acquireRuntime(f.manager)).runtime;
+  assert.deepEqual({ version, storeVersion }, { version: f.control.active.version, storeVersion: STORE_VERSION },
     "migration does not install or activate another release");
+});
+
+// `acc doctor` runs the newest installed generation, also while it waits to activate. A
+// store it migrated then is one the active runtime, and every session admitted on it,
+// cannot read (review of #306).
+test("migration waits until the runtime that speaks the new contract is active", async t => {
+  const f = await fixture(t), before = await readFile(f.identityFile);
+  await writeControl(f.manager, { ...f.control, active: f.older, pending: f.control.active });
+  const result = await migrate(f);
+  assert.equal(result.code, EXIT.CONFLICT, JSON.stringify(result.body));
+  assert.match(result.body.error.message, /acc update/);
+  assert.deepEqual(await readFile(f.identityFile), before);
+  await writeControl(f.manager, f.control);
+  assert.equal((await migrate(f)).code, EXIT.OK);
 });
 
 // Plain doctor called a contract-6 store's identity unreadable and the store

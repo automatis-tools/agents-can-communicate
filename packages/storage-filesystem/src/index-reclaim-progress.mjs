@@ -1,11 +1,12 @@
 import { createHash } from "node:crypto";
 import path from "node:path";
 import { publishAtomic } from "./atomic-json.mjs";
+import { INDEX_DIRECTORY } from "./index-io.mjs";
 import { withRegularNoFollow } from "./safe-file.mjs";
 
 const hash = value => typeof value === "string" && /^[a-f0-9]{64}$/.test(value);
 const digest = bytes => createHash("sha256").update(bytes).digest("hex");
-const file = root => path.join(root, "indexes/v1/reclaim.json");
+const file = root => path.join(root, INDEX_DIRECTORY, "reclaim.json");
 const fresh = () => ({ version: 1, pending: [], visited: [], cursor: null, done: false });
 const valid = state => state && Object.keys(state).sort().join(",") === "cursor,done,pending,version,visited"
   && state.version === 1 && typeof state.done === "boolean"

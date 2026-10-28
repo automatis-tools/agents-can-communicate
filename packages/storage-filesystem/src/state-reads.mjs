@@ -22,7 +22,7 @@ export async function readStateEnvelope(paths, { root, workspaceId }, kind, id) 
 // How many records of one kind are read at once. One at a time, a turn spent
 // 0.4 s reading a workspace of a few thousand records; sixteen read it in 0.15 s
 // on the same Mac (#298). The order of the listing is kept.
-const LIST_READS = 16;
+export const LIST_READS = 16;
 
 export async function listState(paths, root, kind, deadlineAt) {
   const files = await listJsonFiles(path.join(paths.state, kind), { root });

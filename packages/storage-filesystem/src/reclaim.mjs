@@ -136,7 +136,7 @@ export async function reclaimRetired(paths,
   spent += leftovers.spent;
   // What a previous pass already moved has left its live name; removing it is
   // what reclaims it, so it counts here exactly as this pass's own work does.
-  let reclaimed = leftovers.spent;
+  let reclaimed = leftovers.removed;
   if (!leftovers.drained) return { reclaimed, remaining: true };
 
   const doomed = await detachDoomed(root);
@@ -148,7 +148,7 @@ export async function reclaimRetired(paths,
   spent += markers.spent;
 
   const removed = await discard(doomed, root, limit - spent, deadlineAt);
-  reclaimed += removed.spent;
+  reclaimed += removed.removed;
   spent += removed.spent;
   const indexes = journals.drained && markers.drained && removed.drained
     ? await reclaimIndexPages(paths, { root, limit: limit - spent, deadlineAt })
@@ -187,7 +187,7 @@ export async function reclaimStateRecords(paths, entries,
   const leftovers = await discardLeftovers(root, limit, deadlineAt);
   spent += leftovers.spent;
   if (!leftovers.drained) {
-    return { reclaimed: leftovers.spent, skipped, remaining: true };
+    return { reclaimed: leftovers.removed, skipped, remaining: true };
   }
 
   const doomed = await detachDoomed(root);
@@ -230,8 +230,8 @@ export async function reclaimStateRecords(paths, entries,
   }
 
   const removed = await discard(doomed, root, limit - spent, deadlineAt);
-  return { reclaimed: leftovers.spent + removed.spent, skipped,
-    remaining: !drained || !removed.drained || removed.spent < condemned };
+  return { reclaimed: leftovers.removed + removed.removed, skipped,
+    remaining: !drained || !removed.drained || removed.removed < condemned };
 }
 
 /**
@@ -286,6 +286,6 @@ export async function trimEventLog(paths, boundary,
   }
 
   const removed = await discard(doomed, root, limit - spent, deadlineAt);
-  return { reclaimed: removed.spent, trimmedThrough,
+  return { reclaimed: removed.removed, trimmedThrough,
     remaining: !drained || !removed.drained };
 }

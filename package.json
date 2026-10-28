@@ -2,7 +2,7 @@
   "name": "agents-can-communicate",
   "version": "0.12.2",
   "accManagedUpdateProtocol": 2,
-  "accStoreVersion": 7,
+  "accStoreVersion": 8,
   "type": "module",
   "description": "Local-first messaging between AI coding sessions in different vendors' clients, such as Claude Code and Codex.",
   "keywords": [

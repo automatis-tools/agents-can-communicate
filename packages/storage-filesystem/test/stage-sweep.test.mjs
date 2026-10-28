@@ -57,6 +57,29 @@ test("a later sweep adopts a directory an earlier one left behind", async t => {
   assert.deepEqual(await detachedIn(root), []);
 });
 
+// A whole directory is condemned at once - contract 7's index cache after a migration, a
+// pruned cache - and the sweep that removes it runs inside a store open, under the writer
+// mutex. Its files are paid for in the budget one by one, as any other entry (review of #306:
+// 20,000 pages went in one call, 3.1 s).
+test("a condemned directory is removed a file at a time within each pass's budget", async t => {
+  const { root, paths } = await fixture(t, 0);
+  const cache = path.join(root, "indexes", "v1", "pages");
+  await mkdir(cache, { recursive: true });
+  for (let index = 0; index < 25; index += 1) await writeFile(path.join(cache, `page_${index}.json`), "{}\n");
+  const { discardContractSevenCache } = await import("../src/index-reclaim.mjs");
+  await discardContractSevenCache(root);
+  assert.deepEqual(await readdir(path.join(root, "indexes")), []);
+  const passes = [];
+  for (let pass = 0; pass < 10; pass += 1) {
+    const result = await sweepAcceptedStages(paths, { root, limit: 10 });
+    passes.push(result.spent);
+    if (!result.remaining) break;
+  }
+  assert.ok(passes.length >= 3, `25 pages and their directories took ${passes.length} pass(es) of 10`);
+  assert.ok(passes.every(spent => spent <= 10), JSON.stringify(passes));
+  assert.deepEqual(await detachedIn(root), []);
+});
+
 test("a sweep leaves the store with an empty stage directory it can publish into", async t => {
   const { root, paths } = await fixture(t, 1);
 
