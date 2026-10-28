@@ -75,9 +75,11 @@ export function createInboxService(ports, sessions) {
   async function receiptsInState(tx, session, states) {
     const receipts = new Map();
     for (const state of states) {
-      for (const id of await tx.lookup("receiptsByRecipientState",
-        [session.workspaceId, session.participantId, state])) {
-        const receipt = await tx.load("receipt", id);
+      const ids = await tx.lookup("receiptsByRecipientState",
+        [session.workspaceId, session.participantId, state]);
+      // A lookup verifies what it selects and so has read these receipts already, sixteen
+      // at a time; they are loaded the same way rather than rely on that (review of #371).
+      for (const receipt of await loadAll(tx, "receipt", ids)) {
         if (receipt !== null) receipts.set(receipt.messageId, receipt);
       }
     }
