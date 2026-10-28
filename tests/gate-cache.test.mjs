@@ -1,3 +1,5 @@
+// Keep the cache's shared on-disk fixture and receipt lifecycle controls together:
+// splitting them would duplicate setup and hide producer-to-consumer guarantees.
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
 import { chmod, mkdir, mkdtemp, readFile, readdir, rm, symlink, writeFile } from "node:fs/promises";
@@ -281,5 +283,37 @@ test("receipt diagnostics explain CI-disabled without changing Boolean cache cal
   } finally {
     if (previous === undefined) delete process.env.CI;
     else process.env.CI = previous;
+  }
+});
+
+// Without this guard, a standalone successful producer could store substituted
+// Git inputs and reuse that proof after the replacement refs are removed.
+test("full-suite proof producer refuses active replacement aliases unless its env pins original objects", async t => {
+  const { root, env, fingerprint } = await repository(t);
+  const clean = { GIT_NO_REPLACE_OBJECTS: undefined, GIT_REPLACE_REF_BASE: undefined };
+  const initial = await fingerprint(clean);
+  assert.ok(initial?.key);
+  const original = (await run("git", ["hash-object", "-w", "source.mjs"], { cwd: root, env })).stdout.trim();
+  const temporary = path.join(root, ".git", "replacement-blob");
+  await writeFile(temporary, "export const value = 2;\n");
+  const substitute = (await run("git", ["hash-object", "-w", temporary], { cwd: root, env })).stdout.trim();
+  for (const namespace of ["refs/replace/", "refs/private-replacements/"]) {
+    const selected = { ...clean, ...(namespace === "refs/replace/" ? {} : { GIT_REPLACE_REF_BASE: namespace }) };
+    const ref = `${namespace}${original}`;
+    await run("git", ["update-ref", ref, substitute], { cwd: root, env });
+    const producer = await fingerprint(selected);
+    await cache.savePassed("tests", producer);
+    assert.equal(producer, null, "a producer can persist a proof over substituted Git inputs");
+    assert.equal(await fingerprint({ ...selected, GIT_NO_REPLACE_OBJECTS: "0" }), null,
+      "only the canonical original-object environment can certify aliases");
+    const pinned = await fingerprint({ ...selected, GIT_NO_REPLACE_OBJECTS: "1" });
+    assert.ok(pinned?.key, "original-object execution unnecessarily lost receipt eligibility");
+    assert.notEqual(pinned.key, initial.key, "the child's different Git execution context was ignored");
+    await cache.savePassed("tests", pinned);
+    assert.equal(await cache.hasPassed("tests", await fingerprint({ ...selected, GIT_NO_REPLACE_OBJECTS: "1" })), true);
+    await run("git", ["update-ref", "-d", ref], { cwd: root, env });
+    const after = await fingerprint(clean);
+    assert.equal(after.key, initial.key, "replacement removal changed unrelated ordinary input keys");
+    assert.equal(await cache.hasPassed("tests", after), false, "substituted execution left a reusable ordinary proof");
   }
 });

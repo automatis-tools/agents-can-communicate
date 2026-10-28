@@ -26,11 +26,20 @@ try {
   const repo = (await pushGit(process.cwd(), ["rev-parse", "--show-toplevel"])).trim();
   const objectFormat = (await pushGit(repo, ["rev-parse", "--show-object-format"])).trim();
   const refs = parsePushRefs(input, { objectFormat });
+  // npm's own Git children must read original objects too. Preserve the ordinary
+  // test environment when no refs exist, including a custom replacement namespace.
+  if ((await pushGit(repo, ["replace", "--list"])).trim()) process.env.GIT_NO_REPLACE_OBJECTS = "1";
   console.log("pre-push: refusing Claude attribution in pushed commits");
   await runPushCommand(process.execPath, [path.join(import.meta.dirname, "check-commit-attribution.mjs"),
     "--pre-push", remote], { cwd: repo, input });
   const targets = await resolvePushTrees(repo, refs);
   if (!targets.length) console.log("pre-push: deletions only; no content gates needed");
+  // Import and report inside the boundary: even a broken observer cannot fail a gate.
+  try {
+    const { observePushPlans } = await import("./change-plan-observation.mjs");
+    console.log(`pre-push: observation ${JSON.stringify(await observePushPlans(repo, targets))}`);
+  } catch { console.log("pre-push: observation unavailable; existing gates unchanged"); }
+
   for (const target of targets) {
     console.log(`pre-push: validating tree ${target.tree} (${target.requiredScope})`);
     await withPushCheckout(repo, target, async (checkout, signal) => {
