@@ -10,13 +10,9 @@ import { createMemoryStore } from "../helpers/memory-store.mjs";
 
 // A real installed hook process with a version-only client shim. This checks
 // projection and receipts, not whether a native model notices the reminder.
-for (const clientVersion of ["2.1.233", "99.0.0"]) {
-test(`an installed hook preserves a prior backlog with client ${clientVersion}`, async t => {
-  // Both read the 2.1.233 capture: evidence applies forward from the version
-  // that recorded it, on every platform, so a much later client delivers the
-  // same way rather than losing next-turn delivery for being new.
+test("an installed hook preserves a prior backlog with client 2.1.233", async t => {
   const packed = await createPackedAcc(t);
-  await packed.setClientVersions({ claude: clientVersion, codex: "0.0.0" });
+  await packed.setClientVersions({ claude: "2.1.233", codex: "0.0.0" });
   const load = name => import(pathToFileURL(path.join(packed.installed,
     "node_modules", "@agents-can-communicate", name, "src", "index.mjs")));
   const [{ createCoordinationService }, { openFilesystemStore }, { createId },
@@ -122,4 +118,84 @@ test(`an installed hook preserves a prior backlog with client ${clientVersion}`,
   assert.equal(old.message.body,
     "Original review request 0; still unresolved.");
 });
-}
+
+// The future client must inherit captured delivery capabilities without needing
+// another large backlog. Both offers below cross the actual installed hook.
+test("an installed future-version hook preserves an old offer after reopening", async t => {
+  const packed = await createPackedAcc(t);
+  await packed.setClientVersions({ claude: "99.0.0", codex: "0.0.0" });
+  const payload = { session_id: "native-future-reader", cwd: packed.project, source: "startup" };
+  const start = async () => {
+    const output = await packed.hook("claude_code", { ...payload, hook_event_name: "SessionStart" },
+      { ACC_PARTICIPANT: "reader" });
+    assert.equal(output.stderr, "", "SessionStart must attach the future-version reader");
+  };
+  const turn = async (body, label) => {
+    const output = await packed.beforeTurn({ adapterId: "claude_code",
+      harnessSessionId: payload.session_id });
+    const context = JSON.parse(output.stdout).hookSpecificOutput.additionalContext;
+    if (body) assert.ok(context.includes(body),
+      `${label} body delivery must follow the captured capability; the turn carried:\n${context}`);
+    assert.equal(output.stderr, "");
+    return context;
+  };
+  const flags = context => /^ACC CLI \(append\): (--session \S+ --generation \S+) --cwd .+$/m
+    .exec(context)[1].split(" ");
+  const snapshot = async () => (await packed.acc(["sync", "--scope", "full"])).snapshot;
+  const receipt = (state, id) => state.receipts.find(item => item.messageId === id
+    && item.recipientParticipantId === "reader");
+  await start();
+  const sender = await packed.acc(["attach", "--participant", "sender"]);
+  const request = (title, body) => packed.acc(["request", "--session", sender.sessionId,
+    "--generation", sender.generation, "--to", "reader", "--title", title, "--detail", body]);
+  const oldBody = "FUTURE_OLD_REQUEST: review the unresolved port 4301 integration.";
+  const old = await request("Earlier future-client review", oldBody);
+  const oldTurn = await turn(oldBody, "old");
+  const prior = receipt(await snapshot(), old.message.messageId);
+  assert.equal(prior.state, "offered");
+  assert.deepEqual(prior.extensions.offer, { transport: "next-turn",
+    at: prior.updatedAt, repeatedAt: null }, "old receipt must carry an actual next-turn offer");
+  assert.ok(Number.isFinite(Date.parse(prior.updatedAt)), "old offer must have a durable timestamp");
+  const ended = await packed.hook("claude_code", { ...payload,
+    hook_event_name: "SessionEnd", reason: "other" });
+  assert.equal(ended.stderr, "", "SessionEnd must close the old native owner");
+  await start();
+  assert.deepEqual(receipt(await snapshot(), old.message.messageId), prior,
+    "native close/reopen must preserve the old receipt");
+  const body = "FUTURE_CURRENT_REQUEST: use port 4317 for the new integration.";
+  const fresh = await request("Current future-client review", body);
+  const first = await turn(body, "fresh");
+  assert.ok(!first.includes(oldBody), "an old offered body must not replay after reopening");
+  assert.match(first, /1 reply/);
+  assert.ok(first.includes(`[reply_required] ${fresh.message.messageId}`),
+    "the new queued request must remain an individual urgent item");
+  assert.ok(Buffer.byteLength(first) < 1_000);
+  const currentFlags = flags(first);
+  assert.notDeepEqual(currentFlags, flags(oldTurn), "reopening must replace the native owner");
+  const offered = await snapshot();
+  assert.equal(receipt(offered, fresh.message.messageId).state, "offered",
+    "a delivered future-version body must advance its receipt");
+  assert.deepEqual(receipt(offered, old.message.messageId), prior,
+    "fresh delivery must not advance the old receipt");
+  const repeated = await turn();
+  assert.ok(Buffer.byteLength(repeated) < 400, "repeated future-version context must stay compact");
+  assert.match(repeated, /2 replies/);
+  assert.match(repeated, /`acc inbox`/);
+  assert.ok(!repeated.includes(body), "the fresh offered body must not replay");
+  assert.ok(!repeated.includes(oldBody), "the old offered body must not replay");
+  assert.ok(!repeated.includes(old.message.messageId));
+  assert.ok(!repeated.includes(fresh.message.messageId));
+  const after = await snapshot();
+  assert.equal(receipt(after, fresh.message.messageId).state, "offered",
+    "a reminder must not retrieve the fresh body");
+  assert.deepEqual(receipt(after, old.message.messageId), prior,
+    "compact reminders must preserve the old receipt");
+  const [current] = await packed.acc(["inbox", ...currentFlags,
+    "--message", fresh.message.messageId]);
+  assert.equal(current.message.body, body, "explicit reading must recover the full fresh body");
+  const retrieved = await snapshot();
+  assert.equal(receipt(retrieved, fresh.message.messageId).state, "retrieved",
+    "only explicit reading retrieves the fresh body");
+  assert.deepEqual(receipt(retrieved, old.message.messageId), prior,
+    "explicit fresh reading must leave the old obligation receipt unchanged");
+});
