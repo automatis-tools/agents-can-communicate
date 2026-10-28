@@ -1,19 +1,30 @@
 import { AccError, EXIT, TRANSACTION_INDEXES, assertIndexTuple, indexKeysFor }
   from "@agents-can-communicate/protocol";
 import { assertPublicationDeadline } from "./deadline.mjs";
-import { createIndexIO } from "./index-io.mjs";
+import { createIndexIO, INDEX_VERSION } from "./index-io.mjs";
 import { createIndexTree } from "./index-tree.mjs";
 import { encodeIndexPage, IndexCacheUnavailable } from "./index-pages.mjs";
+import { LIST_READS } from "./state-reads.mjs";
 
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 const matches = (kind, record, index, tuple) => indexKeysFor(kind, record)
   .some(key => key.index === index && same(key.tuple, tuple));
 const references = page => page.type === "branch" ? page.children.map(([, hash]) => hash)
-  : page.type === "leaf" ? [...page.entries.map(entry => entry.ids), page.next].filter(Boolean)
+  : page.type === "leaf" ? [...page.entries.map(entry => entry.ids).filter(ids => typeof ids === "string"), page.next].filter(Boolean)
     : [page.next].filter(Boolean);
 
 export function createIndexCache({ paths, root, workspaceId, publishOptions, loadPrimary }) {
   let diagnostic = [];
+  // The last tree rebuilt in memory that could not be published, for the journal
+  // generation it describes. A read-only data home in a client sandbox would otherwise
+  // read every primary record again for each lookup (#306). Message and receipt records
+  // change only through the journal, which moves the generation. A published tree is
+  // read from its pages, so it is not kept.
+  let unpublished = null;
+  // The manifest this instance validated, and the pages it decoded since, for the journal
+  // generation the manifest belongs to. Pages are content-addressed and never change, so
+  // a walk that makes one lookup per decision reads each page once (#306).
+  let validated = null;
   const note = (code, reason) => { diagnostic = [{ code, reason }]; };
   const tools = deadlineAt => {
     const io = createIndexIO({ paths, root, publishOptions: { ...publishOptions, deadlineAt } });
@@ -58,42 +69,78 @@ export function createIndexCache({ paths, root, workspaceId, publishOptions, loa
       const { hash } = encodeIndexPage(page); pages.set(hash, page); return hash;
     } });
     const roots = {};
-    for (const index of Object.keys(deltas)) roots[index] = await tree.apply(null, deltas[index]);
-    const manifest = { indexVersion: 1, workspaceId, journalGeneration: active.generation, roots };
+    for (const index of Object.keys(deltas)) roots[index] = await tree.build(deltas[index]);
+    // Only pages the roots reach are kept and published.
+    const reachable = new Map();
+    const keep = hash => {
+      if (hash === null || reachable.has(hash)) return;
+      reachable.set(hash, pages.get(hash));
+      for (const child of references(pages.get(hash))) keep(child);
+    };
+    for (const hash of Object.values(roots)) keep(hash);
+    pages.clear();
+    for (const [hash, page] of reachable) pages.set(hash, page);
+    const manifest = { indexVersion: INDEX_VERSION, workspaceId, journalGeneration: active.generation, roots };
     const { io } = tools(deadlineAt);
     try {
       // Publish only the final reachable tree, children before parents. The
-      // path copies made during a rebuild need never reach the filesystem.
-      const published = new Set();
-      async function publish(hash) {
-        if (hash === null || published.has(hash)) return;
-        const page = pages.get(hash);
-        for (const child of references(page)) await publish(child);
-        await io.writePage(page); published.add(hash);
+      // path copies made during a rebuild need never reach the filesystem. Pages of
+      // one height go a listing's worth at a time, every one after all of its children:
+      // one after another, a cold page read cost twice the listing it replaced (#306).
+      const heights = new Map();
+      const height = hash => {
+        if (!heights.has(hash)) {
+          heights.set(hash, 1 + Math.max(-1, ...references(pages.get(hash)).map(height)));
+        }
+        return heights.get(hash);
+      };
+      for (const hash of Object.values(roots)) if (hash !== null) height(hash);
+      const levels = [];
+      for (const [hash, level] of heights) (levels[level] ??= []).push(pages.get(hash));
+      for (const level of levels) {
+        for (let start = 0; start < level.length; start += LIST_READS) {
+          await Promise.all(level.slice(start, start + LIST_READS).map(page => io.writePage(page)));
+        }
       }
-      for (const hash of Object.values(roots)) await publish(hash);
       await publishManifest(io, manifest);
       note("index_rebuilt", "verified_primary");
+      return { manifest, tree, published: true };
     } catch (error) {
       if (!(error instanceof IndexCacheUnavailable)) throw error;
       note("index_unavailable", error.reason);
       if (required) throw error;
     }
-    return { manifest, tree };
+    return { manifest, tree, published: false };
   }
   async function lookup(index, tuple, { active, staged, deadlineAt, verify }) {
     assertIndexTuple(index, tuple);
     let tree, manifest;
     try {
-      const selected = tools(deadlineAt);
-      tree = selected.tree;
-      manifest = await valid(selected.io, active);
-      if (manifest === null) throw new IndexCacheUnavailable("missing_manifest");
+      // Each lookup reads through its own deadline; only the decoded pages are shared.
+      const { io } = tools(deadlineAt);
+      const remembering = pages => ({ ...io, readPage: async hash => {
+        if (!pages.has(hash)) pages.set(hash, await io.readPage(hash));
+        return pages.get(hash);
+      } });
+      if (validated === null || validated.generation !== active.generation || active.state !== "idle") {
+        validated = null;
+        const pages = new Map();
+        manifest = await valid(remembering(pages), active);
+        if (manifest === null) throw new IndexCacheUnavailable("missing_manifest");
+        validated = { generation: active.generation, manifest, pages };
+      }
+      manifest = validated.manifest;
+      tree = createIndexTree(remembering(validated.pages));
       return await select(await tree.lookup(manifest.roots[index], tuple));
     } catch (error) {
       if (!(error instanceof IndexCacheUnavailable)) throw error;
+      validated = null;
     }
-    ({ manifest, tree } = await rebuild(active, deadlineAt));
+    if (unpublished === null || unpublished.generation !== active.generation || active.state !== "idle") {
+      const result = await rebuild(active, deadlineAt);
+      unpublished = result.published ? null : { generation: active.generation, ...result };
+      ({ manifest, tree } = result);
+    } else ({ manifest, tree } = unpublished);
     return select(await tree.lookup(manifest.roots[index], tuple));
 
     async function select(ids) {
@@ -104,10 +151,15 @@ export function createIndexCache({ paths, root, workspaceId, publishOptions, loa
         if (entry.removed !== true && matches(kind, entry.record, index, tuple)) selected.add(entry.id);
       }
       const result = [];
-      // Match eager listJsonFiles ordering, including prefix IDs such as a/a-b.
-      for (const id of [...selected].sort((a, b) => `${a}.json`.localeCompare(`${b}.json`))) {
+      // Match eager listJsonFiles ordering, including prefix IDs such as a/a-b. Verified a
+      // listing's worth at a time: one record after another, a page of a small inbox took
+      // twice as long as the listing it replaced (#306).
+      const sorted = [...selected].sort((a, b) => `${a}.json`.localeCompare(`${b}.json`));
+      for (let start = 0; start < sorted.length; start += LIST_READS) {
         assertPublicationDeadline(deadlineAt);
-        if (await verify(id)) result.push(id);
+        const batch = sorted.slice(start, start + LIST_READS);
+        const found = await Promise.all(batch.map(id => verify(id)));
+        batch.forEach((id, position) => { if (found[position]) result.push(id); });
       }
       return result;
     }

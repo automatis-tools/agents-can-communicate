@@ -2,7 +2,7 @@ import path from "node:path";
 import { idleJournal, readActiveJournal } from "./active-journal.mjs";
 import { listDirectoryEntries, nameCommittedLater } from "./atomic-json.mjs";
 import { condemn, detachDoomed, discard, expired } from "./doomed-directory.mjs";
-import { createIndexIO } from "./index-io.mjs";
+import { createIndexIO, INDEX_DIRECTORY } from "./index-io.mjs";
 import { IndexCacheUnavailable } from "./index-pages.mjs";
 import { readReclaimProgress, writeReclaimProgress } from "./index-reclaim-progress.mjs";
 import { readStoreIdentity } from "./identity.mjs";
@@ -11,7 +11,7 @@ import { syncPruneDirectories } from "./prune-durability.mjs";
 import { assertManagedDirectory } from "./safe-directory.mjs";
 
 const children = page => page.type === "branch" ? page.children.map(([, hash]) => hash)
-  : page.type === "leaf" ? [...page.entries.map(entry => entry.ids), page.next].filter(Boolean)
+  : page.type === "leaf" ? [...page.entries.map(entry => entry.ids).filter(ids => typeof ids === "string"), page.next].filter(Boolean)
     : [page.next].filter(Boolean);
 
 // The caller holds the writer mutex. Persist both mark and sweep progress: a
@@ -22,7 +22,7 @@ export async function reclaimIndexPages(paths, { root, roots, limit = 512, deadl
   let spent = 0, reclaimed = 0;
   const result = (remaining, deferred = false) => ({ reclaimed, remaining, spent, deferred });
   if (expired(deadlineAt)) return result(true, true);
-  const directory = path.join(root, "indexes", "v1", "pages");
+  const directory = path.join(root, INDEX_DIRECTORY, "pages");
   try { await assertManagedDirectory(root, directory); }
   catch (error) { return result(error.code !== "ENOENT", error.code !== "ENOENT"); }
   if (limit < 4) return result(true);
@@ -98,14 +98,14 @@ export async function reclaimIndexPages(paths, { root, roots, limit = 512, deadl
   }
   if (doomed !== undefined) {
     const removed = await discard(doomed, root, budget - spent, deadlineAt);
-    reclaimed += removed.spent; spent += removed.spent;
+    reclaimed += removed.removed; spent += removed.spent;
     remaining ||= !removed.drained;
   }
   return checkpoint(remaining);
 }
 
 async function discardCache(root, collect) {
-  const directory = path.join(root, "indexes", "v1");
+  const directory = path.join(root, INDEX_DIRECTORY);
   // Only a validated cache directory may move. Damage/unsafe cache paths stay
   // untouched, and the changed durable epoch already makes their roots stale.
   try {
@@ -113,7 +113,25 @@ async function discardCache(root, collect) {
     const doomed = await detachDoomed(root);
     await condemn(directory, doomed);
     collect(directory, doomed);
+    // Prune is an explicit command, and it pays for the cache it invalidated now: left for
+    // the records' pass below, whose leftovers come first and are paid a file at a time,
+    // a cache larger than the budget would take that budget from the records every pass.
+    await discard(doomed, root, Infinity);
   } catch { /* Cache loss or refusal cannot fail a completed primary prune. */ }
+}
+
+/**
+ * Moves the cache contract 7 kept, `indexes/v1`, out of the store, for the sweep to
+ * remove. Only a store migration calls it, once no older ACC can read the store.
+ * Contract 8 never reads that directory, so one that is missing, damaged or unsafe
+ * stays where it is rather than fail the migration.
+ */
+export async function discardContractSevenCache(root) {
+  const directory = path.join(root, "indexes", "v1");
+  try {
+    await assertManagedDirectory(root, directory);
+    await condemn(directory, await detachDoomed(root));
+  } catch { /* Nothing reads it again. */ }
 }
 
 // Existing empty-publication journals fence physical retirement without

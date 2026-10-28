@@ -54,20 +54,39 @@ export async function condemn(filePath, doomed) {
 /**
  * Remove a doomed directory, one entry at a time, within a budget.
  *
- * @returns {Promise<{ spent: number, drained: boolean }>}
+ * A condemned entry can be a whole directory - contract 7's index cache after a migration,
+ * a pruned cache - and the pass may run inside a store open, under the writer mutex. Such a
+ * directory is emptied the same way, a file at a time, so its size is paid for in the
+ * budget (review of #306: 20,000 cache pages went in one call, 3.1 s inside a hook).
+ * `spent` is that budget; `removed` counts only the condemned entries themselves, which is
+ * what left the store.
+ *
+ * @returns {Promise<{ spent: number, removed: number, drained: boolean }>}
  */
 export async function discard(directory, root, budget, deadlineAt) {
-  let spent = 0;
   await assertManagedDirectory(root, directory);
-  for (const entry of await listDirectoryEntries(directory, { root })) {
-    if (spent >= budget || expired(deadlineAt)) return { spent, drained: false };
-    await removeTree(path.join(directory, entry.name));
-    spent += 1;
-  }
+  const emptied = await empty(directory, root, budget, deadlineAt);
+  if (!emptied.drained) return emptied;
   await rmdir(directory).catch(error => {
     if (error.code !== "ENOENT" && error.code !== "ENOTEMPTY") throw error;
   });
-  return { spent, drained: true };
+  return emptied;
+}
+
+async function empty(directory, root, budget, deadlineAt) {
+  let spent = 0, removed = 0;
+  for (const entry of await listDirectoryEntries(directory, { root })) {
+    if (spent >= budget || expired(deadlineAt)) return { spent, removed, drained: false };
+    const target = path.join(directory, entry.name);
+    if (entry.isDirectory()) {
+      const inner = await empty(target, root, budget - spent, deadlineAt);
+      spent += inner.spent;
+      if (!inner.drained || spent >= budget) return { spent, removed, drained: false };
+    }
+    await removeTree(target);
+    spent += 1; removed += 1;
+  }
+  return { spent, removed, drained: true };
 }
 
 /**
@@ -77,14 +96,14 @@ export async function discard(directory, root, budget, deadlineAt) {
  * never detaches a further directory, so an exhausted budget cannot make them
  * accumulate.
  *
- * @returns {Promise<{ spent: number, drained: boolean }>}
+ * @returns {Promise<{ spent: number, removed: number, drained: boolean }>}
  */
 export async function discardLeftovers(root, budget, deadlineAt) {
-  let spent = 0;
+  let spent = 0, removed = 0;
   for (const directory of await doomedDirectories(root)) {
-    const removed = await discard(directory, root, budget - spent, deadlineAt);
-    spent += removed.spent;
-    if (!removed.drained) return { spent, drained: false };
+    const discarded = await discard(directory, root, budget - spent, deadlineAt);
+    spent += discarded.spent; removed += discarded.removed;
+    if (!discarded.drained) return { spent, removed, drained: false };
   }
-  return { spent, drained: true };
+  return { spent, removed, drained: true };
 }

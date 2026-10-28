@@ -3,6 +3,7 @@ import { mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import test from "node:test";
 import { EXIT } from "@agents-can-communicate/protocol";
+import { STORE_VERSION } from "@agents-can-communicate/storage-filesystem";
 import { createPackedAcc } from "../helpers/packed-acc.mjs";
 import { createUpdateRegistry } from "../helpers/update-registry.mjs";
 
@@ -37,7 +38,7 @@ test("packed doctor migrates explicitly, preserves message bytes and supports se
   assert.match(JSON.parse(hook.stdout).systemMessage, /acc doctor --migrate-store/);
   assert.deepEqual(await readFile(state.file), state.before, "a hook must not migrate automatically");
   const migrated = await f.acc(["doctor", "--migrate-store"]);
-  assert.deepEqual([migrated.fromVersion, migrated.toVersion, migrated.migrated], [6, 7, true]);
+  assert.deepEqual([migrated.fromVersion, migrated.toVersion, migrated.migrated], [6, STORE_VERSION, true]);
   assert.deepEqual(await readFile(messageFile), beforeMessage);
   const args = ["message", "--to", "peer", "--subject", "After", "--body", "After explicit migration",
     "--client-message-id", "client_after", ...owner];
@@ -73,7 +74,7 @@ test("packed verified pending management code migrates only after old native hol
   const after = JSON.parse(await readFile(controlFile));
   assert.deepEqual(after.active, before.active, "migration must not activate another release");
   assert.deepEqual(after.pending, before.pending);
-  assert.equal(JSON.parse(await readFile(state.file)).storeVersion, 7);
+  assert.equal(JSON.parse(await readFile(state.file)).storeVersion, STORE_VERSION);
 });
 
 // With automatic updates on, a user who ran nothing found every older workspace
@@ -92,7 +93,7 @@ test("packed update moves an older store to the new contract by itself", async t
     npm_config_cache: path.join(f.root, "update-cache") });
 
   assert.equal(updated.activated, true, JSON.stringify(updated));
-  assert.equal(JSON.parse(await readFile(state.file)).storeVersion, 7);
+  assert.equal(JSON.parse(await readFile(state.file)).storeVersion, STORE_VERSION);
   const marker = JSON.parse(await readFile(path.join(f.dataHome, "acc", "runtime", "store-upgrade.json")));
   assert.equal(marker.complete, true);
   const sender = await f.acc(["attach", "--participant", "after", "--harness", "cli"]);

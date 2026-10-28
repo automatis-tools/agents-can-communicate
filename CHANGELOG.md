@@ -1,5 +1,34 @@
 # Changelog
 
+## Unreleased — inbox reads without the backlog
+
+- An inbox read no longer reads the workspace's backlog (#306). An exact read and a page listed
+  every message and every receipt in the workspace, then kept the reader's, so a hook that read
+  one message read everything addressed to other participants and the reader's acknowledged
+  history too. They now load the reader's own records, by id and through two new indexes. Beside
+  270 messages to someone else, a page reads 52 records instead of 608 and takes 5.6 ms instead
+  of 32.5 ms, as it does beside none; an exact read reads 4 records instead of 608.
+- **This is store contract 8.** As with contract 7, the update waits until no client session
+  still runs older ACC code, then moves each workspace's store by itself: it writes the message
+  obligation into each note its reader has retrieved, builds the new index cache and removes the
+  old one. Messages keep their bytes, and so does every other receipt. ACC 0.12.x and older then
+  refuse the store, and `acc doctor --migrate-store` waits until the new runtime is active. See
+  [Upgrading](docs/UPGRADING.md#store-contract-7-to-8).
+- A page whose index cache is missing, stale or cannot be published reads every record once, as
+  before, and builds the index: 10 ms instead of 5.5 beside no backlog, 44 ms instead of 33 beside
+  270 messages. The next read is warm, except in a data home the process may only read.
+
+| Development artifact | Value |
+|---|---|
+| Built from | `4a869ce7b60d718f2a1e273d594d487b74f88883` |
+| Tarball | `agents-can-communicate-0.12.2.tgz`, 627,984 bytes, 380 files |
+| sha256 | `4cc393f5d624156366ce49e69ef5641c73bc13b17a6ebda3136f9524a05b5f91` |
+
+The exact archive passed package verification. See
+[development evidence](docs/release-evidence/unreleased-inbox-reads.md).
+This is not a published release; the package version remains `0.12.2`.
+The earlier candidate and release records below retain their original provenance.
+
 ## Unreleased — attention reads each receipt once
 
 - Explicit local documentation gates keep documentation receipts separate from full-suite

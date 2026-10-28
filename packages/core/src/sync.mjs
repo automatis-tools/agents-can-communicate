@@ -4,7 +4,7 @@ import { computeAttention } from "./attention.mjs";
 import { classifySessionPresence } from "./sessions.mjs";
 import { assertMessageId, messagePage } from "./message-pages.mjs";
 import { decisionView, isCurrentDecision } from "./decision-state.mjs";
-import { offerFacts } from "./receipts.mjs";
+import { offerFacts, publicReceipt } from "./receipts.mjs";
 
 const DEFAULT_LIMIT = 100;
 const CURSOR = /^[0-9]{16}$/;
@@ -105,7 +105,7 @@ export function createSyncService(ports, sessions) {
       attention,
       roster,
       events: page.events,
-      ...(input.scope === "full" ? { snapshot } : {}),
+      ...(input.scope === "full" ? { snapshot: { ...snapshot, receipts: snapshot.receipts.map(publicReceipt) } } : {}),
     };
   }
 

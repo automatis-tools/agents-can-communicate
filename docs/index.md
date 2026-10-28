@@ -15,8 +15,8 @@ decides what its task requires.
 3. [Capabilities](CAPABILITIES.md) — check what your client and platform can actually do.
 4. [Troubleshooting](TROUBLESHOOTING.md) — diagnose missing peers, queued messages, and
    capability fallback.
-5. [Upgrading ACC](UPGRADING.md) — update from 0.9.x, whose stores move to contract 7 by
-   themselves, or from an earlier release, and control automatic updates.
+5. [Upgrading ACC](UPGRADING.md) — update from an earlier release, whose stores move to the
+   new store contract by themselves, and control automatic updates.
 
 ## See it in context
 

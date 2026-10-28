@@ -2,12 +2,25 @@ import { AccError, EXIT, SCHEMA_VERSION, advanceReceipt }
   from "@agents-can-communicate/protocol";
 
 import { receiptId, recordMessageInTransaction } from "./conversations.mjs";
+import { publicReceipt } from "./receipts.mjs";
 import { assertExactTransaction } from "./ports.mjs";
 import { messagePage, messageSummary } from "./message-pages.mjs";
 import { decisionView, isCurrentDecision } from "./decision-state.mjs";
 
 const listable = (message, receipt) => receipt.state === "queued" || receipt.state === "offered"
   || (receipt.state === "retrieved" && message.obligation !== "none");
+// Every state a listable receipt can be in; an acknowledged one never is.
+const PENDING = ["queued", "offered", "retrieved"];
+// Records loaded by id are read as many at once as a store listing reads (#298): one after
+// another, a page of a small inbox took twice as long as the listing it replaced (#306).
+const LOADS = 16;
+async function loadAll(tx, kind, ids) {
+  const records = [];
+  for (let start = 0; start < ids.length; start += LOADS) {
+    records.push(...await Promise.all(ids.slice(start, start + LOADS).map(id => tx.load(kind, id))));
+  }
+  return records;
+}
 
 export function createInboxService(ports, sessions) {
   const { store, clock, ids } = ports;
@@ -45,7 +58,11 @@ export function createInboxService(ports, sessions) {
     if (nextState === owned.receipt.state) {
       return { message: owned.message, receipt: owned.receipt };
     }
-    const receipt = { ...owned.receipt, state: nextState, updatedAt: now };
+    // A receipt from before contract 8 gains its message's obligation here, so a note
+    // leaves the receipt index once it is read (#306).
+    const receipt = { ...owned.receipt, state: nextState, updatedAt: now,
+      ...(owned.receipt.extensions?.obligation === undefined
+        ? { extensions: { ...owned.receipt.extensions, obligation: owned.message.obligation } } : {}) };
     tx.put("receipt", owned.id, receipt, tx.generationOf("receipt", owned.id));
     tx.append({ schemaVersion: SCHEMA_VERSION, eventId: ids.next("event"),
       workspaceId: session.workspaceId, actorSessionId: session.sessionId,
@@ -54,33 +71,93 @@ export function createInboxService(ports, sessions) {
     return { message: owned.message, receipt };
   }
 
+  // The reader's receipts in these states, keyed by message.
+  async function receiptsInState(tx, session, states) {
+    const receipts = new Map();
+    for (const state of states) {
+      const ids = await tx.lookup("receiptsByRecipientState",
+        [session.workspaceId, session.participantId, state]);
+      // A lookup verifies what it selects and so has read these receipts already, sixteen
+      // at a time; they are loaded the same way rather than rely on that (review of #371).
+      for (const receipt of await loadAll(tx, "receipt", ids)) {
+        if (receipt !== null) receipts.set(receipt.messageId, receipt);
+      }
+    }
+    return receipts;
+  }
+
+  // The reader's receipt for one message, by its id; null unless it is the reader's.
+  async function ownReceipt(tx, session, messageId) {
+    // Anything but a string names no message, as a listing would have found.
+    if (typeof messageId !== "string") return null;
+    const receipt = await tx.load("receipt", receiptId(messageId, session.participantId));
+    return receipt?.messageId === messageId && receipt.recipientParticipantId === session.participantId
+      ? receipt : null;
+  }
+
+  // The messages of these receipts, each with its decision status. A decision's status
+  // depends on its whole group - the decisions it names and the ones that name it, to
+  // any distance, whoever they were addressed to - so each group is walked in full and
+  // no other decision is read.
+  async function messagesFor(tx, session, receipts) {
+    const messages = new Map(), ids = [...receipts.keys()];
+    (await loadAll(tx, "message", ids)).forEach((message, index) => {
+      if (message !== null) messages.set(ids[index], message);
+    });
+    const group = new Map([...messages.values()].filter(message => message.kind === "decision")
+      .map(message => [message.messageId, message]));
+    if (group.size === 0) return messages;
+    for (const pending = [...group.values()]; pending.length > 0;) {
+      const decision = pending.pop();
+      const named = decision.decisionChange?.messageIds ?? [];
+      const naming = await tx.lookup("decisionsByTarget", [session.workspaceId, decision.messageId]);
+      const unseen = [...new Set([...named, ...naming])].filter(id => !group.has(id));
+      (await loadAll(tx, "message", unseen)).forEach((neighbour, index) => {
+        if (neighbour?.kind !== "decision") return;
+        group.set(unseen[index], neighbour);
+        pending.push(neighbour);
+      });
+    }
+    const view = decisionView([...group.values()]);
+    return new Map([...messages].map(([id, message]) => [id, view(message)]));
+  }
+
   async function listInbox(input) {
     const session = await requireOpen(input, "list the inbox");
     return store.transaction(async tx => {
+      await tx.load("session", input.sessionId);
       await requireOpen(input, "list the inbox", tx);
-      const receipts = new Map(tx.list("receipt", receipt =>
-        receipt.recipientParticipantId === session.participantId)
-        .map(receipt => [receipt.messageId, receipt]));
-      const all = tx.list("message"), view = decisionView(all);
-      const messages = all.filter(message => receipts.has(message.messageId)).map(view);
-      return messagePage(messages, input, {
+      const receipts = await receiptsInState(tx, session, PENDING);
+      // The cursor names the last message of the previous page, which may have been
+      // resolved since. It still anchors the page while it is addressed to the reader.
+      if (input.cursor != null && !receipts.has(input.cursor)) {
+        const anchor = await ownReceipt(tx, session, input.cursor);
+        if (anchor !== null) receipts.set(input.cursor, anchor);
+      }
+      const messages = await messagesFor(tx, session, receipts);
+      return messagePage([...messages.values()], input, {
         include: message => isCurrentDecision(message) && listable(message, receipts.get(message.messageId)),
         project: message => ({ message: messageSummary(message),
-          receipt: receipts.get(message.messageId) }),
+          receipt: publicReceipt(receipts.get(message.messageId)) }),
       });
-    }, { kinds: ["session", "message", "receipt"] });
+    // Loaded by id or index, so the cost follows the reader's records, not the workspace (#306).
+    }, { kinds: ["session", "message", "receipt"], exactKinds: ["session", "message", "receipt"] });
   }
 
   async function readInbox(input) {
     const session = await requireOpen(input, "read the inbox");
     const now = clock.now();
     return store.transaction(async tx => {
+      await tx.load("session", input.sessionId);
       await requireOpen(input, "read the inbox", tx);
-      const all = tx.list("message"), view = decisionView(all);
-      const messages = new Map(all.map(item => [item.messageId, view(item)]));
-      let selected = tx.list("receipt", receipt =>
-        receipt.recipientParticipantId === session.participantId)
-        .filter(receipt => messages.has(receipt.messageId));
+      let receipts;
+      if (input.messageId === undefined) receipts = await receiptsInState(tx, session, PENDING);
+      else {
+        const receipt = await ownReceipt(tx, session, input.messageId);
+        receipts = new Map(receipt === null ? [] : [[input.messageId, receipt]]);
+      }
+      const messages = await messagesFor(tx, session, receipts);
+      let selected = [...receipts.values()].filter(receipt => messages.has(receipt.messageId));
       if (input.messageId === undefined) {
         selected = selected.filter(receipt => listable(messages.get(receipt.messageId), receipt)
           && isCurrentDecision(messages.get(receipt.messageId)));
@@ -102,8 +179,10 @@ export function createInboxService(ports, sessions) {
       return selected.map(receipt => receipt.state === "acknowledged"
         ? { message: messages.get(receipt.messageId), receipt }
         : { ...advanceOwned(tx, session, receipt.messageId, "retrieved", now),
-          message: messages.get(receipt.messageId) });
-    }, { kinds: ["session", "message", "receipt"] });
+          message: messages.get(receipt.messageId) })
+        .map(item => ({ ...item, receipt: publicReceipt(item.receipt) }));
+    // Loaded by id or index, so the cost follows the reader's records, not the workspace (#306).
+    }, { kinds: ["session", "message", "receipt"], exactKinds: ["session", "message", "receipt"] });
   }
 
   async function acknowledgeMessage(input) {
@@ -121,7 +200,7 @@ export function createInboxService(ports, sessions) {
           "this message requires a reply; use reply to answer, clarify, or decline",
           { messageId: input.messageId, obligation: message.obligation });
       }
-      return advanceOwned(tx, session, input.messageId, "acknowledged", now).receipt;
+      return publicReceipt(advanceOwned(tx, session, input.messageId, "acknowledged", now).receipt);
     }, { kinds: ["session", "message", "receipt"], exactKinds: ["session", "message", "receipt"] });
   }
 
@@ -149,7 +228,7 @@ export function createInboxService(ports, sessions) {
           handoff: null,
         } });
       const receipt = advanceOwned(tx, session, input.messageId, "acknowledged", now).receipt;
-      return { reply: recorded.message, receipt };
+      return { reply: recorded.message, receipt: publicReceipt(receipt) };
     }, { kinds: ["participant", "session", "message", "receipt"], exactKinds: ["message", "receipt"] });
   }
 

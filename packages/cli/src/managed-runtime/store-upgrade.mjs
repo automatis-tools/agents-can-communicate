@@ -15,8 +15,9 @@ import { readControl, writeManagedJson } from "./state.mjs";
  * #263 made contract 6 to 7 an explicit `acc doctor --migrate-store` in each
  * workspace. With automatic updates on, a user who ran nothing found every
  * workspace without coordination after the update, its remedy on a stderr line
- * Claude Code does not show (2026-10-06). The activation of a contract-7
- * runtime already waits until no live process holds contract 6, so right after
+ * Claude Code does not show (2026-10-06). The activation of a runtime with a
+ * newer contract already waits until no live process holds an older one (7 to 8
+ * in #306, as 6 to 7 in #263), so right after
  * it - and on every later worker pass - the same check guards each store's
  * migration, under the same admission mutex as the explicit command. The mutex
  * is taken per store, so an entry waits at most one store's migration.

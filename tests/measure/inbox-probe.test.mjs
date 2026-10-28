@@ -16,6 +16,7 @@ async function built(t, scenario) {
   t.after(() => inbox.dispose(value));
   return value;
 }
+const call_ = (value, operate) => call(value, operate);
 const call = async (value, operate = inbox.operate) => {
   const input = await inbox.prepare(value);
   return inbox.validate(value, await operate(value, input), input);
@@ -63,6 +64,24 @@ test("a page the byte budget ends early passes, and one item fewer than fits fai
   assert.deepEqual(await inbox.validate(value, result, input), []);
   const short = await inbox.mutationsFor(scenario)["short-page"](inbox.operate, { side: value.side, scenario });
   assert.match((await call(value, short)).join(), /items where .* fit the 12000-byte page/);
+});
+
+test("every index path gives valid work, and its cost is its own", async t => {
+  const reads = {};
+  for (const index of ["warm", "cold", "rebuilt", "unavailable"]) {
+    for (const operation of ["exact", "page"]) {
+      const value = await built(t, inbox.scenario({ messages: 8, backlog: 12, operation, limit: 5, index, seed: 6 }));
+      for (let call = 0; call < 2; call++) assert.deepEqual(await call_(value), [], `${index}/${operation} call ${call}`);
+      reads[`${index}/${operation}`] = (await inbox.observe(value)).stateReads;
+    }
+  }
+  // A page looks up its receipts by index, so a cache that has to be rebuilt reads every
+  // message and receipt once; a warm one does not. An exact read of anything but a
+  // decision needs no index at all.
+  for (const index of ["cold", "rebuilt", "unavailable"]) {
+    assert.ok(reads[`${index}/page`] > reads["warm/page"], `${index}: ${JSON.stringify(reads)}`);
+    assert.ok(reads[`${index}/page`] <= reads["cold/page"], `${index} rebuilt more than once: ${JSON.stringify(reads)}`);
+  }
 });
 
 test("observations report primary reads beside a valid call", async t => {

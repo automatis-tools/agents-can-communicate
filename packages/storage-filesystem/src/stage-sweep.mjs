@@ -60,7 +60,7 @@ export async function sweepAcceptedStages(paths,
   // directory, so an exhausted budget cannot make them accumulate.
   const leftovers = await discardLeftovers(root, limit, deadlineAt);
   spent += leftovers.spent;
-  swept += leftovers.spent;
+  swept += leftovers.removed;
   if (!leftovers.drained) return { swept, remaining: true, spent };
 
   const detached = doomedName(root);
@@ -79,7 +79,7 @@ export async function sweepAcceptedStages(paths,
 
   const removed = await discard(detached, root, limit - spent, deadlineAt);
   spent += removed.spent;
-  swept += removed.spent;
+  swept += removed.removed;
   if (!removed.drained) remaining = true;
   return { swept, remaining, spent };
 }

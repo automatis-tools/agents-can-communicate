@@ -4,6 +4,7 @@ import { mkdtemp, mkdir, readFile, rm, symlink } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
+import { INDEX_DIRECTORY } from "../src/index-io.mjs";
 
 // Missing exports are the initial RED, rather than a broken fixture import.
 const optional = specifier => import(specifier).catch(error => {
@@ -60,8 +61,96 @@ test("duplicate keys retain ordered ID groups", async () => {
   assert.deepEqual(await tree.lookup(root, tuple(0)), ids.sort((a, b) => a.localeCompare(b)));
   const next = await tree.apply(root, [{ tuple: tuple(0), id: "message_64", operation: "remove" }]);
   assert.deepEqual(await tree.lookup(next, tuple(0)), ids.filter(id => id !== "message_64"));
-  assert(published.some(({ page }) => page.type === "group" && page.next !== null));
+  // A group of more than 32 IDs branches on their digests; v2 groups never chain.
+  assert(published.some(({ page }) => page.type === "branch"));
+  assert(!published.some(({ page }) => page.type === "group" && page.next !== null));
   bounded(published);
+});
+
+// #306: a pending-receipt group grows with a recipient's unread messages. Each change
+// copies the route to its ID, never the pages in front of it in a list.
+test("a large ID group changes along its route, not along its length", async () => {
+  const { tree, published } = memory();
+  const ids = Array.from({ length: 4000 }, (_, i) => `message_${String(i).padStart(5, "0")}`);
+  const shuffled = [...ids].sort((a, b) => sha(Buffer.from(a)).localeCompare(sha(Buffer.from(b))));
+  const root = await tree.apply(null, shuffled.map(id => add(tuple(0), id)));
+  assert.ok(published.length <= 8 * ids.length, `${published.length} pages written for ${ids.length} IDs`);
+  assert.deepEqual(await tree.lookup(root, tuple(0)), ids);
+  for (const [id, operation] of [["message_new", "put"], ["message_02000", "remove"]]) {
+    const before = published.length;
+    await tree.apply(root, [{ tuple: tuple(0), id, operation }]);
+    assert.ok(published.length - before <= 6, `${published.length - before} pages written to ${operation} one ID`);
+  }
+  bounded(published);
+});
+
+// #306: most tuples hold one or two records. Their IDs live in the leaf entry, so a cold
+// rebuild writes pages for the tree, not one for every tuple.
+test("a group of up to eight IDs lives in its leaf entry", async () => {
+  const { tree, published } = memory();
+  const root = await tree.apply(null, Array.from({ length: 300 }, (_, i) => add(tuple(i), `message_${i}`)));
+  assert.ok(published.filter(({ page }) => page.type === "group").length === 0, "no group page for single IDs");
+  assert.deepEqual(await tree.lookup(root, tuple(7)), ["message_7"]);
+  const ids = Array.from({ length: 9 }, (_, i) => `message_extra_${i}`);
+  let grown = root;
+  for (const id of ids.slice(0, 7)) grown = await tree.apply(grown, [add(tuple(7), id)]);
+  assert.deepEqual(await tree.lookup(grown, tuple(7)), ["message_7", ...ids.slice(0, 7)].sort((a, b) => a.localeCompare(b)));
+  grown = await tree.apply(grown, [add(tuple(7), ids[7])]);
+  assert.ok(published.some(({ page }) => page.type === "group"), "the ninth ID moves the group to its own page");
+  assert.deepEqual((await tree.lookup(grown, tuple(7))).length, 9);
+  bounded(published);
+});
+
+test("a forged group cannot answer: misrouted, chained, too deep or not a group", async () => {
+  const { tree, writePage } = memory();
+  const digestOf = value => sha(Buffer.from(value));
+  const under = async ids => writePage({ type: "leaf",
+    entries: [{ digest: digestOf(pages.canonicalTuple(tuple(0))), tuple: tuple(0), ids }], next: null });
+  const id = "message_forged", route = digestOf(id);
+  const group = await writePage({ type: "group", ids: [id], next: null });
+  const wrong = route[0] === "a" ? "b" : "a";
+  const forged = {
+    misrouted: await writePage({ type: "branch", children: [[wrong, group]] }),
+    chained: await writePage({ type: "group", ids: ["message_a"], next: group }),
+    leaf: await writePage({ type: "branch", children: [[route[0], await under(group)]] }),
+  };
+  // Sixty-five branches along the ID's own digest: one deeper than a digest has digits.
+  let deep = group;
+  for (let depth = 64; depth >= 0; depth--) deep = await writePage({ type: "branch", children: [[route[depth] ?? "0", deep]] });
+  forged.deep = deep;
+  const reasons = { misrouted: "misrouted_group_id", chained: "invalid_group_reference",
+    leaf: "invalid_group_reference", deep: "radix_depth_exceeded" };
+  for (const [name, hash] of Object.entries(forged)) {
+    await assert.rejects(tree.lookup(await under(hash), tuple(0)),
+      error => error instanceof pages.IndexCacheUnavailable && error.reason === reasons[name], name);
+  }
+  // An inline group must be small, ordered and made of record IDs.
+  for (const ids of [[], Array.from({ length: 9 }, (_, i) => `message_${i}`), ["message_b", "message_a"], ["../outside"]]) {
+    await assert.rejects(under(ids), pages.IndexCacheUnavailable, JSON.stringify(ids));
+  }
+});
+
+// A rebuild has every key at once and builds the tree in one pass (#306). It must be the
+// tree that applying the same keys one by one makes, page for page.
+test("a tree built at once is the tree its keys make one by one", async () => {
+  let seed = 7;
+  const next = () => (seed = (seed * 1103515245 + 12345) % 2 ** 31) / 2 ** 31;
+  for (let round = 0; round < 40; round += 1) {
+    const keys = 1 + Math.floor(next() * 120), count = Math.floor(next() * 900);
+    const puts = Array.from({ length: count }, () =>
+      add(tuple(Math.floor(next() ** 3 * keys)), `message_${Math.floor(next() * 5000)}`));
+    const built = memory(), applied = memory();
+    const root = await built.tree.build(puts);
+    assert.equal(root, await applied.tree.apply(null, puts), `round ${round}: ${count} puts over ${keys} keys`);
+    for (const [hash] of built.stored) assert.ok(applied.stored.has(hash), "every page built is one applying makes");
+    bounded(built.published);
+  }
+  const collided = memory(() => "f".repeat(64)), one = memory(() => "f".repeat(64));
+  const puts = Array.from({ length: 33 }, (_, i) => add(tuple(i), `message_${i}`));
+  assert.equal(await collided.tree.build(puts), await one.tree.apply(null, puts));
+  assert.equal(await memory().tree.build([]), null);
+  await assert.rejects(memory().tree.build([{ ...add(tuple(1), "message_a"), operation: "remove" }]),
+    { reason: "invalid_delta" });
 });
 
 test("full digest collisions remain separate", async () => {
@@ -96,11 +185,24 @@ test("closed index definitions preserve tuple boundaries and exclude bodies", ()
     ["receiptsByMessage", ["workspace_a", "../message"]]]) {
     assert.throws(() => definitions.assertIndexTuple(index, key));
   }
-  assert.deepEqual(definitions.indexKeysFor("message", { workspaceId: "workspace_a",
+  assert.deepEqual(definitions.indexKeysFor("message", { workspaceId: "workspace_a", kind: "note",
     fromParticipantId: "participant_a", clientMessageId: "client_0", body: "PRIVATE_MESSAGE_BODY" }),
   [{ index: "messageByClientKey", tuple: tuple(0) }]);
-  assert.deepEqual(definitions.indexKeysFor("receipt", { workspaceId: "workspace_a", messageId: "message_a" }),
-    [{ index: "receiptsByMessage", tuple: ["workspace_a", "message_a"] }]);
+  // A decision is keyed once for each decision it replaces.
+  assert.deepEqual(definitions.indexKeysFor("message", { workspaceId: "workspace_a", kind: "decision",
+    fromParticipantId: "participant_a", clientMessageId: "client_0",
+    decisionChange: { action: "replace", messageIds: ["message_a", "message_b"] } }),
+  [{ index: "messageByClientKey", tuple: tuple(0) }, { index: "decisionsByTarget", tuple: ["workspace_a", "message_a"] },
+    { index: "decisionsByTarget", tuple: ["workspace_a", "message_b"] }]);
+  const receipt = (state, obligation) => definitions.indexKeysFor("receipt", { workspaceId: "workspace_a",
+    messageId: "message_a", recipientParticipantId: "participant_b", state,
+    ...(obligation === undefined ? {} : { extensions: { obligation } }) }).map(key => key.index);
+  assert.deepEqual(receipt("queued", "none"), ["receiptsByMessage", "receiptsByRecipientState"]);
+  // What can no longer be listed is left out; a receipt without its obligation is kept.
+  assert.deepEqual(receipt("acknowledged", "reply"), ["receiptsByMessage"]);
+  assert.deepEqual(receipt("retrieved", "none"), ["receiptsByMessage"]);
+  assert.deepEqual(receipt("retrieved", "reply"), ["receiptsByMessage", "receiptsByRecipientState"]);
+  assert.deepEqual(receipt("retrieved"), ["receiptsByMessage", "receiptsByRecipientState"]);
   assert.deepEqual(definitions.indexKeysFor("session", {}), []);
 });
 
@@ -115,18 +217,18 @@ test("real filesystem pages publish safely without flushing or following junctio
   } });
   const tree = trees.createIndexTree(io);
   const head = await tree.apply(null, [add(tuple(0), "message_a")]);
-  const manifest = { indexVersion: 1, workspaceId: "workspace_a", journalGeneration: "0000000000000000",
-    roots: { messageByClientKey: head, receiptsByMessage: null } };
+  const manifest = { indexVersion: ios.INDEX_VERSION, workspaceId: "workspace_a", journalGeneration: "0000000000000000",
+    roots: { decisionsByTarget: null, messageByClientKey: head, receiptsByMessage: null, receiptsByRecipientState: null } };
   await io.writeManifest(manifest);
   assert.deepEqual(await io.readManifest(), manifest);
   assert.deepEqual(await tree.lookup(head, tuple(0)), ["message_a"]);
   assert.equal(flushes, 0);
-  const bytes = await readFile(path.join(root, "indexes/v1/pages", head + ".json"));
+  const bytes = await readFile(path.join(root, INDEX_DIRECTORY, "pages", head + ".json"));
   assert.equal(sha(bytes), head);
   const outside = path.join(root, "outside");
   await mkdir(outside);
-  await rm(path.join(root, "indexes/v1/pages"), { recursive: true });
-  await symlink(outside, path.join(root, "indexes/v1/pages"), "junction");
+  await rm(path.join(root, INDEX_DIRECTORY, "pages"), { recursive: true });
+  await symlink(outside, path.join(root, INDEX_DIRECTORY, "pages"), "junction");
   await assert.rejects(io.readPage(head), pages.IndexCacheUnavailable);
   await assert.rejects(io.writePage({ type: "group", ids: ["message_escape"], next: null }), pages.IndexCacheUnavailable);
 });

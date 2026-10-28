@@ -41,3 +41,13 @@ test("the fail-open line names the step, and only a step ACC itself names", asyn
   assert.equal(other.written.stderr.includes("rm -rf"), false);
   assert.match(other.written.stderr, /coordination unavailable; hook continued without context/);
 });
+
+// Every older contract raises the same code (#306): a contract-7 store waits for its move
+// after an update as a contract-6 one did, so the line names no contract.
+test("the fail-open line for a store that waits for its migration names no older contract", async () => {
+  const written = streams();
+  await completeHookOutput({ stdout: "", failed: true, failureCode: "store_migration_required" }, written);
+  assert.doesNotMatch(written.written.stderr, /contract 6/);
+  assert.match(written.written.stderr, /ACC moves it by itself once older ACC clients have stopped/);
+  assert.match(written.written.stderr, /acc doctor --migrate-store/);
+});
