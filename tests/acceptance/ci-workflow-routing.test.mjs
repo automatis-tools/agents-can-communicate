@@ -272,9 +272,7 @@ test("package and client matrices preserve their workloads and authenticate befo
   const source = await workflow("ci");
   for (const [id, platforms, commands] of [
     ["package", ["ubuntu-latest", "macos-latest", "windows-latest"], ["npm ci", "node scripts/verify-package.mjs"]],
-    ["real-clients", ["ubuntu-latest", "windows-latest"], ["npm ci", "npm install --global @anthropic-ai/claude-code @openai/codex",
-      "claude --version", "codex --version", "node --test tests/acceptance/real-clients-stub.test.mjs",
-      "python -m pip install --quiet pywinpty", "node --test tests/acceptance/real-claude-live-stub.test.mjs"]],
+    ["real-clients", ["ubuntu-latest", "windows-latest"], ["npm ci", "node scripts/ci-real-clients.mjs"]],
   ]) {
     const block = job(source, id);
     assert.equal(scalar(block, "name"), `${id === "package" ? "package" : "real clients"} · \${{ matrix.os }}`);
@@ -294,8 +292,35 @@ test("package and client matrices preserve their workloads and authenticate befo
     for (const os of platforms) assert.equal(interpolate(scalar(block, "CI_WORKER"), { matrix: { os } }), `${id}-${os}`);
     assert.equal(scalar(block, "CI_ROUTE"), "${{ needs.plan.outputs.route }}");
     if (id === "real-clients") {
-      assert.equal((block.match(/ACC_REAL_CLIENTS: '1'/g) ?? []).length, 2);
-      assert.match(block, /if: runner.os == 'Windows'/);
+      assert.equal(scalar(block, "timeout-minutes"), "30");
+      const uploads = block.split(/^      - /m).filter(step => step.includes("actions/upload-artifact@"));
+      assert.equal(uploads.length, 1);
+      assert.equal(scalar(uploads[0], "if"), "${{ always() }}");
+      assert.equal(scalar(uploads[0], "if-no-files-found"), "error");
+      assert.equal(scalar(uploads[0], "path"), "${{ runner.temp }}/acc-client-compatibility/");
+      assert.match(scalar(uploads[0], "name"), /\$\{\{ matrix.os \}\}.*\$\{\{ github.run_id \}\}.*\$\{\{ github.run_attempt \}\}/);
+      assert.ok(block.indexOf("actions/upload-artifact@") > preflights[1].index);
+      assert.doesNotMatch(block, /continue-on-error:|shell: bash|\$\{\{.*inputs\./);
     }
   }
+});
+
+test("latest compatibility is an independent manual-only two-platform workflow", async () => {
+  const source = await workflow("client-compatibility");
+  assert.match(source, /^name: Client compatibility \(latest\)$/m);
+  assert.match(source, /^on:\n  workflow_dispatch:\s*\n/m);
+  assert.doesNotMatch(source, /^  (?:push|pull_request|schedule|release|inputs):|continue-on-error:|CI_ROUTE:|preflight|shell: bash|\$\{\{.*inputs\./m);
+  const block = job(source, "latest-clients");
+  assert.equal(scalar(block, "name"), "latest client compatibility · ${{ matrix.os }}");
+  assert.deepEqual(list(block, "os"), ["ubuntu-latest", "windows-latest"]);
+  assert.equal(scalar(block, "fail-fast"), "false");
+  assert.equal(scalar(block, "timeout-minutes"), "30");
+  assert.equal(scalar(block, "fetch-depth"), "0");
+  assert.equal(scalar(block, "node-version"), "'24'");
+  assert.deepEqual([...block.matchAll(/^        run: (.+)$/gm)].map(match => match[1]), ["node scripts/ci-real-clients.mjs"]);
+  assert.match(block, /- run: npm ci/);
+  assert.equal(scalar(block, "if"), "${{ always() }}");
+  assert.equal(scalar(block, "if-no-files-found"), "error");
+  assert.equal(scalar(block, "path"), "${{ runner.temp }}/acc-client-compatibility/");
+  assert.match(scalar(block, "name"), /^latest client compatibility/);
 });
