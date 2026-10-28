@@ -178,9 +178,11 @@ export async function testFingerprint(repo, { env = process.env } = {}) {
     if (inside(root, await realpath(tmpdir()))) return null;
     const gitEnv = { ...env };
     for (const name of excludedEnv) if (name.startsWith("GIT_")) delete gitEnv[name];
-    const git = args => run("git", ["-C", root, ...args], { env: gitEnv, maxBuffer: 64 * 1024 * 1024 });
+    const git = args => run("git", ["--no-replace-objects", "-C", root, ...args], { env: gitEnv, maxBuffer: 64 * 1024 * 1024 });
     const top = (await git(["rev-parse", "--show-toplevel"])).stdout.trim();
     if (await realpath(top) !== root) return null;
+    // Unpinned test children can read aliased Git objects outside this snapshot.
+    if (gitEnv.GIT_NO_REPLACE_OBJECTS !== "1" && (await git(["replace", "--list"])).stdout.trim()) return null;
     const list = async () => [...new Set((await git(["ls-files", "-z", "--cached", "--others", "--exclude-standard"]))
       .stdout.split("\0").filter(Boolean))].sort();
     const files = await list();

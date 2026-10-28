@@ -29,7 +29,7 @@ const attributionLines = text =>
   text.split(/\r?\n/).filter(line => ATTRIBUTION.some(pattern => pattern.test(line)));
 
 async function git(args) {
-  return (await run("git", args, { maxBuffer: 256 * 1024 * 1024 })).stdout;
+  return (await run("git", ["--no-replace-objects", ...args], { maxBuffer: 256 * 1024 * 1024 })).stdout;
 }
 
 const setting = async key => (await git(["config", "--get", key]).catch(() => "")).trim();
