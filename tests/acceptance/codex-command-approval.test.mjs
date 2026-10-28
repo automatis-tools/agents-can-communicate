@@ -52,10 +52,6 @@ test("real Codex executes packed ACC reads and carries local evidence to approva
         'approvals_reviewer = "auto_review"', 'default_permissions = "fixture"',
         '[permissions.fixture]', 'extends = ":read-only"', '[permissions.fixture.filesystem]',
         '":workspace_roots" = "write"', grants,
-        // Test filesystem approval independently of the runner's network namespace.
-        // GitHub Linux can refuse bwrap's private loopback setup before ACC starts.
-        // Commands are fixed local ACC calls; update checks and live delivery are off.
-        '[permissions.fixture.network]', 'enabled = true',
         '[model_providers.stub]', 'name = "stub"', `base_url = "${stub.url}/v1"`,
         'wire_api = "responses"', 'env_key = "STUB_API_KEY"', "",
       ].join("\n"));
@@ -75,7 +71,8 @@ test("real Codex executes packed ACC reads and carries local evidence to approva
     // A matching rule must not be assumed to override a restricted active profile.
     const normal = await execute(outputs => outputs.length === 0 ? { cmd, ...options[0] } : null);
     const normalOutput = normal.outputs.at(-1)?.output ?? "";
-    assert.ok(/SYNTHETIC_LOCAL_RECORD|state_access_denied/.test(normalOutput), normalOutput);
+    assert.ok(/SYNTHETIC_LOCAL_RECORD|state_access_denied/.test(normalOutput),
+      `${normalOutput}\nCodex startup diagnostics:\n${normal.result.stderr}`);
     assert.equal(normal.actions.length, 0, "default invocation unexpectedly requested approval");
 
     // Removing the rule proves an explicit configured state grant, rather than
