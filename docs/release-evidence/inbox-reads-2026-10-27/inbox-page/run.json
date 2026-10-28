@@ -1,0 +1,7514 @@
+{
+  "schemaVersion": 1,
+  "probe": "inbox",
+  "startedAt": "2026-10-27T23:45:56.462Z",
+  "settings": {
+    "rounds": 10,
+    "samples": 10,
+    "warmup": 3,
+    "timeoutMs": 900000
+  },
+  "harness": {
+    "commit": "d65c9ac801ece46dc00c59c3108e7d67afc953c9",
+    "dirty": false
+  },
+  "host": {
+    "node": "v26.5.1",
+    "v8": "14.6.202.34-node.24",
+    "os": "Darwin",
+    "release": "27.0.0",
+    "arch": "arm64",
+    "cpuModel": "Apple M5 Max",
+    "cores": 18,
+    "memoryBytes": 137438953472
+  },
+  "durability": {
+    "fsync": "real",
+    "nodeOptions": ""
+  },
+  "sides": {
+    "baseline": {
+      "label": "baseline",
+      "ref": "0eb0d3d3",
+      "commit": "0eb0d3d3f864d3dd8bdada63fbeaf842d89cfeb0",
+      "dirty": false,
+      "sourcesHash": "daaf22f3c5ef332833779eb967b40d769149e7b2e0878359681336fa225a2a97"
+    },
+    "candidate": {
+      "label": "candidate",
+      "ref": "d65c9ac8",
+      "commit": "d65c9ac801ece46dc00c59c3108e7d67afc953c9",
+      "dirty": false,
+      "sourcesHash": "c868281e1fe25b574b6e10b29e9a69a579c0c2dc661192f727e020f271e5c521"
+    }
+  },
+  "scenarios": [
+    {
+      "scenario": {
+        "probe": "inbox",
+        "messages": 30,
+        "backlog": 0,
+        "operation": "page",
+        "limit": 1,
+        "mix": true,
+        "index": "warm",
+        "seed": 1
+      },
+      "hash": "50c2b85aa8b5c7c5b7fd6cc48f635a1bc1adf1f7db9f37c63087ed4c1d28b812"
+    },
+    {
+      "scenario": {
+        "probe": "inbox",
+        "messages": 30,
+        "backlog": 0,
+        "operation": "page",
+        "limit": 1,
+        "mix": true,
+        "index": "cold",
+        "seed": 1
+      },
+      "hash": "02ff9cfd3a3cfab2d0550eaa6641be8d022fa01a67430a1d6589bbd70b2a2f27"
+    },
+    {
+      "scenario": {
+        "probe": "inbox",
+        "messages": 30,
+        "backlog": 0,
+        "operation": "page",
+        "limit": 1,
+        "mix": true,
+        "index": "rebuilt",
+        "seed": 1
+      },
+      "hash": "eeae1d75d83cc52130e6d36b8af320bde8ce603d80116ccb0cc05963c2432a91"
+    },
+    {
+      "scenario": {
+        "probe": "inbox",
+        "messages": 30,
+        "backlog": 0,
+        "operation": "page",
+        "limit": 1,
+        "mix": true,
+        "index": "unavailable",
+        "seed": 1
+      },
+      "hash": "d22777295025a18867ade46818e6c5cfa5a19ce7bd80834d889749f7c9cfd9b9"
+    },
+    {
+      "scenario": {
+        "probe": "inbox",
+        "messages": 30,
+        "backlog": 270,
+        "operation": "page",
+        "limit": 1,
+        "mix": true,
+        "index": "warm",
+        "seed": 1
+      },
+      "hash": "a1b4b4b52147e450fe6c461b9d024df99cd2ceecf55f43049d00f5d183eaf77d"
+    },
+    {
+      "scenario": {
+        "probe": "inbox",
+        "messages": 30,
+        "backlog": 270,
+        "operation": "page",
+        "limit": 1,
+        "mix": true,
+        "index": "cold",
+        "seed": 1
+      },
+      "hash": "941b129032377597b2b410b56f35823226bc38fed054d7b1549deabc3957941b"
+    },
+    {
+      "scenario": {
+        "probe": "inbox",
+        "messages": 30,
+        "backlog": 270,
+        "operation": "page",
+        "limit": 1,
+        "mix": true,
+        "index": "rebuilt",
+        "seed": 1
+      },
+      "hash": "e25df55e98bec33e9ca7f9809957d139bc75b1ed9e9a5e263ac05e2c40f3b1fe"
+    },
+    {
+      "scenario": {
+        "probe": "inbox",
+        "messages": 30,
+        "backlog": 270,
+        "operation": "page",
+        "limit": 1,
+        "mix": true,
+        "index": "unavailable",
+        "seed": 1
+      },
+      "hash": "06e97aed50fa0509269c0f8d795de3bcd005d7fc637cf8f3451349cf30d7e1ec"
+    }
+  ],
+  "children": [
+    {
+      "round": 0,
+      "side": "baseline",
+      "scenarioHash": "50c2b85aa8b5c7c5b7fd6cc48f635a1bc1adf1f7db9f37c63087ed4c1d28b812",
+      "loadBefore": [
+        5.115234375,
+        5.27294921875,
+        6.68603515625
+      ],
+      "loadAfter": [
+        4.86572265625,
+        5.21826171875,
+        6.658203125
+      ],
+      "elapsedMs": 2900,
+      "fixtureDigest": "1093ea081e2916690d7b77d7cd0de3b45251db508d6dd6b86a2d83e0cf25d53b",
+      "validation": [],
+      "samplesNs": [
+        5543041,
+        5432125,
+        5599834,
+        5346625,
+        5662708,
+        5321708,
+        5541375,
+        5236667,
+        5267958,
+        5157792
+      ],
+      "observations": {
+        "stateReads": 68,
+        "stateByKind": {
+          "session": 4,
+          "message": 32,
+          "receipt": 32
+        },
+        "readBytes": 37224,
+        "pageReads": 0,
+        "enumerations": {
+          "metadata/readdir": 4,
+          "metadata/readdirEntries": 72,
+          "events/readdir": 1,
+          "events/readdirEntries": 62
+        }
+      }
+    },
+    {
+      "round": 0,
+      "side": "candidate",
+      "scenarioHash": "50c2b85aa8b5c7c5b7fd6cc48f635a1bc1adf1f7db9f37c63087ed4c1d28b812",
+      "loadBefore": [
+        4.86572265625,
+        5.21826171875,
+        6.658203125
+      ],
+      "loadAfter": [
+        4.86572265625,
+        5.21826171875,
+        6.658203125
+      ],
+      "elapsedMs": 2717,
+      "fixtureDigest": "1093ea081e2916690d7b77d7cd0de3b45251db508d6dd6b86a2d83e0cf25d53b",
+      "validation": [],
+      "samplesNs": [
+        5755958,
+        5702458,
+        5716042,
+        5489041,
+        5553541,
+        5457792,
+        5502334,
+        5683042,
+        5750000,
+        5385208
+      ],
+      "observations": {
+        "stateReads": 52,
+        "stateByKind": {
+          "session": 2,
+          "receipt": 25,
+          "message": 25
+        },
+        "readBytes": 43757,
+        "pageReads": 5,
+        "enumerations": {
+          "metadata/readdir": 1,
+          "metadata/readdirEntries": 5,
+          "events/readdir": 1,
+          "events/readdirEntries": 62
+        }
+      }
+    },
+    {
+      "round": 0,
+      "side": "baseline",
+      "scenarioHash": "02ff9cfd3a3cfab2d0550eaa6641be8d022fa01a67430a1d6589bbd70b2a2f27",
+      "loadBefore": [
+        4.86572265625,
+        5.21826171875,
+        6.658203125
+      ],
+      "loadAfter": [
+        5.19677734375,
+        5.28076171875,
+        6.671875
+      ],
+      "elapsedMs": 3245,
+      "fixtureDigest": "1093ea081e2916690d7b77d7cd0de3b45251db508d6dd6b86a2d83e0cf25d53b",
+      "validation": [],
+      "samplesNs": [
+        5360708,
+        5447209,
+        5294416,
+        5317000,
+        5327709,
+        5450292,
+        5350334,
+        5510000,
+        5260875,
+        5434667
+      ],
+      "observations": {
+        "stateReads": 68,
+        "stateByKind": {
+          "session": 4,
+          "message": 32,
+          "receipt": 32
+        },
+        "readBytes": 37224,
+        "pageReads": 0,
+        "enumerations": {
+          "metadata/readdir": 4,
+          "metadata/readdirEntries": 72,
+          "events/readdir": 1,
+          "events/readdirEntries": 62
+        }
+      }
+    },
+    {
+      "round": 0,
+      "side": "candidate",
+      "scenarioHash": "02ff9cfd3a3cfab2d0550eaa6641be8d022fa01a67430a1d6589bbd70b2a2f27",
+      "loadBefore": [
+        5.19677734375,
+        5.28076171875,
+        6.671875
+      ],
+      "loadAfter": [
+        5.19677734375,
+        5.28076171875,
+        6.671875
+      ],
+      "elapsedMs": 2785,
+      "fixtureDigest": "1093ea081e2916690d7b77d7cd0de3b45251db508d6dd6b86a2d83e0cf25d53b",
+      "validation": [],
+      "samplesNs": [
+        10547583,
+        10141709,
+        10752959,
+        10139459,
+        10174750,
+        9990375,
+        10030542,
+        9859000,
+        9976667,
+        9607250
+      ],
+      "observations": {
+        "stateReads": 116,
+        "stateByKind": {
+          "session": 2,
+          "message": 57,
+          "receipt": 57
+        },
+        "readBytes": 103274,
+        "pageReads": 14,
+        "enumerations": {
+          "metadata/readdir": 4,
+          "metadata/readdirEntries": 74,
+          "events/readdir": 1,
+          "events/readdirEntries": 62
+        }
+      }
+    },
+    {
+      "round": 0,
+      "side": "baseline",
+      "scenarioHash": "eeae1d75d83cc52130e6d36b8af320bde8ce603d80116ccb0cc05963c2432a91",
+      "loadBefore": [
+        5.19677734375,
+        5.28076171875,
+        6.671875
+      ],
+      "loadAfter": [
+        5.0205078125,
+        5.24267578125,
+        6.64990234375
+      ],
+      "elapsedMs": 2633,
+      "fixtureDigest": "1093ea081e2916690d7b77d7cd0de3b45251db508d6dd6b86a2d83e0cf25d53b",
+      "validation": [],
+      "samplesNs": [
+        5527125,
+        5711834,
+        5435916,
+        5482791,
+        5328417,
+        5574625,
+        5281750,
+        5433458,
+        5352708,
+        5428291
+      ],
+      "observations": {
+        "stateReads": 68,
+        "stateByKind": {
+          "session": 4,
+          "message": 32,
+          "receipt": 32
+        },
+        "readBytes": 37224,
+        "pageReads": 0,
+        "enumerations": {
+          "metadata/readdir": 4,
+          "metadata/readdirEntries": 72,
+          "events/readdir": 1,
+          "events/readdirEntries": 62
+        }
+      }
+    },
+    {
+      "round": 0,
+      "side": "candidate",
+      "scenarioHash": "eeae1d75d83cc52130e6d36b8af320bde8ce603d80116ccb0cc05963c2432a91",
+      "loadBefore": [
+        5.0205078125,
+        5.24267578125,
+        6.64990234375
+      ],
+      "loadAfter": [
+        5.0205078125,
+        5.24267578125,
+        6.64990234375
+      ],
+      "elapsedMs": 2672,
+      "fixtureDigest": "1093ea081e2916690d7b77d7cd0de3b45251db508d6dd6b86a2d83e0cf25d53b",
+      "validation": [],
+      "samplesNs": [
+        10273000,
+        10483292,
+        10436625,
+        10212209,
+        10164250,
+        10104958,
+        10109375,
+        10752958,
+        10207833,
+        10386500
+      ],
+      "observations": {
+        "stateReads": 116,
+        "stateByKind": {
+          "session": 2,
+          "message": 57,
+          "receipt": 57
+        },
+        "readBytes": 103730,
+        "pageReads": 14,
+        "enumerations": {
+          "metadata/readdir": 4,
+          "metadata/readdirEntries": 74,
+          "events/readdir": 1,
+          "events/readdirEntries": 62
+        }
+      }
+    },
+    {
+      "round": 0,
+      "side": "baseline",
+      "scenarioHash": "d22777295025a18867ade46818e6c5cfa5a19ce7bd80834d889749f7c9cfd9b9",
+      "loadBefore": [
+        5.0205078125,
+        5.24267578125,
+        6.64990234375
+      ],
+      "loadAfter": [
+        4.6982421875,
+        5.171875,
+        6.61669921875
+      ],
+      "elapsedMs": 2646,
+      "fixtureDigest": "1093ea081e2916690d7b77d7cd0de3b45251db508d6dd6b86a2d83e0cf25d53b",
+      "validation": [],
+      "samplesNs": [
+        5490958,
+        5464334,
+        5674125,
+        5447250,
+        5473000,
+        5433875,
+        5267791,
+        5560500,
+        5524209,
+        5540458
+      ],
+      "observations": {
+        "stateReads": 68,
+        "stateByKind": {
+          "session": 4,
+          "message": 32,
+          "receipt": 32
+        },
+        "readBytes": 37224,
+        "pageReads": 0,
+        "enumerations": {
+          "metadata/readdir": 4,
+          "metadata/readdirEntries": 72,
+          "events/readdir": 1,
+          "events/readdirEntries": 62
+        }
+      }
+    },
+    {
+      "round": 0,
+      "side": "candidate",
+      "scenarioHash": "d22777295025a18867ade46818e6c5cfa5a19ce7bd80834d889749f7c9cfd9b9",
+      "loadBefore": [
+        4.6982421875,
+        5.171875,
+        6.61669921875
+      ],
+      "loadAfter": [
+        5.60302734375,
+        5.3515625,
+        6.67138671875
+      ],
+      "elapsedMs": 2841,
+      "fixtureDigest": "1093ea081e2916690d7b77d7cd0de3b45251db508d6dd6b86a2d83e0cf25d53b",
+      "validation": [],
+      "samplesNs": [
+        9616500,
+        9492000,
+        9643625,
+        9651583,
+        9419250,
+        9492833,
+        9436125,
+        10819000,
+        9730000,
+        9658250
+      ],
+      "observations": {
+        "stateReads": 116,
+        "stateByKind": {
+          "session": 2,
+          "message": 57,
+          "receipt": 57
+        },
+        "readBytes": 90499,
+        "pageReads": 10,
+        "enumerations": {
+          "metadata/readdir": 4,
+          "metadata/readdirEntries": 74,
+          "events/readdir": 1,
+          "events/readdirEntries": 62
+        }
+      }
+    },
+    {
+      "round": 0,
+      "side": "baseline",
+      "scenarioHash": "a1b4b4b52147e450fe6c461b9d024df99cd2ceecf55f43049d00f5d183eaf77d",
+      "loadBefore": [
+        5.60302734375,
+        5.3515625,
+        6.67138671875
+      ],
+      "loadAfter": [
+        11.17724609375,
+        6.56591796875,
+        7.0791015625
+      ],
+      "elapsedMs": 15393,
+      "fixtureDigest": "34410714f6e2dfa975312d2bc218e89bb0f818344996386fe05864ab6c41f10e",
+      "validation": [],
+      "samplesNs": [
+        33180000,
+        32875125,
+        31849250,
+        32273417,
+        32067083,
+        32274250,
+        33392167,
+        32673541,
+        33344500,
+        32459625
+      ],
+      "observations": {
+        "stateReads": 608,
+        "stateByKind": {
+          "session": 4,
+          "message": 302,
+          "receipt": 302
+        },
+        "readBytes": 300730,
+        "pageReads": 0,
+        "enumerations": {
+          "metadata/readdir": 4,
+          "metadata/readdirEntries": 612,
+          "events/readdir": 1,
+          "events/readdirEntries": 330
+        }
+      }
+    },
+    {
+      "round": 0,
+      "side": "candidate",
+      "scenarioHash": "a1b4b4b52147e450fe6c461b9d024df99cd2ceecf55f43049d00f5d183eaf77d",
+      "loadBefore": [
+        11.17724609375,
+        6.56591796875,
+        7.0791015625
+      ],
+      "loadAfter": [
+        13.26611328125,
+        7.28125,
+        7.3271484375
+      ],
+      "elapsedMs": 14694,
+      "fixtureDigest": "34410714f6e2dfa975312d2bc218e89bb0f818344996386fe05864ab6c41f10e",
+      "validation": [],
+      "samplesNs": [
+        5351875,
+        5652750,
+        5428292,
+        5580542,
+        5550417,
+        5556667,
+        5426750,
+        5706334,
+        5541791,
+        5641958
+      ],
+      "observations": {
+        "stateReads": 52,
+        "stateByKind": {
+          "session": 2,
+          "receipt": 25,
+          "message": 25
+        },
+        "readBytes": 35571,
+        "pageReads": 5,
+        "enumerations": {
+          "metadata/readdir": 1,
+          "metadata/readdirEntries": 5,
+          "events/readdir": 1,
+          "events/readdirEntries": 330
+        }
+      }
+    },
+    {
+      "round": 0,
+      "side": "baseline",
+      "scenarioHash": "941b129032377597b2b410b56f35823226bc38fed054d7b1549deabc3957941b",
+      "loadBefore": [
+        13.26611328125,
+        7.28125,
+        7.3271484375
+      ],
+      "loadAfter": [
+        14.77392578125,
+        7.96923828125,
+        7.5751953125
+      ],
+      "elapsedMs": 18365,
+      "fixtureDigest": "34410714f6e2dfa975312d2bc218e89bb0f818344996386fe05864ab6c41f10e",
+      "validation": [],
+      "samplesNs": [
+        33115417,
+        32684709,
+        32740167,
+        32220250,
+        32196958,
+        32445500,
+        32862834,
+        32403208,
+        33060500,
+        32105959
+      ],
+      "observations": {
+        "stateReads": 608,
+        "stateByKind": {
+          "session": 4,
+          "message": 302,
+          "receipt": 302
+        },
+        "readBytes": 300730,
+        "pageReads": 0,
+        "enumerations": {
+          "metadata/readdir": 4,
+          "metadata/readdirEntries": 612,
+          "events/readdir": 1,
+          "events/readdirEntries": 330
+        }
+      }
+    },
+    {
+      "round": 0,
+      "side": "candidate",
+      "scenarioHash": "941b129032377597b2b410b56f35823226bc38fed054d7b1549deabc3957941b",
+      "loadBefore": [
+        14.77392578125,
+        7.96923828125,
+        7.5751953125
+      ],
+      "loadAfter": [
+        12.6640625,
+        7.8388671875,
+        7.53564453125
+      ],
+      "elapsedMs": 15372,
+      "fixtureDigest": "34410714f6e2dfa975312d2bc218e89bb0f818344996386fe05864ab6c41f10e",
+      "validation": [],
+      "samplesNs": [
+        43289500,
+        43620125,
+        43501792,
+        46805750,
+        43971750,
+        44192958,
+        44443416,
+        44237916,
+        43192333,
+        43783292
+      ],
+      "observations": {
+        "stateReads": 656,
+        "stateByKind": {
+          "session": 2,
+          "message": 327,
+          "receipt": 327
+        },
+        "readBytes": 596654,
+        "pageReads": 112,
+        "enumerations": {
+          "metadata/readdir": 4,
+          "metadata/readdirEntries": 614,
+          "events/readdir": 1,
+          "events/readdirEntries": 330
+        }
+      }
+    },
+    {
+      "round": 0,
+      "side": "baseline",
+      "scenarioHash": "e25df55e98bec33e9ca7f9809957d139bc75b1ed9e9a5e263ac05e2c40f3b1fe",
+      "loadBefore": [
+        12.6640625,
+        7.8388671875,
+        7.53564453125
+      ],
+      "loadAfter": [
+        10.93359375,
+        7.7392578125,
+        7.5048828125
+      ],
+      "elapsedMs": 16395,
+      "fixtureDigest": "34410714f6e2dfa975312d2bc218e89bb0f818344996386fe05864ab6c41f10e",
+      "validation": [],
+      "samplesNs": [
+        33858542,
+        32407000,
+        32104083,
+        33271083,
+        32634167,
+        32698000,
+        32036208,
+        32502166,
+        32238208,
+        32169750
+      ],
+      "observations": {
+        "stateReads": 608,
+        "stateByKind": {
+          "session": 4,
+          "message": 302,
+          "receipt": 302
+        },
+        "readBytes": 300730,
+        "pageReads": 0,
+        "enumerations": {
+          "metadata/readdir": 4,
+          "metadata/readdirEntries": 612,
+          "events/readdir": 1,
+          "events/readdirEntries": 330
+        }
+      }
+    },
+    {
+      "round": 0,
+      "side": "candidate",
+      "scenarioHash": "e25df55e98bec33e9ca7f9809957d139bc75b1ed9e9a5e263ac05e2c40f3b1fe",
+      "loadBefore": [
+        10.93359375,
+        7.7392578125,
+        7.5048828125
+      ],
+      "loadAfter": [
+        9.8095703125,
+        7.65185546875,
+        7.4775390625
+      ],
+      "elapsedMs": 16610,
+      "fixtureDigest": "34410714f6e2dfa975312d2bc218e89bb0f818344996386fe05864ab6c41f10e",
+      "validation": [],
+      "samplesNs": [
+        44372958,
+        44190875,
+        45756916,
+        45325833,
+        45654000,
+        44670833,
+        44664167,
+        43250792,
+        43321000,
+        44533542
+      ],
+      "observations": {
+        "stateReads": 656,
+        "stateByKind": {
+          "session": 2,
+          "message": 327,
+          "receipt": 327
+        },
+        "readBytes": 597110,
+        "pageReads": 112,
+        "enumerations": {
+          "metadata/readdir": 4,
+          "metadata/readdirEntries": 614,
+          "events/readdir": 1,
+          "events/readdirEntries": 330
+        }
+      }
+    },
+    {
+      "round": 0,
+      "side": "baseline",
+      "scenarioHash": "06e97aed50fa0509269c0f8d795de3bcd005d7fc637cf8f3451349cf30d7e1ec",
+      "loadBefore": [
+        9.8095703125,
+        7.65185546875,
+        7.4775390625
+      ],
+      "loadAfter": [
+        9.08203125,
+        7.58837890625,
+        7.45703125
+      ],
+      "elapsedMs": 15589,
+      "fixtureDigest": "34410714f6e2dfa975312d2bc218e89bb0f818344996386fe05864ab6c41f10e",
+      "validation": [],
+      "samplesNs": [
+        32697792,
+        33249250,
+        32446167,
+        32632459,
+        32228250,
+        33066417,
+        32521042,
+        32892833,
+        32614208,
+        33203750
+      ],
+      "observations": {
+        "stateReads": 608,
+        "stateByKind": {
+          "session": 4,
+          "message": 302,
+          "receipt": 302
+        },
+        "readBytes": 300730,
+        "pageReads": 0,
+        "enumerations": {
+          "metadata/readdir": 4,
+          "metadata/readdirEntries": 612,
+          "events/readdir": 1,
+          "events/readdirEntries": 330
+        }
+      }
+    },
+    {
+      "round": 0,
+      "side": "candidate",
+      "scenarioHash": "06e97aed50fa0509269c0f8d795de3bcd005d7fc637cf8f3451349cf30d7e1ec",
+      "loadBefore": [
+        9.08203125,
+        7.58837890625,
+        7.45703125
+      ],
+      "loadAfter": [
+        9.20556640625,
+        7.71533203125,
+        7.505859375
+      ],
+      "elapsedMs": 16452,
+      "fixtureDigest": "34410714f6e2dfa975312d2bc218e89bb0f818344996386fe05864ab6c41f10e",
+      "validation": [],
+      "samplesNs": [
+        43474083,
+        44539458,
+        43211375,
+        43583709,
+        42528167,
+        42430583,
+        42380875,
+        43342917,
+        42582000,
+        42890417
+      ],
+      "observations": {
+        "stateReads": 656,
+        "stateByKind": {
+          "session": 2,
+          "message": 327,
+          "receipt": 327
+        },
+        "readBytes": 592209,
+        "pageReads": 108,
+        "enumerations": {
+          "metadata/readdir": 4,
+          "metadata/readdirEntries": 614,
+          "events/readdir": 1,
+          "events/readdirEntries": 330
+        }
+      }
+    },
+    {
+      "round": 1,
+      "side": "candidate",
+      "scenarioHash": "50c2b85aa8b5c7c5b7fd6cc48f635a1bc1adf1f7db9f37c63087ed4c1d28b812",
+      "loadBefore": [
+        9.20556640625,
+        7.71533203125,
+        7.505859375
+      ],
+      "loadAfter": [
+        8.62841796875,
+        7.6201171875,
+        7.47314453125
+      ],
+      "elapsedMs": 3306,
+      "fixtureDigest": "1093ea081e2916690d7b77d7cd0de3b45251db508d6dd6b86a2d83e0cf25d53b",
+      "validation": [],
+      "samplesNs": [
+        5752875,
+        5508625,
+        6066458,
+        5477834,
+        5349208,
+        5566125,
+        5343500,
+        5849167,
+        5566875,
+        5678791
+      ],
+      "observations": {
+        "stateReads": 52,
+        "stateByKind": {
+          "session": 2,
+          "receipt": 25,
+          "message": 25
+        },
+        "readBytes": 43757,
+        "pageReads": 5,
+        "enumerations": {
+          "metadata/readdir": 1,
+          "metadata/readdirEntries": 5,
+          "events/readdir": 1,
+          "events/readdirEntries": 62
+        }
+      }
+    },
+    {
+      "round": 1,
+      "side": "baseline",
+      "scenarioHash": "50c2b85aa8b5c7c5b7fd6cc48f635a1bc1adf1f7db9f37c63087ed4c1d28b812",
+      "loadBefore": [
+        8.62841796875,
+        7.6201171875,
+        7.47314453125
+      ],
+      "loadAfter": [
+        8.33740234375,
+        7.576171875,
+        7.45849609375
+      ],
+      "elapsedMs": 3068,
+      "fixtureDigest": "1093ea081e2916690d7b77d7cd0de3b45251db508d6dd6b86a2d83e0cf25d53b",
+      "validation": [],
+      "samplesNs": [
+        5459625,
+        5571792,
+        5358042,
+        5545834,
+        5306917,
+        5357791,
+        5284375,
+        5236375,
+        5282958,
+        5448334
+      ],
+      "observations": {
+        "stateReads": 68,
+        "stateByKind": {
+          "session": 4,
+          "message": 32,
+          "receipt": 32
+        },
+        "readBytes": 37224,
+        "pageReads": 0,
+        "enumerations": {
+          "metadata/readdir": 4,
+          "metadata/readdirEntries": 72,
+          "events/readdir": 1,
+          "events/readdirEntries": 62
+        }
+      }
+    },
+    {
+      "round": 1,
+      "side": "candidate",
+      "scenarioHash": "02ff9cfd3a3cfab2d0550eaa6641be8d022fa01a67430a1d6589bbd70b2a2f27",
+      "loadBefore": [
+        8.33740234375,
+        7.576171875,
+        7.45849609375
+      ],
+      "loadAfter": [
+        8.33740234375,
+        7.576171875,
+        7.45849609375
+      ],
+      "elapsedMs": 3223,
+      "fixtureDigest": "1093ea081e2916690d7b77d7cd0de3b45251db508d6dd6b86a2d83e0cf25d53b",
+      "validation": [],
+      "samplesNs": [
+        10612375,
+        10923625,
+        10264375,
+        9925167,
+        9864833,
+        10097375,
+        9838042,
+        10032708,
+        10150500,
+        9761292
+      ],
+      "observations": {
+        "stateReads": 116,
+        "stateByKind": {
+          "session": 2,
+          "message": 57,
+          "receipt": 57
+        },
+        "readBytes": 103274,
+        "pageReads": 14,
+        "enumerations": {
+          "metadata/readdir": 4,
+          "metadata/readdirEntries": 74,
+          "events/readdir": 1,
+          "events/readdirEntries": 62
+        }
+      }
+    },
+    {
+      "round": 1,
+      "side": "baseline",
+      "scenarioHash": "02ff9cfd3a3cfab2d0550eaa6641be8d022fa01a67430a1d6589bbd70b2a2f27",
+      "loadBefore": [
+        8.33740234375,
+        7.576171875,
+        7.45849609375
+      ],
+      "loadAfter": [
+        9.11083984375,
+        7.7490234375,
+        7.52001953125
+      ],
+      "elapsedMs": 3694,
+      "fixtureDigest": "1093ea081e2916690d7b77d7cd0de3b45251db508d6dd6b86a2d83e0cf25d53b",
+      "validation": [],
+      "samplesNs": [
+        5466000,
+        5843000,
+        5796375,
+        5441083,
+        5439041,
+        5505791,
+        5482417,
+        5262667,
+        5696834,
+        5235375
+      ],
+      "observations": {
+        "stateReads": 68,
+        "stateByKind": {
+          "session": 4,
+          "message": 32,
+          "receipt": 32
+        },
+        "readBytes": 37224,
+        "pageReads": 0,
+        "enumerations": {
+          "metadata/readdir": 4,
+          "metadata/readdirEntries": 72,
+          "events/readdir": 1,
+          "events/readdirEntries": 62
+        }
+      }
+    },
+    {
+      "round": 1,
+      "side": "candidate",
+      "scenarioHash": "eeae1d75d83cc52130e6d36b8af320bde8ce603d80116ccb0cc05963c2432a91",
+      "loadBefore": [
+        9.11083984375,
+        7.7490234375,
+        7.52001953125
+      ],
+      "loadAfter": [
+        8.78125,
+        7.703125,
+        7.5048828125
+      ],
+      "elapsedMs": 3350,
+      "fixtureDigest": "1093ea081e2916690d7b77d7cd0de3b45251db508d6dd6b86a2d83e0cf25d53b",
+      "validation": [],
+      "samplesNs": [
+        11255417,
+        10733834,
+        10221042,
+        10001166,
+        9835083,
+        10049625,
+        9946583,
+        10327666,
+        10241541,
+        11692167
+      ],
+      "observations": {
+        "stateReads": 116,
+        "stateByKind": {
+          "session": 2,
+          "message": 57,
+          "receipt": 57
+        },
+        "readBytes": 103730,
+        "pageReads": 14,
+        "enumerations": {
+          "metadata/readdir": 4,
+          "metadata/readdirEntries": 74,
+          "events/readdir": 1,
+          "events/readdirEntries": 62
+        }
+      }
+    },
+    {
+      "round": 1,
+      "side": "baseline",
+      "scenarioHash": "eeae1d75d83cc52130e6d36b8af320bde8ce603d80116ccb0cc05963c2432a91",
+      "loadBefore": [
+        8.78125,
+        7.703125,
+        7.5048828125
+      ],
+      "loadAfter": [
+        8.78125,
+        7.703125,
+        7.5048828125
+      ],
+      "elapsedMs": 3677,
+      "fixtureDigest": "1093ea081e2916690d7b77d7cd0de3b45251db508d6dd6b86a2d83e0cf25d53b",
+      "validation": [],
+      "samplesNs": [
+        5696833,
+        5780500,
+        5368709,
+        5428250,
+        5420792,
+        5462584,
+        5129417,
+        5361500,
+        5287833,
+        5285666
+      ],
+      "observations": {
+        "stateReads": 68,
+        "stateByKind": {
+          "session": 4,
+          "message": 32,
+          "receipt": 32
+        },
+        "readBytes": 37224,
+        "pageReads": 0,
+        "enumerations": {
+          "metadata/readdir": 4,
+          "metadata/readdirEntries": 72,
+          "events/readdir": 1,
+          "events/readdirEntries": 62
+        }
+      }
+    },
+    {
+      "round": 1,
+      "side": "candidate",
+      "scenarioHash": "d22777295025a18867ade46818e6c5cfa5a19ce7bd80834d889749f7c9cfd9b9",
+      "loadBefore": [
+        8.78125,
+        7.703125,
+        7.5048828125
+      ],
+      "loadAfter": [
+        8.31787109375,
+        7.625,
+        7.47802734375
+      ],
+      "elapsedMs": 3739,
+      "fixtureDigest": "1093ea081e2916690d7b77d7cd0de3b45251db508d6dd6b86a2d83e0cf25d53b",
+      "validation": [],
+      "samplesNs": [
+        9422500,
+        9327750,
+        9544500,
+        9293166,
+        9419583,
+        9443334,
+        10134875,
+        9882791,
+        9688750,
+        9468500
+      ],
+      "observations": {
+        "stateReads": 116,
+        "stateByKind": {
+          "session": 2,
+          "message": 57,
+          "receipt": 57
+        },
+        "readBytes": 90499,
+        "pageReads": 10,
+        "enumerations": {
+          "metadata/readdir": 4,
+          "metadata/readdirEntries": 74,
+          "events/readdir": 1,
+          "events/readdirEntries": 62
+        }
+      }
+    },
+    {
+      "round": 1,
+      "side": "baseline",
+      "scenarioHash": "d22777295025a18867ade46818e6c5cfa5a19ce7bd80834d889749f7c9cfd9b9",
+      "loadBefore": [
+        8.31787109375,
+        7.625,
+        7.47802734375
+      ],
+      "loadAfter": [
+        7.7314453125,
+        7.5146484375,
+        7.43994140625
+      ],
+      "elapsedMs": 3649,
+      "fixtureDigest": "1093ea081e2916690d7b77d7cd0de3b45251db508d6dd6b86a2d83e0cf25d53b",
+      "validation": [],
+      "samplesNs": [
+        5363250,
+        5476750,
+        5334708,
+        5480542,
+        5297208,
+        5539959,
+        5268250,
+        5310250,
+        5037625,
+        5339041
+      ],
+      "observations": {
+        "stateReads": 68,
+        "stateByKind": {
+          "session": 4,
+          "message": 32,
+          "receipt": 32
+        },
+        "readBytes": 37224,
+        "pageReads": 0,
+        "enumerations": {
+          "metadata/readdir": 4,
+          "metadata/readdirEntries": 72,
+          "events/readdir": 1,
+          "events/readdirEntries": 62
+        }
+      }
+    },
+    {
+      "round": 1,
+      "side": "candidate",
+      "scenarioHash": "a1b4b4b52147e450fe6c461b9d024df99cd2ceecf55f43049d00f5d183eaf77d",
+      "loadBefore": [
+        7.7314453125,
+        7.5146484375,
+        7.43994140625
+      ],
+      "loadAfter": [
+        6.47802734375,
+        7.25146484375,
+        7.34716796875
+      ],
+      "elapsedMs": 19692,
+      "fixtureDigest": "34410714f6e2dfa975312d2bc218e89bb0f818344996386fe05864ab6c41f10e",
+      "validation": [],
+      "samplesNs": [
+        5915375,
+        5817333,
+        5957542,
+        5874083,
+        5509625,
+        5537042,
+        5459042,
+        5846000,
+        6594167,
+        5628542
+      ],
+      "observations": {
+        "stateReads": 52,
+        "stateByKind": {
+          "session": 2,
+          "receipt": 25,
+          "message": 25
+        },
+        "readBytes": 35571,
+        "pageReads": 5,
+        "enumerations": {
+          "metadata/readdir": 1,
+          "metadata/readdirEntries": 5,
+          "events/readdir": 1,
+          "events/readdirEntries": 330
+        }
+      }
+    },
+    {
+      "round": 1,
+      "side": "baseline",
+      "scenarioHash": "a1b4b4b52147e450fe6c461b9d024df99cd2ceecf55f43049d00f5d183eaf77d",
+      "loadBefore": [
+        6.47802734375,
+        7.25146484375,
+        7.34716796875
+      ],
+      "loadAfter": [
+        5.802734375,
+        7.04150390625,
+        7.2685546875
+      ],
+      "elapsedMs": 18789,
+      "fixtureDigest": "34410714f6e2dfa975312d2bc218e89bb0f818344996386fe05864ab6c41f10e",
+      "validation": [],
+      "samplesNs": [
+        32925375,
+        32385625,
+        32769333,
+        32426750,
+        32985791,
+        32434750,
+        35764708,
+        34097084,
+        32919542,
+        32772125
+      ],
+      "observations": {
+        "stateReads": 608,
+        "stateByKind": {
+          "session": 4,
+          "message": 302,
+          "receipt": 302
+        },
+        "readBytes": 300730,
+        "pageReads": 0,
+        "enumerations": {
+          "metadata/readdir": 4,
+          "metadata/readdirEntries": 612,
+          "events/readdir": 1,
+          "events/readdirEntries": 330
+        }
+      }
+    },
+    {
+      "round": 1,
+      "side": "candidate",
+      "scenarioHash": "941b129032377597b2b410b56f35823226bc38fed054d7b1549deabc3957941b",
+      "loadBefore": [
+        5.802734375,
+        7.04150390625,
+        7.2685546875
+      ],
+      "loadAfter": [
+        5.05859375,
+        6.8115234375,
+        7.181640625
+      ],
+      "elapsedMs": 19227,
+      "fixtureDigest": "34410714f6e2dfa975312d2bc218e89bb0f818344996386fe05864ab6c41f10e",
+      "validation": [],
+      "samplesNs": [
+        47541042,
+        44524541,
+        44409209,
+        44877458,
+        45254042,
+        44247542,
+        44926917,
+        43154416,
+        43777666,
+        43137959
+      ],
+      "observations": {
+        "stateReads": 656,
+        "stateByKind": {
+          "session": 2,
+          "message": 327,
+          "receipt": 327
+        },
+        "readBytes": 596654,
+        "pageReads": 112,
+        "enumerations": {
+          "metadata/readdir": 4,
+          "metadata/readdirEntries": 614,
+          "events/readdir": 1,
+          "events/readdirEntries": 330
+        }
+      }
+    },
+    {
+      "round": 1,
+      "side": "baseline",
+      "scenarioHash": "941b129032377597b2b410b56f35823226bc38fed054d7b1549deabc3957941b",
+      "loadBefore": [
+        5.05859375,
+        6.8115234375,
+        7.181640625
+      ],
+      "loadAfter": [
+        4.43603515625,
+        6.52099609375,
+        7.06494140625
+      ],
+      "elapsedMs": 20771,
+      "fixtureDigest": "34410714f6e2dfa975312d2bc218e89bb0f818344996386fe05864ab6c41f10e",
+      "validation": [],
+      "samplesNs": [
+        32949458,
+        34195459,
+        35899166,
+        32400250,
+        32448500,
+        32966000,
+        32641292,
+        33215583,
+        32643417,
+        32545417
+      ],
+      "observations": {
+        "stateReads": 608,
+        "stateByKind": {
+          "session": 4,
+          "message": 302,
+          "receipt": 302
+        },
+        "readBytes": 300730,
+        "pageReads": 0,
+        "enumerations": {
+          "metadata/readdir": 4,
+          "metadata/readdirEntries": 612,
+          "events/readdir": 1,
+          "events/readdirEntries": 330
+        }
+      }
+    },
+    {
+      "round": 1,
+      "side": "candidate",
+      "scenarioHash": "e25df55e98bec33e9ca7f9809957d139bc75b1ed9e9a5e263ac05e2c40f3b1fe",
+      "loadBefore": [
+        4.43603515625,
+        6.52099609375,
+        7.06494140625
+      ],
+      "loadAfter": [
+        5.4423828125,
+        6.62841796875,
+        7.09130859375
+      ],
+      "elapsedMs": 20451,
+      "fixtureDigest": "34410714f6e2dfa975312d2bc218e89bb0f818344996386fe05864ab6c41f10e",
+      "validation": [],
+      "samplesNs": [
+        45338958,
+        44799584,
+        45070625,
+        45101000,
+        46777000,
+        44556834,
+        44643125,
+        46549708,
+        44384584,
+        43987583
+      ],
+      "observations": {
+        "stateReads": 656,
+        "stateByKind": {
+          "session": 2,
+          "message": 327,
+          "receipt": 327
+        },
+        "readBytes": 597110,
+        "pageReads": 112,
+        "enumerations": {
+          "metadata/readdir": 4,
+          "metadata/readdirEntries": 614,
+          "events/readdir": 1,
+          "events/readdirEntries": 330
+        }
+      }
+    },
+    {
+      "round": 1,
+      "side": "baseline",
+      "scenarioHash": "e25df55e98bec33e9ca7f9809957d139bc75b1ed9e9a5e263ac05e2c40f3b1fe",
+      "loadBefore": [
+        5.4423828125,
+        6.62841796875,
+        7.09130859375
+      ],
+      "loadAfter": [
+        7.16357421875,
+        6.94189453125,
+        7.19384765625
+      ],
+      "elapsedMs": 19041,
+      "fixtureDigest": "34410714f6e2dfa975312d2bc218e89bb0f818344996386fe05864ab6c41f10e",
+      "validation": [],
+      "samplesNs": [
+        32578000,
+        31723250,
+        32210000,
+        32023542,
+        32029750,
+        32173584,
+        32439542,
+        31923791,
+        32252875,
+        32316125
+      ],
+      "observations": {
+        "stateReads": 608,
+        "stateByKind": {
+          "session": 4,
+          "message": 302,
+          "receipt": 302
+        },
+        "readBytes": 300730,
+        "pageReads": 0,
+        "enumerations": {
+          "metadata/readdir": 4,
+          "metadata/readdirEntries": 612,
+          "events/readdir": 1,
+          "events/readdirEntries": 330
+        }
+      }
+    },
+    {
+      "round": 1,
+      "side": "candidate",
+      "scenarioHash": "06e97aed50fa0509269c0f8d795de3bcd005d7fc637cf8f3451349cf30d7e1ec",
+      "loadBefore": [
+        7.16357421875,
+        6.94189453125,
+        7.19384765625
+      ],
+      "loadAfter": [
+        6.3642578125,
+        6.7685546875,
+        7.12353515625
+      ],
+      "elapsedMs": 21134,
+      "fixtureDigest": "34410714f6e2dfa975312d2bc218e89bb0f818344996386fe05864ab6c41f10e",
+      "validation": [],
+      "samplesNs": [
+        44264625,
+        45360292,
+        43539917,
+        43903292,
+        43477167,
+        44884792,
+        43602166,
+        43449583,
+        43879167,
+        43460625
+      ],
+      "observations": {
+        "stateReads": 656,
+        "stateByKind": {
+          "session": 2,
+          "message": 327,
+          "receipt": 327
+        },
+        "readBytes": 592209,
+        "pageReads": 108,
+        "enumerations": {
+          "metadata/readdir": 4,
+          "metadata/readdirEntries": 614,
+          "events/readdir": 1,
+          "events/readdirEntries": 330
+        }
+      }
+    },
+    {
+      "round": 1,
+      "side": "baseline",
+      "scenarioHash": "06e97aed50fa0509269c0f8d795de3bcd005d7fc637cf8f3451349cf30d7e1ec",
+      "loadBefore": [
+        6.3642578125,
+        6.7685546875,
+        7.12353515625
+      ],
+      "loadAfter": [
+        5.0625,
+        6.44287109375,
+        6.99755859375
+      ],
+      "elapsedMs": 20636,
+      "fixtureDigest": "34410714f6e2dfa975312d2bc218e89bb0f818344996386fe05864ab6c41f10e",
+      "validation": [],
+      "samplesNs": [
+        32790833,
+        32412291,
+        33053000,
+        32718666,
+        32197875,
+        32505833,
+        32048167,
+        32102958,
+        32482708,
+        31815375
+      ],
+      "observations": {
+        "stateReads": 608,
+        "stateByKind": {
+          "session": 4,
+          "message": 302,
+          "receipt": 302
+        },
+        "readBytes": 300730,
+        "pageReads": 0,
+        "enumerations": {
+          "metadata/readdir": 4,
+          "metadata/readdirEntries": 612,
+          "events/readdir": 1,
+          "events/readdirEntries": 330
+        }
+      }
+    },
+    {
+      "round": 2,
+      "side": "baseline",
+      "scenarioHash": "50c2b85aa8b5c7c5b7fd6cc48f635a1bc1adf1f7db9f37c63087ed4c1d28b812",
+      "loadBefore": [
+        5.0625,
+        6.44287109375,
+        6.99755859375
+      ],
+      "loadAfter": [
+        4.89697265625,
+        6.38525390625,
+        6.97412109375
+      ],
+      "elapsedMs": 3636,
+      "fixtureDigest": "1093ea081e2916690d7b77d7cd0de3b45251db508d6dd6b86a2d83e0cf25d53b",
+      "validation": [],
+      "samplesNs": [
+        5568709,
+        5644167,
+        6051417,
+        5400750,
+        5369375,
+        5413708,
+        5262417,
+        5386917,
+        5415625,
+        5287958
+      ],
+      "observations": {
+        "stateReads": 68,
+        "stateByKind": {
+          "session": 4,
+          "message": 32,
+          "receipt": 32
+        },
+        "readBytes": 37224,
+        "pageReads": 0,
+        "enumerations": {
+          "metadata/readdir": 4,
+          "metadata/readdirEntries": 72,
+          "events/readdir": 1,
+          "events/readdirEntries": 62
+        }
+      }
+    },
+    {
+      "round": 2,
+      "side": "candidate",
+      "scenarioHash": "50c2b85aa8b5c7c5b7fd6cc48f635a1bc1adf1f7db9f37c63087ed4c1d28b812",
+      "loadBefore": [
+        4.89697265625,
+        6.38525390625,
+        6.97412109375
+      ],
+      "loadAfter": [
+        4.89697265625,
+        6.38525390625,
+        6.97412109375
+      ],
+      "elapsedMs": 3641,
+      "fixtureDigest": "1093ea081e2916690d7b77d7cd0de3b45251db508d6dd6b86a2d83e0cf25d53b",
+      "validation": [],
+      "samplesNs": [
+        5634666,
+        5643417,
+        5375458,
+        5673250,
+        5303375,
+        5766541,
+        5290292,
+        5695417,
+        5411541,
+        5436375
+      ],
+      "observations": {
+        "stateReads": 52,
+        "stateByKind": {
+          "session": 2,
+          "receipt": 25,
+          "message": 25
+        },
+        "readBytes": 43757,
+        "pageReads": 5,
+        "enumerations": {
+          "metadata/readdir": 1,
+          "metadata/readdirEntries": 5,
+          "events/readdir": 1,
+          "events/readdirEntries": 62
+        }
+      }
+    },
+    {
+      "round": 2,
+      "side": "baseline",
+      "scenarioHash": "02ff9cfd3a3cfab2d0550eaa6641be8d022fa01a67430a1d6589bbd70b2a2f27",
+      "loadBefore": [
+        4.89697265625,
+        6.38525390625,
+        6.97412109375
+      ],
+      "loadAfter": [
+        4.50439453125,
+        6.27880859375,
+        6.93310546875
+      ],
+      "elapsedMs": 3164,
+      "fixtureDigest": "1093ea081e2916690d7b77d7cd0de3b45251db508d6dd6b86a2d83e0cf25d53b",
+      "validation": [],
+      "samplesNs": [
+        5397958,
+        5539917,
+        5485917,
+        5588000,
+        5110584,
+        5354125,
+        5170750,
+        5185083,
+        5672208,
+        5301042
+      ],
+      "observations": {
+        "stateReads": 68,
+        "stateByKind": {
+          "session": 4,
+          "message": 32,
+          "receipt": 32
+        },
+        "readBytes": 37224,
+        "pageReads": 0,
+        "enumerations": {
+          "metadata/readdir": 4,
+          "metadata/readdirEntries": 72,
+          "events/readdir": 1,
+          "events/readdirEntries": 62
+        }
+      }
+    },
+    {
+      "round": 2,
+      "side": "candidate",
+      "scenarioHash": "02ff9cfd3a3cfab2d0550eaa6641be8d022fa01a67430a1d6589bbd70b2a2f27",
+      "loadBefore": [
+        4.50439453125,
+        6.27880859375,
+        6.93310546875
+      ],
+      "loadAfter": [
+        4.6240234375,
+        6.27392578125,
+        6.92724609375
+      ],
+      "elapsedMs": 3576,
+      "fixtureDigest": "1093ea081e2916690d7b77d7cd0de3b45251db508d6dd6b86a2d83e0cf25d53b",
+      "validation": [],
+      "samplesNs": [
+        11032834,
+        10592958,
+        9725708,
+        10068917,
+        9765500,
+        9784875,
+        10120000,
+        9934666,
+        9886916,
+        10070709
+      ],
+      "observations": {
+        "stateReads": 116,
+        "stateByKind": {
+          "session": 2,
+          "message": 57,
+          "receipt": 57
+        },
+        "readBytes": 103274,
+        "pageReads": 14,
+        "enumerations": {
+          "metadata/readdir": 4,
+          "metadata/readdirEntries": 74,
+          "events/readdir": 1,
+          "events/readdirEntries": 62
+        }
+      }
+    },
+    {
+      "round": 2,
+      "side": "baseline",
+      "scenarioHash": "eeae1d75d83cc52130e6d36b8af320bde8ce603d80116ccb0cc05963c2432a91",
+      "loadBefore": [
+        4.6240234375,
+        6.27392578125,
+        6.92724609375
+      ],
+      "loadAfter": [
+        4.6240234375,
+        6.27392578125,
+        6.92724609375
+      ],
+      "elapsedMs": 3234,
+      "fixtureDigest": "1093ea081e2916690d7b77d7cd0de3b45251db508d6dd6b86a2d83e0cf25d53b",
+      "validation": [],
+      "samplesNs": [
+        5290833,
+        5654958,
+        5279958,
+        5563292,
+        5401750,
+        5534125,
+        5497833,
+        5527583,
+        5219458,
+        5427750
+      ],
+      "observations": {
+        "stateReads": 68,
+        "stateByKind": {
+          "session": 4,
+          "message": 32,
+          "receipt": 32
+        },
+        "readBytes": 37224,
+        "pageReads": 0,
+        "enumerations": {
+          "metadata/readdir": 4,
+          "metadata/readdirEntries": 72,
+          "events/readdir": 1,
+          "events/readdirEntries": 62
+        }
+      }
+    },
+    {
+      "round": 2,
+      "side": "candidate",
+      "scenarioHash": "eeae1d75d83cc52130e6d36b8af320bde8ce603d80116ccb0cc05963c2432a91",
+      "loadBefore": [
+        4.6240234375,
+        6.27392578125,
+        6.92724609375
+      ],
+      "loadAfter": [
+        5.53466796875,
+        6.43505859375,
+        6.97998046875
+      ],
+      "elapsedMs": 3205,
+      "fixtureDigest": "1093ea081e2916690d7b77d7cd0de3b45251db508d6dd6b86a2d83e0cf25d53b",
+      "validation": [],
+      "samplesNs": [
+        10487875,
+        10224667,
+        10586459,
+        10078583,
+        10039834,
+        9856750,
+        9636042,
+        10230833,
+        10675041,
+        9695417
+      ],
+      "observations": {
+        "stateReads": 116,
+        "stateByKind": {
+          "session": 2,
+          "message": 57,
+          "receipt": 57
+        },
+        "readBytes": 103730,
+        "pageReads": 14,
+        "enumerations": {
+          "metadata/readdir": 4,
+          "metadata/readdirEntries": 74,
+          "events/readdir": 1,
+          "events/readdirEntries": 62
+        }
+      }
+    },
+    {
+      "round": 2,
+      "side": "baseline",
+      "scenarioHash": "d22777295025a18867ade46818e6c5cfa5a19ce7bd80834d889749f7c9cfd9b9",
+      "loadBefore": [
+        5.53466796875,
+        6.43505859375,
+        6.97998046875
+      ],
+      "loadAfter": [
+        5.17138671875,
+        6.3447265625,
+        6.94482421875
+      ],
+      "elapsedMs": 3143,
+      "fixtureDigest": "1093ea081e2916690d7b77d7cd0de3b45251db508d6dd6b86a2d83e0cf25d53b",
+      "validation": [],
+      "samplesNs": [
+        5525709,
+        5931791,
+        5463417,
+        5260167,
+        5266250,
+        5338541,
+        5192000,
+        5546708,
+        5557250,
+        5497083
+      ],
+      "observations": {
+        "stateReads": 68,
+        "stateByKind": {
+          "session": 4,
+          "message": 32,
+          "receipt": 32
+        },
+        "readBytes": 37224,
+        "pageReads": 0,
+        "enumerations": {
+          "metadata/readdir": 4,
+          "metadata/readdirEntries": 72,
+          "events/readdir": 1,
+          "events/readdirEntries": 62
+        }
+      }
+    },
+    {
+      "round": 2,
+      "side": "candidate",
+      "scenarioHash": "d22777295025a18867ade46818e6c5cfa5a19ce7bd80834d889749f7c9cfd9b9",
+      "loadBefore": [
+        5.17138671875,
+        6.3447265625,
+        6.94482421875
+      ],
+      "loadAfter": [
+        5.17138671875,
+        6.3447265625,
+        6.94482421875
+      ],
+      "elapsedMs": 3496,
+      "fixtureDigest": "1093ea081e2916690d7b77d7cd0de3b45251db508d6dd6b86a2d83e0cf25d53b",
+      "validation": [],
+      "samplesNs": [
+        10290417,
+        9676791,
+        9528708,
+        9394541,
+        9808208,
+        9174667,
+        9502750,
+        9313417,
+        9596625,
+        9958541
+      ],
+      "observations": {
+        "stateReads": 116,
+        "stateByKind": {
+          "session": 2,
+          "message": 57,
+          "receipt": 57
+        },
+        "readBytes": 90499,
+        "pageReads": 10,
+        "enumerations": {
+          "metadata/readdir": 4,
+          "metadata/readdirEntries": 74,
+          "events/readdir": 1,
+          "events/readdirEntries": 62
+        }
+      }
+    },
+    {
+      "round": 2,
+      "side": "baseline",
+      "scenarioHash": "a1b4b4b52147e450fe6c461b9d024df99cd2ceecf55f43049d00f5d183eaf77d",
+      "loadBefore": [
+        5.17138671875,
+        6.3447265625,
+        6.94482421875
+      ],
+      "loadAfter": [
+        4.3486328125,
+        6.0791015625,
+        6.8349609375
+      ],
+      "elapsedMs": 18825,
+      "fixtureDigest": "34410714f6e2dfa975312d2bc218e89bb0f818344996386fe05864ab6c41f10e",
+      "validation": [],
+      "samplesNs": [
+        33349208,
+        32051250,
+        32327041,
+        32088625,
+        31291833,
+        33214958,
+        31542958,
+        31957083,
+        32093000,
+        31834291
+      ],
+      "observations": {
+        "stateReads": 608,
+        "stateByKind": {
+          "session": 4,
+          "message": 302,
+          "receipt": 302
+        },
+        "readBytes": 300730,
+        "pageReads": 0,
+        "enumerations": {
+          "metadata/readdir": 4,
+          "metadata/readdirEntries": 612,
+          "events/readdir": 1,
+          "events/readdirEntries": 330
+        }
+      }
+    },
+    {
+      "round": 2,
+      "side": "candidate",
+      "scenarioHash": "a1b4b4b52147e450fe6c461b9d024df99cd2ceecf55f43049d00f5d183eaf77d",
+      "loadBefore": [
+        4.3486328125,
+        6.0791015625,
+        6.8349609375
+      ],
+      "loadAfter": [
+        4.705078125,
+        6.08056640625,
+        6.8193359375
+      ],
+      "elapsedMs": 19955,
+      "fixtureDigest": "34410714f6e2dfa975312d2bc218e89bb0f818344996386fe05864ab6c41f10e",
+      "validation": [],
+      "samplesNs": [
+        5554083,
+        5754833,
+        5518959,
+        5734791,
+        5576208,
+        5745792,
+        5616125,
+        5575000,
+        5718458,
+        5543250
+      ],
+      "observations": {
+        "stateReads": 52,
+        "stateByKind": {
+          "session": 2,
+          "receipt": 25,
+          "message": 25
+        },
+        "readBytes": 35571,
+        "pageReads": 5,
+        "enumerations": {
+          "metadata/readdir": 1,
+          "metadata/readdirEntries": 5,
+          "events/readdir": 1,
+          "events/readdirEntries": 330
+        }
+      }
+    },
+    {
+      "round": 2,
+      "side": "baseline",
+      "scenarioHash": "941b129032377597b2b410b56f35823226bc38fed054d7b1549deabc3957941b",
+      "loadBefore": [
+        4.705078125,
+        6.08056640625,
+        6.8193359375
+      ],
+      "loadAfter": [
+        5.59716796875,
+        6.21533203125,
+        6.8515625
+      ],
+      "elapsedMs": 20675,
+      "fixtureDigest": "34410714f6e2dfa975312d2bc218e89bb0f818344996386fe05864ab6c41f10e",
+      "validation": [],
+      "samplesNs": [
+        33299875,
+        33163875,
+        32109458,
+        32480459,
+        33288625,
+        32848958,
+        32679417,
+        33213708,
+        32237708,
+        32549584
+      ],
+      "observations": {
+        "stateReads": 608,
+        "stateByKind": {
+          "session": 4,
+          "message": 302,
+          "receipt": 302
+        },
+        "readBytes": 300730,
+        "pageReads": 0,
+        "enumerations": {
+          "metadata/readdir": 4,
+          "metadata/readdirEntries": 612,
+          "events/readdir": 1,
+          "events/readdirEntries": 330
+        }
+      }
+    },
+    {
+      "round": 2,
+      "side": "candidate",
+      "scenarioHash": "941b129032377597b2b410b56f35823226bc38fed054d7b1549deabc3957941b",
+      "loadBefore": [
+        5.59716796875,
+        6.21533203125,
+        6.8515625
+      ],
+      "loadAfter": [
+        4.2802734375,
+        5.8759765625,
+        6.71484375
+      ],
+      "elapsedMs": 19152,
+      "fixtureDigest": "34410714f6e2dfa975312d2bc218e89bb0f818344996386fe05864ab6c41f10e",
+      "validation": [],
+      "samplesNs": [
+        44016792,
+        43937000,
+        44330625,
+        45168167,
+        44780750,
+        44545042,
+        43766750,
+        42805583,
+        42951375,
+        42413375
+      ],
+      "observations": {
+        "stateReads": 656,
+        "stateByKind": {
+          "session": 2,
+          "message": 327,
+          "receipt": 327
+        },
+        "readBytes": 596654,
+        "pageReads": 112,
+        "enumerations": {
+          "metadata/readdir": 4,
+          "metadata/readdirEntries": 614,
+          "events/readdir": 1,
+          "events/readdirEntries": 330
+        }
+      }
+    },
+    {
+      "round": 2,
+      "side": "baseline",
+      "scenarioHash": "e25df55e98bec33e9ca7f9809957d139bc75b1ed9e9a5e263ac05e2c40f3b1fe",
+      "loadBefore": [
+        4.2802734375,
+        5.8759765625,
+        6.71484375
+      ],
+      "loadAfter": [
+        4.18896484375,
+        5.7529296875,
+        6.65087890625
+      ],
+      "elapsedMs": 20251,
+      "fixtureDigest": "34410714f6e2dfa975312d2bc218e89bb0f818344996386fe05864ab6c41f10e",
+      "validation": [],
+      "samplesNs": [
+        33920084,
+        33410583,
+        33302167,
+        33307458,
+        33130291,
+        32946916,
+        32983750,
+        32701833,
+        32586625,
+        33275042
+      ],
+      "observations": {
+        "stateReads": 608,
+        "stateByKind": {
+          "session": 4,
+          "message": 302,
+          "receipt": 302
+        },
+        "readBytes": 300730,
+        "pageReads": 0,
+        "enumerations": {
+          "metadata/readdir": 4,
+          "metadata/readdirEntries": 612,
+          "events/readdir": 1,
+          "events/readdirEntries": 330
+        }
+      }
+    },
+    {
+      "round": 2,
+      "side": "candidate",
+      "scenarioHash": "e25df55e98bec33e9ca7f9809957d139bc75b1ed9e9a5e263ac05e2c40f3b1fe",
+      "loadBefore": [
+        4.18896484375,
+        5.7529296875,
+        6.65087890625
+      ],
+      "loadAfter": [
+        3.65283203125,
+        5.52587890625,
+        6.5478515625
+      ],
+      "elapsedMs": 20176,
+      "fixtureDigest": "34410714f6e2dfa975312d2bc218e89bb0f818344996386fe05864ab6c41f10e",
+      "validation": [],
+      "samplesNs": [
+        46423000,
+        43524500,
+        44973375,
+        46961250,
+        44926625,
+        45567542,
+        45737542,
+        44858125,
+        45594292,
+        44548167
+      ],
+      "observations": {
+        "stateReads": 656,
+        "stateByKind": {
+          "session": 2,
+          "message": 327,
+          "receipt": 327
+        },
+        "readBytes": 597110,
+        "pageReads": 112,
+        "enumerations": {
+          "metadata/readdir": 4,
+          "metadata/readdirEntries": 614,
+          "events/readdir": 1,
+          "events/readdirEntries": 330
+        }
+      }
+    },
+    {
+      "round": 2,
+      "side": "baseline",
+      "scenarioHash": "06e97aed50fa0509269c0f8d795de3bcd005d7fc637cf8f3451349cf30d7e1ec",
+      "loadBefore": [
+        3.65283203125,
+        5.52587890625,
+        6.5478515625
+      ],
+      "loadAfter": [
+        4.07470703125,
+        5.4794921875,
+        6.505859375
+      ],
+      "elapsedMs": 20343,
+      "fixtureDigest": "34410714f6e2dfa975312d2bc218e89bb0f818344996386fe05864ab6c41f10e",
+      "validation": [],
+      "samplesNs": [
+        33051042,
+        32880500,
+        32119250,
+        32053417,
+        33284750,
+        34483459,
+        32464375,
+        34021708,
+        32697959,
+        33537292
+      ],
+      "observations": {
+        "stateReads": 608,
+        "stateByKind": {
+          "session": 4,
+          "message": 302,
+          "receipt": 302
+        },
+        "readBytes": 300730,
+        "pageReads": 0,
+        "enumerations": {
+          "metadata/readdir": 4,
+          "metadata/readdirEntries": 612,
+          "events/readdir": 1,
+          "events/readdirEntries": 330
+        }
+      }
+    },
+    {
+      "round": 2,
+      "side": "candidate",
+      "scenarioHash": "06e97aed50fa0509269c0f8d795de3bcd005d7fc637cf8f3451349cf30d7e1ec",
+      "loadBefore": [
+        4.07470703125,
+        5.4794921875,
+        6.505859375
+      ],
+      "loadAfter": [
+        5.208984375,
+        5.66845703125,
+        6.55029296875
+      ],
+      "elapsedMs": 19099,
+      "fixtureDigest": "34410714f6e2dfa975312d2bc218e89bb0f818344996386fe05864ab6c41f10e",
+      "validation": [],
+      "samplesNs": [
+        43573083,
+        47107000,
+        42899417,
+        43308458,
+        42610458,
+        42082375,
+        42178208,
+        42843667,
+        42400833,
+        44479708
+      ],
+      "observations": {
+        "stateReads": 656,
+        "stateByKind": {
+          "session": 2,
+          "message": 327,
+          "receipt": 327
+        },
+        "readBytes": 592209,
+        "pageReads": 108,
+        "enumerations": {
+          "metadata/readdir": 4,
+          "metadata/readdirEntries": 614,
+          "events/readdir": 1,
+          "events/readdirEntries": 330
+        }
+      }
+    },
+    {
+      "round": 3,
+      "side": "candidate",
+      "scenarioHash": "50c2b85aa8b5c7c5b7fd6cc48f635a1bc1adf1f7db9f37c63087ed4c1d28b812",
+      "loadBefore": [
+        5.208984375,
+        5.66845703125,
+        6.55029296875
+      ],
+      "loadAfter": [
+        5.27197265625,
+        5.673828125,
+        6.546875
+      ],
+      "elapsedMs": 3321,
+      "fixtureDigest": "1093ea081e2916690d7b77d7cd0de3b45251db508d6dd6b86a2d83e0cf25d53b",
+      "validation": [],
+      "samplesNs": [
+        6114209,
+        5832625,
+        5765916,
+        5919125,
+        5750625,
+        5724125,
+        5590458,
+        5492792,
+        5492750,
+        5589292
+      ],
+      "observations": {
+        "stateReads": 52,
+        "stateByKind": {
+          "session": 2,
+          "receipt": 25,
+          "message": 25
+        },
+        "readBytes": 43757,
+        "pageReads": 5,
+        "enumerations": {
+          "metadata/readdir": 1,
+          "metadata/readdirEntries": 5,
+          "events/readdir": 1,
+          "events/readdirEntries": 62
+        }
+      }
+    },
+    {
+      "round": 3,
+      "side": "baseline",
+      "scenarioHash": "50c2b85aa8b5c7c5b7fd6cc48f635a1bc1adf1f7db9f37c63087ed4c1d28b812",
+      "loadBefore": [
+        5.27197265625,
+        5.673828125,
+        6.546875
+      ],
+      "loadAfter": [
+        5.27197265625,
+        5.673828125,
+        6.546875
+      ],
+      "elapsedMs": 3473,
+      "fixtureDigest": "1093ea081e2916690d7b77d7cd0de3b45251db508d6dd6b86a2d83e0cf25d53b",
+      "validation": [],
+      "samplesNs": [
+        5587250,
+        5630125,
+        5396666,
+        5588875,
+        5205084,
+        5623750,
+        5161209,
+        5528292,
+        5393542,
+        5412625
+      ],
+      "observations": {
+        "stateReads": 68,
+        "stateByKind": {
+          "session": 4,
+          "message": 32,
+          "receipt": 32
+        },
+        "readBytes": 37224,
+        "pageReads": 0,
+        "enumerations": {
+          "metadata/readdir": 4,
+          "metadata/readdirEntries": 72,
+          "events/readdir": 1,
+          "events/readdirEntries": 62
+        }
+      }
+    },
+    {
+      "round": 3,
+      "side": "candidate",
+      "scenarioHash": "02ff9cfd3a3cfab2d0550eaa6641be8d022fa01a67430a1d6589bbd70b2a2f27",
+      "loadBefore": [
+        5.27197265625,
+        5.673828125,
+        6.546875
+      ],
+      "loadAfter": [
+        5.890625,
+        5.79541015625,
+        6.58447265625
+      ],
+      "elapsedMs": 3816,
+      "fixtureDigest": "1093ea081e2916690d7b77d7cd0de3b45251db508d6dd6b86a2d83e0cf25d53b",
+      "validation": [],
+      "samplesNs": [
+        11102708,
+        11449125,
+        10214708,
+        9748083,
+        10030458,
+        10201625,
+        9984167,
+        10295125,
+        10416375,
+        10048166
+      ],
+      "observations": {
+        "stateReads": 116,
+        "stateByKind": {
+          "session": 2,
+          "message": 57,
+          "receipt": 57
+        },
+        "readBytes": 103274,
+        "pageReads": 14,
+        "enumerations": {
+          "metadata/readdir": 4,
+          "metadata/readdirEntries": 74,
+          "events/readdir": 1,
+          "events/readdirEntries": 62
+        }
+      }
+    },
+    {
+      "round": 3,
+      "side": "baseline",
+      "scenarioHash": "02ff9cfd3a3cfab2d0550eaa6641be8d022fa01a67430a1d6589bbd70b2a2f27",
+      "loadBefore": [
+        5.890625,
+        5.79541015625,
+        6.58447265625
+      ],
+      "loadAfter": [
+        5.81884765625,
+        5.78173828125,
+        6.57470703125
+      ],
+      "elapsedMs": 3590,
+      "fixtureDigest": "1093ea081e2916690d7b77d7cd0de3b45251db508d6dd6b86a2d83e0cf25d53b",
+      "validation": [],
+      "samplesNs": [
+        5675208,
+        5654625,
+        5492916,
+        5332125,
+        5191166,
+        5479583,
+        5109708,
+        5461834,
+        5302209,
+        5163084
+      ],
+      "observations": {
+        "stateReads": 68,
+        "stateByKind": {
+          "session": 4,
+          "message": 32,
+          "receipt": 32
+        },
+        "readBytes": 37224,
+        "pageReads": 0,
+        "enumerations": {
+          "metadata/readdir": 4,
+          "metadata/readdirEntries": 72,
+          "events/readdir": 1,
+          "events/readdirEntries": 62
+        }
+      }
+    },
+    {
+      "round": 3,
+      "side": "candidate",
+      "scenarioHash": "eeae1d75d83cc52130e6d36b8af320bde8ce603d80116ccb0cc05963c2432a91",
+      "loadBefore": [
+        5.81884765625,
+        5.78173828125,
+        6.57470703125
+      ],
+      "loadAfter": [
+        5.81884765625,
+        5.78173828125,
+        6.57470703125
+      ],
+      "elapsedMs": 3695,
+      "fixtureDigest": "1093ea081e2916690d7b77d7cd0de3b45251db508d6dd6b86a2d83e0cf25d53b",
+      "validation": [],
+      "samplesNs": [
+        10491292,
+        10380250,
+        10403958,
+        10034167,
+        10666292,
+        9868750,
+        9858666,
+        9898167,
+        9938583,
+        9786958
+      ],
+      "observations": {
+        "stateReads": 116,
+        "stateByKind": {
+          "session": 2,
+          "message": 57,
+          "receipt": 57
+        },
+        "readBytes": 103730,
+        "pageReads": 14,
+        "enumerations": {
+          "metadata/readdir": 4,
+          "metadata/readdirEntries": 74,
+          "events/readdir": 1,
+          "events/readdirEntries": 62
+        }
+      }
+    },
+    {
+      "round": 3,
+      "side": "baseline",
+      "scenarioHash": "eeae1d75d83cc52130e6d36b8af320bde8ce603d80116ccb0cc05963c2432a91",
+      "loadBefore": [
+        5.81884765625,
+        5.78173828125,
+        6.57470703125
+      ],
+      "loadAfter": [
+        5.5927734375,
+        5.7353515625,
+        6.5537109375
+      ],
+      "elapsedMs": 3646,
+      "fixtureDigest": "1093ea081e2916690d7b77d7cd0de3b45251db508d6dd6b86a2d83e0cf25d53b",
+      "validation": [],
+      "samplesNs": [
+        5465458,
+        5890833,
+        5510917,
+        5469708,
+        5377208,
+        5637375,
+        5233209,
+        5462250,
+        5198291,
+        5313542
+      ],
+      "observations": {
+        "stateReads": 68,
+        "stateByKind": {
+          "session": 4,
+          "message": 32,
+          "receipt": 32
+        },
+        "readBytes": 37224,
+        "pageReads": 0,
+        "enumerations": {
+          "metadata/readdir": 4,
+          "metadata/readdirEntries": 72,
+          "events/readdir": 1,
+          "events/readdirEntries": 62
+        }
+      }
+    },
+    {
+      "round": 3,
+      "side": "candidate",
+      "scenarioHash": "d22777295025a18867ade46818e6c5cfa5a19ce7bd80834d889749f7c9cfd9b9",
+      "loadBefore": [
+        5.5927734375,
+        5.7353515625,
+        6.5537109375
+      ],
+      "loadAfter": [
+        5.3046875,
+        5.6728515625,
+        6.52685546875
+      ],
+      "elapsedMs": 3446,
+      "fixtureDigest": "1093ea081e2916690d7b77d7cd0de3b45251db508d6dd6b86a2d83e0cf25d53b",
+      "validation": [],
+      "samplesNs": [
+        9558041,
+        10178875,
+        9730792,
+        9663792,
+        9871084,
+        9885833,
+        9367417,
+        9842875,
+        9537042,
+        8912042
+      ],
+      "observations": {
+        "stateReads": 116,
+        "stateByKind": {
+          "session": 2,
+          "message": 57,
+          "receipt": 57
+        },
+        "readBytes": 90499,
+        "pageReads": 10,
+        "enumerations": {
+          "metadata/readdir": 4,
+          "metadata/readdirEntries": 74,
+          "events/readdir": 1,
+          "events/readdirEntries": 62
+        }
+      }
+    },
+    {
+      "round": 3,
+      "side": "baseline",
+      "scenarioHash": "d22777295025a18867ade46818e6c5cfa5a19ce7bd80834d889749f7c9cfd9b9",
+      "loadBefore": [
+        5.3046875,
+        5.6728515625,
+        6.52685546875
+      ],
+      "loadAfter": [
+        5.4404296875,
+        5.69482421875,
+        6.529296875
+      ],
+      "elapsedMs": 3224,
+      "fixtureDigest": "1093ea081e2916690d7b77d7cd0de3b45251db508d6dd6b86a2d83e0cf25d53b",
+      "validation": [],
+      "samplesNs": [
+        5689167,
+        5193416,
+        5665625,
+        5534000,
+        5408459,
+        5204708,
+        5293167,
+        5502750,
+        5386958,
+        5305375
+      ],
+      "observations": {
+        "stateReads": 68,
+        "stateByKind": {
+          "session": 4,
+          "message": 32,
+          "receipt": 32
+        },
+        "readBytes": 37224,
+        "pageReads": 0,
+        "enumerations": {
+          "metadata/readdir": 4,
+          "metadata/readdirEntries": 72,
+          "events/readdir": 1,
+          "events/readdirEntries": 62
+        }
+      }
+    },
+    {
+      "round": 3,
+      "side": "candidate",
+      "scenarioHash": "a1b4b4b52147e450fe6c461b9d024df99cd2ceecf55f43049d00f5d183eaf77d",
+      "loadBefore": [
+        5.4404296875,
+        5.69482421875,
+        6.529296875
+      ],
+      "loadAfter": [
+        5.0283203125,
+        5.59375,
+        6.47802734375
+      ],
+      "elapsedMs": 19817,
+      "fixtureDigest": "34410714f6e2dfa975312d2bc218e89bb0f818344996386fe05864ab6c41f10e",
+      "validation": [],
+      "samplesNs": [
+        5652959,
+        5631292,
+        5426625,
+        5698666,
+        5712584,
+        5448333,
+        5742667,
+        5500208,
+        5446125,
+        5526625
+      ],
+      "observations": {
+        "stateReads": 52,
+        "stateByKind": {
+          "session": 2,
+          "receipt": 25,
+          "message": 25
+        },
+        "readBytes": 35571,
+        "pageReads": 5,
+        "enumerations": {
+          "metadata/readdir": 1,
+          "metadata/readdirEntries": 5,
+          "events/readdir": 1,
+          "events/readdirEntries": 330
+        }
+      }
+    },
+    {
+      "round": 3,
+      "side": "baseline",
+      "scenarioHash": "a1b4b4b52147e450fe6c461b9d024df99cd2ceecf55f43049d00f5d183eaf77d",
+      "loadBefore": [
+        5.0283203125,
+        5.59375,
+        6.47802734375
+      ],
+      "loadAfter": [
+        4.076171875,
+        5.3203125,
+        6.35302734375
+      ],
+      "elapsedMs": 20622,
+      "fixtureDigest": "34410714f6e2dfa975312d2bc218e89bb0f818344996386fe05864ab6c41f10e",
+      "validation": [],
+      "samplesNs": [
+        34091292,
+        32486458,
+        33130917,
+        32509125,
+        31909542,
+        32268000,
+        32041916,
+        32659208,
+        32157500,
+        32195625
+      ],
+      "observations": {
+        "stateReads": 608,
+        "stateByKind": {
+          "session": 4,
+          "message": 302,
+          "receipt": 302
+        },
+        "readBytes": 300730,
+        "pageReads": 0,
+        "enumerations": {
+          "metadata/readdir": 4,
+          "metadata/readdirEntries": 612,
+          "events/readdir": 1,
+          "events/readdirEntries": 330
+        }
+      }
+    },
+    {
+      "round": 3,
+      "side": "candidate",
+      "scenarioHash": "941b129032377597b2b410b56f35823226bc38fed054d7b1549deabc3957941b",
+      "loadBefore": [
+        4.076171875,
+        5.3203125,
+        6.35302734375
+      ],
+      "loadAfter": [
+        3.87451171875,
+        5.20751953125,
+        6.2939453125
+      ],
+      "elapsedMs": 19007,
+      "fixtureDigest": "34410714f6e2dfa975312d2bc218e89bb0f818344996386fe05864ab6c41f10e",
+      "validation": [],
+      "samplesNs": [
+        43982750,
+        45917208,
+        44500916,
+        44922666,
+        45176042,
+        44149708,
+        42954500,
+        43923416,
+        43763500,
+        43701375
+      ],
+      "observations": {
+        "stateReads": 656,
+        "stateByKind": {
+          "session": 2,
+          "message": 327,
+          "receipt": 327
+        },
+        "readBytes": 596654,
+        "pageReads": 112,
+        "enumerations": {
+          "metadata/readdir": 4,
+          "metadata/readdirEntries": 614,
+          "events/readdir": 1,
+          "events/readdirEntries": 330
+        }
+      }
+    },
+    {
+      "round": 3,
+      "side": "baseline",
+      "scenarioHash": "941b129032377597b2b410b56f35823226bc38fed054d7b1549deabc3957941b",
+      "loadBefore": [
+        3.87451171875,
+        5.20751953125,
+        6.2939453125
+      ],
+      "loadAfter": [
+        4.01611328125,
+        5.15869140625,
+        6.2509765625
+      ],
+      "elapsedMs": 18922,
+      "fixtureDigest": "34410714f6e2dfa975312d2bc218e89bb0f818344996386fe05864ab6c41f10e",
+      "validation": [],
+      "samplesNs": [
+        33106583,
+        32561833,
+        32546917,
+        31979584,
+        32113042,
+        32108875,
+        33171791,
+        32128875,
+        31723834,
+        31844792
+      ],
+      "observations": {
+        "stateReads": 608,
+        "stateByKind": {
+          "session": 4,
+          "message": 302,
+          "receipt": 302
+        },
+        "readBytes": 300730,
+        "pageReads": 0,
+        "enumerations": {
+          "metadata/readdir": 4,
+          "metadata/readdirEntries": 612,
+          "events/readdir": 1,
+          "events/readdirEntries": 330
+        }
+      }
+    },
+    {
+      "round": 3,
+      "side": "candidate",
+      "scenarioHash": "e25df55e98bec33e9ca7f9809957d139bc75b1ed9e9a5e263ac05e2c40f3b1fe",
+      "loadBefore": [
+        4.01611328125,
+        5.15869140625,
+        6.2509765625
+      ],
+      "loadAfter": [
+        4.92919921875,
+        5.3056640625,
+        6.27880859375
+      ],
+      "elapsedMs": 20857,
+      "fixtureDigest": "34410714f6e2dfa975312d2bc218e89bb0f818344996386fe05864ab6c41f10e",
+      "validation": [],
+      "samplesNs": [
+        44187375,
+        45137750,
+        45444375,
+        48103916,
+        46387500,
+        44088833,
+        45151958,
+        43947791,
+        43951084,
+        44685750
+      ],
+      "observations": {
+        "stateReads": 656,
+        "stateByKind": {
+          "session": 2,
+          "message": 327,
+          "receipt": 327
+        },
+        "readBytes": 597110,
+        "pageReads": 112,
+        "enumerations": {
+          "metadata/readdir": 4,
+          "metadata/readdirEntries": 614,
+          "events/readdir": 1,
+          "events/readdirEntries": 330
+        }
+      }
+    },
+    {
+      "round": 3,
+      "side": "baseline",
+      "scenarioHash": "e25df55e98bec33e9ca7f9809957d139bc75b1ed9e9a5e263ac05e2c40f3b1fe",
+      "loadBefore": [
+        4.92919921875,
+        5.3056640625,
+        6.27880859375
+      ],
+      "loadAfter": [
+        4.72216796875,
+        5.20458984375,
+        6.21240234375
+      ],
+      "elapsedMs": 20807,
+      "fixtureDigest": "34410714f6e2dfa975312d2bc218e89bb0f818344996386fe05864ab6c41f10e",
+      "validation": [],
+      "samplesNs": [
+        33105083,
+        32024500,
+        32192083,
+        32185125,
+        31752250,
+        32344333,
+        32442125,
+        31792250,
+        32282708,
+        32001708
+      ],
+      "observations": {
+        "stateReads": 608,
+        "stateByKind": {
+          "session": 4,
+          "message": 302,
+          "receipt": 302
+        },
+        "readBytes": 300730,
+        "pageReads": 0,
+        "enumerations": {
+          "metadata/readdir": 4,
+          "metadata/readdirEntries": 612,
+          "events/readdir": 1,
+          "events/readdirEntries": 330
+        }
+      }
+    },
+    {
+      "round": 3,
+      "side": "candidate",
+      "scenarioHash": "06e97aed50fa0509269c0f8d795de3bcd005d7fc637cf8f3451349cf30d7e1ec",
+      "loadBefore": [
+        4.72216796875,
+        5.20458984375,
+        6.21240234375
+      ],
+      "loadAfter": [
+        5.17919921875,
+        5.2724609375,
+        6.21240234375
+      ],
+      "elapsedMs": 20128,
+      "fixtureDigest": "34410714f6e2dfa975312d2bc218e89bb0f818344996386fe05864ab6c41f10e",
+      "validation": [],
+      "samplesNs": [
+        43684125,
+        46378167,
+        43416584,
+        43933250,
+        43955458,
+        43972875,
+        43812166,
+        42815833,
+        45715250,
+        42132458
+      ],
+      "observations": {
+        "stateReads": 656,
+        "stateByKind": {
+          "session": 2,
+          "message": 327,
+          "receipt": 327
+        },
+        "readBytes": 592209,
+        "pageReads": 108,
+        "enumerations": {
+          "metadata/readdir": 4,
+          "metadata/readdirEntries": 614,
+          "events/readdir": 1,
+          "events/readdirEntries": 330
+        }
+      }
+    },
+    {
+      "round": 3,
+      "side": "baseline",
+      "scenarioHash": "06e97aed50fa0509269c0f8d795de3bcd005d7fc637cf8f3451349cf30d7e1ec",
+      "loadBefore": [
+        5.17919921875,
+        5.2724609375,
+        6.21240234375
+      ],
+      "loadAfter": [
+        4.63818359375,
+        5.140625,
+        6.142578125
+      ],
+      "elapsedMs": 21018,
+      "fixtureDigest": "34410714f6e2dfa975312d2bc218e89bb0f818344996386fe05864ab6c41f10e",
+      "validation": [],
+      "samplesNs": [
+        33376958,
+        33162875,
+        32298416,
+        32424208,
+        32238417,
+        32283541,
+        32674125,
+        32566083,
+        32439542,
+        32240833
+      ],
+      "observations": {
+        "stateReads": 608,
+        "stateByKind": {
+          "session": 4,
+          "message": 302,
+          "receipt": 302
+        },
+        "readBytes": 300730,
+        "pageReads": 0,
+        "enumerations": {
+          "metadata/readdir": 4,
+          "metadata/readdirEntries": 612,
+          "events/readdir": 1,
+          "events/readdirEntries": 330
+        }
+      }
+    },
+    {
+      "round": 4,
+      "side": "baseline",
+      "scenarioHash": "50c2b85aa8b5c7c5b7fd6cc48f635a1bc1adf1f7db9f37c63087ed4c1d28b812",
+      "loadBefore": [
+        4.63818359375,
+        5.140625,
+        6.142578125
+      ],
+      "loadAfter": [
+        4.63818359375,
+        5.140625,
+        6.142578125
+      ],
+      "elapsedMs": 3681,
+      "fixtureDigest": "1093ea081e2916690d7b77d7cd0de3b45251db508d6dd6b86a2d83e0cf25d53b",
+      "validation": [],
+      "samplesNs": [
+        5741917,
+        5524958,
+        5523625,
+        5393417,
+        5328209,
+        5383625,
+        5303792,
+        5361584,
+        5397833,
+        5432167
+      ],
+      "observations": {
+        "stateReads": 68,
+        "stateByKind": {
+          "session": 4,
+          "message": 32,
+          "receipt": 32
+        },
+        "readBytes": 37224,
+        "pageReads": 0,
+        "enumerations": {
+          "metadata/readdir": 4,
+          "metadata/readdirEntries": 72,
+          "events/readdir": 1,
+          "events/readdirEntries": 62
+        }
+      }
+    },
+    {
+      "round": 4,
+      "side": "candidate",
+      "scenarioHash": "50c2b85aa8b5c7c5b7fd6cc48f635a1bc1adf1f7db9f37c63087ed4c1d28b812",
+      "loadBefore": [
+        4.63818359375,
+        5.140625,
+        6.142578125
+      ],
+      "loadAfter": [
+        4.5068359375,
+        5.10498046875,
+        6.1240234375
+      ],
+      "elapsedMs": 3521,
+      "fixtureDigest": "1093ea081e2916690d7b77d7cd0de3b45251db508d6dd6b86a2d83e0cf25d53b",
+      "validation": [],
+      "samplesNs": [
+        5767208,
+        6161417,
+        5826500,
+        5678584,
+        5702250,
+        5468125,
+        5699458,
+        5381750,
+        5482750,
+        5529167
+      ],
+      "observations": {
+        "stateReads": 52,
+        "stateByKind": {
+          "session": 2,
+          "receipt": 25,
+          "message": 25
+        },
+        "readBytes": 43757,
+        "pageReads": 5,
+        "enumerations": {
+          "metadata/readdir": 1,
+          "metadata/readdirEntries": 5,
+          "events/readdir": 1,
+          "events/readdirEntries": 62
+        }
+      }
+    },
+    {
+      "round": 4,
+      "side": "baseline",
+      "scenarioHash": "02ff9cfd3a3cfab2d0550eaa6641be8d022fa01a67430a1d6589bbd70b2a2f27",
+      "loadBefore": [
+        4.5068359375,
+        5.10498046875,
+        6.1240234375
+      ],
+      "loadAfter": [
+        4.3056640625,
+        5.05322265625,
+        6.099609375
+      ],
+      "elapsedMs": 3766,
+      "fixtureDigest": "1093ea081e2916690d7b77d7cd0de3b45251db508d6dd6b86a2d83e0cf25d53b",
+      "validation": [],
+      "samplesNs": [
+        5450625,
+        5516208,
+        5224583,
+        5496167,
+        5669417,
+        5649083,
+        5567542,
+        5658333,
+        5821917,
+        5630459
+      ],
+      "observations": {
+        "stateReads": 68,
+        "stateByKind": {
+          "session": 4,
+          "message": 32,
+          "receipt": 32
+        },
+        "readBytes": 37224,
+        "pageReads": 0,
+        "enumerations": {
+          "metadata/readdir": 4,
+          "metadata/readdirEntries": 72,
+          "events/readdir": 1,
+          "events/readdirEntries": 62
+        }
+      }
+    },
+    {
+      "round": 4,
+      "side": "candidate",
+      "scenarioHash": "02ff9cfd3a3cfab2d0550eaa6641be8d022fa01a67430a1d6589bbd70b2a2f27",
+      "loadBefore": [
+        4.3056640625,
+        5.05322265625,
+        6.099609375
+      ],
+      "loadAfter": [
+        4.52099609375,
+        5.08544921875,
+        6.1044921875
+      ],
+      "elapsedMs": 3695,
+      "fixtureDigest": "1093ea081e2916690d7b77d7cd0de3b45251db508d6dd6b86a2d83e0cf25d53b",
+      "validation": [],
+      "samplesNs": [
+        10650000,
+        10068750,
+        10618625,
+        10199542,
+        9881417,
+        9813292,
+        10126250,
+        9857375,
+        10604500,
+        9791917
+      ],
+      "observations": {
+        "stateReads": 116,
+        "stateByKind": {
+          "session": 2,
+          "message": 57,
+          "receipt": 57
+        },
+        "readBytes": 103274,
+        "pageReads": 14,
+        "enumerations": {
+          "metadata/readdir": 4,
+          "metadata/readdirEntries": 74,
+          "events/readdir": 1,
+          "events/readdirEntries": 62
+        }
+      }
+    },
+    {
+      "round": 4,
+      "side": "baseline",
+      "scenarioHash": "eeae1d75d83cc52130e6d36b8af320bde8ce603d80116ccb0cc05963c2432a91",
+      "loadBefore": [
+        4.52099609375,
+        5.08544921875,
+        6.1044921875
+      ],
+      "loadAfter": [
+        4.52099609375,
+        5.08544921875,
+        6.1044921875
+      ],
+      "elapsedMs": 3669,
+      "fixtureDigest": "1093ea081e2916690d7b77d7cd0de3b45251db508d6dd6b86a2d83e0cf25d53b",
+      "validation": [],
+      "samplesNs": [
+        5531417,
+        5391916,
+        5349750,
+        5438042,
+        5417625,
+        5477125,
+        5469208,
+        5633667,
+        5175709,
+        5417625
+      ],
+      "observations": {
+        "stateReads": 68,
+        "stateByKind": {
+          "session": 4,
+          "message": 32,
+          "receipt": 32
+        },
+        "readBytes": 37224,
+        "pageReads": 0,
+        "enumerations": {
+          "metadata/readdir": 4,
+          "metadata/readdirEntries": 72,
+          "events/readdir": 1,
+          "events/readdirEntries": 62
+        }
+      }
+    },
+    {
+      "round": 4,
+      "side": "candidate",
+      "scenarioHash": "eeae1d75d83cc52130e6d36b8af320bde8ce603d80116ccb0cc05963c2432a91",
+      "loadBefore": [
+        4.52099609375,
+        5.08544921875,
+        6.1044921875
+      ],
+      "loadAfter": [
+        4.63916015625,
+        5.1005859375,
+        6.103515625
+      ],
+      "elapsedMs": 3847,
+      "fixtureDigest": "1093ea081e2916690d7b77d7cd0de3b45251db508d6dd6b86a2d83e0cf25d53b",
+      "validation": [],
+      "samplesNs": [
+        10565000,
+        10989542,
+        10349875,
+        10237375,
+        10091875,
+        9894625,
+        10033875,
+        9953000,
+        9938667,
+        10082000
+      ],
+      "observations": {
+        "stateReads": 116,
+        "stateByKind": {
+          "session": 2,
+          "message": 57,
+          "receipt": 57
+        },
+        "readBytes": 103730,
+        "pageReads": 14,
+        "enumerations": {
+          "metadata/readdir": 4,
+          "metadata/readdirEntries": 74,
+          "events/readdir": 1,
+          "events/readdirEntries": 62
+        }
+      }
+    },
+    {
+      "round": 4,
+      "side": "baseline",
+      "scenarioHash": "d22777295025a18867ade46818e6c5cfa5a19ce7bd80834d889749f7c9cfd9b9",
+      "loadBefore": [
+        4.63916015625,
+        5.1005859375,
+        6.103515625
+      ],
+      "loadAfter": [
+        4.34765625,
+        5.0322265625,
+        6.0732421875
+      ],
+      "elapsedMs": 3747,
+      "fixtureDigest": "1093ea081e2916690d7b77d7cd0de3b45251db508d6dd6b86a2d83e0cf25d53b",
+      "validation": [],
+      "samplesNs": [
+        5542833,
+        5668083,
+        5581541,
+        5575542,
+        5389334,
+        5752416,
+        5355541,
+        5556125,
+        5364750,
+        5245958
+      ],
+      "observations": {
+        "stateReads": 68,
+        "stateByKind": {
+          "session": 4,
+          "message": 32,
+          "receipt": 32
+        },
+        "readBytes": 37224,
+        "pageReads": 0,
+        "enumerations": {
+          "metadata/readdir": 4,
+          "metadata/readdirEntries": 72,
+          "events/readdir": 1,
+          "events/readdirEntries": 62
+        }
+      }
+    },
+    {
+      "round": 4,
+      "side": "candidate",
+      "scenarioHash": "d22777295025a18867ade46818e6c5cfa5a19ce7bd80834d889749f7c9cfd9b9",
+      "loadBefore": [
+        4.34765625,
+        5.0322265625,
+        6.0732421875
+      ],
+      "loadAfter": [
+        4.3994140625,
+        5.03125,
+        6.06689453125
+      ],
+      "elapsedMs": 3742,
+      "fixtureDigest": "1093ea081e2916690d7b77d7cd0de3b45251db508d6dd6b86a2d83e0cf25d53b",
+      "validation": [],
+      "samplesNs": [
+        9743792,
+        9570125,
+        9415542,
+        9647625,
+        9673959,
+        9807875,
+        9692166,
+        9566459,
+        10074292,
+        9347458
+      ],
+      "observations": {
+        "stateReads": 116,
+        "stateByKind": {
+          "session": 2,
+          "message": 57,
+          "receipt": 57
+        },
+        "readBytes": 90499,
+        "pageReads": 10,
+        "enumerations": {
+          "metadata/readdir": 4,
+          "metadata/readdirEntries": 74,
+          "events/readdir": 1,
+          "events/readdirEntries": 62
+        }
+      }
+    },
+    {
+      "round": 4,
+      "side": "baseline",
+      "scenarioHash": "a1b4b4b52147e450fe6c461b9d024df99cd2ceecf55f43049d00f5d183eaf77d",
+      "loadBefore": [
+        4.3994140625,
+        5.03125,
+        6.06689453125
+      ],
+      "loadAfter": [
+        5.19091796875,
+        5.16064453125,
+        6.087890625
+      ],
+      "elapsedMs": 20590,
+      "fixtureDigest": "34410714f6e2dfa975312d2bc218e89bb0f818344996386fe05864ab6c41f10e",
+      "validation": [],
+      "samplesNs": [
+        32604083,
+        31983209,
+        32298834,
+        32145125,
+        32249209,
+        32336334,
+        31970417,
+        32531208,
+        32140542,
+        31886875
+      ],
+      "observations": {
+        "stateReads": 608,
+        "stateByKind": {
+          "session": 4,
+          "message": 302,
+          "receipt": 302
+        },
+        "readBytes": 300730,
+        "pageReads": 0,
+        "enumerations": {
+          "metadata/readdir": 4,
+          "metadata/readdirEntries": 612,
+          "events/readdir": 1,
+          "events/readdirEntries": 330
+        }
+      }
+    },
+    {
+      "round": 4,
+      "side": "candidate",
+      "scenarioHash": "a1b4b4b52147e450fe6c461b9d024df99cd2ceecf55f43049d00f5d183eaf77d",
+      "loadBefore": [
+        5.19091796875,
+        5.16064453125,
+        6.087890625
+      ],
+      "loadAfter": [
+        4.67138671875,
+        5.037109375,
+        6.02099609375
+      ],
+      "elapsedMs": 19035,
+      "fixtureDigest": "34410714f6e2dfa975312d2bc218e89bb0f818344996386fe05864ab6c41f10e",
+      "validation": [],
+      "samplesNs": [
+        5557417,
+        5765750,
+        5719791,
+        5811041,
+        5801167,
+        5701250,
+        5829625,
+        5620500,
+        5535542,
+        5556167
+      ],
+      "observations": {
+        "stateReads": 52,
+        "stateByKind": {
+          "session": 2,
+          "receipt": 25,
+          "message": 25
+        },
+        "readBytes": 35571,
+        "pageReads": 5,
+        "enumerations": {
+          "metadata/readdir": 1,
+          "metadata/readdirEntries": 5,
+          "events/readdir": 1,
+          "events/readdirEntries": 330
+        }
+      }
+    },
+    {
+      "round": 4,
+      "side": "baseline",
+      "scenarioHash": "941b129032377597b2b410b56f35823226bc38fed054d7b1549deabc3957941b",
+      "loadBefore": [
+        4.67138671875,
+        5.037109375,
+        6.02099609375
+      ],
+      "loadAfter": [
+        5.212890625,
+        5.11865234375,
+        6.02587890625
+      ],
+      "elapsedMs": 19578,
+      "fixtureDigest": "34410714f6e2dfa975312d2bc218e89bb0f818344996386fe05864ab6c41f10e",
+      "validation": [],
+      "samplesNs": [
+        33082083,
+        33623125,
+        32839625,
+        32579875,
+        33075042,
+        32653041,
+        33496334,
+        32943250,
+        32730333,
+        32275792
+      ],
+      "observations": {
+        "stateReads": 608,
+        "stateByKind": {
+          "session": 4,
+          "message": 302,
+          "receipt": 302
+        },
+        "readBytes": 300730,
+        "pageReads": 0,
+        "enumerations": {
+          "metadata/readdir": 4,
+          "metadata/readdirEntries": 612,
+          "events/readdir": 1,
+          "events/readdirEntries": 330
+        }
+      }
+    },
+    {
+      "round": 4,
+      "side": "candidate",
+      "scenarioHash": "941b129032377597b2b410b56f35823226bc38fed054d7b1549deabc3957941b",
+      "loadBefore": [
+        5.212890625,
+        5.11865234375,
+        6.02587890625
+      ],
+      "loadAfter": [
+        5.21142578125,
+        5.12548828125,
+        6.00634765625
+      ],
+      "elapsedMs": 21013,
+      "fixtureDigest": "34410714f6e2dfa975312d2bc218e89bb0f818344996386fe05864ab6c41f10e",
+      "validation": [],
+      "samplesNs": [
+        44139333,
+        43982958,
+        43951125,
+        44927084,
+        43919584,
+        43259500,
+        43122000,
+        43703958,
+        45475916,
+        42733917
+      ],
+      "observations": {
+        "stateReads": 656,
+        "stateByKind": {
+          "session": 2,
+          "message": 327,
+          "receipt": 327
+        },
+        "readBytes": 596654,
+        "pageReads": 112,
+        "enumerations": {
+          "metadata/readdir": 4,
+          "metadata/readdirEntries": 614,
+          "events/readdir": 1,
+          "events/readdirEntries": 330
+        }
+      }
+    },
+    {
+      "round": 4,
+      "side": "baseline",
+      "scenarioHash": "e25df55e98bec33e9ca7f9809957d139bc75b1ed9e9a5e263ac05e2c40f3b1fe",
+      "loadBefore": [
+        5.21142578125,
+        5.12548828125,
+        6.00634765625
+      ],
+      "loadAfter": [
+        5.216796875,
+        5.13232421875,
+        5.98779296875
+      ],
+      "elapsedMs": 21633,
+      "fixtureDigest": "34410714f6e2dfa975312d2bc218e89bb0f818344996386fe05864ab6c41f10e",
+      "validation": [],
+      "samplesNs": [
+        33696792,
+        32431250,
+        32656792,
+        32455292,
+        32830334,
+        41081959,
+        33102500,
+        33784791,
+        32121084,
+        32432042
+      ],
+      "observations": {
+        "stateReads": 608,
+        "stateByKind": {
+          "session": 4,
+          "message": 302,
+          "receipt": 302
+        },
+        "readBytes": 300730,
+        "pageReads": 0,
+        "enumerations": {
+          "metadata/readdir": 4,
+          "metadata/readdirEntries": 612,
+          "events/readdir": 1,
+          "events/readdirEntries": 330
+        }
+      }
+    },
+    {
+      "round": 4,
+      "side": "candidate",
+      "scenarioHash": "e25df55e98bec33e9ca7f9809957d139bc75b1ed9e9a5e263ac05e2c40f3b1fe",
+      "loadBefore": [
+        5.216796875,
+        5.13232421875,
+        5.98779296875
+      ],
+      "loadAfter": [
+        5.6064453125,
+        5.259765625,
+        6.01513671875
+      ],
+      "elapsedMs": 18562,
+      "fixtureDigest": "34410714f6e2dfa975312d2bc218e89bb0f818344996386fe05864ab6c41f10e",
+      "validation": [],
+      "samplesNs": [
+        45220000,
+        43865250,
+        43638958,
+        45369250,
+        46397167,
+        44527667,
+        44796584,
+        42889916,
+        44361083,
+        43905459
+      ],
+      "observations": {
+        "stateReads": 656,
+        "stateByKind": {
+          "session": 2,
+          "message": 327,
+          "receipt": 327
+        },
+        "readBytes": 597110,
+        "pageReads": 112,
+        "enumerations": {
+          "metadata/readdir": 4,
+          "metadata/readdirEntries": 614,
+          "events/readdir": 1,
+          "events/readdirEntries": 330
+        }
+      }
+    },
+    {
+      "round": 4,
+      "side": "baseline",
+      "scenarioHash": "06e97aed50fa0509269c0f8d795de3bcd005d7fc637cf8f3451349cf30d7e1ec",
+      "loadBefore": [
+        5.6064453125,
+        5.259765625,
+        6.01513671875
+      ],
+      "loadAfter": [
+        6.1044921875,
+        5.39013671875,
+        6.04345703125
+      ],
+      "elapsedMs": 20614,
+      "fixtureDigest": "34410714f6e2dfa975312d2bc218e89bb0f818344996386fe05864ab6c41f10e",
+      "validation": [],
+      "samplesNs": [
+        33368667,
+        33502292,
+        32443875,
+        33157167,
+        32836958,
+        33018583,
+        32553417,
+        32466458,
+        33310292,
+        33892709
+      ],
+      "observations": {
+        "stateReads": 608,
+        "stateByKind": {
+          "session": 4,
+          "message": 302,
+          "receipt": 302
+        },
+        "readBytes": 300730,
+        "pageReads": 0,
+        "enumerations": {
+          "metadata/readdir": 4,
+          "metadata/readdirEntries": 612,
+          "events/readdir": 1,
+          "events/readdirEntries": 330
+        }
+      }
+    },
+    {
+      "round": 4,
+      "side": "candidate",
+      "scenarioHash": "06e97aed50fa0509269c0f8d795de3bcd005d7fc637cf8f3451349cf30d7e1ec",
+      "loadBefore": [
+        6.1044921875,
+        5.39013671875,
+        6.04345703125
+      ],
+      "loadAfter": [
+        5.8720703125,
+        5.3798828125,
+        6.02392578125
+      ],
+      "elapsedMs": 21542,
+      "fixtureDigest": "34410714f6e2dfa975312d2bc218e89bb0f818344996386fe05864ab6c41f10e",
+      "validation": [],
+      "samplesNs": [
+        43017458,
+        44285250,
+        42516375,
+        42999375,
+        55907500,
+        46386541,
+        47153667,
+        43126542,
+        46651125,
+        42728750
+      ],
+      "observations": {
+        "stateReads": 656,
+        "stateByKind": {
+          "session": 2,
+          "message": 327,
+          "receipt": 327
+        },
+        "readBytes": 592209,
+        "pageReads": 108,
+        "enumerations": {
+          "metadata/readdir": 4,
+          "metadata/readdirEntries": 614,
+          "events/readdir": 1,
+          "events/readdirEntries": 330
+        }
+      }
+    },
+    {
+      "round": 5,
+      "side": "candidate",
+      "scenarioHash": "50c2b85aa8b5c7c5b7fd6cc48f635a1bc1adf1f7db9f37c63087ed4c1d28b812",
+      "loadBefore": [
+        5.8720703125,
+        5.3798828125,
+        6.02392578125
+      ],
+      "loadAfter": [
+        5.5615234375,
+        5.32373046875,
+        6
+      ],
+      "elapsedMs": 3800,
+      "fixtureDigest": "1093ea081e2916690d7b77d7cd0de3b45251db508d6dd6b86a2d83e0cf25d53b",
+      "validation": [],
+      "samplesNs": [
+        5727208,
+        5602500,
+        6102959,
+        5428250,
+        5786667,
+        5580167,
+        5749583,
+        5524208,
+        5458958,
+        5304833
+      ],
+      "observations": {
+        "stateReads": 52,
+        "stateByKind": {
+          "session": 2,
+          "receipt": 25,
+          "message": 25
+        },
+        "readBytes": 43757,
+        "pageReads": 5,
+        "enumerations": {
+          "metadata/readdir": 1,
+          "metadata/readdirEntries": 5,
+          "events/readdir": 1,
+          "events/readdirEntries": 62
+        }
+      }
+    },
+    {
+      "round": 5,
+      "side": "baseline",
+      "scenarioHash": "50c2b85aa8b5c7c5b7fd6cc48f635a1bc1adf1f7db9f37c63087ed4c1d28b812",
+      "loadBefore": [
+        5.5615234375,
+        5.32373046875,
+        6
+      ],
+      "loadAfter": [
+        5.35595703125,
+        5.28466796875,
+        5.982421875
+      ],
+      "elapsedMs": 3452,
+      "fixtureDigest": "1093ea081e2916690d7b77d7cd0de3b45251db508d6dd6b86a2d83e0cf25d53b",
+      "validation": [],
+      "samplesNs": [
+        5657875,
+        5390125,
+        5496500,
+        5384708,
+        5332833,
+        5381209,
+        5306166,
+        5330584,
+        6039708,
+        5453084
+      ],
+      "observations": {
+        "stateReads": 68,
+        "stateByKind": {
+          "session": 4,
+          "message": 32,
+          "receipt": 32
+        },
+        "readBytes": 37224,
+        "pageReads": 0,
+        "enumerations": {
+          "metadata/readdir": 4,
+          "metadata/readdirEntries": 72,
+          "events/readdir": 1,
+          "events/readdirEntries": 62
+        }
+      }
+    },
+    {
+      "round": 5,
+      "side": "candidate",
+      "scenarioHash": "02ff9cfd3a3cfab2d0550eaa6641be8d022fa01a67430a1d6589bbd70b2a2f27",
+      "loadBefore": [
+        5.35595703125,
+        5.28466796875,
+        5.982421875
+      ],
+      "loadAfter": [
+        5.35595703125,
+        5.28466796875,
+        5.982421875
+      ],
+      "elapsedMs": 3399,
+      "fixtureDigest": "1093ea081e2916690d7b77d7cd0de3b45251db508d6dd6b86a2d83e0cf25d53b",
+      "validation": [],
+      "samplesNs": [
+        10529875,
+        10035792,
+        10042625,
+        10461333,
+        9670083,
+        10058667,
+        9849417,
+        9717917,
+        10079083,
+        9909625
+      ],
+      "observations": {
+        "stateReads": 116,
+        "stateByKind": {
+          "session": 2,
+          "message": 57,
+          "receipt": 57
+        },
+        "readBytes": 103274,
+        "pageReads": 14,
+        "enumerations": {
+          "metadata/readdir": 4,
+          "metadata/readdirEntries": 74,
+          "events/readdir": 1,
+          "events/readdirEntries": 62
+        }
+      }
+    },
+    {
+      "round": 5,
+      "side": "baseline",
+      "scenarioHash": "02ff9cfd3a3cfab2d0550eaa6641be8d022fa01a67430a1d6589bbd70b2a2f27",
+      "loadBefore": [
+        5.35595703125,
+        5.28466796875,
+        5.982421875
+      ],
+      "loadAfter": [
+        4.9267578125,
+        5.19677734375,
+        5.947265625
+      ],
+      "elapsedMs": 3435,
+      "fixtureDigest": "1093ea081e2916690d7b77d7cd0de3b45251db508d6dd6b86a2d83e0cf25d53b",
+      "validation": [],
+      "samplesNs": [
+        5690834,
+        5526959,
+        5343709,
+        5446750,
+        5519916,
+        5495333,
+        5097209,
+        5411833,
+        5391833,
+        5360667
+      ],
+      "observations": {
+        "stateReads": 68,
+        "stateByKind": {
+          "session": 4,
+          "message": 32,
+          "receipt": 32
+        },
+        "readBytes": 37224,
+        "pageReads": 0,
+        "enumerations": {
+          "metadata/readdir": 4,
+          "metadata/readdirEntries": 72,
+          "events/readdir": 1,
+          "events/readdirEntries": 62
+        }
+      }
+    },
+    {
+      "round": 5,
+      "side": "candidate",
+      "scenarioHash": "eeae1d75d83cc52130e6d36b8af320bde8ce603d80116ccb0cc05963c2432a91",
+      "loadBefore": [
+        4.9267578125,
+        5.19677734375,
+        5.947265625
+      ],
+      "loadAfter": [
+        4.6123046875,
+        5.126953125,
+        5.91796875
+      ],
+      "elapsedMs": 3562,
+      "fixtureDigest": "1093ea081e2916690d7b77d7cd0de3b45251db508d6dd6b86a2d83e0cf25d53b",
+      "validation": [],
+      "samplesNs": [
+        10482083,
+        10103500,
+        10442875,
+        10293500,
+        9931625,
+        10780958,
+        10294750,
+        10412250,
+        10029417,
+        9770667
+      ],
+      "observations": {
+        "stateReads": 116,
+        "stateByKind": {
+          "session": 2,
+          "message": 57,
+          "receipt": 57
+        },
+        "readBytes": 103730,
+        "pageReads": 14,
+        "enumerations": {
+          "metadata/readdir": 4,
+          "metadata/readdirEntries": 74,
+          "events/readdir": 1,
+          "events/readdirEntries": 62
+        }
+      }
+    },
+    {
+      "round": 5,
+      "side": "baseline",
+      "scenarioHash": "eeae1d75d83cc52130e6d36b8af320bde8ce603d80116ccb0cc05963c2432a91",
+      "loadBefore": [
+        4.6123046875,
+        5.126953125,
+        5.91796875
+      ],
+      "loadAfter": [
+        4.6123046875,
+        5.126953125,
+        5.91796875
+      ],
+      "elapsedMs": 3726,
+      "fixtureDigest": "1093ea081e2916690d7b77d7cd0de3b45251db508d6dd6b86a2d83e0cf25d53b",
+      "validation": [],
+      "samplesNs": [
+        5841166,
+        5618000,
+        5558667,
+        5518334,
+        5335334,
+        5527875,
+        5105083,
+        5297208,
+        5321208,
+        5544584
+      ],
+      "observations": {
+        "stateReads": 68,
+        "stateByKind": {
+          "session": 4,
+          "message": 32,
+          "receipt": 32
+        },
+        "readBytes": 37224,
+        "pageReads": 0,
+        "enumerations": {
+          "metadata/readdir": 4,
+          "metadata/readdirEntries": 72,
+          "events/readdir": 1,
+          "events/readdirEntries": 62
+        }
+      }
+    },
+    {
+      "round": 5,
+      "side": "candidate",
+      "scenarioHash": "d22777295025a18867ade46818e6c5cfa5a19ce7bd80834d889749f7c9cfd9b9",
+      "loadBefore": [
+        4.6123046875,
+        5.126953125,
+        5.91796875
+      ],
+      "loadAfter": [
+        4.48291015625,
+        5.09130859375,
+        5.900390625
+      ],
+      "elapsedMs": 3891,
+      "fixtureDigest": "1093ea081e2916690d7b77d7cd0de3b45251db508d6dd6b86a2d83e0cf25d53b",
+      "validation": [],
+      "samplesNs": [
+        9908000,
+        9910042,
+        9833792,
+        9538666,
+        9530167,
+        9095542,
+        9546041,
+        9349333,
+        10941459,
+        9619875
+      ],
+      "observations": {
+        "stateReads": 116,
+        "stateByKind": {
+          "session": 2,
+          "message": 57,
+          "receipt": 57
+        },
+        "readBytes": 90499,
+        "pageReads": 10,
+        "enumerations": {
+          "metadata/readdir": 4,
+          "metadata/readdirEntries": 74,
+          "events/readdir": 1,
+          "events/readdirEntries": 62
+        }
+      }
+    },
+    {
+      "round": 5,
+      "side": "baseline",
+      "scenarioHash": "d22777295025a18867ade46818e6c5cfa5a19ce7bd80834d889749f7c9cfd9b9",
+      "loadBefore": [
+        4.48291015625,
+        5.09130859375,
+        5.900390625
+      ],
+      "loadAfter": [
+        9.88916015625,
+        6.20166015625,
+        6.28759765625
+      ],
+      "elapsedMs": 3156,
+      "fixtureDigest": "1093ea081e2916690d7b77d7cd0de3b45251db508d6dd6b86a2d83e0cf25d53b",
+      "validation": [],
+      "samplesNs": [
+        6039833,
+        5574500,
+        5735500,
+        5354042,
+        5421875,
+        5647125,
+        5408459,
+        5647500,
+        5641292,
+        5308208
+      ],
+      "observations": {
+        "stateReads": 68,
+        "stateByKind": {
+          "session": 4,
+          "message": 32,
+          "receipt": 32
+        },
+        "readBytes": 37224,
+        "pageReads": 0,
+        "enumerations": {
+          "metadata/readdir": 4,
+          "metadata/readdirEntries": 72,
+          "events/readdir": 1,
+          "events/readdirEntries": 62
+        }
+      }
+    },
+    {
+      "round": 5,
+      "side": "candidate",
+      "scenarioHash": "a1b4b4b52147e450fe6c461b9d024df99cd2ceecf55f43049d00f5d183eaf77d",
+      "loadBefore": [
+        9.88916015625,
+        6.20166015625,
+        6.28759765625
+      ],
+      "loadAfter": [
+        14.67529296875,
+        7.51953125,
+        6.75634765625
+      ],
+      "elapsedMs": 18359,
+      "fixtureDigest": "34410714f6e2dfa975312d2bc218e89bb0f818344996386fe05864ab6c41f10e",
+      "validation": [],
+      "samplesNs": [
+        5536625,
+        5618917,
+        5566917,
+        5813750,
+        5504709,
+        5695584,
+        5500542,
+        5844959,
+        5759917,
+        5435834
+      ],
+      "observations": {
+        "stateReads": 52,
+        "stateByKind": {
+          "session": 2,
+          "receipt": 25,
+          "message": 25
+        },
+        "readBytes": 35571,
+        "pageReads": 5,
+        "enumerations": {
+          "metadata/readdir": 1,
+          "metadata/readdirEntries": 5,
+          "events/readdir": 1,
+          "events/readdirEntries": 330
+        }
+      }
+    },
+    {
+      "round": 5,
+      "side": "baseline",
+      "scenarioHash": "a1b4b4b52147e450fe6c461b9d024df99cd2ceecf55f43049d00f5d183eaf77d",
+      "loadBefore": [
+        14.67529296875,
+        7.51953125,
+        6.75634765625
+      ],
+      "loadAfter": [
+        12.40234375,
+        7.36328125,
+        6.71337890625
+      ],
+      "elapsedMs": 19686,
+      "fixtureDigest": "34410714f6e2dfa975312d2bc218e89bb0f818344996386fe05864ab6c41f10e",
+      "validation": [],
+      "samplesNs": [
+        33119875,
+        33006875,
+        32281292,
+        32577000,
+        32394125,
+        32765750,
+        32061416,
+        32289667,
+        32143584,
+        32527083
+      ],
+      "observations": {
+        "stateReads": 608,
+        "stateByKind": {
+          "session": 4,
+          "message": 302,
+          "receipt": 302
+        },
+        "readBytes": 300730,
+        "pageReads": 0,
+        "enumerations": {
+          "metadata/readdir": 4,
+          "metadata/readdirEntries": 612,
+          "events/readdir": 1,
+          "events/readdirEntries": 330
+        }
+      }
+    },
+    {
+      "round": 5,
+      "side": "candidate",
+      "scenarioHash": "941b129032377597b2b410b56f35823226bc38fed054d7b1549deabc3957941b",
+      "loadBefore": [
+        12.40234375,
+        7.36328125,
+        6.71337890625
+      ],
+      "loadAfter": [
+        10.99560546875,
+        7.39599609375,
+        6.7412109375
+      ],
+      "elapsedMs": 20144,
+      "fixtureDigest": "34410714f6e2dfa975312d2bc218e89bb0f818344996386fe05864ab6c41f10e",
+      "validation": [],
+      "samplesNs": [
+        44874542,
+        43835291,
+        47635209,
+        45302333,
+        44589417,
+        44185834,
+        45291791,
+        44833958,
+        46416959,
+        43031500
+      ],
+      "observations": {
+        "stateReads": 656,
+        "stateByKind": {
+          "session": 2,
+          "message": 327,
+          "receipt": 327
+        },
+        "readBytes": 596654,
+        "pageReads": 112,
+        "enumerations": {
+          "metadata/readdir": 4,
+          "metadata/readdirEntries": 614,
+          "events/readdir": 1,
+          "events/readdirEntries": 330
+        }
+      }
+    },
+    {
+      "round": 5,
+      "side": "baseline",
+      "scenarioHash": "941b129032377597b2b410b56f35823226bc38fed054d7b1549deabc3957941b",
+      "loadBefore": [
+        10.99560546875,
+        7.39599609375,
+        6.7412109375
+      ],
+      "loadAfter": [
+        9.40380859375,
+        7.3134765625,
+        6.73046875
+      ],
+      "elapsedMs": 20543,
+      "fixtureDigest": "34410714f6e2dfa975312d2bc218e89bb0f818344996386fe05864ab6c41f10e",
+      "validation": [],
+      "samplesNs": [
+        53685708,
+        32432208,
+        32577750,
+        32191833,
+        31689875,
+        32164250,
+        32691584,
+        31983375,
+        32188750,
+        32140500
+      ],
+      "observations": {
+        "stateReads": 608,
+        "stateByKind": {
+          "session": 4,
+          "message": 302,
+          "receipt": 302
+        },
+        "readBytes": 300730,
+        "pageReads": 0,
+        "enumerations": {
+          "metadata/readdir": 4,
+          "metadata/readdirEntries": 612,
+          "events/readdir": 1,
+          "events/readdirEntries": 330
+        }
+      }
+    },
+    {
+      "round": 5,
+      "side": "candidate",
+      "scenarioHash": "e25df55e98bec33e9ca7f9809957d139bc75b1ed9e9a5e263ac05e2c40f3b1fe",
+      "loadBefore": [
+        9.40380859375,
+        7.3134765625,
+        6.73046875
+      ],
+      "loadAfter": [
+        7.7080078125,
+        7.05126953125,
+        6.64892578125
+      ],
+      "elapsedMs": 20465,
+      "fixtureDigest": "34410714f6e2dfa975312d2bc218e89bb0f818344996386fe05864ab6c41f10e",
+      "validation": [],
+      "samplesNs": [
+        45536375,
+        44969875,
+        44514083,
+        46031125,
+        46305500,
+        43266166,
+        44950959,
+        44626291,
+        42929167,
+        43973375
+      ],
+      "observations": {
+        "stateReads": 656,
+        "stateByKind": {
+          "session": 2,
+          "message": 327,
+          "receipt": 327
+        },
+        "readBytes": 597110,
+        "pageReads": 112,
+        "enumerations": {
+          "metadata/readdir": 4,
+          "metadata/readdirEntries": 614,
+          "events/readdir": 1,
+          "events/readdirEntries": 330
+        }
+      }
+    },
+    {
+      "round": 5,
+      "side": "baseline",
+      "scenarioHash": "e25df55e98bec33e9ca7f9809957d139bc75b1ed9e9a5e263ac05e2c40f3b1fe",
+      "loadBefore": [
+        7.7080078125,
+        7.05126953125,
+        6.64892578125
+      ],
+      "loadAfter": [
+        6.49951171875,
+        6.806640625,
+        6.5693359375
+      ],
+      "elapsedMs": 20634,
+      "fixtureDigest": "34410714f6e2dfa975312d2bc218e89bb0f818344996386fe05864ab6c41f10e",
+      "validation": [],
+      "samplesNs": [
+        33328583,
+        32265417,
+        32073542,
+        32140000,
+        32680416,
+        32829667,
+        31741125,
+        33376208,
+        31523042,
+        32233583
+      ],
+      "observations": {
+        "stateReads": 608,
+        "stateByKind": {
+          "session": 4,
+          "message": 302,
+          "receipt": 302
+        },
+        "readBytes": 300730,
+        "pageReads": 0,
+        "enumerations": {
+          "metadata/readdir": 4,
+          "metadata/readdirEntries": 612,
+          "events/readdir": 1,
+          "events/readdirEntries": 330
+        }
+      }
+    },
+    {
+      "round": 5,
+      "side": "candidate",
+      "scenarioHash": "06e97aed50fa0509269c0f8d795de3bcd005d7fc637cf8f3451349cf30d7e1ec",
+      "loadBefore": [
+        6.49951171875,
+        6.806640625,
+        6.5693359375
+      ],
+      "loadAfter": [
+        5.68359375,
+        6.60595703125,
+        6.5029296875
+      ],
+      "elapsedMs": 22257,
+      "fixtureDigest": "34410714f6e2dfa975312d2bc218e89bb0f818344996386fe05864ab6c41f10e",
+      "validation": [],
+      "samplesNs": [
+        43465833,
+        46132417,
+        43848042,
+        43396083,
+        44337542,
+        42827542,
+        43925792,
+        43469833,
+        43119959,
+        45170542
+      ],
+      "observations": {
+        "stateReads": 656,
+        "stateByKind": {
+          "session": 2,
+          "message": 327,
+          "receipt": 327
+        },
+        "readBytes": 592209,
+        "pageReads": 108,
+        "enumerations": {
+          "metadata/readdir": 4,
+          "metadata/readdirEntries": 614,
+          "events/readdir": 1,
+          "events/readdirEntries": 330
+        }
+      }
+    },
+    {
+      "round": 5,
+      "side": "baseline",
+      "scenarioHash": "06e97aed50fa0509269c0f8d795de3bcd005d7fc637cf8f3451349cf30d7e1ec",
+      "loadBefore": [
+        5.68359375,
+        6.60595703125,
+        6.5029296875
+      ],
+      "loadAfter": [
+        6.92919921875,
+        6.8388671875,
+        6.58837890625
+      ],
+      "elapsedMs": 20302,
+      "fixtureDigest": "34410714f6e2dfa975312d2bc218e89bb0f818344996386fe05864ab6c41f10e",
+      "validation": [],
+      "samplesNs": [
+        34217000,
+        32190417,
+        33108667,
+        32448125,
+        32613875,
+        33534416,
+        33193125,
+        32069958,
+        32566958,
+        32618333
+      ],
+      "observations": {
+        "stateReads": 608,
+        "stateByKind": {
+          "session": 4,
+          "message": 302,
+          "receipt": 302
+        },
+        "readBytes": 300730,
+        "pageReads": 0,
+        "enumerations": {
+          "metadata/readdir": 4,
+          "metadata/readdirEntries": 612,
+          "events/readdir": 1,
+          "events/readdirEntries": 330
+        }
+      }
+    },
+    {
+      "round": 6,
+      "side": "baseline",
+      "scenarioHash": "50c2b85aa8b5c7c5b7fd6cc48f635a1bc1adf1f7db9f37c63087ed4c1d28b812",
+      "loadBefore": [
+        6.92919921875,
+        6.8388671875,
+        6.58837890625
+      ],
+      "loadAfter": [
+        6.6943359375,
+        6.79150390625,
+        6.57275390625
+      ],
+      "elapsedMs": 3714,
+      "fixtureDigest": "1093ea081e2916690d7b77d7cd0de3b45251db508d6dd6b86a2d83e0cf25d53b",
+      "validation": [],
+      "samplesNs": [
+        5762250,
+        5321042,
+        5590209,
+        5203042,
+        5377125,
+        5335583,
+        5418875,
+        5369833,
+        5452708,
+        5615041
+      ],
+      "observations": {
+        "stateReads": 68,
+        "stateByKind": {
+          "session": 4,
+          "message": 32,
+          "receipt": 32
+        },
+        "readBytes": 37224,
+        "pageReads": 0,
+        "enumerations": {
+          "metadata/readdir": 4,
+          "metadata/readdirEntries": 72,
+          "events/readdir": 1,
+          "events/readdirEntries": 62
+        }
+      }
+    },
+    {
+      "round": 6,
+      "side": "candidate",
+      "scenarioHash": "50c2b85aa8b5c7c5b7fd6cc48f635a1bc1adf1f7db9f37c63087ed4c1d28b812",
+      "loadBefore": [
+        6.6943359375,
+        6.79150390625,
+        6.57275390625
+      ],
+      "loadAfter": [
+        6.55859375,
+        6.76171875,
+        6.5634765625
+      ],
+      "elapsedMs": 3935,
+      "fixtureDigest": "1093ea081e2916690d7b77d7cd0de3b45251db508d6dd6b86a2d83e0cf25d53b",
+      "validation": [],
+      "samplesNs": [
+        5628458,
+        5914417,
+        5908625,
+        5614791,
+        5611458,
+        5454750,
+        5703958,
+        5461709,
+        5751292,
+        5450625
+      ],
+      "observations": {
+        "stateReads": 52,
+        "stateByKind": {
+          "session": 2,
+          "receipt": 25,
+          "message": 25
+        },
+        "readBytes": 43757,
+        "pageReads": 5,
+        "enumerations": {
+          "metadata/readdir": 1,
+          "metadata/readdirEntries": 5,
+          "events/readdir": 1,
+          "events/readdirEntries": 62
+        }
+      }
+    },
+    {
+      "round": 6,
+      "side": "baseline",
+      "scenarioHash": "02ff9cfd3a3cfab2d0550eaa6641be8d022fa01a67430a1d6589bbd70b2a2f27",
+      "loadBefore": [
+        6.55859375,
+        6.76171875,
+        6.5634765625
+      ],
+      "loadAfter": [
+        6.193359375,
+        6.6826171875,
+        6.53662109375
+      ],
+      "elapsedMs": 3671,
+      "fixtureDigest": "1093ea081e2916690d7b77d7cd0de3b45251db508d6dd6b86a2d83e0cf25d53b",
+      "validation": [],
+      "samplesNs": [
+        5745167,
+        5689083,
+        5567625,
+        5266541,
+        5345166,
+        5205000,
+        5468959,
+        5184917,
+        5249125,
+        5146667
+      ],
+      "observations": {
+        "stateReads": 68,
+        "stateByKind": {
+          "session": 4,
+          "message": 32,
+          "receipt": 32
+        },
+        "readBytes": 37224,
+        "pageReads": 0,
+        "enumerations": {
+          "metadata/readdir": 4,
+          "metadata/readdirEntries": 72,
+          "events/readdir": 1,
+          "events/readdirEntries": 62
+        }
+      }
+    },
+    {
+      "round": 6,
+      "side": "candidate",
+      "scenarioHash": "02ff9cfd3a3cfab2d0550eaa6641be8d022fa01a67430a1d6589bbd70b2a2f27",
+      "loadBefore": [
+        6.193359375,
+        6.6826171875,
+        6.53662109375
+      ],
+      "loadAfter": [
+        6.193359375,
+        6.6826171875,
+        6.53662109375
+      ],
+      "elapsedMs": 3500,
+      "fixtureDigest": "1093ea081e2916690d7b77d7cd0de3b45251db508d6dd6b86a2d83e0cf25d53b",
+      "validation": [],
+      "samplesNs": [
+        10327709,
+        10475000,
+        10249125,
+        10206958,
+        9893292,
+        9705917,
+        9884625,
+        10369292,
+        10265291,
+        9817500
+      ],
+      "observations": {
+        "stateReads": 116,
+        "stateByKind": {
+          "session": 2,
+          "message": 57,
+          "receipt": 57
+        },
+        "readBytes": 103274,
+        "pageReads": 14,
+        "enumerations": {
+          "metadata/readdir": 4,
+          "metadata/readdirEntries": 74,
+          "events/readdir": 1,
+          "events/readdirEntries": 62
+        }
+      }
+    },
+    {
+      "round": 6,
+      "side": "baseline",
+      "scenarioHash": "eeae1d75d83cc52130e6d36b8af320bde8ce603d80116ccb0cc05963c2432a91",
+      "loadBefore": [
+        6.193359375,
+        6.6826171875,
+        6.53662109375
+      ],
+      "loadAfter": [
+        5.857421875,
+        6.6044921875,
+        6.509765625
+      ],
+      "elapsedMs": 3654,
+      "fixtureDigest": "1093ea081e2916690d7b77d7cd0de3b45251db508d6dd6b86a2d83e0cf25d53b",
+      "validation": [],
+      "samplesNs": [
+        7792583,
+        5664750,
+        5263916,
+        5033042,
+        9566291,
+        5450708,
+        5573625,
+        9038667,
+        5464125,
+        6786750
+      ],
+      "observations": {
+        "stateReads": 68,
+        "stateByKind": {
+          "session": 4,
+          "message": 32,
+          "receipt": 32
+        },
+        "readBytes": 37224,
+        "pageReads": 0,
+        "enumerations": {
+          "metadata/readdir": 4,
+          "metadata/readdirEntries": 72,
+          "events/readdir": 1,
+          "events/readdirEntries": 62
+        }
+      }
+    },
+    {
+      "round": 6,
+      "side": "candidate",
+      "scenarioHash": "eeae1d75d83cc52130e6d36b8af320bde8ce603d80116ccb0cc05963c2432a91",
+      "loadBefore": [
+        5.857421875,
+        6.6044921875,
+        6.509765625
+      ],
+      "loadAfter": [
+        6.34912109375,
+        6.69384765625,
+        6.54150390625
+      ],
+      "elapsedMs": 3599,
+      "fixtureDigest": "1093ea081e2916690d7b77d7cd0de3b45251db508d6dd6b86a2d83e0cf25d53b",
+      "validation": [],
+      "samplesNs": [
+        10210250,
+        9907875,
+        10331834,
+        11145917,
+        10563958,
+        10135417,
+        9621167,
+        10388583,
+        9948291,
+        9974375
+      ],
+      "observations": {
+        "stateReads": 116,
+        "stateByKind": {
+          "session": 2,
+          "message": 57,
+          "receipt": 57
+        },
+        "readBytes": 103730,
+        "pageReads": 14,
+        "enumerations": {
+          "metadata/readdir": 4,
+          "metadata/readdirEntries": 74,
+          "events/readdir": 1,
+          "events/readdirEntries": 62
+        }
+      }
+    },
+    {
+      "round": 6,
+      "side": "baseline",
+      "scenarioHash": "d22777295025a18867ade46818e6c5cfa5a19ce7bd80834d889749f7c9cfd9b9",
+      "loadBefore": [
+        6.34912109375,
+        6.69384765625,
+        6.54150390625
+      ],
+      "loadAfter": [
+        6.34912109375,
+        6.69384765625,
+        6.54150390625
+      ],
+      "elapsedMs": 3698,
+      "fixtureDigest": "1093ea081e2916690d7b77d7cd0de3b45251db508d6dd6b86a2d83e0cf25d53b",
+      "validation": [],
+      "samplesNs": [
+        5776834,
+        5678084,
+        5303667,
+        5571083,
+        5422125,
+        5641208,
+        5157791,
+        5256333,
+        5418250,
+        5478625
+      ],
+      "observations": {
+        "stateReads": 68,
+        "stateByKind": {
+          "session": 4,
+          "message": 32,
+          "receipt": 32
+        },
+        "readBytes": 37224,
+        "pageReads": 0,
+        "enumerations": {
+          "metadata/readdir": 4,
+          "metadata/readdirEntries": 72,
+          "events/readdir": 1,
+          "events/readdirEntries": 62
+        }
+      }
+    },
+    {
+      "round": 6,
+      "side": "candidate",
+      "scenarioHash": "d22777295025a18867ade46818e6c5cfa5a19ce7bd80834d889749f7c9cfd9b9",
+      "loadBefore": [
+        6.34912109375,
+        6.69384765625,
+        6.54150390625
+      ],
+      "loadAfter": [
+        6.56103515625,
+        6.73193359375,
+        6.5556640625
+      ],
+      "elapsedMs": 3798,
+      "fixtureDigest": "1093ea081e2916690d7b77d7cd0de3b45251db508d6dd6b86a2d83e0cf25d53b",
+      "validation": [],
+      "samplesNs": [
+        10288042,
+        10014209,
+        9990708,
+        9621125,
+        10815083,
+        9863167,
+        9646208,
+        9403292,
+        9208541,
+        9207458
+      ],
+      "observations": {
+        "stateReads": 116,
+        "stateByKind": {
+          "session": 2,
+          "message": 57,
+          "receipt": 57
+        },
+        "readBytes": 90499,
+        "pageReads": 10,
+        "enumerations": {
+          "metadata/readdir": 4,
+          "metadata/readdirEntries": 74,
+          "events/readdir": 1,
+          "events/readdirEntries": 62
+        }
+      }
+    },
+    {
+      "round": 6,
+      "side": "baseline",
+      "scenarioHash": "a1b4b4b52147e450fe6c461b9d024df99cd2ceecf55f43049d00f5d183eaf77d",
+      "loadBefore": [
+        6.56103515625,
+        6.73193359375,
+        6.5556640625
+      ],
+      "loadAfter": [
+        5.3447265625,
+        6.44091796875,
+        6.455078125
+      ],
+      "elapsedMs": 19977,
+      "fixtureDigest": "34410714f6e2dfa975312d2bc218e89bb0f818344996386fe05864ab6c41f10e",
+      "validation": [],
+      "samplesNs": [
+        32691208,
+        33708584,
+        32214125,
+        32509042,
+        32871042,
+        34494167,
+        33036541,
+        32031167,
+        32531750,
+        32659833
+      ],
+      "observations": {
+        "stateReads": 608,
+        "stateByKind": {
+          "session": 4,
+          "message": 302,
+          "receipt": 302
+        },
+        "readBytes": 300730,
+        "pageReads": 0,
+        "enumerations": {
+          "metadata/readdir": 4,
+          "metadata/readdirEntries": 612,
+          "events/readdir": 1,
+          "events/readdirEntries": 330
+        }
+      }
+    },
+    {
+      "round": 6,
+      "side": "candidate",
+      "scenarioHash": "a1b4b4b52147e450fe6c461b9d024df99cd2ceecf55f43049d00f5d183eaf77d",
+      "loadBefore": [
+        5.3447265625,
+        6.44091796875,
+        6.455078125
+      ],
+      "loadAfter": [
+        4.5078125,
+        6.18359375,
+        6.36181640625
+      ],
+      "elapsedMs": 18973,
+      "fixtureDigest": "34410714f6e2dfa975312d2bc218e89bb0f818344996386fe05864ab6c41f10e",
+      "validation": [],
+      "samplesNs": [
+        5449750,
+        5657209,
+        5591958,
+        5512541,
+        5480666,
+        5448333,
+        5666209,
+        5611458,
+        5677208,
+        5821375
+      ],
+      "observations": {
+        "stateReads": 52,
+        "stateByKind": {
+          "session": 2,
+          "receipt": 25,
+          "message": 25
+        },
+        "readBytes": 35571,
+        "pageReads": 5,
+        "enumerations": {
+          "metadata/readdir": 1,
+          "metadata/readdirEntries": 5,
+          "events/readdir": 1,
+          "events/readdirEntries": 330
+        }
+      }
+    },
+    {
+      "round": 6,
+      "side": "baseline",
+      "scenarioHash": "941b129032377597b2b410b56f35823226bc38fed054d7b1549deabc3957941b",
+      "loadBefore": [
+        4.5078125,
+        6.18359375,
+        6.36181640625
+      ],
+      "loadAfter": [
+        5.09423828125,
+        6.19091796875,
+        6.35888671875
+      ],
+      "elapsedMs": 20483,
+      "fixtureDigest": "34410714f6e2dfa975312d2bc218e89bb0f818344996386fe05864ab6c41f10e",
+      "validation": [],
+      "samplesNs": [
+        32470542,
+        32304666,
+        32477250,
+        32356375,
+        32634583,
+        32513209,
+        32117625,
+        32297667,
+        33370459,
+        34716333
+      ],
+      "observations": {
+        "stateReads": 608,
+        "stateByKind": {
+          "session": 4,
+          "message": 302,
+          "receipt": 302
+        },
+        "readBytes": 300730,
+        "pageReads": 0,
+        "enumerations": {
+          "metadata/readdir": 4,
+          "metadata/readdirEntries": 612,
+          "events/readdir": 1,
+          "events/readdirEntries": 330
+        }
+      }
+    },
+    {
+      "round": 6,
+      "side": "candidate",
+      "scenarioHash": "941b129032377597b2b410b56f35823226bc38fed054d7b1549deabc3957941b",
+      "loadBefore": [
+        5.09423828125,
+        6.19091796875,
+        6.35888671875
+      ],
+      "loadAfter": [
+        5.62060546875,
+        6.267578125,
+        6.38330078125
+      ],
+      "elapsedMs": 21097,
+      "fixtureDigest": "34410714f6e2dfa975312d2bc218e89bb0f818344996386fe05864ab6c41f10e",
+      "validation": [],
+      "samplesNs": [
+        44195041,
+        45507584,
+        45706875,
+        46262041,
+        45284542,
+        45839291,
+        44271333,
+        43513709,
+        43227416,
+        42856334
+      ],
+      "observations": {
+        "stateReads": 656,
+        "stateByKind": {
+          "session": 2,
+          "message": 327,
+          "receipt": 327
+        },
+        "readBytes": 596654,
+        "pageReads": 112,
+        "enumerations": {
+          "metadata/readdir": 4,
+          "metadata/readdirEntries": 614,
+          "events/readdir": 1,
+          "events/readdirEntries": 330
+        }
+      }
+    },
+    {
+      "round": 6,
+      "side": "baseline",
+      "scenarioHash": "e25df55e98bec33e9ca7f9809957d139bc75b1ed9e9a5e263ac05e2c40f3b1fe",
+      "loadBefore": [
+        5.62060546875,
+        6.267578125,
+        6.38330078125
+      ],
+      "loadAfter": [
+        4.8818359375,
+        6.03662109375,
+        6.2958984375
+      ],
+      "elapsedMs": 21324,
+      "fixtureDigest": "34410714f6e2dfa975312d2bc218e89bb0f818344996386fe05864ab6c41f10e",
+      "validation": [],
+      "samplesNs": [
+        33210292,
+        33635458,
+        32880792,
+        34356125,
+        32165000,
+        32476500,
+        33508875,
+        34476417,
+        32911083,
+        33044583
+      ],
+      "observations": {
+        "stateReads": 608,
+        "stateByKind": {
+          "session": 4,
+          "message": 302,
+          "receipt": 302
+        },
+        "readBytes": 300730,
+        "pageReads": 0,
+        "enumerations": {
+          "metadata/readdir": 4,
+          "metadata/readdirEntries": 612,
+          "events/readdir": 1,
+          "events/readdirEntries": 330
+        }
+      }
+    },
+    {
+      "round": 6,
+      "side": "candidate",
+      "scenarioHash": "e25df55e98bec33e9ca7f9809957d139bc75b1ed9e9a5e263ac05e2c40f3b1fe",
+      "loadBefore": [
+        4.8818359375,
+        6.03662109375,
+        6.2958984375
+      ],
+      "loadAfter": [
+        4.27294921875,
+        5.82275390625,
+        6.21240234375
+      ],
+      "elapsedMs": 20956,
+      "fixtureDigest": "34410714f6e2dfa975312d2bc218e89bb0f818344996386fe05864ab6c41f10e",
+      "validation": [],
+      "samplesNs": [
+        44337875,
+        44438666,
+        45177375,
+        43705125,
+        45511584,
+        43491083,
+        44533167,
+        44045417,
+        43624792,
+        43219167
+      ],
+      "observations": {
+        "stateReads": 656,
+        "stateByKind": {
+          "session": 2,
+          "message": 327,
+          "receipt": 327
+        },
+        "readBytes": 597110,
+        "pageReads": 112,
+        "enumerations": {
+          "metadata/readdir": 4,
+          "metadata/readdirEntries": 614,
+          "events/readdir": 1,
+          "events/readdirEntries": 330
+        }
+      }
+    },
+    {
+      "round": 6,
+      "side": "baseline",
+      "scenarioHash": "06e97aed50fa0509269c0f8d795de3bcd005d7fc637cf8f3451349cf30d7e1ec",
+      "loadBefore": [
+        4.27294921875,
+        5.82275390625,
+        6.21240234375
+      ],
+      "loadAfter": [
+        5.3154296875,
+        5.9755859375,
+        6.25830078125
+      ],
+      "elapsedMs": 19665,
+      "fixtureDigest": "34410714f6e2dfa975312d2bc218e89bb0f818344996386fe05864ab6c41f10e",
+      "validation": [],
+      "samplesNs": [
+        33021791,
+        32980167,
+        33280125,
+        32171875,
+        33125208,
+        32608041,
+        33475458,
+        32273167,
+        32461041,
+        32701292
+      ],
+      "observations": {
+        "stateReads": 608,
+        "stateByKind": {
+          "session": 4,
+          "message": 302,
+          "receipt": 302
+        },
+        "readBytes": 300730,
+        "pageReads": 0,
+        "enumerations": {
+          "metadata/readdir": 4,
+          "metadata/readdirEntries": 612,
+          "events/readdir": 1,
+          "events/readdirEntries": 330
+        }
+      }
+    },
+    {
+      "round": 6,
+      "side": "candidate",
+      "scenarioHash": "06e97aed50fa0509269c0f8d795de3bcd005d7fc637cf8f3451349cf30d7e1ec",
+      "loadBefore": [
+        5.3154296875,
+        5.9755859375,
+        6.25830078125
+      ],
+      "loadAfter": [
+        5.57568359375,
+        5.97900390625,
+        6.25146484375
+      ],
+      "elapsedMs": 19635,
+      "fixtureDigest": "34410714f6e2dfa975312d2bc218e89bb0f818344996386fe05864ab6c41f10e",
+      "validation": [],
+      "samplesNs": [
+        44088834,
+        47011250,
+        43936959,
+        43648083,
+        43317333,
+        42605416,
+        43427542,
+        44578167,
+        43584042,
+        43072125
+      ],
+      "observations": {
+        "stateReads": 656,
+        "stateByKind": {
+          "session": 2,
+          "message": 327,
+          "receipt": 327
+        },
+        "readBytes": 592209,
+        "pageReads": 108,
+        "enumerations": {
+          "metadata/readdir": 4,
+          "metadata/readdirEntries": 614,
+          "events/readdir": 1,
+          "events/readdirEntries": 330
+        }
+      }
+    },
+    {
+      "round": 7,
+      "side": "candidate",
+      "scenarioHash": "50c2b85aa8b5c7c5b7fd6cc48f635a1bc1adf1f7db9f37c63087ed4c1d28b812",
+      "loadBefore": [
+        5.57568359375,
+        5.97900390625,
+        6.25146484375
+      ],
+      "loadAfter": [
+        5.57568359375,
+        5.97900390625,
+        6.25146484375
+      ],
+      "elapsedMs": 3309,
+      "fixtureDigest": "1093ea081e2916690d7b77d7cd0de3b45251db508d6dd6b86a2d83e0cf25d53b",
+      "validation": [],
+      "samplesNs": [
+        5907958,
+        5463917,
+        5629417,
+        5760459,
+        5640666,
+        5768959,
+        5442375,
+        5790417,
+        5727333,
+        5619041
+      ],
+      "observations": {
+        "stateReads": 52,
+        "stateByKind": {
+          "session": 2,
+          "receipt": 25,
+          "message": 25
+        },
+        "readBytes": 43757,
+        "pageReads": 5,
+        "enumerations": {
+          "metadata/readdir": 1,
+          "metadata/readdirEntries": 5,
+          "events/readdir": 1,
+          "events/readdirEntries": 62
+        }
+      }
+    },
+    {
+      "round": 7,
+      "side": "baseline",
+      "scenarioHash": "50c2b85aa8b5c7c5b7fd6cc48f635a1bc1adf1f7db9f37c63087ed4c1d28b812",
+      "loadBefore": [
+        5.57568359375,
+        5.97900390625,
+        6.25146484375
+      ],
+      "loadAfter": [
+        5.689453125,
+        5.99560546875,
+        6.25537109375
+      ],
+      "elapsedMs": 3531,
+      "fixtureDigest": "1093ea081e2916690d7b77d7cd0de3b45251db508d6dd6b86a2d83e0cf25d53b",
+      "validation": [],
+      "samplesNs": [
+        5602583,
+        5737583,
+        5439708,
+        5900417,
+        5309583,
+        5294500,
+        5226041,
+        5575875,
+        5288042,
+        5602459
+      ],
+      "observations": {
+        "stateReads": 68,
+        "stateByKind": {
+          "session": 4,
+          "message": 32,
+          "receipt": 32
+        },
+        "readBytes": 37224,
+        "pageReads": 0,
+        "enumerations": {
+          "metadata/readdir": 4,
+          "metadata/readdirEntries": 72,
+          "events/readdir": 1,
+          "events/readdirEntries": 62
+        }
+      }
+    },
+    {
+      "round": 7,
+      "side": "candidate",
+      "scenarioHash": "02ff9cfd3a3cfab2d0550eaa6641be8d022fa01a67430a1d6589bbd70b2a2f27",
+      "loadBefore": [
+        5.689453125,
+        5.99560546875,
+        6.25537109375
+      ],
+      "loadAfter": [
+        5.2333984375,
+        5.89599609375,
+        6.21826171875
+      ],
+      "elapsedMs": 3807,
+      "fixtureDigest": "1093ea081e2916690d7b77d7cd0de3b45251db508d6dd6b86a2d83e0cf25d53b",
+      "validation": [],
+      "samplesNs": [
+        10609292,
+        10224708,
+        10572792,
+        10607750,
+        10294958,
+        10157000,
+        9789958,
+        10283917,
+        10082833,
+        9839000
+      ],
+      "observations": {
+        "stateReads": 116,
+        "stateByKind": {
+          "session": 2,
+          "message": 57,
+          "receipt": 57
+        },
+        "readBytes": 103274,
+        "pageReads": 14,
+        "enumerations": {
+          "metadata/readdir": 4,
+          "metadata/readdirEntries": 74,
+          "events/readdir": 1,
+          "events/readdirEntries": 62
+        }
+      }
+    },
+    {
+      "round": 7,
+      "side": "baseline",
+      "scenarioHash": "02ff9cfd3a3cfab2d0550eaa6641be8d022fa01a67430a1d6589bbd70b2a2f27",
+      "loadBefore": [
+        5.2333984375,
+        5.89599609375,
+        6.21826171875
+      ],
+      "loadAfter": [
+        5.05419921875,
+        5.84765625,
+        6.19921875
+      ],
+      "elapsedMs": 3766,
+      "fixtureDigest": "1093ea081e2916690d7b77d7cd0de3b45251db508d6dd6b86a2d83e0cf25d53b",
+      "validation": [],
+      "samplesNs": [
+        5648042,
+        5593042,
+        5265583,
+        5613417,
+        5388292,
+        5487875,
+        5196625,
+        8425458,
+        5342667,
+        5509542
+      ],
+      "observations": {
+        "stateReads": 68,
+        "stateByKind": {
+          "session": 4,
+          "message": 32,
+          "receipt": 32
+        },
+        "readBytes": 37224,
+        "pageReads": 0,
+        "enumerations": {
+          "metadata/readdir": 4,
+          "metadata/readdirEntries": 72,
+          "events/readdir": 1,
+          "events/readdirEntries": 62
+        }
+      }
+    },
+    {
+      "round": 7,
+      "side": "candidate",
+      "scenarioHash": "eeae1d75d83cc52130e6d36b8af320bde8ce603d80116ccb0cc05963c2432a91",
+      "loadBefore": [
+        5.05419921875,
+        5.84765625,
+        6.19921875
+      ],
+      "loadAfter": [
+        5.05419921875,
+        5.84765625,
+        6.19921875
+      ],
+      "elapsedMs": 3780,
+      "fixtureDigest": "1093ea081e2916690d7b77d7cd0de3b45251db508d6dd6b86a2d83e0cf25d53b",
+      "validation": [],
+      "samplesNs": [
+        10797541,
+        10723125,
+        10962375,
+        10169750,
+        10066167,
+        10020375,
+        9874833,
+        10141417,
+        9974500,
+        9561167
+      ],
+      "observations": {
+        "stateReads": 116,
+        "stateByKind": {
+          "session": 2,
+          "message": 57,
+          "receipt": 57
+        },
+        "readBytes": 103730,
+        "pageReads": 14,
+        "enumerations": {
+          "metadata/readdir": 4,
+          "metadata/readdirEntries": 74,
+          "events/readdir": 1,
+          "events/readdirEntries": 62
+        }
+      }
+    },
+    {
+      "round": 7,
+      "side": "baseline",
+      "scenarioHash": "eeae1d75d83cc52130e6d36b8af320bde8ce603d80116ccb0cc05963c2432a91",
+      "loadBefore": [
+        5.05419921875,
+        5.84765625,
+        6.19921875
+      ],
+      "loadAfter": [
+        4.8095703125,
+        5.78369140625,
+        6.17431640625
+      ],
+      "elapsedMs": 3708,
+      "fixtureDigest": "1093ea081e2916690d7b77d7cd0de3b45251db508d6dd6b86a2d83e0cf25d53b",
+      "validation": [],
+      "samplesNs": [
+        5445875,
+        5711000,
+        5452375,
+        5403166,
+        5532958,
+        5496959,
+        5251958,
+        5651083,
+        5344875,
+        5417875
+      ],
+      "observations": {
+        "stateReads": 68,
+        "stateByKind": {
+          "session": 4,
+          "message": 32,
+          "receipt": 32
+        },
+        "readBytes": 37224,
+        "pageReads": 0,
+        "enumerations": {
+          "metadata/readdir": 4,
+          "metadata/readdirEntries": 72,
+          "events/readdir": 1,
+          "events/readdirEntries": 62
+        }
+      }
+    },
+    {
+      "round": 7,
+      "side": "candidate",
+      "scenarioHash": "d22777295025a18867ade46818e6c5cfa5a19ce7bd80834d889749f7c9cfd9b9",
+      "loadBefore": [
+        4.8095703125,
+        5.78369140625,
+        6.17431640625
+      ],
+      "loadAfter": [
+        4.42431640625,
+        5.6875,
+        6.1376953125
+      ],
+      "elapsedMs": 3845,
+      "fixtureDigest": "1093ea081e2916690d7b77d7cd0de3b45251db508d6dd6b86a2d83e0cf25d53b",
+      "validation": [],
+      "samplesNs": [
+        9942459,
+        10334208,
+        9815541,
+        9558250,
+        10006541,
+        9203583,
+        9514958,
+        9085417,
+        9490958,
+        11271583
+      ],
+      "observations": {
+        "stateReads": 116,
+        "stateByKind": {
+          "session": 2,
+          "message": 57,
+          "receipt": 57
+        },
+        "readBytes": 90499,
+        "pageReads": 10,
+        "enumerations": {
+          "metadata/readdir": 4,
+          "metadata/readdirEntries": 74,
+          "events/readdir": 1,
+          "events/readdirEntries": 62
+        }
+      }
+    },
+    {
+      "round": 7,
+      "side": "baseline",
+      "scenarioHash": "d22777295025a18867ade46818e6c5cfa5a19ce7bd80834d889749f7c9cfd9b9",
+      "loadBefore": [
+        4.42431640625,
+        5.6875,
+        6.1376953125
+      ],
+      "loadAfter": [
+        4.39013671875,
+        5.6591796875,
+        6.125
+      ],
+      "elapsedMs": 3631,
+      "fixtureDigest": "1093ea081e2916690d7b77d7cd0de3b45251db508d6dd6b86a2d83e0cf25d53b",
+      "validation": [],
+      "samplesNs": [
+        5799792,
+        5448417,
+        5801834,
+        5862792,
+        5371208,
+        5471792,
+        5235583,
+        5405042,
+        5848291,
+        5553167
+      ],
+      "observations": {
+        "stateReads": 68,
+        "stateByKind": {
+          "session": 4,
+          "message": 32,
+          "receipt": 32
+        },
+        "readBytes": 37224,
+        "pageReads": 0,
+        "enumerations": {
+          "metadata/readdir": 4,
+          "metadata/readdirEntries": 72,
+          "events/readdir": 1,
+          "events/readdirEntries": 62
+        }
+      }
+    },
+    {
+      "round": 7,
+      "side": "candidate",
+      "scenarioHash": "a1b4b4b52147e450fe6c461b9d024df99cd2ceecf55f43049d00f5d183eaf77d",
+      "loadBefore": [
+        4.39013671875,
+        5.6591796875,
+        6.125
+      ],
+      "loadAfter": [
+        4.82958984375,
+        5.67919921875,
+        6.12109375
+      ],
+      "elapsedMs": 20220,
+      "fixtureDigest": "34410714f6e2dfa975312d2bc218e89bb0f818344996386fe05864ab6c41f10e",
+      "validation": [],
+      "samplesNs": [
+        5577791,
+        5777042,
+        5583417,
+        5788500,
+        5575625,
+        5458875,
+        5347291,
+        5441000,
+        5638167,
+        5638583
+      ],
+      "observations": {
+        "stateReads": 52,
+        "stateByKind": {
+          "session": 2,
+          "receipt": 25,
+          "message": 25
+        },
+        "readBytes": 35571,
+        "pageReads": 5,
+        "enumerations": {
+          "metadata/readdir": 1,
+          "metadata/readdirEntries": 5,
+          "events/readdir": 1,
+          "events/readdirEntries": 330
+        }
+      }
+    },
+    {
+      "round": 7,
+      "side": "baseline",
+      "scenarioHash": "a1b4b4b52147e450fe6c461b9d024df99cd2ceecf55f43049d00f5d183eaf77d",
+      "loadBefore": [
+        4.82958984375,
+        5.67919921875,
+        6.12109375
+      ],
+      "loadAfter": [
+        5.31494140625,
+        5.71875,
+        6.12353515625
+      ],
+      "elapsedMs": 20828,
+      "fixtureDigest": "34410714f6e2dfa975312d2bc218e89bb0f818344996386fe05864ab6c41f10e",
+      "validation": [],
+      "samplesNs": [
+        32710625,
+        32220875,
+        32144625,
+        32282500,
+        32386333,
+        31829334,
+        31968375,
+        32386333,
+        31968167,
+        32047583
+      ],
+      "observations": {
+        "stateReads": 608,
+        "stateByKind": {
+          "session": 4,
+          "message": 302,
+          "receipt": 302
+        },
+        "readBytes": 300730,
+        "pageReads": 0,
+        "enumerations": {
+          "metadata/readdir": 4,
+          "metadata/readdirEntries": 612,
+          "events/readdir": 1,
+          "events/readdirEntries": 330
+        }
+      }
+    },
+    {
+      "round": 7,
+      "side": "candidate",
+      "scenarioHash": "941b129032377597b2b410b56f35823226bc38fed054d7b1549deabc3957941b",
+      "loadBefore": [
+        5.31494140625,
+        5.71875,
+        6.12353515625
+      ],
+      "loadAfter": [
+        4.5537109375,
+        5.52392578125,
+        6.0439453125
+      ],
+      "elapsedMs": 21379,
+      "fixtureDigest": "34410714f6e2dfa975312d2bc218e89bb0f818344996386fe05864ab6c41f10e",
+      "validation": [],
+      "samplesNs": [
+        45596792,
+        44491333,
+        43828334,
+        45089292,
+        44808833,
+        43862500,
+        45900167,
+        44511458,
+        44446459,
+        44041166
+      ],
+      "observations": {
+        "stateReads": 656,
+        "stateByKind": {
+          "session": 2,
+          "message": 327,
+          "receipt": 327
+        },
+        "readBytes": 596654,
+        "pageReads": 112,
+        "enumerations": {
+          "metadata/readdir": 4,
+          "metadata/readdirEntries": 614,
+          "events/readdir": 1,
+          "events/readdirEntries": 330
+        }
+      }
+    },
+    {
+      "round": 7,
+      "side": "baseline",
+      "scenarioHash": "941b129032377597b2b410b56f35823226bc38fed054d7b1549deabc3957941b",
+      "loadBefore": [
+        4.5537109375,
+        5.52392578125,
+        6.0439453125
+      ],
+      "loadAfter": [
+        3.88330078125,
+        5.310546875,
+        5.95458984375
+      ],
+      "elapsedMs": 21821,
+      "fixtureDigest": "34410714f6e2dfa975312d2bc218e89bb0f818344996386fe05864ab6c41f10e",
+      "validation": [],
+      "samplesNs": [
+        33024292,
+        33520166,
+        32606458,
+        31981125,
+        32386584,
+        31986875,
+        33380500,
+        33211167,
+        31928875,
+        32647958
+      ],
+      "observations": {
+        "stateReads": 608,
+        "stateByKind": {
+          "session": 4,
+          "message": 302,
+          "receipt": 302
+        },
+        "readBytes": 300730,
+        "pageReads": 0,
+        "enumerations": {
+          "metadata/readdir": 4,
+          "metadata/readdirEntries": 612,
+          "events/readdir": 1,
+          "events/readdirEntries": 330
+        }
+      }
+    },
+    {
+      "round": 7,
+      "side": "candidate",
+      "scenarioHash": "e25df55e98bec33e9ca7f9809957d139bc75b1ed9e9a5e263ac05e2c40f3b1fe",
+      "loadBefore": [
+        3.88330078125,
+        5.310546875,
+        5.95458984375
+      ],
+      "loadAfter": [
+        3.95068359375,
+        5.2265625,
+        5.908203125
+      ],
+      "elapsedMs": 19253,
+      "fixtureDigest": "34410714f6e2dfa975312d2bc218e89bb0f818344996386fe05864ab6c41f10e",
+      "validation": [],
+      "samplesNs": [
+        45424542,
+        45683625,
+        44958416,
+        45628083,
+        45064750,
+        44626917,
+        45139250,
+        44261583,
+        44921458,
+        44784083
+      ],
+      "observations": {
+        "stateReads": 656,
+        "stateByKind": {
+          "session": 2,
+          "message": 327,
+          "receipt": 327
+        },
+        "readBytes": 597110,
+        "pageReads": 112,
+        "enumerations": {
+          "metadata/readdir": 4,
+          "metadata/readdirEntries": 614,
+          "events/readdir": 1,
+          "events/readdirEntries": 330
+        }
+      }
+    },
+    {
+      "round": 7,
+      "side": "baseline",
+      "scenarioHash": "e25df55e98bec33e9ca7f9809957d139bc75b1ed9e9a5e263ac05e2c40f3b1fe",
+      "loadBefore": [
+        3.95068359375,
+        5.2265625,
+        5.908203125
+      ],
+      "loadAfter": [
+        11.3134765625,
+        6.74462890625,
+        6.42919921875
+      ],
+      "elapsedMs": 21771,
+      "fixtureDigest": "34410714f6e2dfa975312d2bc218e89bb0f818344996386fe05864ab6c41f10e",
+      "validation": [],
+      "samplesNs": [
+        33631042,
+        33065417,
+        32443167,
+        32773917,
+        32052292,
+        37032625,
+        32458750,
+        32516959,
+        33934375,
+        32185250
+      ],
+      "observations": {
+        "stateReads": 608,
+        "stateByKind": {
+          "session": 4,
+          "message": 302,
+          "receipt": 302
+        },
+        "readBytes": 300730,
+        "pageReads": 0,
+        "enumerations": {
+          "metadata/readdir": 4,
+          "metadata/readdirEntries": 612,
+          "events/readdir": 1,
+          "events/readdirEntries": 330
+        }
+      }
+    },
+    {
+      "round": 7,
+      "side": "candidate",
+      "scenarioHash": "06e97aed50fa0509269c0f8d795de3bcd005d7fc637cf8f3451349cf30d7e1ec",
+      "loadBefore": [
+        11.3134765625,
+        6.74462890625,
+        6.42919921875
+      ],
+      "loadAfter": [
+        16.74609375,
+        8.30810546875,
+        6.998046875
+      ],
+      "elapsedMs": 21769,
+      "fixtureDigest": "34410714f6e2dfa975312d2bc218e89bb0f818344996386fe05864ab6c41f10e",
+      "validation": [],
+      "samplesNs": [
+        43478667,
+        47512083,
+        44167458,
+        44098292,
+        45498208,
+        42977375,
+        43652542,
+        42884000,
+        42962250,
+        42394750
+      ],
+      "observations": {
+        "stateReads": 656,
+        "stateByKind": {
+          "session": 2,
+          "message": 327,
+          "receipt": 327
+        },
+        "readBytes": 592209,
+        "pageReads": 108,
+        "enumerations": {
+          "metadata/readdir": 4,
+          "metadata/readdirEntries": 614,
+          "events/readdir": 1,
+          "events/readdirEntries": 330
+        }
+      }
+    },
+    {
+      "round": 7,
+      "side": "baseline",
+      "scenarioHash": "06e97aed50fa0509269c0f8d795de3bcd005d7fc637cf8f3451349cf30d7e1ec",
+      "loadBefore": [
+        16.74609375,
+        8.30810546875,
+        6.998046875
+      ],
+      "loadAfter": [
+        13.45556640625,
+        8.10791015625,
+        6.95703125
+      ],
+      "elapsedMs": 21752,
+      "fixtureDigest": "34410714f6e2dfa975312d2bc218e89bb0f818344996386fe05864ab6c41f10e",
+      "validation": [],
+      "samplesNs": [
+        32495917,
+        32375041,
+        32255583,
+        33499042,
+        32301209,
+        31715417,
+        31946959,
+        32057584,
+        31809875,
+        31923750
+      ],
+      "observations": {
+        "stateReads": 608,
+        "stateByKind": {
+          "session": 4,
+          "message": 302,
+          "receipt": 302
+        },
+        "readBytes": 300730,
+        "pageReads": 0,
+        "enumerations": {
+          "metadata/readdir": 4,
+          "metadata/readdirEntries": 612,
+          "events/readdir": 1,
+          "events/readdirEntries": 330
+        }
+      }
+    },
+    {
+      "round": 8,
+      "side": "baseline",
+      "scenarioHash": "50c2b85aa8b5c7c5b7fd6cc48f635a1bc1adf1f7db9f37c63087ed4c1d28b812",
+      "loadBefore": [
+        13.45556640625,
+        8.10791015625,
+        6.95703125
+      ],
+      "loadAfter": [
+        12.6982421875,
+        8.03955078125,
+        6.939453125
+      ],
+      "elapsedMs": 3848,
+      "fixtureDigest": "1093ea081e2916690d7b77d7cd0de3b45251db508d6dd6b86a2d83e0cf25d53b",
+      "validation": [],
+      "samplesNs": [
+        5506500,
+        5494000,
+        5456250,
+        5717666,
+        5533958,
+        5746375,
+        5544167,
+        5583250,
+        5649875,
+        5363792
+      ],
+      "observations": {
+        "stateReads": 68,
+        "stateByKind": {
+          "session": 4,
+          "message": 32,
+          "receipt": 32
+        },
+        "readBytes": 37224,
+        "pageReads": 0,
+        "enumerations": {
+          "metadata/readdir": 4,
+          "metadata/readdirEntries": 72,
+          "events/readdir": 1,
+          "events/readdirEntries": 62
+        }
+      }
+    },
+    {
+      "round": 8,
+      "side": "candidate",
+      "scenarioHash": "50c2b85aa8b5c7c5b7fd6cc48f635a1bc1adf1f7db9f37c63087ed4c1d28b812",
+      "loadBefore": [
+        12.6982421875,
+        8.03955078125,
+        6.939453125
+      ],
+      "loadAfter": [
+        11.92138671875,
+        7.95556640625,
+        6.916015625
+      ],
+      "elapsedMs": 3737,
+      "fixtureDigest": "1093ea081e2916690d7b77d7cd0de3b45251db508d6dd6b86a2d83e0cf25d53b",
+      "validation": [],
+      "samplesNs": [
+        5996291,
+        5833291,
+        5558750,
+        5930500,
+        5760625,
+        5652875,
+        5536542,
+        5492666,
+        5597041,
+        5397417
+      ],
+      "observations": {
+        "stateReads": 52,
+        "stateByKind": {
+          "session": 2,
+          "receipt": 25,
+          "message": 25
+        },
+        "readBytes": 43757,
+        "pageReads": 5,
+        "enumerations": {
+          "metadata/readdir": 1,
+          "metadata/readdirEntries": 5,
+          "events/readdir": 1,
+          "events/readdirEntries": 62
+        }
+      }
+    },
+    {
+      "round": 8,
+      "side": "baseline",
+      "scenarioHash": "02ff9cfd3a3cfab2d0550eaa6641be8d022fa01a67430a1d6589bbd70b2a2f27",
+      "loadBefore": [
+        11.92138671875,
+        7.95556640625,
+        6.916015625
+      ],
+      "loadAfter": [
+        11.20654296875,
+        7.873046875,
+        6.89306640625
+      ],
+      "elapsedMs": 3716,
+      "fixtureDigest": "1093ea081e2916690d7b77d7cd0de3b45251db508d6dd6b86a2d83e0cf25d53b",
+      "validation": [],
+      "samplesNs": [
+        6289416,
+        6247083,
+        6035833,
+        5544917,
+        5385167,
+        5485750,
+        5395375,
+        5470583,
+        5238167,
+        5612625
+      ],
+      "observations": {
+        "stateReads": 68,
+        "stateByKind": {
+          "session": 4,
+          "message": 32,
+          "receipt": 32
+        },
+        "readBytes": 37224,
+        "pageReads": 0,
+        "enumerations": {
+          "metadata/readdir": 4,
+          "metadata/readdirEntries": 72,
+          "events/readdir": 1,
+          "events/readdirEntries": 62
+        }
+      }
+    },
+    {
+      "round": 8,
+      "side": "candidate",
+      "scenarioHash": "02ff9cfd3a3cfab2d0550eaa6641be8d022fa01a67430a1d6589bbd70b2a2f27",
+      "loadBefore": [
+        11.20654296875,
+        7.873046875,
+        6.89306640625
+      ],
+      "loadAfter": [
+        11.20654296875,
+        7.873046875,
+        6.89306640625
+      ],
+      "elapsedMs": 3933,
+      "fixtureDigest": "1093ea081e2916690d7b77d7cd0de3b45251db508d6dd6b86a2d83e0cf25d53b",
+      "validation": [],
+      "samplesNs": [
+        10755292,
+        10584542,
+        10664500,
+        9989959,
+        10467708,
+        10212375,
+        10019291,
+        10035875,
+        9865959,
+        9896333
+      ],
+      "observations": {
+        "stateReads": 116,
+        "stateByKind": {
+          "session": 2,
+          "message": 57,
+          "receipt": 57
+        },
+        "readBytes": 103274,
+        "pageReads": 14,
+        "enumerations": {
+          "metadata/readdir": 4,
+          "metadata/readdirEntries": 74,
+          "events/readdir": 1,
+          "events/readdirEntries": 62
+        }
+      }
+    },
+    {
+      "round": 8,
+      "side": "baseline",
+      "scenarioHash": "eeae1d75d83cc52130e6d36b8af320bde8ce603d80116ccb0cc05963c2432a91",
+      "loadBefore": [
+        11.20654296875,
+        7.873046875,
+        6.89306640625
+      ],
+      "loadAfter": [
+        10.54931640625,
+        7.7919921875,
+        6.8701171875
+      ],
+      "elapsedMs": 3740,
+      "fixtureDigest": "1093ea081e2916690d7b77d7cd0de3b45251db508d6dd6b86a2d83e0cf25d53b",
+      "validation": [],
+      "samplesNs": [
+        5639000,
+        5706375,
+        5433209,
+        5632875,
+        5566792,
+        5525167,
+        5317167,
+        5531667,
+        5520708,
+        5268000
+      ],
+      "observations": {
+        "stateReads": 68,
+        "stateByKind": {
+          "session": 4,
+          "message": 32,
+          "receipt": 32
+        },
+        "readBytes": 37224,
+        "pageReads": 0,
+        "enumerations": {
+          "metadata/readdir": 4,
+          "metadata/readdirEntries": 72,
+          "events/readdir": 1,
+          "events/readdirEntries": 62
+        }
+      }
+    },
+    {
+      "round": 8,
+      "side": "candidate",
+      "scenarioHash": "eeae1d75d83cc52130e6d36b8af320bde8ce603d80116ccb0cc05963c2432a91",
+      "loadBefore": [
+        10.54931640625,
+        7.7919921875,
+        6.8701171875
+      ],
+      "loadAfter": [
+        10.2646484375,
+        7.77880859375,
+        6.87060546875
+      ],
+      "elapsedMs": 3853,
+      "fixtureDigest": "1093ea081e2916690d7b77d7cd0de3b45251db508d6dd6b86a2d83e0cf25d53b",
+      "validation": [],
+      "samplesNs": [
+        10409875,
+        10404750,
+        10556875,
+        10185458,
+        9905500,
+        9753042,
+        10433416,
+        10326959,
+        10221458,
+        9792750
+      ],
+      "observations": {
+        "stateReads": 116,
+        "stateByKind": {
+          "session": 2,
+          "message": 57,
+          "receipt": 57
+        },
+        "readBytes": 103730,
+        "pageReads": 14,
+        "enumerations": {
+          "metadata/readdir": 4,
+          "metadata/readdirEntries": 74,
+          "events/readdir": 1,
+          "events/readdirEntries": 62
+        }
+      }
+    },
+    {
+      "round": 8,
+      "side": "baseline",
+      "scenarioHash": "d22777295025a18867ade46818e6c5cfa5a19ce7bd80834d889749f7c9cfd9b9",
+      "loadBefore": [
+        10.2646484375,
+        7.77880859375,
+        6.87060546875
+      ],
+      "loadAfter": [
+        9.7626953125,
+        7.7158203125,
+        6.853515625
+      ],
+      "elapsedMs": 3732,
+      "fixtureDigest": "1093ea081e2916690d7b77d7cd0de3b45251db508d6dd6b86a2d83e0cf25d53b",
+      "validation": [],
+      "samplesNs": [
+        5722084,
+        5627834,
+        5516458,
+        5428292,
+        5341000,
+        5477709,
+        5265958,
+        5190500,
+        5603708,
+        5458208
+      ],
+      "observations": {
+        "stateReads": 68,
+        "stateByKind": {
+          "session": 4,
+          "message": 32,
+          "receipt": 32
+        },
+        "readBytes": 37224,
+        "pageReads": 0,
+        "enumerations": {
+          "metadata/readdir": 4,
+          "metadata/readdirEntries": 72,
+          "events/readdir": 1,
+          "events/readdirEntries": 62
+        }
+      }
+    },
+    {
+      "round": 8,
+      "side": "candidate",
+      "scenarioHash": "d22777295025a18867ade46818e6c5cfa5a19ce7bd80834d889749f7c9cfd9b9",
+      "loadBefore": [
+        9.7626953125,
+        7.7158203125,
+        6.853515625
+      ],
+      "loadAfter": [
+        9.7626953125,
+        7.7158203125,
+        6.853515625
+      ],
+      "elapsedMs": 3755,
+      "fixtureDigest": "1093ea081e2916690d7b77d7cd0de3b45251db508d6dd6b86a2d83e0cf25d53b",
+      "validation": [],
+      "samplesNs": [
+        9793959,
+        10603875,
+        9904333,
+        9939833,
+        9890833,
+        9459291,
+        9552458,
+        9841500,
+        9635709,
+        9675417
+      ],
+      "observations": {
+        "stateReads": 116,
+        "stateByKind": {
+          "session": 2,
+          "message": 57,
+          "receipt": 57
+        },
+        "readBytes": 90499,
+        "pageReads": 10,
+        "enumerations": {
+          "metadata/readdir": 4,
+          "metadata/readdirEntries": 74,
+          "events/readdir": 1,
+          "events/readdirEntries": 62
+        }
+      }
+    },
+    {
+      "round": 8,
+      "side": "baseline",
+      "scenarioHash": "a1b4b4b52147e450fe6c461b9d024df99cd2ceecf55f43049d00f5d183eaf77d",
+      "loadBefore": [
+        9.7626953125,
+        7.7158203125,
+        6.853515625
+      ],
+      "loadAfter": [
+        8.23046875,
+        7.52587890625,
+        6.81005859375
+      ],
+      "elapsedMs": 21377,
+      "fixtureDigest": "34410714f6e2dfa975312d2bc218e89bb0f818344996386fe05864ab6c41f10e",
+      "validation": [],
+      "samplesNs": [
+        33430166,
+        33049709,
+        32588791,
+        32637750,
+        33198541,
+        32370625,
+        32809750,
+        33271875,
+        32425000,
+        32694042
+      ],
+      "observations": {
+        "stateReads": 608,
+        "stateByKind": {
+          "session": 4,
+          "message": 302,
+          "receipt": 302
+        },
+        "readBytes": 300730,
+        "pageReads": 0,
+        "enumerations": {
+          "metadata/readdir": 4,
+          "metadata/readdirEntries": 612,
+          "events/readdir": 1,
+          "events/readdirEntries": 330
+        }
+      }
+    },
+    {
+      "round": 8,
+      "side": "candidate",
+      "scenarioHash": "a1b4b4b52147e450fe6c461b9d024df99cd2ceecf55f43049d00f5d183eaf77d",
+      "loadBefore": [
+        8.23046875,
+        7.52587890625,
+        6.81005859375
+      ],
+      "loadAfter": [
+        7.3505859375,
+        7.37646484375,
+        6.77294921875
+      ],
+      "elapsedMs": 20234,
+      "fixtureDigest": "34410714f6e2dfa975312d2bc218e89bb0f818344996386fe05864ab6c41f10e",
+      "validation": [],
+      "samplesNs": [
+        8061666,
+        8279500,
+        8748667,
+        6557500,
+        5531792,
+        6592292,
+        5822750,
+        5783083,
+        9685958,
+        5828208
+      ],
+      "observations": {
+        "stateReads": 52,
+        "stateByKind": {
+          "session": 2,
+          "receipt": 25,
+          "message": 25
+        },
+        "readBytes": 35571,
+        "pageReads": 5,
+        "enumerations": {
+          "metadata/readdir": 1,
+          "metadata/readdirEntries": 5,
+          "events/readdir": 1,
+          "events/readdirEntries": 330
+        }
+      }
+    },
+    {
+      "round": 8,
+      "side": "baseline",
+      "scenarioHash": "941b129032377597b2b410b56f35823226bc38fed054d7b1549deabc3957941b",
+      "loadBefore": [
+        7.3505859375,
+        7.37646484375,
+        6.77294921875
+      ],
+      "loadAfter": [
+        7.27099609375,
+        7.3525390625,
+        6.77734375
+      ],
+      "elapsedMs": 20990,
+      "fixtureDigest": "34410714f6e2dfa975312d2bc218e89bb0f818344996386fe05864ab6c41f10e",
+      "validation": [],
+      "samplesNs": [
+        32816666,
+        32969083,
+        33115084,
+        32568791,
+        32484667,
+        32802125,
+        33232042,
+        32302042,
+        31883875,
+        32713167
+      ],
+      "observations": {
+        "stateReads": 608,
+        "stateByKind": {
+          "session": 4,
+          "message": 302,
+          "receipt": 302
+        },
+        "readBytes": 300730,
+        "pageReads": 0,
+        "enumerations": {
+          "metadata/readdir": 4,
+          "metadata/readdirEntries": 612,
+          "events/readdir": 1,
+          "events/readdirEntries": 330
+        }
+      }
+    },
+    {
+      "round": 8,
+      "side": "candidate",
+      "scenarioHash": "941b129032377597b2b410b56f35823226bc38fed054d7b1549deabc3957941b",
+      "loadBefore": [
+        7.27099609375,
+        7.3525390625,
+        6.77734375
+      ],
+      "loadAfter": [
+        6.06640625,
+        7.06982421875,
+        6.6884765625
+      ],
+      "elapsedMs": 20864,
+      "fixtureDigest": "34410714f6e2dfa975312d2bc218e89bb0f818344996386fe05864ab6c41f10e",
+      "validation": [],
+      "samplesNs": [
+        43553375,
+        43679958,
+        44140542,
+        45111166,
+        44925959,
+        43502042,
+        43568666,
+        43502209,
+        44868417,
+        43073166
+      ],
+      "observations": {
+        "stateReads": 656,
+        "stateByKind": {
+          "session": 2,
+          "message": 327,
+          "receipt": 327
+        },
+        "readBytes": 596654,
+        "pageReads": 112,
+        "enumerations": {
+          "metadata/readdir": 4,
+          "metadata/readdirEntries": 614,
+          "events/readdir": 1,
+          "events/readdirEntries": 330
+        }
+      }
+    },
+    {
+      "round": 8,
+      "side": "baseline",
+      "scenarioHash": "e25df55e98bec33e9ca7f9809957d139bc75b1ed9e9a5e263ac05e2c40f3b1fe",
+      "loadBefore": [
+        6.06640625,
+        7.06982421875,
+        6.6884765625
+      ],
+      "loadAfter": [
+        5.4609375,
+        6.869140625,
+        6.62451171875
+      ],
+      "elapsedMs": 20725,
+      "fixtureDigest": "34410714f6e2dfa975312d2bc218e89bb0f818344996386fe05864ab6c41f10e",
+      "validation": [],
+      "samplesNs": [
+        32901625,
+        32304083,
+        32824042,
+        32934292,
+        32918708,
+        32604584,
+        32236959,
+        32454167,
+        32112917,
+        32721125
+      ],
+      "observations": {
+        "stateReads": 608,
+        "stateByKind": {
+          "session": 4,
+          "message": 302,
+          "receipt": 302
+        },
+        "readBytes": 300730,
+        "pageReads": 0,
+        "enumerations": {
+          "metadata/readdir": 4,
+          "metadata/readdirEntries": 612,
+          "events/readdir": 1,
+          "events/readdirEntries": 330
+        }
+      }
+    },
+    {
+      "round": 8,
+      "side": "candidate",
+      "scenarioHash": "e25df55e98bec33e9ca7f9809957d139bc75b1ed9e9a5e263ac05e2c40f3b1fe",
+      "loadBefore": [
+        5.4609375,
+        6.869140625,
+        6.62451171875
+      ],
+      "loadAfter": [
+        4.619140625,
+        6.58544921875,
+        6.52783203125
+      ],
+      "elapsedMs": 20720,
+      "fixtureDigest": "34410714f6e2dfa975312d2bc218e89bb0f818344996386fe05864ab6c41f10e",
+      "validation": [],
+      "samplesNs": [
+        43913000,
+        45297416,
+        43949500,
+        44810791,
+        44645500,
+        43796625,
+        44413875,
+        45655750,
+        43382375,
+        42630416
+      ],
+      "observations": {
+        "stateReads": 656,
+        "stateByKind": {
+          "session": 2,
+          "message": 327,
+          "receipt": 327
+        },
+        "readBytes": 597110,
+        "pageReads": 112,
+        "enumerations": {
+          "metadata/readdir": 4,
+          "metadata/readdirEntries": 614,
+          "events/readdir": 1,
+          "events/readdirEntries": 330
+        }
+      }
+    },
+    {
+      "round": 8,
+      "side": "baseline",
+      "scenarioHash": "06e97aed50fa0509269c0f8d795de3bcd005d7fc637cf8f3451349cf30d7e1ec",
+      "loadBefore": [
+        4.619140625,
+        6.58544921875,
+        6.52783203125
+      ],
+      "loadAfter": [
+        3.74658203125,
+        6.21728515625,
+        6.3955078125
+      ],
+      "elapsedMs": 21739,
+      "fixtureDigest": "34410714f6e2dfa975312d2bc218e89bb0f818344996386fe05864ab6c41f10e",
+      "validation": [],
+      "samplesNs": [
+        33153583,
+        32923167,
+        32411250,
+        31871042,
+        32338500,
+        32558000,
+        32345917,
+        32030459,
+        32421042,
+        32511084
+      ],
+      "observations": {
+        "stateReads": 608,
+        "stateByKind": {
+          "session": 4,
+          "message": 302,
+          "receipt": 302
+        },
+        "readBytes": 300730,
+        "pageReads": 0,
+        "enumerations": {
+          "metadata/readdir": 4,
+          "metadata/readdirEntries": 612,
+          "events/readdir": 1,
+          "events/readdirEntries": 330
+        }
+      }
+    },
+    {
+      "round": 8,
+      "side": "candidate",
+      "scenarioHash": "06e97aed50fa0509269c0f8d795de3bcd005d7fc637cf8f3451349cf30d7e1ec",
+      "loadBefore": [
+        3.74658203125,
+        6.21728515625,
+        6.3955078125
+      ],
+      "loadAfter": [
+        3.62548828125,
+        6.025390625,
+        6.32177734375
+      ],
+      "elapsedMs": 21787,
+      "fixtureDigest": "34410714f6e2dfa975312d2bc218e89bb0f818344996386fe05864ab6c41f10e",
+      "validation": [],
+      "samplesNs": [
+        43965875,
+        46304250,
+        43557000,
+        42975750,
+        42991041,
+        43832916,
+        43159375,
+        42612375,
+        42225416,
+        43918083
+      ],
+      "observations": {
+        "stateReads": 656,
+        "stateByKind": {
+          "session": 2,
+          "message": 327,
+          "receipt": 327
+        },
+        "readBytes": 592209,
+        "pageReads": 108,
+        "enumerations": {
+          "metadata/readdir": 4,
+          "metadata/readdirEntries": 614,
+          "events/readdir": 1,
+          "events/readdirEntries": 330
+        }
+      }
+    },
+    {
+      "round": 9,
+      "side": "candidate",
+      "scenarioHash": "50c2b85aa8b5c7c5b7fd6cc48f635a1bc1adf1f7db9f37c63087ed4c1d28b812",
+      "loadBefore": [
+        3.62548828125,
+        6.025390625,
+        6.32177734375
+      ],
+      "loadAfter": [
+        3.5751953125,
+        5.97509765625,
+        6.30224609375
+      ],
+      "elapsedMs": 3731,
+      "fixtureDigest": "1093ea081e2916690d7b77d7cd0de3b45251db508d6dd6b86a2d83e0cf25d53b",
+      "validation": [],
+      "samplesNs": [
+        5657166,
+        5987459,
+        6176125,
+        5740042,
+        5470000,
+        6066541,
+        6392791,
+        5553083,
+        5369417,
+        5622250
+      ],
+      "observations": {
+        "stateReads": 52,
+        "stateByKind": {
+          "session": 2,
+          "receipt": 25,
+          "message": 25
+        },
+        "readBytes": 43757,
+        "pageReads": 5,
+        "enumerations": {
+          "metadata/readdir": 1,
+          "metadata/readdirEntries": 5,
+          "events/readdir": 1,
+          "events/readdirEntries": 62
+        }
+      }
+    },
+    {
+      "round": 9,
+      "side": "baseline",
+      "scenarioHash": "50c2b85aa8b5c7c5b7fd6cc48f635a1bc1adf1f7db9f37c63087ed4c1d28b812",
+      "loadBefore": [
+        3.5751953125,
+        5.97509765625,
+        6.30224609375
+      ],
+      "loadAfter": [
+        3.5751953125,
+        5.97509765625,
+        6.30224609375
+      ],
+      "elapsedMs": 3695,
+      "fixtureDigest": "1093ea081e2916690d7b77d7cd0de3b45251db508d6dd6b86a2d83e0cf25d53b",
+      "validation": [],
+      "samplesNs": [
+        5473042,
+        5630917,
+        5243334,
+        5476875,
+        5597041,
+        5644959,
+        5297084,
+        5124583,
+        5492208,
+        5472417
+      ],
+      "observations": {
+        "stateReads": 68,
+        "stateByKind": {
+          "session": 4,
+          "message": 32,
+          "receipt": 32
+        },
+        "readBytes": 37224,
+        "pageReads": 0,
+        "enumerations": {
+          "metadata/readdir": 4,
+          "metadata/readdirEntries": 72,
+          "events/readdir": 1,
+          "events/readdirEntries": 62
+        }
+      }
+    },
+    {
+      "round": 9,
+      "side": "candidate",
+      "scenarioHash": "02ff9cfd3a3cfab2d0550eaa6641be8d022fa01a67430a1d6589bbd70b2a2f27",
+      "loadBefore": [
+        3.5751953125,
+        5.97509765625,
+        6.30224609375
+      ],
+      "loadAfter": [
+        3.44873046875,
+        5.90869140625,
+        6.27685546875
+      ],
+      "elapsedMs": 3915,
+      "fixtureDigest": "1093ea081e2916690d7b77d7cd0de3b45251db508d6dd6b86a2d83e0cf25d53b",
+      "validation": [],
+      "samplesNs": [
+        10568000,
+        10409042,
+        10739375,
+        10060625,
+        10044209,
+        9931042,
+        10133416,
+        10140125,
+        10177167,
+        9909250
+      ],
+      "observations": {
+        "stateReads": 116,
+        "stateByKind": {
+          "session": 2,
+          "message": 57,
+          "receipt": 57
+        },
+        "readBytes": 103274,
+        "pageReads": 14,
+        "enumerations": {
+          "metadata/readdir": 4,
+          "metadata/readdirEntries": 74,
+          "events/readdir": 1,
+          "events/readdirEntries": 62
+        }
+      }
+    },
+    {
+      "round": 9,
+      "side": "baseline",
+      "scenarioHash": "02ff9cfd3a3cfab2d0550eaa6641be8d022fa01a67430a1d6589bbd70b2a2f27",
+      "loadBefore": [
+        3.44873046875,
+        5.90869140625,
+        6.27685546875
+      ],
+      "loadAfter": [
+        3.49267578125,
+        5.876953125,
+        6.26318359375
+      ],
+      "elapsedMs": 3739,
+      "fixtureDigest": "1093ea081e2916690d7b77d7cd0de3b45251db508d6dd6b86a2d83e0cf25d53b",
+      "validation": [],
+      "samplesNs": [
+        5793292,
+        5645833,
+        5404167,
+        5406875,
+        5497208,
+        5451166,
+        5294958,
+        5615292,
+        5340583,
+        5221417
+      ],
+      "observations": {
+        "stateReads": 68,
+        "stateByKind": {
+          "session": 4,
+          "message": 32,
+          "receipt": 32
+        },
+        "readBytes": 37224,
+        "pageReads": 0,
+        "enumerations": {
+          "metadata/readdir": 4,
+          "metadata/readdirEntries": 72,
+          "events/readdir": 1,
+          "events/readdirEntries": 62
+        }
+      }
+    },
+    {
+      "round": 9,
+      "side": "candidate",
+      "scenarioHash": "eeae1d75d83cc52130e6d36b8af320bde8ce603d80116ccb0cc05963c2432a91",
+      "loadBefore": [
+        3.49267578125,
+        5.876953125,
+        6.26318359375
+      ],
+      "loadAfter": [
+        3.533203125,
+        5.845703125,
+        6.24951171875
+      ],
+      "elapsedMs": 3842,
+      "fixtureDigest": "1093ea081e2916690d7b77d7cd0de3b45251db508d6dd6b86a2d83e0cf25d53b",
+      "validation": [],
+      "samplesNs": [
+        11077583,
+        10529250,
+        10288584,
+        10594750,
+        11673625,
+        10228541,
+        10312291,
+        10229709,
+        10231542,
+        10186542
+      ],
+      "observations": {
+        "stateReads": 116,
+        "stateByKind": {
+          "session": 2,
+          "message": 57,
+          "receipt": 57
+        },
+        "readBytes": 103730,
+        "pageReads": 14,
+        "enumerations": {
+          "metadata/readdir": 4,
+          "metadata/readdirEntries": 74,
+          "events/readdir": 1,
+          "events/readdirEntries": 62
+        }
+      }
+    },
+    {
+      "round": 9,
+      "side": "baseline",
+      "scenarioHash": "eeae1d75d83cc52130e6d36b8af320bde8ce603d80116ccb0cc05963c2432a91",
+      "loadBefore": [
+        3.533203125,
+        5.845703125,
+        6.24951171875
+      ],
+      "loadAfter": [
+        3.970703125,
+        5.89794921875,
+        6.265625
+      ],
+      "elapsedMs": 3788,
+      "fixtureDigest": "1093ea081e2916690d7b77d7cd0de3b45251db508d6dd6b86a2d83e0cf25d53b",
+      "validation": [],
+      "samplesNs": [
+        6029750,
+        5971708,
+        5779375,
+        6054000,
+        5936916,
+        5815416,
+        6647750,
+        5923750,
+        6506041,
+        6238625
+      ],
+      "observations": {
+        "stateReads": 68,
+        "stateByKind": {
+          "session": 4,
+          "message": 32,
+          "receipt": 32
+        },
+        "readBytes": 37224,
+        "pageReads": 0,
+        "enumerations": {
+          "metadata/readdir": 4,
+          "metadata/readdirEntries": 72,
+          "events/readdir": 1,
+          "events/readdirEntries": 62
+        }
+      }
+    },
+    {
+      "round": 9,
+      "side": "candidate",
+      "scenarioHash": "d22777295025a18867ade46818e6c5cfa5a19ce7bd80834d889749f7c9cfd9b9",
+      "loadBefore": [
+        3.970703125,
+        5.89794921875,
+        6.265625
+      ],
+      "loadAfter": [
+        3.970703125,
+        5.89794921875,
+        6.265625
+      ],
+      "elapsedMs": 3907,
+      "fixtureDigest": "1093ea081e2916690d7b77d7cd0de3b45251db508d6dd6b86a2d83e0cf25d53b",
+      "validation": [],
+      "samplesNs": [
+        10685375,
+        10731750,
+        10398542,
+        10363750,
+        10101667,
+        10169667,
+        10206584,
+        9867959,
+        10380125,
+        9861416
+      ],
+      "observations": {
+        "stateReads": 116,
+        "stateByKind": {
+          "session": 2,
+          "message": 57,
+          "receipt": 57
+        },
+        "readBytes": 90499,
+        "pageReads": 10,
+        "enumerations": {
+          "metadata/readdir": 4,
+          "metadata/readdirEntries": 74,
+          "events/readdir": 1,
+          "events/readdirEntries": 62
+        }
+      }
+    },
+    {
+      "round": 9,
+      "side": "baseline",
+      "scenarioHash": "d22777295025a18867ade46818e6c5cfa5a19ce7bd80834d889749f7c9cfd9b9",
+      "loadBefore": [
+        3.970703125,
+        5.89794921875,
+        6.265625
+      ],
+      "loadAfter": [
+        3.8125,
+        5.8330078125,
+        6.240234375
+      ],
+      "elapsedMs": 3914,
+      "fixtureDigest": "1093ea081e2916690d7b77d7cd0de3b45251db508d6dd6b86a2d83e0cf25d53b",
+      "validation": [],
+      "samplesNs": [
+        6083000,
+        6383166,
+        5947291,
+        6075334,
+        6340166,
+        6280959,
+        5588708,
+        5840708,
+        6176708,
+        5648209
+      ],
+      "observations": {
+        "stateReads": 68,
+        "stateByKind": {
+          "session": 4,
+          "message": 32,
+          "receipt": 32
+        },
+        "readBytes": 37224,
+        "pageReads": 0,
+        "enumerations": {
+          "metadata/readdir": 4,
+          "metadata/readdirEntries": 72,
+          "events/readdir": 1,
+          "events/readdirEntries": 62
+        }
+      }
+    },
+    {
+      "round": 9,
+      "side": "candidate",
+      "scenarioHash": "a1b4b4b52147e450fe6c461b9d024df99cd2ceecf55f43049d00f5d183eaf77d",
+      "loadBefore": [
+        3.8125,
+        5.8330078125,
+        6.240234375
+      ],
+      "loadAfter": [
+        4.91259765625,
+        5.92919921875,
+        6.263671875
+      ],
+      "elapsedMs": 19946,
+      "fixtureDigest": "34410714f6e2dfa975312d2bc218e89bb0f818344996386fe05864ab6c41f10e",
+      "validation": [],
+      "samplesNs": [
+        5678208,
+        6657583,
+        5953708,
+        5901792,
+        5541458,
+        5522125,
+        5453917,
+        5708208,
+        5733084,
+        5477750
+      ],
+      "observations": {
+        "stateReads": 52,
+        "stateByKind": {
+          "session": 2,
+          "receipt": 25,
+          "message": 25
+        },
+        "readBytes": 35571,
+        "pageReads": 5,
+        "enumerations": {
+          "metadata/readdir": 1,
+          "metadata/readdirEntries": 5,
+          "events/readdir": 1,
+          "events/readdirEntries": 330
+        }
+      }
+    },
+    {
+      "round": 9,
+      "side": "baseline",
+      "scenarioHash": "a1b4b4b52147e450fe6c461b9d024df99cd2ceecf55f43049d00f5d183eaf77d",
+      "loadBefore": [
+        4.91259765625,
+        5.92919921875,
+        6.263671875
+      ],
+      "loadAfter": [
+        5.107421875,
+        5.91552734375,
+        6.25048828125
+      ],
+      "elapsedMs": 20710,
+      "fixtureDigest": "34410714f6e2dfa975312d2bc218e89bb0f818344996386fe05864ab6c41f10e",
+      "validation": [],
+      "samplesNs": [
+        33065250,
+        32768334,
+        32363291,
+        32333083,
+        32109250,
+        32484000,
+        33703625,
+        31872334,
+        32497000,
+        33928333
+      ],
+      "observations": {
+        "stateReads": 608,
+        "stateByKind": {
+          "session": 4,
+          "message": 302,
+          "receipt": 302
+        },
+        "readBytes": 300730,
+        "pageReads": 0,
+        "enumerations": {
+          "metadata/readdir": 4,
+          "metadata/readdirEntries": 612,
+          "events/readdir": 1,
+          "events/readdirEntries": 330
+        }
+      }
+    },
+    {
+      "round": 9,
+      "side": "candidate",
+      "scenarioHash": "941b129032377597b2b410b56f35823226bc38fed054d7b1549deabc3957941b",
+      "loadBefore": [
+        5.107421875,
+        5.91552734375,
+        6.25048828125
+      ],
+      "loadAfter": [
+        4.91357421875,
+        5.80908203125,
+        6.203125
+      ],
+      "elapsedMs": 20538,
+      "fixtureDigest": "34410714f6e2dfa975312d2bc218e89bb0f818344996386fe05864ab6c41f10e",
+      "validation": [],
+      "samplesNs": [
+        43761000,
+        44287084,
+        44587083,
+        42861708,
+        46133708,
+        44686792,
+        44082125,
+        45682250,
+        42816458,
+        44338208
+      ],
+      "observations": {
+        "stateReads": 656,
+        "stateByKind": {
+          "session": 2,
+          "message": 327,
+          "receipt": 327
+        },
+        "readBytes": 596654,
+        "pageReads": 112,
+        "enumerations": {
+          "metadata/readdir": 4,
+          "metadata/readdirEntries": 614,
+          "events/readdir": 1,
+          "events/readdirEntries": 330
+        }
+      }
+    },
+    {
+      "round": 9,
+      "side": "baseline",
+      "scenarioHash": "941b129032377597b2b410b56f35823226bc38fed054d7b1549deabc3957941b",
+      "loadBefore": [
+        4.91357421875,
+        5.80908203125,
+        6.203125
+      ],
+      "loadAfter": [
+        5.21435546875,
+        5.8203125,
+        6.1953125
+      ],
+      "elapsedMs": 21416,
+      "fixtureDigest": "34410714f6e2dfa975312d2bc218e89bb0f818344996386fe05864ab6c41f10e",
+      "validation": [],
+      "samplesNs": [
+        34528709,
+        33852125,
+        32123208,
+        32512584,
+        32339083,
+        32268208,
+        32422834,
+        32123667,
+        32037917,
+        31496834
+      ],
+      "observations": {
+        "stateReads": 608,
+        "stateByKind": {
+          "session": 4,
+          "message": 302,
+          "receipt": 302
+        },
+        "readBytes": 300730,
+        "pageReads": 0,
+        "enumerations": {
+          "metadata/readdir": 4,
+          "metadata/readdirEntries": 612,
+          "events/readdir": 1,
+          "events/readdirEntries": 330
+        }
+      }
+    },
+    {
+      "round": 9,
+      "side": "candidate",
+      "scenarioHash": "e25df55e98bec33e9ca7f9809957d139bc75b1ed9e9a5e263ac05e2c40f3b1fe",
+      "loadBefore": [
+        5.21435546875,
+        5.8203125,
+        6.1953125
+      ],
+      "loadAfter": [
+        5.6044921875,
+        5.86474609375,
+        6.20166015625
+      ],
+      "elapsedMs": 19955,
+      "fixtureDigest": "34410714f6e2dfa975312d2bc218e89bb0f818344996386fe05864ab6c41f10e",
+      "validation": [],
+      "samplesNs": [
+        46748375,
+        45338625,
+        44415542,
+        44754375,
+        45268750,
+        44477000,
+        44959583,
+        44349125,
+        44330375,
+        43892000
+      ],
+      "observations": {
+        "stateReads": 656,
+        "stateByKind": {
+          "session": 2,
+          "message": 327,
+          "receipt": 327
+        },
+        "readBytes": 597110,
+        "pageReads": 112,
+        "enumerations": {
+          "metadata/readdir": 4,
+          "metadata/readdirEntries": 614,
+          "events/readdir": 1,
+          "events/readdirEntries": 330
+        }
+      }
+    },
+    {
+      "round": 9,
+      "side": "baseline",
+      "scenarioHash": "e25df55e98bec33e9ca7f9809957d139bc75b1ed9e9a5e263ac05e2c40f3b1fe",
+      "loadBefore": [
+        5.6044921875,
+        5.86474609375,
+        6.20166015625
+      ],
+      "loadAfter": [
+        4.8251953125,
+        5.66357421875,
+        6.12060546875
+      ],
+      "elapsedMs": 21236,
+      "fixtureDigest": "34410714f6e2dfa975312d2bc218e89bb0f818344996386fe05864ab6c41f10e",
+      "validation": [],
+      "samplesNs": [
+        33104292,
+        32270917,
+        33222250,
+        31532583,
+        31583500,
+        32463500,
+        32696250,
+        34764042,
+        33076750,
+        32343584
+      ],
+      "observations": {
+        "stateReads": 608,
+        "stateByKind": {
+          "session": 4,
+          "message": 302,
+          "receipt": 302
+        },
+        "readBytes": 300730,
+        "pageReads": 0,
+        "enumerations": {
+          "metadata/readdir": 4,
+          "metadata/readdirEntries": 612,
+          "events/readdir": 1,
+          "events/readdirEntries": 330
+        }
+      }
+    },
+    {
+      "round": 9,
+      "side": "candidate",
+      "scenarioHash": "06e97aed50fa0509269c0f8d795de3bcd005d7fc637cf8f3451349cf30d7e1ec",
+      "loadBefore": [
+        4.8251953125,
+        5.66357421875,
+        6.12060546875
+      ],
+      "loadAfter": [
+        4.26025390625,
+        5.47509765625,
+        6.04150390625
+      ],
+      "elapsedMs": 19880,
+      "fixtureDigest": "34410714f6e2dfa975312d2bc218e89bb0f818344996386fe05864ab6c41f10e",
+      "validation": [],
+      "samplesNs": [
+        42733750,
+        44888417,
+        42422583,
+        42886125,
+        41999667,
+        42381500,
+        43007291,
+        43326583,
+        42450292,
+        44016792
+      ],
+      "observations": {
+        "stateReads": 656,
+        "stateByKind": {
+          "session": 2,
+          "message": 327,
+          "receipt": 327
+        },
+        "readBytes": 592209,
+        "pageReads": 108,
+        "enumerations": {
+          "metadata/readdir": 4,
+          "metadata/readdirEntries": 614,
+          "events/readdir": 1,
+          "events/readdirEntries": 330
+        }
+      }
+    },
+    {
+      "round": 9,
+      "side": "baseline",
+      "scenarioHash": "06e97aed50fa0509269c0f8d795de3bcd005d7fc637cf8f3451349cf30d7e1ec",
+      "loadBefore": [
+        4.26025390625,
+        5.47509765625,
+        6.04150390625
+      ],
+      "loadAfter": [
+        5.2451171875,
+        5.62158203125,
+        6.080078125
+      ],
+      "elapsedMs": 20007,
+      "fixtureDigest": "34410714f6e2dfa975312d2bc218e89bb0f818344996386fe05864ab6c41f10e",
+      "validation": [],
+      "samplesNs": [
+        32388625,
+        33228291,
+        32090166,
+        33047209,
+        32661709,
+        31902500,
+        32449667,
+        32698667,
+        32740542,
+        32489958
+      ],
+      "observations": {
+        "stateReads": 608,
+        "stateByKind": {
+          "session": 4,
+          "message": 302,
+          "receipt": 302
+        },
+        "readBytes": 300730,
+        "pageReads": 0,
+        "enumerations": {
+          "metadata/readdir": 4,
+          "metadata/readdirEntries": 612,
+          "events/readdir": 1,
+          "events/readdirEntries": 330
+        }
+      }
+    }
+  ],
+  "finishedAt": "2026-10-28T00:17:16.121Z"
+}
