@@ -46,10 +46,11 @@ test("a turn reads each message and receipt once, and its heartbeat one session"
   for (let i = 0; i < PEERS; i += 1) await invoke("sessionStart", `peer-session-${i}`);
   const recipientId = recipient.sessions
     .find(item => item.sessionId === recipient.accSessionId).participantId;
+  const messages = [];
   for (let i = 0; i < MESSAGES; i += 1) {
-    await sender.service.sendMessage({ sessionId: sender.accSessionId, generation: sender.generation,
+    messages.push(await sender.service.sendMessage({ sessionId: sender.accSessionId, generation: sender.generation,
       clientMessageId: `client_read_cost_${i}`, toParticipantIds: [recipientId], kind: "note",
-      obligation: "none", subject: `Backlog ${i}`, body: "A message the turn has to consider." });
+      obligation: "none", subject: `Backlog ${i}`, body: "A message the turn has to consider." }));
   }
   const store = recipient.service.store;
   const stored = await store.snapshot(store.workspaceId);
@@ -64,6 +65,16 @@ test("a turn reads each message and receipt once, and its heartbeat one session"
   assert.equal(turn.result.timedOut, undefined);
   assert.deepEqual(turn.result.sessions, [],
     "fourteen sessions are present, and the hook entry point asks for none of them");
+  assert.match(turn.result.stdout, /A message the turn has to consider\./);
+  const rendered = messages.find(message => turn.result.stdout.includes(message.messageId));
+  assert.ok(rendered, "stdout identifies an actual sent message");
+  await turn.result.commitOffers();
+  // Services retain their hook deadline; use this turn, not the setup hook.
+  const receipt = await turn.result.service.readReceipt({ messageId: rendered.messageId,
+    recipientParticipantId: recipientId });
+  assert.equal(receipt.messageId, rendered.messageId);
+  assert.equal(receipt.recipientParticipantId, recipientId);
+  assert.equal(receipt.state, "offered");
   assert.equal(turn.stateByKind.message, MESSAGES, "each message is read once a turn");
   assert.equal(turn.stateByKind.receipt, stored.receipts.length, "each receipt is read once a turn");
   // The turn's one read of the store lists every session once; finding this
@@ -71,7 +82,9 @@ test("a turn reads each message and receipt once, and its heartbeat one session"
   assert.ok(turn.stateByKind.session <= stored.sessions.length + 3,
     `a turn read ${turn.stateByKind.session} session records of ${stored.sessions.length}`);
 
-  const beat = await probe.capture(() => recipient.service.heartbeatSession({
+  const beat = await probe.capture(() => turn.result.service.heartbeatSession({
     sessionId: recipient.accSessionId, generation: recipient.generation }));
+  assert.equal(beat.result.sessionId, recipient.accSessionId);
+  assert.equal(beat.result.generation, recipient.generation);
   assert.deepEqual(beat.stateByKind, { session: 1 }, "a heartbeat reads its own session alone");
 });
