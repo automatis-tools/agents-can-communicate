@@ -3,6 +3,7 @@
 import path from "node:path";
 import { readFile } from "node:fs/promises";
 import { parsePushRefs, pushGit, resolvePushTrees, runPushCommand, withPushCheckout } from "./push-targets.mjs";
+import { supportsSelection, withSelectionPlan } from "./push-selection.mjs";
 
 async function supportsReceipt(checkout) {
   try {
@@ -32,13 +33,18 @@ try {
   console.log("pre-push: refusing Claude attribution in pushed commits");
   await runPushCommand(process.execPath, [path.join(import.meta.dirname, "check-commit-attribution.mjs"),
     "--pre-push", remote], { cwd: repo, input });
-  const targets = await resolvePushTrees(repo, refs);
+  const targets = await resolvePushTrees(repo, refs, { planForRef: async ({ ref, commit, base }) => {
+    // Even a broken planner import must retain attribution and full fallback.
+    const { createGatePlan, validateGatePlan } = await import("./change-plan.mjs");
+    const plan = await createGatePlan({ repo, targetCommit: commit, baseCommit: base,
+      event: { kind: "push", ref: ref.remoteRef } });
+    await validateGatePlan(plan, { repo });
+    return plan;
+  } });
   if (!targets.length) console.log("pre-push: deletions only; no content gates needed");
-  // Import and report inside the boundary: even a broken observer cannot fail a gate.
-  try {
-    const { observePushPlans } = await import("./change-plan-observation.mjs");
-    console.log(`pre-push: observation ${JSON.stringify(await observePushPlans(repo, targets))}`);
-  } catch { console.log("pre-push: observation unavailable; existing gates unchanged"); }
+  console.log(`pre-push: resolved scopes ${JSON.stringify(targets.map(({ tree, requiredScope, refPlans }) =>
+    ({ tree, scope: requiredScope, refs: refPlans.map(({ requiredScope: scope, plan }) =>
+      ({ scope, planDigest: plan?.planDigest, selectionDigest: plan?.selectionDigest })) })))}`);
 
   for (const target of targets) {
     console.log(`pre-push: validating tree ${target.tree} (${target.requiredScope})`);
@@ -49,10 +55,16 @@ try {
       if (target.requiredScope === "measurement-only") {
         console.log("pre-push: measurement-only target; actual-target syntax passed; no suite");
       } else {
-        console.log("pre-push: running actual target's full test suite");
         const reuse = checkout === repo && await supportsReceipt(checkout);
-        await runPushCommand("npm", ["test", ...(reuse ? ["--", "--if-needed"] : [])],
-          { cwd: checkout, signal });
+        if (target.requiredScope === "docs" && await supportsSelection(checkout)) {
+          console.log(`pre-push: running actual target's documentation subset (planDigest=${target.plan.planDigest}, selectionDigest=${target.plan.selectionDigest})`);
+          await withSelectionPlan(target.plan, signal, file => runPushCommand("npm",
+            ["test", "--", "--selection-plan", file, ...(reuse ? ["--if-needed"] : [])], { cwd: checkout, signal }));
+        } else {
+          console.log("pre-push: running actual target's full test suite");
+          await runPushCommand("npm", ["test", ...(reuse ? ["--", "--if-needed"] : [])],
+            { cwd: checkout, signal });
+        }
       }
     });
   }

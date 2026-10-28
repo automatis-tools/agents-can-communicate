@@ -1,4 +1,4 @@
-// Observation only: these proposals never select the currently executed gates.
+// Immutable plans authorize supported local docs gates; all uncertainty requires full.
 import { createHash } from "node:crypto";
 
 export const digest = value => createHash("sha256").update(JSON.stringify(value)).digest("hex");

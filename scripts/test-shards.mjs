@@ -1,12 +1,16 @@
 // Interleave the sorted discovery list so every package and acceptance group
 // contributes to each shard. No hand-maintained allowlist can miss a new test.
 export function runnerOptions(args) {
-  const options = { list: false, ifNeeded: false, shard: null };
+  const options = { list: false, ifNeeded: false, shard: null, selectionPlan: null };
   for (let index = 0; index < args.length; index += 1) {
     const argument = args[index];
     if (argument === "--list" && !options.list) options.list = true;
     else if (argument === "--if-needed" && !options.ifNeeded) options.ifNeeded = true;
-    else if (argument === "--shard" && options.shard === null) {
+    else if (argument === "--selection-plan" && options.selectionPlan === null) {
+      const file = args[++index];
+      if (typeof file !== "string" || !file.trim() || file.startsWith("-")) throw Error("--selection-plan requires a file");
+      options.selectionPlan = file;
+    } else if (argument === "--shard" && options.shard === null) {
       const match = /^(\d+)\/(\d+)$/.exec(args[++index] ?? "");
       if (match === null) throw new Error("--shard requires index/count, for example 1/2");
       const [, part, count] = match.map(Number);
@@ -19,6 +23,7 @@ export function runnerOptions(args) {
   if (options.ifNeeded && options.shard !== null) {
     throw new Error("--if-needed requires a complete suite, not a shard");
   }
+  if (options.selectionPlan !== null && options.shard !== null) throw Error("--selection-plan cannot be combined with --shard");
   return options;
 }
 

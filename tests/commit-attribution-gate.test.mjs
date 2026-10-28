@@ -10,6 +10,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { promisify } from "node:util";
+import { pathToFileURL } from "node:url";
 
 const run = promisify(execFile);
 const repo = path.resolve(import.meta.dirname, "..");
@@ -205,24 +206,58 @@ test("a trailer in a comment or in the `git commit -v` diff is not the message",
 });
 
 // The real pre-push hook, with a stub npm standing in for the eight-minute suite.
-async function stubNpmPath(t, script = "#!/bin/sh\nexit 0\n") {
+async function stubNpmEnv(t, script = "#!/bin/sh\nexit 0\n") {
   const stub = await mkdtemp(path.join(tmpdir(), "acc-attribution-npm-"));
   t.after(() => rm(stub, { recursive: true, force: true }));
   await writeFile(path.join(stub, "npm"), script);
   await chmod(path.join(stub, "npm"), 0o755);
-  // The Node pre-push runner invokes npm through cmd.exe on Windows, which
-  // resolves npm.cmd rather than the extensionless script Git's sh can run.
-  // Keep one stub body and forward every npm argument, including -- --if-needed.
-  await writeFile(path.join(stub, "npm.cmd"), '@sh "%~dp0npm" %*\r\n');
+  // Model both query and final execution with a private real npm bin package.
+  // The tracked discovery probe still runs; no real project npm can fall through.
+  const npmRoot = path.join(stub, "fixture-npm");
+  await mkdir(npmRoot);
+  const cli = path.join(npmRoot, "npm-cli.js");
+  await writeFile(path.join(npmRoot, "package.json"), JSON.stringify({ name: "npm", bin: { npm: "npm-cli.js" } }));
+  await writeFile(cli, `if (process.argv[2] === '--version') console.log('1.0.0');
+    else {
+      const result = require('node:child_process').spawnSync('sh',
+        [${JSON.stringify(editorCommand(path.join(stub, "npm")))}, ...process.argv.slice(2)], {stdio:'inherit'});
+      process.exitCode = result.status ?? 1;
+    }`);
+  // Synchronize named ESM imports because push-targets imports spawn directly.
+  const preload = path.join(stub, "npm-recorder.cjs");
+  await writeFile(preload, `const childProcess = require('node:child_process');
+    const spawn = childProcess.spawn;
+    childProcess.spawn = function(file, args, options) {
+      if (args?.[0] === '/d' && args?.[4] === 'npm --version --offline --update-notifier=false --logs-max=0 --color=false') {
+        return spawn(process.execPath, [${JSON.stringify(cli)}, '--version', '--offline', '--update-notifier=false', '--logs-max=0', '--color=false'], options);
+      }
+      return spawn(file, args, options);
+    };
+    require('node:module').syncBuiltinESMExports();`);
   // Windows has no /usr/bin: git, and the sh and xargs the hook runs, are where
   // the machine's own PATH finds them, behind the stub.
   const system = process.platform === "win32"
     ? (process.env.PATH ?? process.env.Path ?? "").split(path.delimiter) : ["/usr/bin", "/bin"];
-  return [stub, path.dirname(process.execPath), ...system].join(path.delimiter);
+  return { PATH: [stub, path.dirname(process.execPath), ...system].join(path.delimiter),
+    ComSpec: process.env.ComSpec ?? (process.platform === "win32" ? process.env.COMSPEC : "/bin/sh"),
+    NODE_OPTIONS: [process.env.NODE_OPTIONS, `--require=${JSON.stringify(editorCommand(preload))}`].filter(Boolean).join(" ") };
 }
 
+// Exercise both fixed discovery and final Node/npm-cli on every host.
+// The private recorder must never run real project npm tests or packs.
+test("the npm recorder handles discovery and Node/npm-cli without changing semantic argv", async t => {
+  const { root, env } = await scratch(t, await stubNpmEnv(t, `#!/bin/sh\nprintf '<%s>\\n' "$@"\n`));
+  const command = pathToFileURL(path.join(repo, "scripts/push-targets.mjs")).href;
+  const args = ["test", "--", "--selection-plan", "owned path & (literal) %x% !y! ^.json", "--if-needed"];
+  const result = await attempt(process.execPath, ["--input-type=module", "-e",
+    `import {runPushCommand} from ${JSON.stringify(command)};
+     await runPushCommand("npm", ${JSON.stringify(args)}, {cwd:process.cwd(),platform:"win32"});`], { cwd: root, env });
+  assert.equal(result.code, 0, result.stdout + result.stderr);
+  assert.equal(result.stdout, args.map(arg => `<${arg}>\n`).join(""));
+});
+
 test("the pre-push hook refuses attributed commits before the suite runs", async t => {
-  const { git, commit } = await scratch(t, { PATH: await stubNpmPath(t) });
+  const { git, commit } = await scratch(t, await stubNpmEnv(t));
 
   assert.equal((await git(["push", "-q", "origin", "main"])).code, 0, "a clean first push was refused");
   assert.equal((await commit(ATTRIBUTED["a session trailer"], "--no-verify")).code, 0);
@@ -238,7 +273,7 @@ test("the pre-push hook refuses attributed commits before the suite runs", async
 });
 
 test("a new branch cannot carry an attributed commit that another remote branch already has", async t => {
-  const { git, commit } = await scratch(t, { PATH: await stubNpmPath(t) });
+  const { git, commit } = await scratch(t, await stubNpmEnv(t));
   assert.equal((await git(["push", "-q", "origin", "main"])).code, 0);
   assert.equal((await commit(ATTRIBUTED["a Claude co-author trailer"], "--no-verify")).code, 0);
   // Fixture only: the attributed commit reaches the remote the way it would have
@@ -255,7 +290,7 @@ test("a new branch cannot carry an attributed commit that another remote branch 
 // The hook syntax-checks every tracked module before the suite; the check runs
 // in a pool, and a module that does not parse still stops the push by name.
 test("the pre-push hook refuses a tracked module that does not parse", async t => {
-  const { root, git } = await scratch(t, { PATH: await stubNpmPath(t) });
+  const { root, git } = await scratch(t, await stubNpmEnv(t));
   await writeFile(path.join(root, "broken.mjs"), "export const = 1;\n");
   await git(["add", "broken.mjs"]);
   assert.equal((await git(["commit", "-q", "-m", "chore: a module that does not parse"])).code, 0);
@@ -269,7 +304,7 @@ test("the pre-push hook refuses a tracked module that does not parse", async t =
 // suite. The stub npm fails, so a push that ran the suite would be refused.
 test("a push of measurement branches alone skips the suite, and nothing else does", async t => {
   const { git, commit } = await scratch(t,
-    { PATH: await stubNpmPath(t, "#!/bin/sh\necho 'suite ran' >&2\nexit 1\n") });
+    await stubNpmEnv(t, "#!/bin/sh\necho 'suite ran' >&2\nexit 1\n"));
 
   const probe = await git(["push", "-q", "origin", "HEAD:refs/heads/measure/probe"]);
   assert.equal(probe.code, 0, probe.stderr);
@@ -323,7 +358,7 @@ test("an unknown mode is a usage error, not a pass", async () => {
 
 test("deletion-only pushes do not parse the working tree or run the suite", async t => {
   const { root, git } = await scratch(t,
-    { PATH: await stubNpmPath(t, "#!/bin/sh\necho 'suite ran' >&2\nexit 1\n") });
+    await stubNpmEnv(t, "#!/bin/sh\necho 'suite ran' >&2\nexit 1\n"));
   assert.equal((await git(["push", "-q", "origin", "HEAD:refs/heads/measure/delete"])).code, 0);
   await writeFile(path.join(root, "a.mjs"), "export const = ;\n");
   const deleted = await git(["push", "-q", "origin", ":refs/heads/measure/delete"]);
@@ -334,7 +369,7 @@ test("deletion-only pushes do not parse the working tree or run the suite", asyn
 test("only a clean HEAD tree can request full-suite receipt reuse", async t => {
   const stub = "#!/bin/sh\nif [ \"$2\" = -- ]; then echo 'receipt requested' >&2; "
     + "else echo 'suite required' >&2; fi\nexit 0\n";
-  const { root, git, commit } = await scratch(t, { PATH: await stubNpmPath(t, stub) });
+  const { root, git, commit } = await scratch(t, await stubNpmEnv(t, stub));
   // A known full-suite runner contract permits --if-needed. Older or arbitrary
   // npm scripts receive plain npm test instead of an unsupported extra option.
   await mkdir(path.join(root, "scripts"));

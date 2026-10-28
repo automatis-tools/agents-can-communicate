@@ -2,7 +2,7 @@
 // splitting them would duplicate setup and hide producer-to-consumer guarantees.
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
-import { chmod, mkdir, mkdtemp, readFile, readdir, rm, symlink, writeFile } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, readFile, readdir, rm, symlink, utimes, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -316,4 +316,35 @@ test("full-suite proof producer refuses active replacement aliases unless its en
     assert.equal(after.key, initial.key, "replacement removal changed unrelated ordinary input keys");
     assert.equal(await cache.hasPassed("tests", after), false, "substituted execution left a reusable ordinary proof");
   }
+});
+
+test("real reruns durably invalidate both full and docs proofs; refusal precedes unsafe execution", async t => {
+  assert.equal(typeof cache.invalidateGateProofs, "function");
+  const { fingerprint } = await repository(t); const snapshot = await fingerprint();
+  t.after(() => cache.clearPassed("test-docs", snapshot)); t.after(() => cache.clearPassed("test", snapshot));
+  await cache.savePassed("test", snapshot); await cache.savePassed("test-docs", snapshot);
+  let attempted = 0;
+  await assert.rejects(cache.invalidateGateProofs(snapshot, { remove: async () => { attempted++; throw Error("denied"); } }),
+    /existing gate proof could not be invalidated; validation did not start/);
+  assert.equal(attempted, 2, "one failed namespace prevented attempting the other");
+  assert.equal(await cache.hasPassed("test", snapshot), true);
+  await cache.invalidateGateProofs(snapshot);
+  assert.equal(await cache.hasPassed("test", snapshot), false); assert.equal(await cache.hasPassed("test-docs", snapshot), false);
+  await assert.doesNotReject(cache.invalidateGateProofs(snapshot, { remove: async () => { throw Error("denied"); } }));
+  await assert.doesNotReject(cache.invalidateGateProofs(null));
+});
+
+
+test("expiry cleanup includes documentation proofs and preserves current full receipt schema", async t => {
+  const { fingerprint } = await repository(t); const snapshot = await fingerprint();
+  const directory = path.join(tmpdir(), `acc-development-gates-${process.getuid?.() ?? "user"}`);
+  const file = path.join(directory, `test-docs-${snapshot.key}.json`);
+  t.after(() => cache.clearPassed("test", snapshot)); t.after(() => cache.clearPassed("test-docs", snapshot));
+  await cache.savePassed("test-docs", snapshot);
+  const expired = new Date(Date.now() - 25 * 60 * 60 * 1000); await utimes(file, expired, expired);
+  await run(process.execPath, ["--input-type=module", "-e", `import { savePassed } from ${JSON.stringify(new URL("../scripts/gate-cache.mjs", import.meta.url).href)};
+    await savePassed("test", ${JSON.stringify(snapshot)});`]);
+  await assert.rejects(readFile(file), { code: "ENOENT" });
+  const receipt = JSON.parse(await readFile(path.join(directory, `test-${snapshot.key}.json`)));
+  assert.deepEqual(Object.keys(receipt).sort(), ["key", "kind", "passedAt", "version"]); assert.equal(receipt.version, 1);
 });

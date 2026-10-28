@@ -158,24 +158,33 @@ test("PR validation merge verifies both exact base and requested head ancestry",
     event: { kind: "pr", headCommit: future } })).scope, "full");
 });
 
-test("broken optional observer cannot suppress a passing or failing full gate or measurement policy", async t => {
+for (const failure of ["call", "import"]) test(`planner ${failure} failure preserves passing and failing full gates and measurement policy`, async t => {
   const f = await pushFixture(t);
   const scripts = path.join(f.base, "driver");
   await cp(path.join(source, "scripts"), scripts, { recursive: true });
-  await writeFile(path.join(scripts, "change-plan-observation.mjs"), "throw Error('observer failed');\n");
+  const plannerFile = path.join(scripts, "change-plan.mjs");
+  const marker = path.join(f.base, "planner-called");
+  const original = await readFile(plannerFile, "utf8");
+  const fail = `await writeFile(${JSON.stringify(marker)}, 'called\\n', {flag:'a'}); throw Error('planner failed');\n`;
+  const entry = "export async function createGatePlan({ repo, targetCommit, baseCommit, event }) {";
+  assert.ok(original.includes(entry));
+  await writeFile(plannerFile, failure === "call" ? original.replace(entry, `${entry}\n${fail}`) : `${fail}${original}`);
   const driver = path.join(scripts, "validate-push.mjs");
   const good = await invokePush(f, refLine(await f.oid()), driver);
   assert.equal(good.code, 0, good.stdout + good.stderr);
-  assert.match(good.stdout, /observation unavailable/);
+  assert.match(good.stdout, /resolved scopes.*"scope":"full"/);
   assert.match(good.stdout, /actual target passed/);
+  assert.equal(await readFile(marker, "utf8"), "called\n", "planner failure path was not executed");
   await writeFile(path.join(f.root, "target.test.mjs"), "throw Error('full gate still executes');\n");
   const bad = await f.commit("bad target");
   const failed = await invokePush(f, refLine(bad), driver);
   assert.notEqual(failed.code, 0);
   assert.match(failed.stdout + failed.stderr, /full gate still executes/);
+  assert.equal(await readFile(marker, "utf8"), "called\ncalled\n");
   const measurement = await invokePush(f, refLine(bad, "measure/probe"), driver);
   assert.equal(measurement.code, 0, measurement.stdout + measurement.stderr);
   assert.match(measurement.stdout, /measurement-only.*no suite/);
+  assert.equal(await readFile(marker, "utf8"), "called\ncalled\n", "measurement policy invoked ordinary planner");
 });
 
 test("unrelated history, a failed diff and malformed manifest force complete selection", async t => {

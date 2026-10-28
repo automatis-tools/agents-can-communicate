@@ -204,6 +204,7 @@ test("unsupported sparse checkouts and ignored inputs cannot substitute for a cl
 
 // Native forced Windows child.kill cannot deliver a graceful SIGTERM. This
 // narrow executor seam instead tests taskkill ownership/completion ordering.
+// Use Node here to isolate teardown; push-npm-arguments covers npm resolution.
 function controlledProcess(pid) {
   const child = new EventEmitter();
   return Object.assign(child, { pid, stdin: new PassThrough(), stdout: new PassThrough(), stderr: new PassThrough() });
@@ -214,7 +215,7 @@ test("Windows termination is awaited for the owned PID before command rejection"
   const killer = controlledProcess(23456);
   const controller = new AbortController();
   const calls = [];
-  const running = runPushCommand("npm", ["test"], { cwd: path.resolve(import.meta.dirname, "../.."),
+  const running = runPushCommand(process.execPath, ["test"], { cwd: path.resolve(import.meta.dirname, "../.."),
     signal: controller.signal, quiet: true, platform: "win32", spawnCommand: (file, args, options) => {
       calls.push({ file, args, options });
       return calls.length === 1 ? target : killer;
@@ -225,7 +226,8 @@ test("Windows termination is awaited for the owned PID before command rejection"
   target.emit("close", 1);
   await new Promise(resolve => setImmediate(resolve));
   assert.equal(settled, false, "command settled before descendant termination completed");
-  assert.equal(calls[0].options.shell, true);
+  assert.equal(calls[0].file, process.execPath);
+  assert.equal(calls[0].options.shell, false);
   assert.equal(calls[1].file, "taskkill");
   assert.deepEqual(calls[1].args, ["/pid", "12345", "/t", "/f"]);
   killer.emit("close", 0);
@@ -238,7 +240,7 @@ for (const failure of ["error", "nonzero", "throw"]) {
     const killer = controlledProcess(23456);
     const controller = new AbortController();
     let calls = 0;
-    const running = runPushCommand("npm", ["test"], { cwd: path.resolve(import.meta.dirname, "../.."),
+    const running = runPushCommand(process.execPath, ["test"], { cwd: path.resolve(import.meta.dirname, "../.."),
       signal: controller.signal, quiet: true, platform: "win32", spawnCommand: () => {
         if (++calls === 1) return target;
         if (failure === "throw") throw Error("launch denied");
