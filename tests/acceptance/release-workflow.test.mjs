@@ -69,6 +69,14 @@ test("the release workflow creates its pack destination before npm writes there"
   assert.ok(prepare < pack, "release.yml creates dist/ only after npm needs it");
 });
 
+test("release checkout supplies source history for the candidate provenance gate", async () => {
+  const workflow = await readFile(path.join(repo, ".github/workflows/release.yml"), "utf8");
+  const [, checkout] = /- uses: actions\/checkout@[^\n]*\n((?:        .+\n)+)/.exec(workflow) ?? [];
+  assert.equal(typeof checkout, "string", "release has no checkout configuration");
+  assert.match(checkout, /^        with:\n          fetch-depth: 0\s*$/m,
+    "release checkout must retain the recorded candidate source history");
+});
+
 test("release and CI pass bounded test deadlines to the real runner plan", async () => {
   for (const name of ["ci", "release"]) {
     const workflow = name === "ci"
