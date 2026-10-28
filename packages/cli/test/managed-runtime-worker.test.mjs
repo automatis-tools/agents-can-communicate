@@ -90,7 +90,9 @@ test("failed downloads keep the working runtime and concurrent opt-out prevents 
 });
 
 test("a background poll releases the update lock while waiting for clients", { timeout: 15_000 }, async t => {
-  const f = await fixture(t);
+  // This pass tests waiting on a staged update. A due registry check would
+  // make reaching that idle interval depend on the external registry.
+  const f = await fixture(t, { checkedAt: new Date().toISOString() });
   const pending = { version: "0.4.1", root: path.join(f.root, "generations", "new") };
   const modules = path.join(pending.root, "node_modules", "@agents-can-communicate", "cli", "src", "managed-runtime");
   await mkdir(modules, { recursive: true });
@@ -101,6 +103,7 @@ test("a background poll releases the update lock while waiting for clients", { t
   // Preparation finishes before the activation pass and its durable writes.
   // Observe the actual idle interval without shortening it or changing locks.
   const source = `import { runWorker } from ${JSON.stringify(new URL("../src/managed-runtime/worker.mjs", import.meta.url).href)};
+    globalThis.fetch = async () => { throw new Error('unexpected registry request in idle-poll fixture'); };
     const sleep = globalThis.setTimeout;
     globalThis.setTimeout = (callback, delay, ...args) => {
       if (delay === 60_000) process.send('waiting-for-clients');
