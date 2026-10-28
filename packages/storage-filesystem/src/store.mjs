@@ -232,6 +232,12 @@ export async function openFilesystemStore({ root, clock, ids, workspaceId, failA
       assertPublicationDeadline(deadlineAt);
       let sequence = await nextSequence(paths, root);
       const firstSequence = pad(sequence);
+      // Every sequence this transaction takes, not only its first, stays where adding one
+      // still changes the value: past it two events would share a name (review of #307).
+      if (BigInt(sequence) + BigInt(events.length) - 1n > BigInt(Number.MAX_SAFE_INTEGER)) {
+        throw new AccError(EXIT.DATA, "event sequence is exhausted",
+          { first: firstSequence, events: events.length });
+      }
       for (const appended of events) {
         appended.sequence = pad(sequence);
         sequence += 1;

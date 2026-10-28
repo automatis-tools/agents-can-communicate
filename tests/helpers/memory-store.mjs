@@ -118,13 +118,16 @@ export function createMemoryStore({ clock, ids, workspaceId }) {
       let result;
       try { result = await callback(tx); }
       finally { accepting = false; }
+      // Kept only when every event is valid: a refused commit takes no sequence.
+      let sequence = nextSequence;
       for (const appended of stagedEvents) {
-        appended.sequence = pad(nextSequence);
-        nextSequence += 1;
+        appended.sequence = pad(sequence);
+        sequence += 1;
         validateRecord("event", appended);
       }
       committed = staged;
       events = [...events, ...stagedEvents];
+      nextSequence = sequence;
       return result;
     });
   }

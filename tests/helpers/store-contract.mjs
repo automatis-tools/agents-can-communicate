@@ -125,6 +125,25 @@ export function runStoreContract(name, makeStore) {
     assert.equal(new Set(sequences).size, 3);
   });
 
+  // The sequence is given at commit (#307), and a commit refused there takes none: an
+  // event made invalid after it was appended leaves no gap in the log.
+  test(`${name}: a commit refused for an invalid event uses no sequence`, async () => {
+    const store = await makeStore();
+    await store.transaction(async tx => {
+      tx.append(eventRecord("session.opened", { eventId: "event_open_1" }));
+    });
+    await assert.rejects(store.transaction(async tx => {
+      const appended = tx.append(eventRecord("session.opened", { eventId: "event_open_2" }));
+      appended.type = "not an event type";
+    }), error => error.code === EXIT.DATA);
+    await store.transaction(async tx => {
+      tx.append(eventRecord("session.opened", { eventId: "event_open_3" }));
+    });
+    const { events } = await store.eventsSince(WORKSPACE, null, 10);
+    assert.deepEqual(events.map(event => [event.eventId, Number(event.sequence)]),
+      [["event_open_1", 1], ["event_open_3", 2]]);
+  });
+
   test(`${name}: eventsSince honours the cursor and the limit`, async () => {
     const store = await makeStore();
     for (const index of [1, 2, 3]) {

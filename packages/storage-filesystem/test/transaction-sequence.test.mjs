@@ -75,6 +75,23 @@ test("an exhausted sequence refuses a write and leaves reads working", async t =
   assert.equal((await opened.transaction(tx => tx.get("intent", "session_a"), { kinds: ["intent"] })).summary, "working");
 });
 
+// The exhaustion check covered only a transaction's first sequence: past
+// Number.MAX_SAFE_INTEGER adding one stops changing the value, so two events of one
+// transaction could take the same name and leave its journal open (review of #307).
+test("every sequence a transaction takes stays in the safe range, or it publishes none", async t => {
+  const { store: opened } = await store(t);
+  const { readdir } = await import("node:fs/promises");
+  const last = String(Number.MAX_SAFE_INTEGER - 3).padStart(16, "0");
+  await writeFile(path.join(opened.paths.events, `${last}.json`), `${JSON.stringify({ sequence: last })}\n`);
+  const appendAll = count => opened.transaction(tx => Array.from({ length: count },
+    (_, index) => tx.append(event(100 + index))), { kinds: [] });
+  await assert.rejects(appendAll(4), error => error.code === EXIT.DATA && /exhausted/.test(error.message));
+  assert.deepEqual(await readdir(opened.paths.events), [`${last}.json`]);
+  const fitted = await appendAll(3);
+  assert.deepEqual(fitted.map(item => item.sequence),
+    [2, 1, 0].map(back => String(Number.MAX_SAFE_INTEGER - back).padStart(16, "0")));
+});
+
 test("an event the callback appends is refused there when its shape is wrong", async t => {
   const { store: opened } = await store(t);
   let reached = false;
