@@ -1,4 +1,6 @@
 // These subprocess fixtures test CI orchestration, never vendor compatibility.
+// Keeping their shared fixed-command fixture and failure controls together avoids
+// duplicating the process/phase contract across files, including native Windows.
 import assert from "node:assert/strict";
 import { spawn, execFile } from "node:child_process";
 import { access, mkdir, mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/promises";
@@ -268,6 +270,43 @@ test("actual Git identity ignores inherited repository redirection", async t => 
     return exe === "git" ? spawn(exe, args, options) : f.dependencies.spawn(exe, args, options);
   } });
   assert.equal(code, 0); assert.equal(r.context.checkoutSha, stdout.trim());
+});
+
+test("a failing log destination reaps its real child before returning and blocks later phases", { timeout: 10_000 }, async t => {
+  const f = await fixture(t);
+  await mkdir(path.join(f.root, "evidence", "npm-version.stderr.log"), { recursive: true });
+  let child, closed, actualResult;
+  const launched = [];
+  t.after(async () => {
+    if (child?.exitCode === null && child.signalCode === null) child.kill("SIGKILL");
+    await closed;
+  });
+  const { code, report: r, phases: p } = await f.invoke({}, { spawn(exe, args, options) {
+    launched.push(args);
+    if (exe !== process.execPath || args[0] !== f.program || args[1] !== "--version") return f.dependencies.spawn(exe, args, options);
+    child = spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)"], options);
+    closed = new Promise(resolve => child.once("close", (exitCode, signal) => {
+      actualResult = { exitCode, signal }; resolve();
+    }));
+    return child;
+  } });
+  assert.equal(code, 1);
+  assert.ok(actualResult, "the driver must observe child close before returning");
+  assert.throws(() => process.kill(child.pid, 0), { code: "ESRCH" }, "owned child must no longer be alive");
+  const phase = p["npm-version"];
+  assert.deepEqual({ exitCode: phase.exitCode, signal: phase.signal }, actualResult);
+  assert.equal(phase.status, "failed");
+  assert.equal(phase.spawnError, null);
+  assert.ok(["EISDIR", "EPERM", "EACCES"].includes(phase.outputError.code), phase.outputError.message);
+  assert.equal(r.status, "failed");
+  assert.equal(r.failure.phase, "npm-version");
+  assert.equal(p.checkout.status, "not-run");
+  assert.equal(p.install.status, "not-run");
+  assert.equal(p["claude-version"].status, "not-run");
+  assert.equal(p.hooks.status, "not-run");
+  assert.equal(launched.length, 1, "only the failing npm version command may launch");
+  t.diagnostic(JSON.stringify({ childReaped: true, ...actualResult, outputError: phase.outputError.code,
+    reportStatus: r.status, commandsLaunched: launched.length }));
 });
 
 test("native Windows resolves fixed version commands in PowerShell and actual npm under Node",
