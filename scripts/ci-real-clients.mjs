@@ -52,7 +52,7 @@ export async function runRealClients({ cwd, env, evidenceDir, platform = process
   };
   function phase(id, executable, args) {
     const value = { id, executable, args, cwd, status: "not-run", reason: "blocked by incomplete prerequisites",
-      startedAt: null, finishedAt: null, durationMs: null, exitCode: null, signal: null, spawnError: null,
+      startedAt: null, finishedAt: null, durationMs: null, exitCode: null, signal: null, spawnError: null, outputError: null,
       stdoutFile: `${id}.stdout.log`, stderrFile: `${id}.stderr.log`, tests: null };
     report.phases.push(value);
     return value;
@@ -97,9 +97,11 @@ export async function runRealClients({ cwd, env, evidenceDir, platform = process
     console.log(`compatibility: ${p.id}`);
     const stdout = createWriteStream(path.join(evidenceDir, p.stdoutFile));
     const stderr = createWriteStream(path.join(evidenceDir, p.stderrFile));
+    let child, closed;
+    const streams = [];
     try {
-      const child = launch(p.executable, p.args, { cwd, env: childEnv, shell: false, stdio: ["pipe", "pipe", "pipe"] });
-      const closed = new Promise(resolve => {
+      child = launch(p.executable, p.args, { cwd, env: childEnv, shell: false, stdio: ["pipe", "pipe", "pipe"] });
+      closed = new Promise(resolve => {
         child.on("error", error => { p.spawnError = { code: error.code ?? null, message: error.message }; });
         child.on("close", (code, signal) => { p.exitCode = code; p.signal = signal; resolve(); });
       });
@@ -107,17 +109,23 @@ export async function runRealClients({ cwd, env, evidenceDir, platform = process
       child.stdin.end();
       child.stdout.on("data", bytes => process.stdout.write(bytes));
       child.stderr.on("data", bytes => process.stderr.write(bytes));
-      await Promise.all([closed, pipeline(child.stdout, stdout), pipeline(child.stderr, stderr)]);
+      streams.push(pipeline(child.stdout, stdout), pipeline(child.stderr, stderr));
+      await Promise.all([closed, ...streams]);
       if (p.spawnError || p.exitCode !== 0 || p.signal) fail(p, p.spawnError?.message ?? `exit ${p.exitCode}, signal ${p.signal}`);
       else p.status = "passed";
     } catch (error) {
+      if (child && !p.spawnError) p.outputError = { code: error.code ?? null, message: error.message };
+      else p.spawnError ??= { code: error.code ?? null, message: error.message };
       stdout.destroy(); stderr.destroy();
-      p.spawnError ??= { code: error.code ?? null, message: error.message };
-      fail(p, error.message);
+      // Reap this exact child before recording its result or starting a phase.
+      // Windows may report termination as an exit code; preserve close's facts.
+      if (child?.exitCode === null && child.signalCode === null) child.kill("SIGKILL");
+      await Promise.allSettled([...streams, ...(closed ? [closed] : [])]);
+      fail(p, p.outputError ? `output capture failed: ${error.message}` : error.message);
     }
     p.finishedAt = now(); p.durationMs = elapsed(p.startedAt);
     await checkpoint();
-    return readFile(path.join(evidenceDir, p.stdoutFile), "utf8");
+    return p.outputError ? "" : readFile(path.join(evidenceDir, p.stdoutFile), "utf8");
   }
   await checkpoint();
   const required = ["GITHUB_RUN_ID", "GITHUB_RUN_ATTEMPT", "GITHUB_REPOSITORY", "GITHUB_WORKFLOW", "GITHUB_JOB", "GITHUB_SHA", "GITHUB_REF"];
@@ -144,12 +152,14 @@ export async function runRealClients({ cwd, env, evidenceDir, platform = process
   await checkpoint();
   if (resolution.status === "failed") return finish();
   const npmOutput = await execute(npmVersion);
+  if (npmVersion.outputError) return finish();
   if (npmVersion.status === "passed" && /^\d+\.\d+\.\d+\r?\n?$/.test(npmOutput)) {
     report.context.npmVersion = npmOutput.trim(); report.context.unavailable.npmVersion = null;
   } else { fail(npmVersion, "npm version unavailable or malformed"); report.context.unavailable.npmVersion = npmVersion.reason; }
   const gitEnv = { ...env };
   delete gitEnv.GIT_DIR; delete gitEnv.GIT_WORK_TREE;
   const gitOutput = await execute(checkout, gitEnv);
+  if (checkout.outputError) return finish();
   if (checkout.status === "passed" && /^[a-f0-9]{40}\r?\n?$/.test(gitOutput)) {
     report.context.checkoutSha = gitOutput.trim(); report.context.unavailable.checkoutSha = null;
   } else { fail(checkout, "checkout identity unavailable or malformed"); report.context.unavailable.checkoutSha = checkout.reason; }
@@ -158,6 +168,7 @@ export async function runRealClients({ cwd, env, evidenceDir, platform = process
   for (const client of ["claude", "codex"]) {
     const p = versions[client];
     const output = await execute(p);
+    if (p.outputError) return finish();
     const pattern = client === "claude" ? /^(\d+\.\d+\.\d+) \(Claude Code\)\r?\n?$/ : /^codex-cli (\d+\.\d+\.\d+)\r?\n?$/;
     const version = p.status === "passed" ? pattern.exec(output)?.[1] ?? null : null;
     if (!version || (report.policy === "pinned-pr" && version !== pins[client])) {
