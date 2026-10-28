@@ -79,7 +79,7 @@ test("all stale PR runs coalesce because every Lint run validates the full gate"
 
 const lanes = [
   ["linux-test", "linux", "ubuntu-latest", ["full-linux", "docs-linux"]],
-  ["macos-test", "darwin", "macos-latest", ["full-macos", "docs-macos"]],
+  ["macos-test", "darwin", "macos-latest", ["full-macos", "docs-macos"], "macos-26-intel"],
   ["windows-test", "win32", "windows-latest", ["full-windows-1", "full-windows-2", "docs-windows"]],
 ];
 const condition = (block, ctx) => evaluate(scalar(block, "if").replace(/^\$\{\{|\}\}$/g, ""), ctx);
@@ -109,7 +109,7 @@ test("routing retains required identities and selects every planned worker witho
   assert.match(planner, /run: node scripts\/ci-validation\.mjs plan/);
   assert.equal(scalar(planner, "route"), "${{ steps.route.outputs.route }}");
   assert.equal(scalar(planner, "scope"), "${{ steps.route.outputs.scope }}");
-  for (const [id, , os, workers] of lanes) {
+  for (const [id, , os, workers, runner = os] of lanes) {
     const aggregate = job(source, id);
     assert.equal(scalar(aggregate, "name"), `${os} · node 24`);
     assert.deepEqual(list(aggregate, "needs"), ["plan", ...workers]);
@@ -120,7 +120,7 @@ test("routing retains required identities and selects every planned worker witho
       for (const worker of workers) {
         const block = job(source, worker);
         assert.equal(scalar(block, "needs"), "plan");
-        assert.equal(scalar(block, "runs-on"), os);
+        assert.equal(scalar(block, "runs-on"), runner);
         assert.equal(scalar(block, "timeout-minutes"), "30");
         assert.doesNotMatch(block, /strategy:|continue-on-error:/);
         assert.equal(condition(block, { needs: { plan: { outputs: { scope } } } }), ciWorker(worker).scope === scope);

@@ -58,7 +58,9 @@ jobs:
     name: macos-latest · node 24 · full
     needs: plan
     if: needs.plan.outputs.scope == 'full'
-    runs-on: macos-latest
+    # Keep required check/proof identities stable; use standard Intel macOS 26
+    # capacity for the same planned darwin workload.
+    runs-on: macos-26-intel
     timeout-minutes: 30
     outputs:
       proof: ${{ steps.test.outputs.proof }}
@@ -134,7 +136,8 @@ jobs:
     name: macos-latest · node 24 · docs
     needs: plan
     if: needs.plan.outputs.scope == 'docs'
-    runs-on: macos-latest
+    # Match the full darwin worker pool without changing its workload or identity.
+    runs-on: macos-26-intel
     timeout-minutes: 30
     outputs:
       proof: ${{ steps.test.outputs.proof }}
