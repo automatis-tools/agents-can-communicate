@@ -61,7 +61,7 @@ try {
 }
 `;
 
-test("independent processes cannot both win the same optimistic write", async t => {
+test("seeded independent-process contention", async t => {
   const root = await realpath(await mkdtemp(path.join(tmpdir(), "acc-concurrency-")));
   t.after(() => rm(root, { recursive: true, force: true }));
   const barrier = path.join(root, "start");
@@ -76,63 +76,55 @@ test("independent processes cannot both win the same optimistic write", async t 
   });
   const generation = await store.transaction(async tx => tx.generationOf("workspace", WORKSPACE));
 
-  const runs = Array.from({ length: CONTENDERS }, (_, index) =>
-    execFileAsync(process.execPath,
-      ["--input-type=module", "--eval", child(root, barrier, `c${index}`, generation)],
+  const runs = Array.from({ length: CONTENDERS }, (_, index) => {
+    const label = `c${index}`;
+    return execFileAsync(process.execPath,
+      ["--input-type=module", "--eval", child(root, barrier, label, generation)],
       { cwd: repoRoot })
-      .then(({ stdout }) => ({ code: 0, stdout }))
-      .catch(error => ({ code: error.code, stdout: error.stdout ?? "" })));
+      .then(({ stdout }) => ({ label, code: 0, stdout }))
+      .catch(error => ({ label, code: error.code, stdout: error.stdout ?? "",
+        stderr: error.stderr ?? error.message }));
+  });
 
   await writeFile(barrier, "go");
   const results = await Promise.all(runs);
-
   const winners = results.filter(result => result.code === 0);
   const losers = results.filter(result => result.code !== 0);
 
-  assert.equal(winners.length, 1, `expected exactly one winner, saw ${winners.length}`);
-  assert.equal(losers.length, CONTENDERS - 1);
-  for (const loser of losers) {
-    assert.equal(loser.code, EXIT.CONFLICT,
-      `a losing process exited ${loser.code} rather than EXIT.CONFLICT`);
-  }
-});
-
-test("the event log has no gaps and no duplicate sequences after contention", async t => {
-  const root = await realpath(await mkdtemp(path.join(tmpdir(), "acc-concurrency-")));
-  t.after(() => rm(root, { recursive: true, force: true }));
-  const barrier = path.join(root, "start");
-
-  const store = await openFilesystemStore({ root, clock: createFakeClock(NOW),
-    ids: createFakeIds(), workspaceId: WORKSPACE });
-  await store.transaction(async tx => {
-    tx.put("workspace", WORKSPACE, workspaceRecord("seed"));
-    tx.append({ schemaVersion: SCHEMA_VERSION, eventId: "event_seed",
-      workspaceId: WORKSPACE, actorSessionId: "session_a", type: "workspace.materialised",
-      occurredAt: NOW, payload: {} });
+  await t.test("independent processes cannot both win the same optimistic write", () => {
+    for (const result of results) {
+      assert.ok(result.code === 0 || result.code === EXIT.CONFLICT,
+        `contender setup or unexpected failure: ${JSON.stringify(result)}`);
+      assert.equal(result.stdout, result.code === 0 ? "won" : String(EXIT.CONFLICT),
+        `contender did not report its transaction outcome: ${JSON.stringify(result)}`);
+    }
+    assert.equal(winners.length, 1, `expected exactly one winner, saw ${winners.length}`);
+    assert.equal(losers.length, CONTENDERS - 1);
+    for (const loser of losers) {
+      assert.equal(loser.code, EXIT.CONFLICT,
+        `a losing process exited ${loser.code} rather than EXIT.CONFLICT`);
+    }
   });
-  const generation = await store.transaction(async tx => tx.generationOf("workspace", WORKSPACE));
 
-  const runs = Array.from({ length: CONTENDERS }, (_, index) =>
-    execFileAsync(process.execPath,
-      ["--input-type=module", "--eval", child(root, barrier, `d${index}`, generation)],
-      { cwd: repoRoot }).catch(() => undefined));
-  await writeFile(barrier, "go");
-  await Promise.all(runs);
+  await t.test("the event log has no gaps and no duplicate sequences after contention", async () => {
+    const files = (await readdir(path.join(root, "events"))).sort();
+    const sequences = files.map(file => Number(path.basename(file, ".json")));
 
-  const files = (await readdir(path.join(root, "events"))).sort();
-  const sequences = files.map(file => Number(path.basename(file, ".json")));
+    assert.deepEqual(sequences, [1, 2], "the event log gained a gap or a duplicate");
+    assert.equal(new Set(sequences).size, sequences.length);
+    assert.deepEqual(await readOpenJournals(store.paths, root), [],
+      "a completed journal entry was still treated as open");
 
-  assert.deepEqual(sequences, [1, 2], "the event log gained a gap or a duplicate");
-  assert.equal(new Set(sequences).size, sequences.length);
-  assert.deepEqual(await readOpenJournals(store.paths, root), [],
-    "a completed journal entry was still treated as open");
-
-  // A losing process must leave nothing behind at all, not even an event.
-  const events = await Promise.all(files.map(async file =>
-    JSON.parse(await readFile(path.join(root, "events", file), "utf8"))));
-  assert.deepEqual(events.map(event => event.type),
-    ["workspace.materialised", "session.opened"]);
-  await access(path.join(root, "protocol.json"));
+    // Only the seed and the successful contender may publish events.
+    const events = await Promise.all(files.map(async file =>
+      JSON.parse(await readFile(path.join(root, "events", file), "utf8"))));
+    assert.deepEqual(events.map(event => event.type),
+      ["workspace.materialised", "session.opened"]);
+    assert.deepEqual(events.map(event => event.eventId),
+      ["event_seed", ...winners.map(winner => `event_${winner.label}`)],
+      "the event log must contain the seed then the winner, with no losing events");
+    await access(path.join(root, "protocol.json"));
+  });
 });
 
 /** A workspace nobody has opened, and the CLI, for the first-run race. */
