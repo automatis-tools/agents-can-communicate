@@ -124,6 +124,13 @@ planner lineage. Each worker proof records its actual execution attempt, bounded
 and current aggregate attempts. First-attempt timing artifact names stay stable. Retry uploads
 add an attempt suffix and remain optional.
 
+Documentation scope retains package-link, exact archive and recorded-candidate checks.
+Markdown listed in `package.json.files` is shipped content. Changes to those files may need
+a new candidate record under [Releasing](docs/RELEASING.md); keep historical evidence unchanged.
+Before linking a new page from shipped Markdown, include it in the intentional packed set.
+Contributor guidance in this `AGENTS.md` is outside that set and can change without rewriting
+the package's recorded source or artifact provenance.
+
 Native CI observations are needed to measure the resulting runtime; scoped success never proves full-suite success.
 `--list` can inspect a shard without packing. Test files have a ten-minute process deadline
 (`ACC_TEST_FILE_TIMEOUT_MS`) in addition to the five-minute default per-test deadline
