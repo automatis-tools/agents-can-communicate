@@ -52,6 +52,10 @@ test("real Codex executes packed ACC reads and carries local evidence to approva
         'approvals_reviewer = "auto_review"', 'default_permissions = "fixture"',
         '[permissions.fixture]', 'extends = ":read-only"', '[permissions.fixture.filesystem]',
         '":workspace_roots" = "write"', grants,
+        // Test filesystem approval independently of the runner's network namespace.
+        // GitHub Linux can refuse bwrap's private loopback setup before ACC starts.
+        // Commands are fixed local ACC calls; update checks and live delivery are off.
+        '[permissions.fixture.network]', 'enabled = true',
         '[model_providers.stub]', 'name = "stub"', `base_url = "${stub.url}/v1"`,
         'wire_api = "responses"', 'env_key = "STUB_API_KEY"', "",
       ].join("\n"));
