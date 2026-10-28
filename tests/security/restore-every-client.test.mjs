@@ -26,7 +26,10 @@ const digest = async file => createHash("sha256").update(await readFile(file)).d
 /** Every file under a directory, with its digest. Missing directory reads empty. */
 async function fingerprint(root) {
   const entries = await readdir(root, { recursive: true, withFileTypes: true })
-    .catch(() => []);
+    .catch(error => {
+      if (error.code === "ENOENT") return [];
+      throw error;
+    });
   const files = new Map();
   for (const entry of entries) {
     if (!entry.isFile()) continue;
@@ -124,30 +127,62 @@ for (const adapterId of ["codex", "claude_code", "gemini_cli", "grok", "kimi"]) 
  * instance was fixed and the shape was not, so this checks both fixtures.
  */
 test("a home that had nothing is left with nothing", async t => {
-  const home = await realpath(await mkdtemp(path.join(tmpdir(), "acc-empty-")));
-  t.after(() => rm(home, { recursive: true, force: true }));
+  const antigravityRegistered = config => ["SessionStart", "PreInvocation", "Stop"]
+    .every(event => config.acc?.[event]?.some(action =>
+      action.type === "command" && typeof action.command === "string" && action.command.length > 0));
+  // Literal client paths and registrations, independent of installer reports.
+  // A newly supported adapter must gain an explicit install proof here.
+  const expectedArtifacts = {
+    "codex/global": [".agents/acc-local/.agents/plugins/marketplace.json",
+      config => config.plugins?.some(plugin => plugin.name === "agents-can-communicate")],
+    "claude_code/global": [".claude/settings.json",
+      config => config.enabledPlugins?.["agents-can-communicate@acc-local"] === true],
+    "gemini_cli/global": [".gemini/extensions/agents-can-communicate/gemini-extension.json",
+      config => config.name === "agents-can-communicate"],
+    "grok/global": [".grok/hooks/acc.json",
+      config => config.hooks?.SessionStart?.some(entry => entry.hooks?.some(hook =>
+        hook.type === "command" && typeof hook.command === "string" && hook.command.length > 0))],
+    "kimi/global": [".kimi-code/plugins/installed.json",
+      config => config.plugins?.some(plugin => plugin.id === "agents-can-communicate")],
+    "antigravity/global": [".gemini/config/hooks.json", antigravityRegistered],
+    "antigravity/workspace": ["project/.agents/hooks.json", antigravityRegistered],
+  };
 
-  // Every client, and for the one that can register in two places, both of
-  // them: a home left clean by a global registration says nothing about what a
-  // workspace registration leaves behind.
-  for (const location of ["global", "workspace"]) {
-    const context = clientContext(home, undefined,
-      { env: { ACC_ANTIGRAVITY_HOOKS: location }, cwd: path.join(home, "project") });
-    for (const adapter of ALL_ADAPTERS()) {
-      // One stand-in agy per location, shared by install and uninstall, so the
-      // plugin it installs is the one it is asked to remove.
-      const agy = fakeAgy();
-      await adapter.install({ ...context, runAgy: agy.run,
-        probeHooks: async () => ({ hooks: [{ name: "acc",
-          enabled: true, actions: ["SessionStart", "PreInvocation", "Stop"]
-            .map(event => ({ event })) }] }) });
-      await adapter.uninstall({ ...context, runAgy: agy.run });
+  // Every client once; both registration locations for Antigravity. Each case
+  // starts empty and must restore itself before the next case can run.
+  for (const adapter of ALL_ADAPTERS()) {
+    const locations = adapter.id === "antigravity" ? ["global", "workspace"] : ["global"];
+    for (const location of locations) {
+      const label = `${adapter.id}/${location}`;
+      await t.test(`${label}: install then uninstall restores its empty home`, async t => {
+        assert.ok(Object.hasOwn(expectedArtifacts, label),
+          `${label} needs an explicit expected install artifact`);
+        const temporaryHome = await mkdtemp(path.join(tmpdir(), "acc-empty-"));
+        t.after(() => rm(temporaryHome, { recursive: true, force: true }));
+        const home = await realpath(temporaryHome);
+        const context = clientContext(home, undefined,
+          { env: { ACC_ANTIGRAVITY_HOOKS: location }, cwd: path.join(home, "project") });
+        // The same stand-in agy serves this case's install and uninstall.
+        const agy = fakeAgy();
+        await adapter.install({ ...context, runAgy: agy.run,
+          probeHooks: async () => ({ hooks: [{ name: "acc",
+            enabled: true, actions: ["SessionStart", "PreInvocation", "Stop"]
+              .map(event => ({ event })) }] }) });
+
+        const [relative, isInstalled] = expectedArtifacts[label];
+        const installed = await readFile(path.join(home, relative), "utf8")
+          .catch(error => { throw new Error(`${label} install artifact ${relative}: ${error.message}`,
+            { cause: error }); });
+        assert.ok(isInstalled(JSON.parse(installed)),
+          `${label} did not register its install in ${relative}`);
+
+        await adapter.uninstall({ ...context, runAgy: agy.run });
+        const left = [...(await fingerprint(home)).keys()].sort();
+        assert.deepEqual(left, [],
+          `${label} left files in its initially empty home: ${left.join(", ")}`);
+      });
     }
   }
-
-  const left = [...(await fingerprint(home)).keys()].sort();
-  assert.deepEqual(left, [],
-    `an install and its removal left files in a home that had none: ${left.join(", ")}`);
 });
 
 test("a file with anything of the user's in it is not removed as empty", async t => {
