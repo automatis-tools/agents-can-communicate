@@ -2,6 +2,7 @@
 // while ordinary writes add events. Every call opens its own store, and the
 // validator reads the published log back through another: a read commits
 // nothing, and a write commits one event with the next sequence.
+import { rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { digest } from "../probe-kit.mjs";
@@ -304,6 +305,17 @@ const writeMutations = {
   "rewrites-receipt": async operate => async (built, input) => {
     const result = await operate(built, input);
     await rewriteReceipt(input.store, built.side.receiptId(built.target, "reader"));
+    return result;
+  },
+  // Commits the offer, but its event one sequence later than the log's next, as a writer
+  // that found the sequence before another commit would publish it (#307).
+  "skips-a-sequence": async operate => async (built, input) => {
+    const result = await operate(built, input);
+    const { events } = await visibleEvents(input.store, built.eventCursor);
+    const own = events.at(-1), log = path.join(built.fixture.root, "events");
+    const later = String(BigInt(own.sequence) + 1n).padStart(own.sequence.length, "0");
+    await writeFile(path.join(log, `${later}.json`), `${JSON.stringify({ ...own, sequence: later })}\n`);
+    await rm(path.join(log, `${own.sequence}.json`));
     return result;
   },
   "wrong-target": async () => async (built, input) => {

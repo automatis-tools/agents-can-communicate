@@ -41,7 +41,6 @@ export function createMemoryStore({ clock, ids, workspaceId }) {
       // neither a record nor an event behind.
       const staged = new Map(committed);
       const stagedEvents = [];
-      let sequence = nextSequence;
 
       const tx = Object.freeze({
         async load(kind, id) {
@@ -107,21 +106,25 @@ export function createMemoryStore({ clock, ids, workspaceId }) {
           }
           staged.delete(key(kind, id));
         },
+        // As the filesystem store: checked as appended, given its sequence at commit (#307).
         append(event) {
-          const stamped = { ...event, sequence: pad(sequence) };
-          sequence += 1;
-          validateRecord("event", stamped);
-          stagedEvents.push(stamped);
-          return stamped;
+          const { sequence: unassigned, ...fields } = event;
+          validateRecord("event", { ...fields, sequence: pad(1) });
+          stagedEvents.push(fields);
+          return fields;
         },
       });
 
       let result;
       try { result = await callback(tx); }
       finally { accepting = false; }
+      for (const appended of stagedEvents) {
+        appended.sequence = pad(nextSequence);
+        nextSequence += 1;
+        validateRecord("event", appended);
+      }
       committed = staged;
       events = [...events, ...stagedEvents];
-      nextSequence = sequence;
       return result;
     });
   }
