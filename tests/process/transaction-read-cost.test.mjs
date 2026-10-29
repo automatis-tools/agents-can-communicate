@@ -53,20 +53,28 @@ test("steady sends do not scale primary reads with backlog; receipts read only t
   const failed = await probe.capture(() => f.service.recordOfferFailed({ ...f.offer(messages[1]),
     safeErrorCode: "transport_rejected" }));
   t.diagnostic(JSON.stringify({ sends, read, offered, ack, failed }));
+  assert.equal(read.result.state, "queued");
+  assert.equal(read.result.messageId, messages[0].messageId);
+  assert.equal(read.result.recipientParticipantId, "reader");
+  assert.equal(offered.result.state, "offered");
+  assert.equal(ack.result.state, "acknowledged");
+  assert.equal(failed.result.type, "message.offer_failed");
+  assert.equal(failed.result.payload.messageId, messages[1].messageId);
+  assert.equal(failed.result.payload.recipientParticipantId, "reader");
+  assert.equal(failed.result.payload.safeErrorCode, "transport_rejected");
+  assert.equal((await f.service.readReceipt(f.offer(messages[1]))).state, "queued");
+  t.diagnostic("receipt identities, queued/offered/acknowledged states and failed-offer facts verified before cost bounds");
   assert.equal(read.stateReads, 2);
   assert.deepEqual(read.stateByKind, { receipt: 1, message: 1 });
   assert.equal(offered.stateReads, 3);
   assert.equal(ack.stateReads, 4, "including the owner lookup outside the writer");
   assert.equal(failed.stateReads, 3);
-  assert.equal(read.result.state, "queued");
-  assert.equal(offered.result.state, "offered");
-  assert.equal(ack.result.state, "acknowledged");
   const reopened = await openFilesystemStore({ root: f.root, workspaceId,
     clock: f.clock, ids: f.ids });
   const coldService = createCoordinationService({ store: reopened, clock: f.clock, ids: f.ids });
   const cold = await probe.capture(() => coldService.readReceipt(f.offer(messages[0])));
-  assert.equal(cold.stateReads, 2);
   assert.equal(cold.result.state, "acknowledged");
+  assert.equal(cold.stateReads, 2);
   const reopenedRetry = await probe.capture(() => coldService.sendMessage({ ...owner(f.sender),
     clientMessageId: "client_0", toParticipantIds: ["reader"], kind: "note", obligation: "none",
     subject: "client_0", body: "Same measured fixture" }));
