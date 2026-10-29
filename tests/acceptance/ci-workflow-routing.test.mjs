@@ -272,9 +272,7 @@ test("package and client matrices preserve their workloads and authenticate befo
   const source = await workflow("ci");
   for (const [id, platforms, commands] of [
     ["package", ["ubuntu-latest", "macos-latest", "windows-latest"], ["npm ci", "node scripts/verify-package.mjs"]],
-    ["real-clients", ["ubuntu-latest", "windows-latest"], ["npm ci", "npm install --global @anthropic-ai/claude-code @openai/codex",
-      "claude --version", "codex --version", "node --test tests/acceptance/real-clients-stub.test.mjs",
-      "python -m pip install --quiet pywinpty", "node --test tests/acceptance/real-claude-live-stub.test.mjs"]],
+    ["real-clients", ["ubuntu-latest", "windows-latest"], ["npm ci", "node scripts/ci-real-clients.mjs"]],
   ]) {
     const block = job(source, id);
     assert.equal(scalar(block, "name"), `${id === "package" ? "package" : "real clients"} · \${{ matrix.os }}`);
@@ -294,8 +292,74 @@ test("package and client matrices preserve their workloads and authenticate befo
     for (const os of platforms) assert.equal(interpolate(scalar(block, "CI_WORKER"), { matrix: { os } }), `${id}-${os}`);
     assert.equal(scalar(block, "CI_ROUTE"), "${{ needs.plan.outputs.route }}");
     if (id === "real-clients") {
-      assert.equal((block.match(/ACC_REAL_CLIENTS: '1'/g) ?? []).length, 2);
-      assert.match(block, /if: runner.os == 'Windows'/);
+      assert.equal(scalar(block, "timeout-minutes"), "30");
+      const uploads = block.split(/^      - /m).filter(step => step.includes("actions/upload-artifact@"));
+      assert.equal(uploads.length, 1);
+      assert.equal(scalar(uploads[0], "if"), "${{ always() }}");
+      assert.equal(scalar(uploads[0], "if-no-files-found"), "error");
+      assert.equal(scalar(uploads[0], "path"), "${{ runner.temp }}/acc-client-compatibility/");
+      assert.match(scalar(uploads[0], "name"), /\$\{\{ matrix.os \}\}.*\$\{\{ github.run_id \}\}.*\$\{\{ github.run_attempt \}\}/);
+      assert.ok(block.indexOf("actions/upload-artifact@") > preflights[1].index);
+      assert.doesNotMatch(block, /continue-on-error:|\$\{\{.*inputs\./);
+      for (const step of block.split(/^      - /m).filter(step => !step.startsWith("name: Prepare Linux Codex sandbox\n"))) {
+        assert.doesNotMatch(step, /shell: bash/);
+      }
     }
+  }
+});
+
+test("latest compatibility is an independent manual-only two-platform workflow", async () => {
+  const source = await workflow("client-compatibility");
+  assert.match(source, /^name: Client compatibility \(latest\)$/m);
+  assert.match(source, /^on:\n  workflow_dispatch:\s*\n/m);
+  assert.doesNotMatch(source, /^  (?:push|pull_request|schedule|release|inputs):|continue-on-error:|CI_ROUTE:|preflight|\$\{\{.*inputs\./m);
+  const block = job(source, "latest-clients");
+  assert.equal(scalar(block, "name"), "latest client compatibility · ${{ matrix.os }}");
+  assert.deepEqual(list(block, "os"), ["ubuntu-latest", "windows-latest"]);
+  assert.equal(scalar(block, "fail-fast"), "false");
+  assert.equal(scalar(block, "timeout-minutes"), "30");
+  assert.equal(scalar(block, "fetch-depth"), "0");
+  assert.equal(scalar(block, "node-version"), "'24'");
+  const ordinarySteps = block.split(/^      - /m).filter(step => !step.startsWith("name: Prepare Linux Codex sandbox\n")).join("\n");
+  assert.doesNotMatch(ordinarySteps, /shell: bash/);
+  assert.deepEqual([...ordinarySteps.matchAll(/^        run: (.+)$/gm)].map(match => match[1]), ["node scripts/ci-real-clients.mjs"]);
+  assert.match(block, /- run: npm ci/);
+  const upload = block.split(/^      - /m).find(step => step.includes("actions/upload-artifact@"));
+  assert.equal(scalar(upload, "if"), "${{ always() }}");
+  assert.equal(scalar(block, "if-no-files-found"), "error");
+  assert.equal(scalar(block, "path"), "${{ runner.temp }}/acc-client-compatibility/");
+  assert.match(scalar(block, "name"), /^latest client compatibility/);
+});
+
+test("both compatibility lanes prepare Linux namespaces before the complete driver workload", async () => {
+  const expected = [
+    "sudo apt-get update",
+    "sudo apt-get install --yes bubblewrap apparmor-profiles apparmor-utils",
+    "if test -f /usr/share/apparmor/extra-profiles/bwrap-userns-restrict; then",
+    "  sudo install -m 0644 /usr/share/apparmor/extra-profiles/bwrap-userns-restrict /etc/apparmor.d/bwrap-userns-restrict",
+    "fi",
+    "if test -f /etc/apparmor.d/bwrap-userns-restrict; then",
+    "  sudo apparmor_parser -r /etc/apparmor.d/bwrap-userns-restrict",
+    "fi",
+    "command -v bwrap",
+    "bwrap --version",
+    "dpkg-query -W bubblewrap apparmor-profiles apparmor-utils",
+    "bwrap --unshare-user --unshare-net --ro-bind / / /bin/true",
+  ].join("\n");
+  for (const [name, id] of [["ci", "real-clients"], ["client-compatibility", "latest-clients"]]) {
+    const block = job(await workflow(name), id);
+    const steps = block.split(/^      - /m).slice(1);
+    const setups = steps.filter(step => step.startsWith("name: Prepare Linux Codex sandbox\n"));
+    assert.equal(setups.length, 1, `${name} must prepare the Linux sandbox exactly once`);
+    const setup = setups[0];
+    assert.equal(scalar(setup, "shell"), "bash");
+    assert.equal(scalar(setup, "if"), "runner.os == 'Linux'");
+    assert.equal(shouldRun(setup, { runner: { os: "Linux" } }), true);
+    assert.equal(shouldRun(setup, { runner: { os: "Windows" } }), false);
+    const commands = setup.split("        run: |\n")[1]?.trimEnd().replace(/^          /gm, "");
+    assert.equal(commands, expected, `${name} must retain the ordinary-user namespace probe and distribution profile`);
+    assert.ok(block.indexOf("- run: npm ci") < block.indexOf("name: Prepare Linux Codex sandbox"));
+    assert.ok(block.indexOf("name: Prepare Linux Codex sandbox") < block.indexOf("run: node scripts/ci-real-clients.mjs"));
+    assert.doesNotMatch(block, /sysctl|apparmor_restrict_unprivileged_userns|unprivileged_userns_clone/);
   }
 });
