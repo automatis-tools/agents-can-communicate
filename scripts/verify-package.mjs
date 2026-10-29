@@ -18,6 +18,7 @@ import { promisify } from "node:util";
 import { gitProvenance } from "./git-provenance.mjs";
 import { verifyCertificationFixtureAllowlist } from "./package-certification.mjs";
 import { treeSnapshot } from "./tree-snapshot.mjs";
+import { runtimeWorkersQuiet } from "../tests/helpers/runtime-workers.mjs";
 
 const run = promisify(execFile);
 const repo = path.resolve(import.meta.dirname, "..");
@@ -106,6 +107,8 @@ async function main() {
     await mkdir(dir, { recursive: true });
   }
 
+  let verificationError;
+  let summary;
   try {
     step("pack");
     // Resolved before use: the install runs from a temporary directory, and a
@@ -305,11 +308,25 @@ async function main() {
 
     // One line to copy into the changelog, complete enough to be checkable
     // later: which file, which bytes, and which revision produced them.
-    console.log(`\nPASS  ${path.basename(tarball)}  sha256 ${digest}`
-      + `${commit === null ? "" : `  built from ${commit}${dirty ? " (dirty)" : ""}`}`);
+    summary = `\nPASS  ${path.basename(tarball)}  sha256 ${digest}`
+      + `${commit === null ? "" : `  built from ${commit}${dirty ? " (dirty)" : ""}`}`;
+  } catch (error) {
+    verificationError = error;
+    throw error;
   } finally {
-    await rm(workspace, { recursive: true, force: true });
+    try {
+      // The installed CLI starts finite detached writers. Their manager lock
+      // can be released before the final reclaim writes, so wait for exit too.
+      // Windows keeps its existing removal path; POSIX ps is not available there.
+      if (!isWindows) await runtimeWorkersQuiet(dataHome, { roots: [workspace], strict: true });
+      await rm(workspace, { recursive: true, force: true });
+    } catch (error) {
+      const detail = `Package cleanup failed; workspace retained at ${workspace}: ${error.message}`;
+      if (verificationError) console.error(`\n${detail}`);
+      else throw new Error(detail, { cause: error });
+    }
   }
+  console.log(summary);
 }
 
 // The message matters more than the stack: this runs in CI and in a release

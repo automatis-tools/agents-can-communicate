@@ -1,9 +1,11 @@
 import assert from "node:assert/strict";
-import { spawn } from "node:child_process";
-import { mkdir, mkdtemp, realpath, rm } from "node:fs/promises";
+import { execFile, spawn } from "node:child_process";
+import { lstat, mkdir, mkdtemp, readFile, realpath, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
+import { promisify } from "node:util";
+import { fileURLToPath } from "node:url";
 
 import { removeFixture } from "./helpers/fixture-cleanup.mjs";
 import { runtimeWorkersQuiet } from "./helpers/runtime-workers.mjs";
@@ -61,4 +63,143 @@ test("a quiet data home is not waited on", async t => {
   const started = performance.now();
   await runtimeWorkersQuiet(home, { timeoutMs: 10_000 });
   assert.equal(performance.now() - started < 2_000, true);
+});
+
+const posixOnly = { skip: process.platform === "win32"
+  ? "Strict process inspection is POSIX-only; Windows verifier cleanup is unchanged" : false };
+
+test("strict cleanup waits through lock release for the worker's final write", posixOnly, async t => {
+  const home = await dataHome(t);
+  const lock = path.join(home, "acc", "runtime", "worker", "manager.lock");
+  await mkdir(lock, { recursive: true });
+  const worker = spawn(process.execPath, ["--input-type=module", "-e", `
+    import { writeFile } from "node:fs/promises";
+    process.on("message", async () => {
+      await writeFile(process.argv[1] + "/finished", "final write");
+      process.disconnect();
+    });
+    process.send("ready");
+  `, home], { stdio: ["ignore", "ignore", "inherit", "ipc"] });
+  const exited = new Promise(resolve => worker.once("exit", resolve));
+  t.after(async () => { if (worker.exitCode === null) worker.kill(); await exited; });
+  await new Promise(resolve => worker.once("message", resolve));
+  let removed = false;
+  let cleanupFailure;
+  const cleanup = runtimeWorkersQuiet(home, { strict: true, timeoutMs: 5_000 })
+    .then(async () => {
+      assert.equal(await readFile(path.join(home, "finished"), "utf8"), "final write");
+      await rm(home, { recursive: true });
+      removed = true;
+    }).catch(error => { cleanupFailure = error; });
+  // Observe both stages: a held lock, then the writer after releasing its lock.
+  await pause(250);
+  assert.equal(removed, false);
+  await rm(lock, { recursive: true });
+  await pause(250);
+  assert.equal(removed, false, "deleted a root while its final writer was alive");
+  worker.send("finish");
+  await exited;
+  await cleanup;
+  assert.ifError(cleanupFailure);
+  await assert.rejects(lstat(home), { code: "ENOENT" });
+});
+
+test("strict timeout retains a root whose manager lock is still held", posixOnly, async t => {
+  const home = await dataHome(t);
+  const lock = path.join(home, "acc", "runtime", "worker", "poller", "manager.lock");
+  await mkdir(lock, { recursive: true });
+  await assert.rejects(runtimeWorkersQuiet(home, { strict: true, timeoutMs: 100 })
+    .then(() => rm(home, { recursive: true })), /timed out.*runtime workers/i);
+  assert.equal((await lstat(lock)).isDirectory(), true);
+});
+
+test("strict inspection rejects a filesystem error instead of calling it unlocked", posixOnly, async t => {
+  const home = await dataHome(t);
+  await mkdir(path.join(home, "acc"));
+  await writeFile(path.join(home, "acc", "runtime"), "not a directory");
+  await assert.rejects(runtimeWorkersQuiet(home, { strict: true, timeoutMs: 5_000 }), /ENOTDIR/);
+});
+
+test("strict inspection rejects an unavailable process inspector", posixOnly, async t => {
+  const home = await dataHome(t);
+  const helper = new URL("./helpers/runtime-workers.mjs", import.meta.url).href;
+  const result = await promisify(execFile)(process.execPath, ["--input-type=module", "-e", `
+    import { runtimeWorkersQuiet } from ${JSON.stringify(helper)};
+    try {
+      await runtimeWorkersQuiet(process.argv[1], { strict: true, timeoutMs: 5_000 });
+      process.exitCode = 2;
+    } catch (error) { console.log(error.message); }
+  `, home], { env: { ...process.env, PATH: home }, timeout: 5_000 });
+  assert.match(result.stdout, /ps.*ENOENT/);
+});
+
+test("a verification failure remains primary when cleanup inspection also fails", posixOnly, async t => {
+  const home = await dataHome(t);
+  const verifier = new URL("../scripts/verify-package.mjs", import.meta.url);
+  const missing = path.join(home, "missing-archive.tgz");
+  const failure = await promisify(execFile)(process.execPath, [fileURLToPath(verifier), missing], {
+    env: { ...process.env, PATH: home, TMPDIR: home }, timeout: 5_000,
+  }).then(() => assert.fail("verification unexpectedly succeeded"), error => error);
+  assert.equal(failure.code, 1);
+  assert.match(failure.stderr, /Package cleanup failed; workspace retained at/);
+  assert.match(failure.stderr, /Cannot inspect runtime workers.*ps.*ENOENT/);
+  assert.match(failure.stderr.trim().split("\n").at(-1), /FAIL.*missing-archive\.tgz/);
+  assert.doesNotMatch(failure.stdout, /PASS/);
+  const retained = /workspace retained at (.+?): Cannot inspect/.exec(failure.stderr)[1];
+  assert.equal(path.dirname(retained), home);
+  assert.equal((await lstat(retained)).isDirectory(), true);
+});
+
+test("strict inspection cannot keep its caller alive by ignoring SIGTERM", posixOnly, async t => {
+  const home = await dataHome(t);
+  const inspector = path.join(home, "ps");
+  const helper = new URL("./helpers/runtime-workers.mjs", import.meta.url).href;
+  await symlink(process.execPath, path.join(home, "node"));
+  await writeFile(inspector, `#!/usr/bin/env node
+    const { writeFileSync } = require("node:fs");
+    process.on("SIGTERM", () => writeFileSync(process.argv[1] + ".term", "ignored"));
+    writeFileSync(process.argv[1] + ".pid", String(process.pid));
+    setInterval(() => {}, 1_000);
+  `, { mode: 0o755 });
+  let outcome;
+  try {
+    outcome = await promisify(execFile)(process.execPath, ["--input-type=module", "-e", `
+      import { runtimeWorkersQuiet } from ${JSON.stringify(helper)};
+      try {
+        await runtimeWorkersQuiet(process.argv[1], { strict: true, timeoutMs: 1_500 });
+        process.exitCode = 2;
+      } catch (error) { console.log("rejected: " + error.message); }
+    `, home], { env: { ...process.env, PATH: home }, timeout: 4_000, killSignal: "SIGKILL" })
+      .catch(error => error);
+    // The pid record is written after the real inspector installs its TERM handler.
+    assert.match(await readFile(inspector + ".pid", "utf8"), /^\d+$/);
+    if (outcome.killed) assert.equal(await readFile(inspector + ".term", "utf8"), "ignored");
+    assert.equal(outcome.killed, undefined, "inspector kept its caller alive beyond the outer deadline");
+    assert.match(outcome.stdout, /rejected: .*runtime workers/i);
+  } finally {
+    // A mutant can strand this child after its caller is killed. Verify its
+    // unique executable path before killing only this test-owned inspector.
+    const pid = Number(await readFile(inspector + ".pid", "utf8").catch(error => {
+      if (error.code !== "ENOENT") throw error;
+      return "0";
+    }));
+    if (pid > 0) {
+      const ownedInspectorAlive = async () => {
+        const { stdout } = await promisify(execFile)("/bin/ps", ["-p", String(pid), "-o", "args="],
+          { timeout: 1_000, killSignal: "SIGKILL" }).catch(error => {
+          if (error.code !== 1) throw error;
+          return { stdout: "" };
+        });
+        return stdout.includes(inspector);
+      };
+      if (await ownedInspectorAlive()) {
+        try { process.kill(pid, "SIGKILL"); } catch (error) { if (error.code !== "ESRCH") throw error; }
+        const deadline = Date.now() + 1_000;
+        while (await ownedInspectorAlive()) {
+          assert.ok(Date.now() < deadline, "owned inspector survived cleanup");
+          await pause(25);
+        }
+      }
+    }
+  }
 });

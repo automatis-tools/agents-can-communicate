@@ -1,12 +1,48 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { CAPABILITY_SHAPE, effectiveCapabilities, evaluateNativeEligibility, projectContext }
+import { CAPABILITY_SHAPE, effectiveCapabilities, evaluateNativeEligibility }
   from "@agents-can-communicate/adapter-sdk";
 
+// Shared test-only guards used by the reference matrix and its hostile controls.
+export async function assertInstallPreservesConfiguration(createAdapter, fixture) {
+  const unrelated = await fixture.snapshot();
+
+  const first = await createAdapter().install(fixture.context);
+  const afterFirst = await fixture.snapshot();
+  const second = await createAdapter().install(fixture.context);
+
+  assert.equal(first.ok, true, JSON.stringify(first.diagnostics));
+  assert.equal(second.ok, true, JSON.stringify(second.diagnostics));
+  assert.deepEqual(await fixture.snapshot(), afterFirst,
+    "a second install changed the environment again");
+  for (const [key, value] of Object.entries(unrelated)) {
+    assert.deepEqual(await fixture.valueOf(key), value,
+      `install disturbed unrelated configuration at ${key}`);
+  }
+}
+
+export async function assertContextBudget(instance) {
+  const roster = Array.from({ length: 60 }, (_, index) => ({
+    sessionId: `session_${index}`, participantId: `participant_${index}`,
+    harness: "x", parentSessionId: null, presence: "online" }));
+
+  // Presence alone is compact. A peer question makes ignoring the budget observable.
+  const messages = [{ messageId: "message_budget", threadId: "message_budget",
+    kind: "question", obligation: "reply", fromSessionId: "session_0",
+    fromParticipantId: "participant_0", subject: "Shared configuration ownership",
+    body: "Which configuration entries does this session own? The requested work overlaps "
+      + "installed hooks and unrelated settings; confirm ownership before changing shared config." }];
+  const rendered = await instance.renderContext({ cursor: "0000000000000003", scope: "delta",
+    solo: false, attention: [], roster, events: [], messages }, { budgetBytes: 300 });
+
+  assert.equal(Buffer.byteLength(rendered, "utf8") <= 300, true,
+    "rendered context exceeded caller budget of 300 bytes");
+}
+
 /**
- * The shared matrix behind docs/ADAPTER_AUTHORING.md. Every adapter is held to it, so a
- * capability is a claim the suite can check rather than a line in a manifest.
+ * The matrix behind docs/ADAPTER_AUTHORING.md, currently exercised by the regular and
+ * native reference kits. Passing it does not certify an installed production adapter.
  *
  * @param {string} name
  * @param {{ createAdapter: () => object, createFixture: () => Promise<object>,
@@ -60,20 +96,7 @@ export function runAdapterConformance(name, kit) {
 
   test(`${name}: install is idempotent and preserves unrelated config`, async () => {
     const fixture = await kit.createFixture();
-    const unrelated = await fixture.snapshot();
-
-    const first = await adapter().install(fixture.context);
-    const afterFirst = await fixture.snapshot();
-    const second = await adapter().install(fixture.context);
-
-    assert.equal(first.ok, true, JSON.stringify(first.diagnostics));
-    assert.equal(second.ok, true, JSON.stringify(second.diagnostics));
-    assert.deepEqual(await fixture.snapshot(), afterFirst,
-      "a second install changed the environment again");
-    for (const [key, value] of Object.entries(unrelated)) {
-      assert.deepEqual(await fixture.valueOf(key), value,
-        `install disturbed unrelated configuration at ${key}`);
-    }
+    await assertInstallPreservesConfiguration(adapter, fixture);
   });
 
   test(`${name}: uninstall removes only what it owns, twice safely`, async () => {
@@ -126,14 +149,7 @@ export function runAdapterConformance(name, kit) {
   });
 
   test(`${name}: rendering respects the caller's byte budget`, async () => {
-    const roster = Array.from({ length: 60 }, (_, index) => ({
-      sessionId: `session_${index}`, participantId: `participant_${index}`,
-      harness: "x", parentSessionId: null, presence: "online" }));
-
-    const rendered = projectContext({ cursor: "0000000000000003", scope: "delta",
-      solo: false, attention: [], roster, events: [], messages: [] }, { budgetBytes: 300 });
-
-    assert.equal(Buffer.byteLength(rendered, "utf8") <= 300, true);
+    await assertContextBudget(adapter());
   });
 
   test(`${name}: doctor reports rather than repairs`, async () => {

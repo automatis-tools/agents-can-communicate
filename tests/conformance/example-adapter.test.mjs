@@ -7,7 +7,8 @@ import test, { after } from "node:test";
 import { defineAdapter, mergeOwnedConfig, ownedKeys, projectContext, removeOwnedConfig }
   from "@agents-can-communicate/adapter-sdk";
 
-import { runAdapterConformance } from "./adapter-contract.mjs";
+import { assertContextBudget, assertInstallPreservesConfiguration, runAdapterConformance }
+  from "./adapter-contract.mjs";
 
 // A reference adapter over a fake harness config. It exists so the conformance
 // runner is exercised before any real adapter depends on it: a matrix nothing
@@ -163,9 +164,32 @@ test("the conformance runner fails an adapter that breaks unrelated config", asy
       return { ok: true, changes: [], diagnostics: [] };
     } };
 
-  await destructive.install(fixture.context);
+  await assert.rejects(assertInstallPreservesConfiguration(() => destructive, fixture), {
+    name: "AssertionError", code: "ERR_ASSERTION", operator: "deepStrictEqual",
+    message: /^install disturbed unrelated configuration at theme(?:\n|$)/,
+    actual: undefined, expected: "dark",
+  });
 
   assert.equal((await fixture.snapshot()).theme, undefined,
     "the destructive adapter did not actually destroy anything");
   assert.notDeepEqual(await fixture.snapshot(), UNRELATED);
+});
+
+test("the conformance runner rejects a renderer that ignores the caller's byte budget", async () => {
+  let receivedBudget;
+  let renderedBytes;
+  const unbounded = { ...createAdapter(), renderContext: async (sync, options) => {
+    receivedBudget = options?.budgetBytes;
+    const rendered = projectContext(sync);
+    renderedBytes = Buffer.byteLength(rendered, "utf8");
+    return rendered;
+  } };
+
+  await assert.rejects(assertContextBudget(unbounded), {
+    name: "AssertionError", code: "ERR_ASSERTION", operator: "strictEqual",
+    message: /^rendered context exceeded caller budget of 300 bytes(?:\n|$)/,
+    actual: false, expected: true,
+  });
+  assert.equal(receivedBudget, 300, "the guard did not pass the caller's byte budget");
+  assert.equal(renderedBytes > 300, true, "the unbounded renderer did not exceed the budget");
 });
