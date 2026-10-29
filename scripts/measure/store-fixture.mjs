@@ -18,8 +18,8 @@ export function fixedClock(start = START) {
 
 // A store writes each record with a generation from `next("generation")`, so how far
 // that counter moved during a call is how many records the call wrote.
-export function fixedIds(prefix = "") {
-  const counters = new Map();
+export function fixedIds(prefix = "", initial = []) {
+  const counters = new Map(initial);
   const name = (kind, value) => `${kind}_${prefix}${pad(value)}`;
   return {
     next(kind) {
@@ -31,6 +31,8 @@ export function fixedIds(prefix = "") {
     count: kind => counters.get(kind) ?? 0,
     /** The id handed out as the `value`th of this kind. */
     nameOf: name,
+    /** Continue every counter independently from this exact point. */
+    fork: () => fixedIds(prefix, counters),
   };
 }
 
