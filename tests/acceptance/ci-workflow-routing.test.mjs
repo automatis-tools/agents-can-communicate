@@ -1,6 +1,9 @@
+// Workflow source contracts and actual checker/aggregate entry points stay together
+// so scheduling, input safety and their executed gates cannot drift apart.
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
-import { readFile } from "node:fs/promises";
+import { access, mkdtemp, readFile, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { promisify } from "node:util";
@@ -38,6 +41,59 @@ const context = (event, action, ref = "refs/pull/12/merge", name = "Lint") => ({
   github: { event_name: event, event: { action }, ref, workflow: name },
 });
 
+const shouldRun = (block, ctx) => {
+  const indentation = block.startsWith("    ") ? "    " : "        ";
+  const expression = block.match(new RegExp(`^${indentation}if: (.+)$`, "m"))?.[1];
+  return expression === undefined || evaluate(expression.replace(/^\$\{\{|\}\}$/g, ""), ctx);
+};
+
+test("PR metadata has an independent identity on every PR event and skips main pushes", async () => {
+  const source = await workflow("lint");
+  assert.deepEqual(list(source, "types"), ["opened", "synchronize", "reopened", "edited"]);
+  assert.deepEqual(list(source, "branches"), ["main"]);
+  assert.doesNotMatch(source, /pull_request_target|^\s+permissions:|^\s+paths(?:-ignore)?:/m);
+  const metadata = job(source, "pr-metadata");
+  assert.equal(scalar(metadata, "name"), "PR metadata");
+  const lintName = job(source, "Lint").match(/^    name: (.+)$/m)?.[1] ?? "Lint";
+  assert.equal(lintName, "Lint");
+  assert.notEqual(scalar(metadata, "name"), lintName);
+  assert.doesNotMatch(metadata, /^\s+needs:|continue-on-error:/m);
+  for (const action of ["opened", "synchronize", "reopened", "edited"]) {
+    assert.equal(shouldRun(metadata, context("pull_request", action)), true, action);
+  }
+  assert.equal(shouldRun(metadata, context("push", undefined, "refs/heads/main")), false);
+});
+
+test("PR metadata passes hostile description bytes as data to the actual checker", async t => {
+  const metadata = job(await workflow("lint"), "pr-metadata");
+  const steps = metadata.split(/^      - /m).slice(1);
+  const body = steps.find(step => step.includes("--text-env PR_BODY"));
+  assert.ok(body, "metadata must invoke the existing text-env checker");
+  const commands = [...metadata.matchAll(/^        run: (.+)$/gm)].map(match => match[1]);
+  assert.deepEqual(commands, ["node scripts/check-commit-attribution.mjs --text-env PR_BODY"]);
+  assert.equal(scalar(body, "PR_BODY"), "${{ github.event.pull_request.body }}");
+  for (const action of ["opened", "synchronize", "reopened", "edited"]) {
+    assert.equal(shouldRun(body, context("pull_request", action)), true, action);
+  }
+  const temporary = await mkdtemp(path.join(tmpdir(), "acc-metadata-body-"));
+  t.after(() => rm(temporary, { recursive: true, force: true }));
+  const sentinel = path.join(temporary, "executed");
+  const shellLooking = `quotes ' "\n$(touch '${sentinel}')\n\`touch '${sentinel}'\``;
+  for (const [description, code] of [["A clean description", 0], ["", 0],
+    ["Claude-Session: https://claude.ai/code/session_fixture", 1], [shellLooking, 0]]) {
+    const ctx = context("pull_request", "edited");
+    ctx.github.event.pull_request = { body: description };
+    assert.equal(shouldRun(body, ctx), true);
+    const env = { ...process.env, PR_BODY: interpolate(scalar(body, "PR_BODY"), ctx) };
+    assert.equal(env.PR_BODY, description);
+    const [, ...args] = commands[0].split(" ");
+    const result = await run(process.execPath, args, { cwd: repo, env }).then(
+      () => 0, error => error.code);
+    assert.equal(result, code, description);
+  }
+  await assert.rejects(access(sentinel), { code: "ENOENT" });
+});
+
 test("description edits cannot replace failed syntax with a green attribution-only check", async () => {
   const lint = job(await workflow("lint"), "Lint");
   const steps = lint.split(/^      - /m).slice(1);
@@ -45,17 +101,15 @@ test("description edits cannot replace failed syntax with a green attribution-on
   const history = steps.find(step => step.includes("--history HEAD"));
   const body = steps.find(step => step.includes("--text-env PR_BODY"));
   assert.ok(syntax && history && body);
-  const shouldRun = (step, ctx) => {
-    const expression = step.match(/^        if: (.+)$/m)?.[1];
-    return expression === undefined || evaluate(expression.replace(/^\$\{\{|\}\}$/g, ""), ctx);
-  };
   for (const action of ["opened", "synchronize", "reopened", "edited"]) {
     const ctx = context("pull_request", action);
+    assert.equal(shouldRun(lint, ctx), true, action);
     assert.equal(shouldRun(syntax, ctx), true, action);
     assert.equal(shouldRun(history, ctx), true, action);
     assert.equal(shouldRun(body, ctx), true, action);
   }
   const push = context("push", undefined, "refs/heads/main");
+  assert.equal(shouldRun(lint, push), true);
   assert.equal(shouldRun(syntax, push), true);
   assert.equal(shouldRun(history, push), true);
   assert.equal(shouldRun(body, push), false);
