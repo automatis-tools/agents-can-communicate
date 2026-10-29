@@ -7,7 +7,7 @@ import { createGatePlan, sourceDigest } from "../../scripts/change-plan.mjs";
 import { readTree } from "../../scripts/change-plan-git.mjs";
 import { fixture, invokePush, repo } from "./push-fixture.mjs";
 
-export async function pushDocsFixture(t, { ci } = {}) {
+export async function preparePushDocsFixture(t, { ci } = {}) {
   const f = await fixture(t);
   // Only this private child environment changes; the outer CI job stays intact.
   if (ci !== undefined) {
@@ -81,14 +81,19 @@ export async function pushDocsFixture(t, { ci } = {}) {
       documentation: ["AGENTS.md", "CHANGELOG.md", "README.md", "SECURITY.md"], documentationRoots: ["docs", "examples"],
       externalReaders: readers, sourceDigest: sourceDigest(await readTree(f.root, tree)) }));
   };
-  await audit();
-  const baseCommit = await f.commit("audited fixture source");
-  await write("README.md", "# after\n");
-  const targetCommit = await f.commit("documentation change");
   const planForRef = facts => createGatePlan({ repo: f.root, targetCommit: facts.commit,
     baseCommit: facts.base, event: { kind: "push", ref: facts.ref.remoteRef } });
   const records = async name => (await readFile(controls[name], "utf8").catch(() => ""))
     .trim().split("\n").filter(Boolean).map(line => name === "packs" ? line : JSON.parse(line));
-  return { ...f, write, audit, baseCommit, targetCommit, planForRef, records, supportsSelection,
+  return { ...f, write, audit, planForRef, records, supportsSelection,
     invoke: input => invokePush(f, input, path.join(trusted, "scripts/validate-push.mjs")) };
+}
+
+export async function pushDocsFixture(t, options = {}) {
+  const f = await preparePushDocsFixture(t, options);
+  await f.audit();
+  const baseCommit = await f.commit("audited fixture source");
+  await f.write("README.md", "# after\n");
+  const targetCommit = await f.commit("documentation change");
+  return { ...f, baseCommit, targetCommit };
 }
