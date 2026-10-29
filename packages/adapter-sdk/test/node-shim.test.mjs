@@ -31,9 +31,13 @@ process.stdout.write("runner-output");
   return { root, dir, seen, target };
 }
 
-const fire = (shim, args, input = "") => new Promise(resolve => {
+const fire = (shim, args, input = "") => new Promise((resolve, reject) => {
   const child = execFile(process.execPath, [shim, ...args], { env: {} },
     (error, stdout, stderr) => resolve({ code: error?.code ?? 0, stdout, stderr }));
+  // A missing target exits before reading stdin; keep its actual result.
+  child.stdin.once("error", error => {
+    if (error.code !== "EPIPE") reject(error);
+  });
   child.stdin.end(input);
 });
 
@@ -70,7 +74,7 @@ test("windows: the CLI shim passes the agent's arguments and fails loudly when t
   assert.deepEqual(JSON.parse(await readFile(seen, "utf8")).argv, ["status", "--json", "it's"]);
   const gone = await writeCliShim({ dir: path.join(root, "gone"), cli: path.join(root, "missing.mjs"),
     node: path.join(root, "node.exe"), platform: "win32" });
-  const result = await fire(gone, ["status"]);
+  const result = await fire(gone, ["status"], "x".repeat(1024 * 1024));
   assert.equal(result.code, 1);
   assert.match(result.stderr, /the CLI installed here is gone/);
 });
