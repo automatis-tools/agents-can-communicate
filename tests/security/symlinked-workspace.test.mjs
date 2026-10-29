@@ -13,6 +13,12 @@ const repo = path.resolve(import.meta.dirname, "..", "..");
 const acc = path.join(repo, "bin", "acc.mjs");
 const hook = path.join(repo, "bin", "acc-hook.mjs");
 
+async function hookOutput(child, phase) {
+  const { stdout, stderr } = await child;
+  assert.equal(stderr, "", `${phase} emitted hook diagnostics: ${stderr}`);
+  return stdout;
+}
+
 /**
  * A guard that only holds when the path is spelled one particular way is not a
  * guard.
@@ -45,7 +51,7 @@ async function workspace(t, { throughSymlink }) {
     const child = run(process.execPath, [hook, adapter, "sessionStart"], { env });
     child.child.stdin.end(JSON.stringify({ hook_event_name: "SessionStart",
       session_id: clientSessionId, cwd: project, source: "startup" }));
-    return child;
+    return hookOutput(child, `${adapter} SessionStart at ${project}`);
   };
   await start("codex", "owner-1");
   await start("claude_code", "writer-1");
@@ -54,6 +60,7 @@ async function workspace(t, { throughSymlink }) {
     [acc, "doctor", "--cwd", project, "--json"], { env });
   const runtimeDir = JSON.parse(reported).data.runtimeRoot;
   const owner = await loadSessionBinding({ runtimeDir, harnessSessionId: "owner-1" });
+  assert.ok(owner, `SessionStart did not persist the owner binding at ${project}`);
 
   await run(process.execPath, [acc, "claim", "--session", owner.accSessionId,
     "--generation", owner.generation, "--cwd", project,
@@ -63,46 +70,39 @@ async function workspace(t, { throughSymlink }) {
   return { project, env };
 }
 
-/** What the writer's client is told when it tries to write into the claim. */
-async function attemptWrite({ project, env }) {
+/** What the writer's client is told when it tries to write the target. */
+async function attemptWrite({ project, env }, relativePath = "src/store/index.mjs") {
   const child = run(process.execPath, [hook, "claude_code", "preToolUse"], { env });
   child.child.stdin.end(JSON.stringify({ hook_event_name: "PreToolUse",
     session_id: "writer-1", cwd: project, tool_name: "Write",
-    tool_input: { file_path: path.join(project, "src", "store", "index.mjs") } }));
-  const { stdout } = await child;
-  return stdout;
+    tool_input: { file_path: path.join(project, relativePath) } }));
+  return hookOutput(child, `claude_code PreToolUse at ${path.join(project, relativePath)}`);
 }
 
-test("a claim is enforced when the workspace is reached through a symlink", async t => {
+test("guarded writes through a symlinked workspace", async t => {
   const place = await workspace(t, { throughSymlink: true });
 
-  const stdout = await attemptWrite(place);
+  await t.test("a write into the claim is denied", async () => {
+    const stdout = await attemptWrite(place);
 
-  assert.match(stdout, /"permissionDecision"\s*:\s*"deny"/,
-    "the write was allowed through a symlinked path while status reported guarded");
-  assert.match(stdout, /file:src\/store\/\*\*/);
+    assert.match(stdout, /"permissionDecision"\s*:\s*"deny"/,
+      "the write was allowed through a symlinked path while status reported guarded");
+    assert.match(stdout, /file:src\/store\/\*\*/);
+  });
+
+  await t.test("a write outside the claim is still allowed", async () => {
+    // A guard that denies everything must not satisfy the denial check above.
+    const stdout = await attemptWrite(place, "src/cli/args.mjs");
+
+    assert.equal(stdout, "", `an unrelated write was interfered with: ${stdout}`);
+  });
 });
 
 test("the same claim is enforced when the workspace is reached directly", async t => {
-  // The control. Without it a broken guard could pass the test above by
-  // denying everything, and a broken *test* could pass by asserting nothing.
+  // Independently initialized control for the canonical-path spelling.
   const place = await workspace(t, { throughSymlink: false });
 
   const stdout = await attemptWrite(place);
 
   assert.match(stdout, /"permissionDecision"\s*:\s*"deny"/);
-});
-
-test("a write outside the claim is still allowed through a symlink", async t => {
-  // The guard must not become "deny everything" as a way of passing the first
-  // test. A path the claim does not cover has to go through untouched.
-  const place = await workspace(t, { throughSymlink: true });
-
-  const child = run(process.execPath, [hook, "claude_code", "preToolUse"], { env: place.env });
-  child.child.stdin.end(JSON.stringify({ hook_event_name: "PreToolUse",
-    session_id: "writer-1", cwd: place.project, tool_name: "Write",
-    tool_input: { file_path: path.join(place.project, "src", "cli", "args.mjs") } }));
-  const { stdout } = await child;
-
-  assert.equal(stdout, "", `an unrelated write was interfered with: ${stdout}`);
 });
