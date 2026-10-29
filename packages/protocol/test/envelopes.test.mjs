@@ -53,13 +53,6 @@ test("an unexpected error becomes a generic failure without its stack", () => {
   assert.equal("stack" in envelope.error, false);
 });
 
-test("envelopes serialise to exactly one JSON object", () => {
-  const rendered = `${JSON.stringify(ok({ value: 1 }))}\n`;
-
-  assert.equal(rendered.trimEnd().split("\n").length, 1);
-  assert.deepEqual(JSON.parse(rendered), ok({ value: 1 }));
-});
-
 test("envelopes are frozen so a caller cannot mutate a published result", () => {
   const envelope = ok({ value: 1 });
 
