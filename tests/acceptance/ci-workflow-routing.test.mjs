@@ -47,25 +47,55 @@ const shouldRun = (block, ctx) => {
   return expression === undefined || evaluate(expression.replace(/^\$\{\{|\}\}$/g, ""), ctx);
 };
 
-test("PR metadata has an independent identity on every PR event and skips main pushes", async () => {
-  const source = await workflow("lint");
-  assert.deepEqual(list(source, "types"), ["opened", "synchronize", "reopened", "edited"]);
-  assert.deepEqual(list(source, "branches"), ["main"]);
-  assert.doesNotMatch(source, /pull_request_target|^\s+permissions:|^\s+paths(?:-ignore)?:/m);
-  const metadata = job(source, "pr-metadata");
-  assert.equal(scalar(metadata, "name"), "PR metadata");
-  const lintName = job(source, "Lint").match(/^    name: (.+)$/m)?.[1] ?? "Lint";
-  assert.equal(lintName, "Lint");
-  assert.notEqual(scalar(metadata, "name"), lintName);
-  assert.doesNotMatch(metadata, /^\s+needs:|continue-on-error:/m);
-  for (const action of ["opened", "synchronize", "reopened", "edited"]) {
-    assert.equal(shouldRun(metadata, context("pull_request", action)), true, action);
+// Evaluate only the event filters used by these workflows. A skipped job still
+// creates a check; an absent workflow event must not schedule any job at all.
+function workflowRuns(source, ctx) {
+  const triggers = source.match(/^on:\n([\s\S]*?)(?=^\S|$(?![\s\S]))/m)?.[1];
+  assert.ok(triggers, "workflow has no event boundary");
+  const event = triggers.match(new RegExp(`^  ${ctx.github.event_name}:\\n([\\s\\S]*?)(?=^  \\w+:|$(?![\\s\\S]))`, "m"))?.[1];
+  if (event === undefined) return false;
+  if (ctx.github.event_name === "pull_request") return list(event, "types").includes(ctx.github.event.action);
+  if (ctx.github.event_name === "push") return list(event, "branches").includes(ctx.github.ref.replace(/^refs\/heads\//, ""));
+  throw new Error(`unsupported workflow event: ${ctx.github.event_name}`);
+}
+const workflowName = source => source.match(/^name: (.+)$/m)?.[1];
+const jobIds = source => [...source.slice(source.indexOf("jobs:\n")).matchAll(/^  ([\w-]+):/gm)].map(match => match[1]);
+
+test("workflow event boundaries keep Lint absent from edits and metadata required on every PR action", async () => {
+  const lintSource = await workflow("lint");
+  assert.deepEqual(list(lintSource, "types"), ["opened", "synchronize", "reopened"],
+    "Lint must exclude edited at the workflow event boundary");
+  const metadataSource = await workflow("pr-metadata");
+  assert.deepEqual(list(metadataSource, "types"), ["opened", "synchronize", "reopened", "edited"],
+    "metadata must include description edits");
+  assert.deepEqual(list(lintSource, "branches"), ["main"]);
+  assert.doesNotMatch(metadataSource, /^  (?:push|pull_request_target|workflow_dispatch):/m);
+  for (const source of [lintSource, metadataSource]) {
+    assert.doesNotMatch(source, /pull_request_target|^\s+permissions:|^\s+paths(?:-ignore)?:/m);
   }
-  assert.equal(shouldRun(metadata, context("push", undefined, "refs/heads/main")), false);
+  assert.equal(workflowName(lintSource), "Lint");
+  assert.equal(workflowName(metadataSource), "PR metadata");
+  assert.deepEqual(jobIds(lintSource), ["Lint"]);
+  assert.deepEqual(jobIds(metadataSource), ["pr-metadata"]);
+  const metadata = job(metadataSource, "pr-metadata");
+  const lint = job(lintSource, "Lint");
+  assert.equal(scalar(metadata, "name"), "PR metadata");
+  assert.equal(lint.match(/^    name: (.+)$/m)?.[1] ?? "Lint", "Lint");
+  for (const block of [metadata, lint]) assert.doesNotMatch(block, /^    (?:if|needs):|continue-on-error:/m);
+  for (const action of ["opened", "synchronize", "reopened", "edited"]) {
+    const ctx = context("pull_request", action);
+    assert.equal(workflowRuns(lintSource, ctx), action !== "edited", action);
+    assert.equal(workflowRuns(metadataSource, ctx), true, action);
+    assert.equal(shouldRun(metadata, ctx), true, action);
+  }
+  const push = context("push", undefined, "refs/heads/main");
+  assert.equal(workflowRuns(lintSource, push), true);
+  assert.equal(workflowRuns(metadataSource, push), false);
+  assert.equal(workflowRuns(lintSource, context("push", undefined, "refs/heads/other")), false);
 });
 
 test("PR metadata passes hostile description bytes as data to the actual checker", async t => {
-  const metadata = job(await workflow("lint"), "pr-metadata");
+  const metadata = job(await workflow("pr-metadata"), "pr-metadata");
   const steps = metadata.split(/^      - /m).slice(1);
   const body = steps.find(step => step.includes("--text-env PR_BODY"));
   assert.ok(body, "metadata must invoke the existing text-env checker");
@@ -94,41 +124,46 @@ test("PR metadata passes hostile description bytes as data to the actual checker
   await assert.rejects(access(sentinel), { code: "ENOENT" });
 });
 
-test("description edits cannot replace failed syntax with a green attribution-only check", async () => {
-  const lint = job(await workflow("lint"), "Lint");
+test("code Lint retains unconditional syntax and complete history while descriptions are metadata-only", async () => {
+  const source = await workflow("lint");
+  const lint = job(source, "Lint");
   const steps = lint.split(/^      - /m).slice(1);
-  const syntax = steps.find(step => step.includes("run: node scripts/check-syntax.mjs"));
-  const history = steps.find(step => step.includes("--history HEAD"));
-  const body = steps.find(step => step.includes("--text-env PR_BODY"));
-  assert.ok(syntax && history && body);
-  for (const action of ["opened", "synchronize", "reopened", "edited"]) {
-    const ctx = context("pull_request", action);
-    assert.equal(shouldRun(lint, ctx), true, action);
-    assert.equal(shouldRun(syntax, ctx), true, action);
-    assert.equal(shouldRun(history, ctx), true, action);
-    assert.equal(shouldRun(body, ctx), true, action);
+  const syntax = steps.find(step => step.includes("run: node scripts/check-syntax.mjs --tracked"));
+  const history = steps.find(step => step.includes("run: node scripts/check-commit-attribution.mjs --history HEAD"));
+  assert.ok(syntax, "Lint must validate tracked syntax");
+  assert.ok(history, "Lint must validate complete commit history");
+  assert.equal(scalar(lint, "fetch-depth"), "0");
+  assert.deepEqual([...lint.matchAll(/^        run: (.+)$/gm)].map(match => match[1]), [
+    "node scripts/check-syntax.mjs --tracked",
+    "node scripts/check-commit-attribution.mjs --history HEAD",
+  ]);
+  assert.doesNotMatch(lint, /PR_BODY|--text-env|pull_request\.body/);
+  for (const ctx of [context("pull_request", "opened"), context("pull_request", "synchronize"),
+    context("pull_request", "reopened"), context("push", undefined, "refs/heads/main")]) {
+    assert.equal(workflowRuns(source, ctx), true);
+    assert.equal(shouldRun(lint, ctx), true);
+    assert.equal(shouldRun(syntax, ctx), true);
+    assert.equal(shouldRun(history, ctx), true);
   }
-  const push = context("push", undefined, "refs/heads/main");
-  assert.equal(shouldRun(lint, push), true);
-  assert.equal(shouldRun(syntax, push), true);
-  assert.equal(shouldRun(history, push), true);
-  assert.equal(shouldRun(body, push), false);
 });
 
-test("all stale PR runs coalesce because every Lint run validates the full gate", async () => {
-  for (const name of ["ci", "lint"]) {
+test("each workflow coalesces its own stale PR runs without cross-workflow cancellation", async () => {
+  const groups = [];
+  for (const [name, expectedName] of [["ci", "CI"], ["lint", "Lint"], ["pr-metadata", "PR metadata"]]) {
     const source = await workflow(name);
+    assert.equal(workflowName(source), expectedName);
     const group = scalar(source, "group");
-    const workflowName = name === "ci" ? "CI" : "Lint";
     const key = action => interpolate(group, context("pull_request", action,
-      "refs/pull/12/merge", workflowName));
+      "refs/pull/12/merge", workflowName(source)));
     assert.equal(key("opened"), key("synchronize"));
     assert.equal(key("reopened"), key("synchronize"));
     assert.notEqual(key("opened"), interpolate(group,
-      context("pull_request", "opened", "refs/pull/13/merge", workflowName)));
+      context("pull_request", "opened", "refs/pull/13/merge", workflowName(source))));
     assert.equal(evaluate(scalar(source, "cancel-in-progress"), {}), true);
-    assert.equal(key("edited"), key("synchronize"));
+    if (name === "pr-metadata") assert.equal(key("edited"), key("synchronize"));
+    groups.push(key(name === "pr-metadata" ? "edited" : "synchronize"));
   }
+  assert.equal(new Set(groups).size, 3, "metadata edits must not cancel code Lint or CI");
 });
 
 const lanes = [
