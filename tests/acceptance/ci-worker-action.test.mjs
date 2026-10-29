@@ -29,7 +29,7 @@ test('the composite publishes proof only from the production test-driver step', 
   const install = steps.find(s => s.includes('run: npm ci'));
   assert.ok(install && steps.indexOf(install) < steps.indexOf(driver));
   assert.match(source, /uses: actions\/setup-node@820762786026740c76f36085b0efc47a31fe5020/);
-  assert.equal(scalar(source, 'node-version'), "'24'");
+  assert.equal(scalar(source, 'node-version'), "'24.22.1'");
   for (const step of [install, driver]) {
     const selector = scalar(step, 'shell');
     for (const [os, want] of [['Windows', 'pwsh'], ['Linux', 'bash'], ['macOS', 'bash']]) {

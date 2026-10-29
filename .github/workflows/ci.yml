@@ -58,9 +58,8 @@ jobs:
     name: macos-latest · node 24 · full
     needs: plan
     if: needs.plan.outputs.scope == 'full'
-    # Keep required check/proof identities stable; use standard Intel macOS 26
-    # capacity for the same planned darwin workload.
-    runs-on: macos-26-intel
+    # The measured compute cohort ran faster on the standard macOS pool.
+    runs-on: macos-latest
     timeout-minutes: 30
     outputs:
       proof: ${{ steps.test.outputs.proof }}
@@ -136,8 +135,8 @@ jobs:
     name: macos-latest · node 24 · docs
     needs: plan
     if: needs.plan.outputs.scope == 'docs'
-    # Match the full darwin worker pool without changing its workload or identity.
-    runs-on: macos-26-intel
+    # Match the full Darwin worker pool without changing workload or identity.
+    runs-on: macos-latest
     timeout-minutes: 30
     outputs:
       proof: ${{ steps.test.outputs.proof }}

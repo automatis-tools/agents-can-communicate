@@ -79,7 +79,7 @@ test("all stale PR runs coalesce because every Lint run validates the full gate"
 
 const lanes = [
   ["linux-test", "linux", "ubuntu-latest", ["full-linux", "docs-linux"]],
-  ["macos-test", "darwin", "macos-latest", ["full-macos", "docs-macos"], "macos-26-intel"],
+  ["macos-test", "darwin", "macos-latest", ["full-macos", "docs-macos"]],
   ["windows-test", "win32", "windows-latest", ["full-windows-1", "full-windows-2", "docs-windows"]],
 ];
 const condition = (block, ctx) => evaluate(scalar(block, "if").replace(/^\$\{\{|\}\}$/g, ""), ctx);
