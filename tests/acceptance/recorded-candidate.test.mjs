@@ -78,15 +78,13 @@ test("the changelog's digest describes the code that is here now", async () => {
   const [, recorded] = /\|\s*Built from\s*\|\s*`([0-9a-f]{7,40})`\s*\|/.exec(changelog) ?? [];
   assert.equal(typeof recorded, "string", "the changelog records no commit");
 
-  // A shallow clone - which is what `actions/checkout` makes by default - may
-  // not have the recorded commit at all. Saying so is honest; failing would make
-  // this a test of the checkout depth rather than of the record.
+  // Unavailable source objects cannot establish provenance. The comparison
+  // needs the recorded commit and trees, not a complete ancestor graph.
   const known = await git("cat-file", "-e", `${recorded}^{commit}`)
     .then(() => true, () => false);
-  if (!known) {
-    console.log(`recorded commit ${recorded} is not in this clone; nothing to compare`);
-    return;
-  }
+  assert.equal(known, true,
+    `recorded commit ${recorded} is unavailable; required source history/objects `
+    + "must be available to verify the candidate");
 
   // Commits, and the working tree beside them. Comparing only commits meant
   // `npm test` passed on an edited README and the pre-push hook caught it a
