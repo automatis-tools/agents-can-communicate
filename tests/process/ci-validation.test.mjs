@@ -1,6 +1,9 @@
+// Real execution and synthetic diagnostic witnesses share one CLI contract;
+// keeping them together makes the two retained runner/package boundaries explicit.
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { ciRunnerFixture, postRunInterruption } from '../helpers/ci-runner-fixture.mjs';
+import { ciDiagnosticFixture } from '../helpers/ci-diagnostic-fixture.mjs';
 
 test('production CLI executes docs, exact smoke, then proof', async t => {
   const f = await ciRunnerFixture(t);
@@ -67,21 +70,78 @@ test('auxiliary preflight accepts only a planned native auxiliary worker', async
   await f.write('README.md','dirty'); noProof(await f.invoke('preflight',env));
 });
 
-for (const [name, suffix] of Object.entries({
-  missing: `\nawait (await import('node:fs/promises')).unlink(process.env.ACC_GATE_DIAGNOSTIC);`,
-  invalid: `\nawait (await import('node:fs/promises')).writeFile(process.env.ACC_GATE_DIAGNOSTIC,'{');`,
-  zero: sabotage('m.files=[];'), duplicate: sabotage('m.files[1]=m.files[0];'),
-  foreign: sabotage("m.files[0].file='tests/foreign.test.mjs';"), failed: sabotage('m.files[0].success=false;'),
+async function observeSynthetic(f, run, action, bytes) {
+  assert.equal(run.completionsAfter.length, run.completionsBefore.length + 1,
+    'each CLI invocation must complete a new synthetic child');
+  assert.deepEqual(run.completionsAfter.slice(0, -1), run.completionsBefore);
+  const completion = run.completionsAfter.at(-1);
+  assert.deepEqual({ ...completion, pid: 0 }, { kind: 'synthetic-ci-diagnostic',
+    invocationId: run.invocationId, diagnosticPath: f.diagnosticPath, argv: f.expectedArgv,
+    pid: 0, action, intendedExit: 0 });
+  assert.ok(Number.isSafeInteger(completion.pid) && completion.pid > 0);
+  if (action === 'missing') await assert.rejects(readFile(f.diagnosticPath), { code: 'ENOENT' });
+  else assert.equal(await readFile(f.diagnosticPath, 'utf8'), bytes);
+  const counts = {};
+  for (const counter of ['docs', 'runtime', 'packs', 'smoke']) {
+    counts[counter] = (await f.records(counter)).length;
+    assert.equal(counts[counter], 0, `synthetic diagnostics must not execute ${counter}`);
+  }
+  return { evidence: 'synthetic-child-diagnostics', completion, counts, exitCode: run.result.code,
+    proofPublished: run.result.outputs.proof !== undefined };
+}
+
+// All eleven case names/order survive. Nine reports are synthetic CLI inputs;
+// smoke and child retain the actual runner, npm pack and exact-package smoke.
+for (const [name, corrupt] of Object.entries({
+  missing: null, invalid: null,
+  zero: m => { m.files = []; }, duplicate: m => { m.files[1] = m.files[0]; },
+  foreign: m => { m.files[0].file = 'tests/foreign.test.mjs'; }, failed: m => { m.files[0].success = false; },
   smoke: sabotage("m.events=m.events.filter(e=>e.event!=='package-smoke');"),
-  fallback: sabotage("m.events.forEach(e=>e.scope='full');"),
-  batch: sabotage("m.events.find(e=>e.event==='batch-execution').fileCount--;"),
-  stale: sabotage("m.events.forEach(e=>e.commit='a'.repeat(40));"),
+  fallback: m => { m.events.forEach(e => e.scope = 'full'); },
+  batch: m => { m.events.find(e => e.event === 'batch-execution').fileCount--; },
+  stale: m => { m.events.forEach(e => e.commit = (e.commit[0] === 'a' ? 'b' : 'a').repeat(e.commit.length)); },
   child: '\nprocess.exitCode=1;',
-})) test(`no proof for actual CLI ${name} diagnostics or child failure`,async t=>{
-  const f=await ciRunnerFixture(t,{runnerSuffix:suffix}); const p=await f.invoke('plan');
-  assert.equal(p.code,0,p.stderr);
-  noProof(await f.invoke('test',{CI_ROUTE:p.outputs.route,CI_WORKER:f.worker}));
-  assert.equal((await f.records('docs')).length,1);
+})) test(`no proof for actual CLI ${name} diagnostics or child failure`, async t => {
+  if (name === 'smoke' || name === 'child') {
+    const f = await ciRunnerFixture(t, { runnerSuffix: corrupt });
+    const p = await f.invoke('plan'); assert.equal(p.code, 0, p.stderr);
+    const result = await f.invoke('test', { CI_ROUTE: p.outputs.route, CI_WORKER: f.worker });
+    const counts = {};
+    for (const [counter, expected] of [['docs', 1], ['runtime', 0], ['packs', 1], ['smoke', 1]]) {
+      counts[counter] = (await f.records(counter)).length;
+      assert.equal(counts[counter], expected, `real ${name} execution: ${counter}`);
+    }
+    const manifest = JSON.parse(await readFile(path.join(f.temporary, 'acc-test-timings.jsonl.manifest.json'), 'utf8'));
+    assert.equal(manifest.files.length, 8);
+    assert.equal(manifest.files.every(record => record.success === true), true);
+    assert.equal(manifest.resultCounts.failed, 0);
+    assert.equal(manifest.events.at(-1).result, 'passed');
+    assert.equal(manifest.events.some(event => event.event === 'package-smoke'), name === 'child');
+    t.diagnostic(JSON.stringify({ evidence: 'real-runner-package', case: name, counts,
+      exitCode: result.code, proofPublished: result.outputs.proof !== undefined }));
+    noProof(result);
+    await assert.rejects(readFile(path.join(f.temporary, 'acc-ci-proof.json')), { code: 'ENOENT' });
+    return;
+  }
+  const f = await ciDiagnosticFixture(t);
+  const valid = JSON.stringify(f.baselineManifest);
+  const positive = await f.runDiagnostic({ bytes: valid });
+  assert.equal(positive.completionsBefore.length, 0);
+  t.diagnostic(JSON.stringify(await observeSynthetic(f, positive, 'write', valid)));
+  assert.equal(positive.result.code, 0, positive.result.stderr);
+  assert.deepEqual(JSON.parse(positive.result.outputs.proof), f.expectedProof);
+  assert.deepEqual(JSON.parse(await readFile(f.proofPath, 'utf8')), f.expectedProof);
+  const changed = structuredClone(f.baselineManifest);
+  if (corrupt) corrupt(changed);
+  const action = name === 'missing' ? 'missing' : 'write';
+  const bytes = name === 'invalid' ? '{' : JSON.stringify(changed);
+  const negative = await f.runDiagnostic({ action, bytes });
+  assert.equal(negative.completionsBefore.length, 1);
+  assert.notEqual(negative.invocationId, positive.invocationId);
+  t.diagnostic(JSON.stringify(await observeSynthetic(f, negative, action, bytes)));
+  noProof(negative.result);
+  assert.equal(negative.result.stderr.trim(), 'ci-validation-failed');
+  await assert.rejects(readFile(f.proofPath), { code: 'ENOENT' });
 });
 
 test('zero-execution runner cannot reuse stale matching success diagnostics',async t=>{
