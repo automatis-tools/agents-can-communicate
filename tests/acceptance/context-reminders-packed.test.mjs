@@ -121,14 +121,14 @@ test("an installed hook preserves a prior backlog with client 2.1.233", async t 
 
 // The future client must inherit captured delivery capabilities without needing
 // another large backlog. Both offers below cross the actual installed hook.
-test("an installed future-version hook preserves an old offer after reopening", async t => {
+test("an installed future-version hook preserves a captured-version offer after reopening", async t => {
   const packed = await createPackedAcc(t);
-  await packed.setClientVersions({ claude: "99.0.0", codex: "0.0.0" });
+  await packed.setClientVersions({ claude: "2.1.233", codex: "0.0.0" });
   const payload = { session_id: "native-future-reader", cwd: packed.project, source: "startup" };
   const start = async () => {
     const output = await packed.hook("claude_code", { ...payload, hook_event_name: "SessionStart" },
       { ACC_PARTICIPANT: "reader" });
-    assert.equal(output.stderr, "", "SessionStart must attach the future-version reader");
+    assert.equal(output.stderr, "", "SessionStart must attach the reader");
   };
   const turn = async (body, label) => {
     const output = await packed.beforeTurn({ adapterId: "claude_code",
@@ -151,19 +151,38 @@ test("an installed future-version hook preserves an old offer after reopening", 
   const oldBody = "FUTURE_OLD_REQUEST: review the unresolved port 4301 integration.";
   const old = await request("Earlier future-client review", oldBody);
   const oldTurn = await turn(oldBody, "old");
+  const oldOffer = (await packed.acc(["sync", "--scope", "full"])).events.find(event =>
+    event.type === "message.offer_succeeded" && event.payload.messageId === old.message.messageId
+    && event.payload.recipientParticipantId === "reader");
+  assert.ok(oldOffer, "the installed hook must record the old offer");
+  assert.equal(oldOffer.payload.clientVersion, "2.1.233",
+    "the old offer must come from the captured-version reader");
+  assert.deepEqual([oldOffer.payload.adapterId, oldOffer.payload.transport,
+    oldOffer.payload.targetSessionId, oldOffer.payload.targetGeneration],
+  ["claude_code", "next-turn", flags(oldTurn)[1], flags(oldTurn)[3]],
+  "the old offer must identify the installed hook and its native owner");
   const prior = receipt(await snapshot(), old.message.messageId);
   assert.equal(prior.state, "offered");
   assert.deepEqual(prior.extensions.offer, { transport: "next-turn",
     at: prior.updatedAt, repeatedAt: null }, "old receipt must carry an actual next-turn offer");
   assert.ok(Number.isFinite(Date.parse(prior.updatedAt)), "old offer must have a durable timestamp");
+  const body = "FUTURE_CURRENT_REQUEST: use port 4317 for the new integration.";
+  const fresh = await request("Current future-client review", body);
+  assert.equal(receipt(await snapshot(), fresh.message.messageId).state, "queued",
+    "the fresh request must be queued before closing the captured-version reader");
   const ended = await packed.hook("claude_code", { ...payload,
     hook_event_name: "SessionEnd", reason: "other" });
   assert.equal(ended.stderr, "", "SessionEnd must close the old native owner");
+  await packed.setClientVersions({ claude: "99.0.0", codex: "0.0.0" });
   await start();
-  assert.deepEqual(receipt(await snapshot(), old.message.messageId), prior,
+  const binding = await packed.findBinding(payload.session_id);
+  assert.ok(binding, "SessionStart must publish the future reader binding");
+  assert.equal(binding.clientVersion, "99.0.0", "the reopened reader must probe the future version");
+  const reopened = await snapshot();
+  assert.deepEqual(receipt(reopened, old.message.messageId), prior,
     "native close/reopen must preserve the old receipt");
-  const body = "FUTURE_CURRENT_REQUEST: use port 4317 for the new integration.";
-  const fresh = await request("Current future-client review", body);
+  assert.equal(receipt(reopened, fresh.message.messageId).state, "queued",
+    "reopening with the future version must preserve the queued fresh request");
   const first = await turn(body, "fresh");
   assert.ok(!first.includes(oldBody), "an old offered body must not replay after reopening");
   assert.match(first, /1 reply/);
@@ -172,6 +191,16 @@ test("an installed future-version hook preserves an old offer after reopening", 
   assert.ok(Buffer.byteLength(first) < 1_000);
   const currentFlags = flags(first);
   assert.notDeepEqual(currentFlags, flags(oldTurn), "reopening must replace the native owner");
+  const freshOffer = (await packed.acc(["sync", "--scope", "full"])).events.find(event =>
+    event.type === "message.offer_succeeded" && event.payload.messageId === fresh.message.messageId
+    && event.payload.recipientParticipantId === "reader");
+  assert.ok(freshOffer, "the installed hook must record the fresh offer");
+  assert.equal(freshOffer.payload.clientVersion, "99.0.0",
+    "the fresh offer must come from the future-version reader");
+  assert.deepEqual([freshOffer.payload.adapterId, freshOffer.payload.transport,
+    freshOffer.payload.targetSessionId, freshOffer.payload.targetGeneration],
+  ["claude_code", "next-turn", currentFlags[1], currentFlags[3]],
+  "the fresh offer must identify the installed hook and its replacement native owner");
   const offered = await snapshot();
   assert.equal(receipt(offered, fresh.message.messageId).state, "offered",
     "a delivered future-version body must advance its receipt");
