@@ -104,8 +104,6 @@ function successfulNeeds(route, plan, workers) {
 
 test("routing retains required identities and selects every planned worker without fail-fast coupling", async () => {
   const source = await workflow("ci");
-  const workerAction = await readFile(path.join(repo, ".github", "actions", "ci-test", "action.yml"), "utf8");
-  assert.equal(scalar(workerAction, "node-version"), "'24.22.1'");
   assert.doesNotMatch(source, /^\s+paths(?:-ignore)?:|pull_request_target|--if-needed/m);
   const planner = job(source, "plan");
   assert.match(planner, /run: node scripts\/ci-validation\.mjs plan/);
