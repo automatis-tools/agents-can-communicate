@@ -67,6 +67,11 @@ export async function runRealClients({ cwd, env, evidenceDir, platform = process
         `$ErrorActionPreference = 'Stop'; ${client} --version; exit $LASTEXITCODE`] : ["--version"])]));
   const hooks = phase("hooks", process.execPath,
     ["--test", "--test-reporter=tap", "tests/acceptance/real-clients-stub.test.mjs"]);
+  const approval = phase("command-approval", process.execPath,
+    ["--test", "--test-reporter=tap", "tests/acceptance/codex-command-approval.test.mjs"]);
+  if (platform === "win32") Object.assign(approval, {
+    status: "not-applicable", reason: "POSIX-only command approval is unsupported on Windows",
+  });
   const terminal = phase("pywinpty", "python", ["-m", "pip", "install", "--quiet", "pywinpty"]);
   if (platform !== "win32") Object.assign(terminal, { status: "not-applicable", reason: "POSIX uses Python pty" });
   const interactive = phase("interactive", process.execPath,
@@ -191,6 +196,10 @@ export async function runRealClients({ cwd, env, evidenceDir, platform = process
   }
   await behavior(hooks);
   if (report.failure) return finish();
+  if (platform !== "win32") {
+    await behavior(approval);
+    if (report.failure) return finish();
+  }
   if (platform === "win32") {
     await execute(terminal);
     if (report.failure) return finish();

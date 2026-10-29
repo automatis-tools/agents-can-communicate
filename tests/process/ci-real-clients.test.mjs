@@ -37,24 +37,31 @@ else { process.stdout.write(value.stdout ?? ({claude:'2.1.312 (Claude Code)\\n',
 process.stderr.write(value.stderr??'');process.exitCode=value.code??0; }
 `);
   const files = {};
-  for (const name of ["first", "second"]) {
+  for (const name of ["first", "approval", "second"]) {
     files[name] = path.join(root, `${name}.test.mjs`);
     await writeFile(files[name], "import test from 'node:test'; test('one',()=>{}); test('two',()=>{});\n");
   }
   const env = { ...process.env, ...identity, RUNNER_TEMP: root, FIXTURE_CALLS: calls,
     FIXTURE_CONFIG: "{}", ...changes };
   delete env.NODE_TEST_CONTEXT;
+  const testCalls = [];
   const dependencies = { npmCli: async () => program, spawn(executable, args, options) {
     const isTest = args[0] === "--test";
     if (isTest) {
       assert.equal(executable, process.execPath);
       assert.deepEqual(args.slice(0, 2), ["--test", "--test-reporter=tap"]);
-      assert.deepEqual(args.slice(2), [args[2].includes("real-clients-stub")
-        ? "tests/acceptance/real-clients-stub.test.mjs" : "tests/acceptance/real-claude-live-stub.test.mjs"]);
+      const targets = {
+        "tests/acceptance/real-clients-stub.test.mjs": "first",
+        "tests/acceptance/codex-command-approval.test.mjs": "approval",
+        "tests/acceptance/real-claude-live-stub.test.mjs": "second",
+      };
+      assert.equal(args.length, 3, "each phase must run exactly one acceptance file");
+      const target = targets[args[2]];
+      assert.ok(target, `unexpected behavioral command: ${JSON.stringify(args)}`);
+      testCalls.push([...args]);
       assert.equal(options.env.ACC_REAL_CLIENTS, "1");
       assert.equal(options.env.GIT_DIR, "");
       assert.equal(options.env.GIT_WORK_TREE, "");
-      const target = args[2].includes("real-clients-stub") ? "first" : "second";
       return spawn(executable, [...args.slice(0, 2), ...(env.FIXTURE_ZERO === target ? ["--test-name-pattern=absent-case"] : []),
         files[target]], options);
     }
@@ -78,11 +85,11 @@ process.stderr.write(value.stderr??'');process.exitCode=value.code??0; }
     const report = JSON.parse(await readFile(path.join(evidenceDir, "compatibility.json"), "utf8"));
     return { code, report, phases: Object.fromEntries(report.phases.map(phase => [phase.id, phase])) };
   };
-  return { root, env, files, invoke, program, calls, dependencies,
+  return { root, env, files, invoke, program, calls, testCalls, dependencies,
     config(value) { env.FIXTURE_CONFIG = JSON.stringify(value); } };
 }
 
-test("pinned PR runs exact installs, both behavioral commands and complete evidence", async t => {
+test("pinned PR runs exact installs, behavioral commands and complete evidence", async t => {
   const f = await fixture(t);
   const { code, report: r, phases: p } = await f.invoke();
   assert.equal(code, 0);
@@ -117,6 +124,44 @@ test("pinned PR runs exact installs, both behavioral commands and complete evide
   assert.equal(p.hooks.tests.tests, 2);
   assert.equal(p.interactive.tests.pass, 2);
   assert.equal(p.pywinpty.status, process.platform === "win32" ? "passed" : "not-applicable");
+});
+
+test("command approval runs strictly between hooks and interactive on POSIX and is not launched on Windows", async t => {
+  for (const platform of ["linux", "win32"]) {
+    const f = await fixture(t);
+    const { code, report: r, phases: p } = await f.invoke({ platform });
+    assert.ok(p["command-approval"], "the driver must record a dedicated command-approval phase");
+    assert.equal(code, 0);
+    assert.equal(r.status, "passed");
+    const approval = ["--test", "--test-reporter=tap", "tests/acceptance/codex-command-approval.test.mjs"];
+    assert.deepEqual(p["command-approval"].args, approval);
+    assert.deepEqual(f.testCalls, platform === "win32" ? [
+      ["--test", "--test-reporter=tap", "tests/acceptance/real-clients-stub.test.mjs"],
+      ["--test", "--test-reporter=tap", "tests/acceptance/real-claude-live-stub.test.mjs"],
+    ] : [
+      ["--test", "--test-reporter=tap", "tests/acceptance/real-clients-stub.test.mjs"],
+      approval,
+      ["--test", "--test-reporter=tap", "tests/acceptance/real-claude-live-stub.test.mjs"],
+    ]);
+    assert.equal(p.hooks.status, "passed");
+    assert.equal(p.interactive.status, "passed");
+    assert.equal(p.pywinpty.status, platform === "win32" ? "passed" : "not-applicable");
+    const phase = p["command-approval"];
+    if (platform === "win32") {
+      assert.equal(phase.status, "not-applicable");
+      assert.match(phase.reason, /POSIX-only/);
+      assert.equal(phase.startedAt, null);
+      assert.equal(phase.exitCode, null);
+      assert.equal(phase.tests, null);
+      await assert.rejects(access(path.join(f.root, "evidence", phase.stdoutFile)), { code: "ENOENT" });
+    } else {
+      assert.equal(phase.status, "passed");
+      assert.equal(phase.exitCode, 0);
+      assert.equal(phase.tests.pass, 2);
+      assert.ok(phase.startedAt && phase.finishedAt);
+      await access(path.join(f.root, "evidence", phase.stdoutFile));
+    }
+  }
 });
 
 test("main and manual latest retain moving installs while other events cannot install", async t => {
@@ -190,23 +235,28 @@ test("wrong, absent, diagnostic-only and nonzero client versions block behavior 
   assert.match(await readFile(path.join(f.root, "evidence", p["codex-version"].stderrFile), "utf8"), /Missing optional dependency/);
 });
 
-test("actual failed, empty, skipped, todo and cancelled TAP processes cannot pass either behavioral phase", async t => {
+test("actual failed, empty, skipped, todo and cancelled TAP processes cannot pass any behavioral phase", async t => {
   for (const [body, expected] of [["test('bad',()=>{throw Error('behavior fault')})", "fail"],
     ["test('present-case',()=>{})", "tests"], ["test.skip('skipped',()=>{})", "skipped"], ["test.todo('later')", "todo"],
     ["test('cancelled',{timeout:20},()=>new Promise(()=>{}))", "cancelled"]]) {
-    for (const target of ["first", "second"]) {
+    for (const target of ["first", "approval", "second"]) {
       const f = await fixture(t);
       if (expected === "tests") f.env.FIXTURE_ZERO = target;
       await writeFile(f.files[target], `import test from 'node:test'; ${body};\n`);
-      const { code, phases: p } = await f.invoke();
+      const { code, report: r, phases: p } = await f.invoke(target === "approval" ? { platform: "linux" } : {});
       assert.equal(code, 1, `${expected} ${target}`);
-      const phase = p[target === "first" ? "hooks" : "interactive"];
+      const phase = p[{ first: "hooks", approval: "command-approval", second: "interactive" }[target]];
       assert.equal(phase.status, "failed");
       // Node 24 wraps a no-matching-test file as one passing file; its empty
       // plan still must fail this compatibility gate, with raw counters intact.
       assert.equal(phase.tests[expected], 1);
-      if (target === "first") assert.equal(p.interactive.status, "not-run");
-      else assert.equal(p.hooks.status, "passed");
+      if (target !== "second") assert.equal(p.interactive.status, "not-run");
+      if (target === "first" && process.platform !== "win32") assert.equal(p["command-approval"].status, "not-run");
+      if (target !== "first") assert.equal(p.hooks.status, "passed");
+      if (target === "approval") {
+        assert.equal(r.failure.phase, "command-approval");
+        assert.equal(f.testCalls.length, 2, "approval failure blocks the interactive launch");
+      }
     }
   }
 });

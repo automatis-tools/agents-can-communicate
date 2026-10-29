@@ -300,7 +300,10 @@ test("package and client matrices preserve their workloads and authenticate befo
       assert.equal(scalar(uploads[0], "path"), "${{ runner.temp }}/acc-client-compatibility/");
       assert.match(scalar(uploads[0], "name"), /\$\{\{ matrix.os \}\}.*\$\{\{ github.run_id \}\}.*\$\{\{ github.run_attempt \}\}/);
       assert.ok(block.indexOf("actions/upload-artifact@") > preflights[1].index);
-      assert.doesNotMatch(block, /continue-on-error:|shell: bash|\$\{\{.*inputs\./);
+      assert.doesNotMatch(block, /continue-on-error:|\$\{\{.*inputs\./);
+      for (const step of block.split(/^      - /m).filter(step => !step.startsWith("name: Prepare Linux Codex sandbox\n"))) {
+        assert.doesNotMatch(step, /shell: bash/);
+      }
     }
   }
 });
@@ -309,7 +312,7 @@ test("latest compatibility is an independent manual-only two-platform workflow",
   const source = await workflow("client-compatibility");
   assert.match(source, /^name: Client compatibility \(latest\)$/m);
   assert.match(source, /^on:\n  workflow_dispatch:\s*\n/m);
-  assert.doesNotMatch(source, /^  (?:push|pull_request|schedule|release|inputs):|continue-on-error:|CI_ROUTE:|preflight|shell: bash|\$\{\{.*inputs\./m);
+  assert.doesNotMatch(source, /^  (?:push|pull_request|schedule|release|inputs):|continue-on-error:|CI_ROUTE:|preflight|\$\{\{.*inputs\./m);
   const block = job(source, "latest-clients");
   assert.equal(scalar(block, "name"), "latest client compatibility · ${{ matrix.os }}");
   assert.deepEqual(list(block, "os"), ["ubuntu-latest", "windows-latest"]);
@@ -317,10 +320,46 @@ test("latest compatibility is an independent manual-only two-platform workflow",
   assert.equal(scalar(block, "timeout-minutes"), "30");
   assert.equal(scalar(block, "fetch-depth"), "0");
   assert.equal(scalar(block, "node-version"), "'24'");
-  assert.deepEqual([...block.matchAll(/^        run: (.+)$/gm)].map(match => match[1]), ["node scripts/ci-real-clients.mjs"]);
+  const ordinarySteps = block.split(/^      - /m).filter(step => !step.startsWith("name: Prepare Linux Codex sandbox\n")).join("\n");
+  assert.doesNotMatch(ordinarySteps, /shell: bash/);
+  assert.deepEqual([...ordinarySteps.matchAll(/^        run: (.+)$/gm)].map(match => match[1]), ["node scripts/ci-real-clients.mjs"]);
   assert.match(block, /- run: npm ci/);
-  assert.equal(scalar(block, "if"), "${{ always() }}");
+  const upload = block.split(/^      - /m).find(step => step.includes("actions/upload-artifact@"));
+  assert.equal(scalar(upload, "if"), "${{ always() }}");
   assert.equal(scalar(block, "if-no-files-found"), "error");
   assert.equal(scalar(block, "path"), "${{ runner.temp }}/acc-client-compatibility/");
   assert.match(scalar(block, "name"), /^latest client compatibility/);
+});
+
+test("both compatibility lanes prepare Linux namespaces before the complete driver workload", async () => {
+  const expected = [
+    "sudo apt-get update",
+    "sudo apt-get install --yes bubblewrap apparmor-profiles apparmor-utils",
+    "if test -f /usr/share/apparmor/extra-profiles/bwrap-userns-restrict; then",
+    "  sudo install -m 0644 /usr/share/apparmor/extra-profiles/bwrap-userns-restrict /etc/apparmor.d/bwrap-userns-restrict",
+    "fi",
+    "if test -f /etc/apparmor.d/bwrap-userns-restrict; then",
+    "  sudo apparmor_parser -r /etc/apparmor.d/bwrap-userns-restrict",
+    "fi",
+    "command -v bwrap",
+    "bwrap --version",
+    "dpkg-query -W bubblewrap apparmor-profiles apparmor-utils",
+    "bwrap --unshare-user --unshare-net --ro-bind / / /bin/true",
+  ].join("\n");
+  for (const [name, id] of [["ci", "real-clients"], ["client-compatibility", "latest-clients"]]) {
+    const block = job(await workflow(name), id);
+    const steps = block.split(/^      - /m).slice(1);
+    const setups = steps.filter(step => step.startsWith("name: Prepare Linux Codex sandbox\n"));
+    assert.equal(setups.length, 1, `${name} must prepare the Linux sandbox exactly once`);
+    const setup = setups[0];
+    assert.equal(scalar(setup, "shell"), "bash");
+    assert.equal(scalar(setup, "if"), "runner.os == 'Linux'");
+    assert.equal(shouldRun(setup, { runner: { os: "Linux" } }), true);
+    assert.equal(shouldRun(setup, { runner: { os: "Windows" } }), false);
+    const commands = setup.split("        run: |\n")[1]?.trimEnd().replace(/^          /gm, "");
+    assert.equal(commands, expected, `${name} must retain the ordinary-user namespace probe and distribution profile`);
+    assert.ok(block.indexOf("- run: npm ci") < block.indexOf("name: Prepare Linux Codex sandbox"));
+    assert.ok(block.indexOf("name: Prepare Linux Codex sandbox") < block.indexOf("run: node scripts/ci-real-clients.mjs"));
+    assert.doesNotMatch(block, /sysctl|apparmor_restrict_unprivileged_userns|unprivileged_userns_clone/);
+  }
 });

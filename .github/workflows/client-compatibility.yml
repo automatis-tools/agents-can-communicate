@@ -20,6 +20,25 @@ jobs:
         with:
           node-version: '24'
       - run: npm ci
+      - name: Prepare Linux Codex sandbox
+        if: runner.os == 'Linux'
+        shell: bash
+        # Codex requires distribution bubblewrap and Ubuntu's bwrap userns profile:
+        # https://learn.chatgpt.com/docs/sandboxing#prerequisites
+        # Load only that profile, preserving the runner's global userns policy.
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes bubblewrap apparmor-profiles apparmor-utils
+          if test -f /usr/share/apparmor/extra-profiles/bwrap-userns-restrict; then
+            sudo install -m 0644 /usr/share/apparmor/extra-profiles/bwrap-userns-restrict /etc/apparmor.d/bwrap-userns-restrict
+          fi
+          if test -f /etc/apparmor.d/bwrap-userns-restrict; then
+            sudo apparmor_parser -r /etc/apparmor.d/bwrap-userns-restrict
+          fi
+          command -v bwrap
+          bwrap --version
+          dpkg-query -W bubblewrap apparmor-profiles apparmor-utils
+          bwrap --unshare-user --unshare-net --ro-bind / / /bin/true
       - name: Observe latest clients and run real compatibility checks
         run: node scripts/ci-real-clients.mjs
       - name: Upload latest client compatibility evidence
