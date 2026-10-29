@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import path from "node:path";
-import test from "node:test";
+import test, { after } from "node:test";
 import inbox from "../../scripts/measure/probes/inbox.mjs";
+import { forkInboxFixture } from "../helpers/fork-probe-fixture.mjs";
 
 // #304 for #306: an inbox probe proves which message came back, which receipt
 // moved and which event it published, read back from a fresh store.
@@ -9,15 +10,34 @@ const repo = path.resolve(import.meta.dirname, "..", "..");
 const exact = inbox.scenario({ messages: 12, backlog: 10, operation: "exact", seed: 3 });
 // Enough listable messages that the byte budget, not the limit, ends a page.
 const page = inbox.scenario({ messages: 40, backlog: 4, operation: "page", limit: 20, seed: 3 });
-// Each mutation builds its own real store; these need witnesses, not a large backlog.
+// Each mutation gets a private real store; these need witnesses, not a large backlog.
 const mutationScenarios = [
   inbox.scenario({ messages: 8, backlog: 4, operation: "exact", seed: 3 }),
   inbox.scenario({ messages: 12, backlog: 4, operation: "page", limit: 5, seed: 3 }),
 ];
 
-async function built(t, scenario) {
+async function realBuilt(t, scenario) {
   const side = await inbox.load(repo);
   const value = await inbox.build(scenario, side);
+  t.after(() => inbox.dispose(value));
+  return value;
+}
+
+// Only immutable setup is shared within this file, never a store handle or
+// operated fixture. Every subject call still opens its own filesystem store.
+const seeds = new Map();
+after(async () => {
+  const completed = await Promise.allSettled(seeds.values());
+  await Promise.all(completed.filter(item => item.status === "fulfilled")
+    .map(item => inbox.dispose(item.value)));
+});
+function seedFor(scenario) {
+  const key = inbox.hash(scenario);
+  if (!seeds.has(key)) seeds.set(key, inbox.load(repo).then(side => inbox.build(scenario, side)));
+  return seeds.get(key);
+}
+async function built(t, scenario) {
+  const value = await forkInboxFixture(await seedFor(scenario));
   t.after(() => inbox.dispose(value));
   return value;
 }
@@ -28,7 +48,7 @@ const call = async (value, operate = inbox.operate) => {
 };
 
 test("an inbox scenario builds the same records every time, with receipts in every state", async t => {
-  const first = await built(t, exact), second = await built(t, exact);
+  const first = await realBuilt(t, exact), second = await realBuilt(t, exact);
   assert.equal(first.digest, second.digest);
   assert.notEqual(inbox.hash(exact), inbox.hash(page));
   const states = new Set([...first.receipts.values()].filter(item => item.recipient === "reader").map(item => item.state));
@@ -71,6 +91,7 @@ test("every negative mutation for each operation fails validation", async t => {
   for (const scenario of mutationScenarios) {
     const mutations = inbox.mutationsFor(scenario);
     assert.ok(Object.keys(mutations).length >= 5, scenario.operation);
+    assert.deepEqual(await call(await built(t, scenario)), [], `${scenario.operation} fork control`);
     for (const [name, mutate] of Object.entries(mutations)) {
       const value = await built(t, scenario);
       const failures = await call(value, await mutate(inbox.operate, { side: value.side, scenario }));
