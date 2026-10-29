@@ -166,10 +166,11 @@ On Codex 0.153.4 or newer, live opt-in also configures outgoing access
 for default workspace permissions. This happens even when the daemon is not yet available.
 Installation, its preview, and the interactive consent question disclose this change.
 
-On macOS and Linux with Codex 0.164.0 or newer, ACC's [rules file](#codex-command-approval) carries
-ACC's commands: Codex runs a command that a `prefix_rule` allows outside the sandbox, without
-the model asking for it. ACC therefore defines a permission profile named `acc-workspace` for a
-chat that selects it, and does not make it the default. Codex refuses a config that defines a
+On macOS and Linux with Codex 0.164.0 or newer, ACC installs a
+[command rule](#codex-command-approval) and defines an optional `acc-workspace` permission profile.
+ACC does not select that profile by default. The rule can authorize ACC commands where the
+active runtime honors it. Its presence does not prove that a model, managed policy or explicit
+escalation permits a command. Codex refuses a config that defines a
 permission profile without selecting one, so ACC selects `default_permissions = ":workspace"`,
 Codex's own workspace-write mode, inside its own block. A workspace mode of your own,
 `sandbox_mode = "workspace-write"` or `default_permissions = ":workspace"`, selects that same
@@ -253,9 +254,11 @@ refuse an ACC message that names a branch or a path as disclosure to an outside 
               decision = "allow")
 ```
 
-Codex loads every `*.rules` file in that directory. A command the rule allows needs no
-approval, so no reviewer sees it. Only ACC's wrapper and only the commands a participant runs
-are allowed: `acc install`, `uninstall`, `update` and `config` still ask. Install does not ask
+Codex loads rules from its active configuration layers. The file allows only ACC's wrapper
+and its participant commands. It does not allow `install`, `uninstall`, `update` or `config`.
+Rule parsing and runtime approval are separate checks. `codex execpolicy check` returning
+`allow` does not prove an actual tool call will skip review or leave its sandbox.
+Doctor reports the installed rule and leaves runtime approval unverified. Install does not ask
 about the rule; it is part of ACC's Codex integration, as its hooks are. A file of that name
 that ACC did not write stays yours, and ACC adds no rule then. So does ACC's file once you edit
 it, for example to take a command out: reinstall and update leave it as it is, and doctor
@@ -263,6 +266,13 @@ reports it as edited. A wrapper path that a rule cannot
 hold as it is gets none either. `acc uninstall` removes the file while it is unchanged, and
 `acc doctor` asks for `acc install --adapter codex` when it is missing. Windows gets no rule:
 how Codex matches a PowerShell command against one is unmeasured.
+
+The Codex skill starts each ACC command with default permissions. After a local state or
+transport permission error, it uses approved escalation with a justification in that exact
+request. For reads, the justification explains that `acc://` selects local filesystem state
+and that `sync` reads coordination records rather than conversation transcripts. For sends,
+it names the user's own local sessions and the local socket delivery. A reviewer denial is
+separate from a sandbox error and must not be bypassed.
 
 ### Antigravity CLI command approval
 

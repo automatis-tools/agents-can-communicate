@@ -7,10 +7,9 @@ import { scanConfig } from "./toml-scan.mjs";
 
 const PROFILE = "acc-workspace";
 const MINIMUM = "0.153.4";
-// Codex 0.164.0 on macOS (2026-10-26): a command a `prefix_rule` allows runs
-// outside the sandbox without the model asking, so ACC's rules file carries
-// its commands and ACC's profile need not be every chat's default. The capture
-// applies forward on every platform that has the rule; Windows has none.
+// The 0.164.0 macOS capture selects this installation strategy, not a runtime
+// approval guarantee. Active profiles, models or escalation can still require
+// review; the skill handles permission errors without changing those policies.
 const RULE_SANDBOX_BYPASS = "0.164.0";
 const equal = (keys, expected) => JSON.stringify(keys) === JSON.stringify(expected);
 const literal = value => { try { return JSON.parse(value); } catch { return null; } };
@@ -118,7 +117,8 @@ export function outgoingStatus(source, context) {
         + "local sockets ACC delivers to - ACC's own channel, the Codex control socket and other clients' session "
         + "inboxes - through the network proxy (external network stays denied); custom policies are preserved. "
         + "Start a new session after installation."
-      : `Codex outgoing setup: ACC's rules file runs its commands outside the Codex sandbox, so ACC defines a `
+      : `Codex outgoing setup: ACC's rules file allows participant commands where Codex honors it; `
+        + `runtime approval remains unverified. ACC defines a `
         + `permission profile named ${PROFILE} and selects it for no chat. `
         + (selectsMode(source)
           ? `ACC keeps your workspace mode, written as default_permissions = ":workspace", and restores your own `
@@ -130,7 +130,7 @@ export function outgoingStatus(source, context) {
     diagnostic: reasonCode === null
       ? selectsProfile(context)
         ? "outgoing live delivery: local socket permissions configured for new sessions; active session overrides remain unverified"
-        : `outgoing live delivery: ACC's rules file runs its commands outside the Codex sandbox; the ${PROFILE} `
+        : `outgoing live delivery: ACC's rules file is installed; runtime command access remains unverified; the ${PROFILE} `
           + "profile is available for a chat that selects it"
       : `outgoing live delivery: sender permissions unverified in ${context.file}; `
         + (reasonCode === "permission_configuration_uncaptured"

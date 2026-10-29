@@ -11,16 +11,59 @@ import { promisify } from "node:util";
 import { removeFixture } from "./helpers/fixture-cleanup.mjs";
 const smoke = await import("../scripts/scoped-package.mjs").catch(() => ({}));
 const run = promisify(execFile);
-async function fixture(t, source = "") {
-  const base = await mkdtemp(path.join(tmpdir(), "acc-smoke-fixture-")); t.after(() => removeFixture(base));
+async function fixture(t, source = "", { beforeEvidence = "" } = {}) {
+  const base = await mkdtemp(path.join(tmpdir(), "acc-smoke-fixture-"));
+  const f = { base, cleanupConfirmed: true };
+  t.after(() => f.cleanupConfirmed ? removeFixture(base) : undefined);
   const repo = path.join(base, "repo"); const template = path.join(base, "template");
   await mkdir(path.join(repo, "scripts"), { recursive: true }); await mkdir(path.join(template, "pack"), { recursive: true });
   const archive = path.join(template, "pack/exact.tgz"); await writeFile(archive, "exact bytes");
   const evidence = path.join(base, "evidence.json");
   await writeFile(path.join(repo, "scripts/verify-package.mjs"), `import { readFile, writeFile } from 'node:fs/promises';
+    ${beforeEvidence}
     await writeFile(${JSON.stringify(evidence)}, JSON.stringify({ args: process.argv.slice(2), tmp: process.env.TMPDIR,
       temp: process.env.TEMP, tmp2: process.env.TMP, pid: process.pid, update: process.env.ACC_NO_UPDATE_CHECK, bytes: await readFile(process.argv[2], 'utf8') })); ${source}`);
-  return { base, repo, template, archive, evidence };
+  return Object.assign(f, { repo, template, archive, evidence, launcher: path.join(base, "launcher.json") });
+}
+async function launcherEntry(f) {
+  // Keep launcher diagnostics and template until owned teardown succeeds.
+  f.cleanupConfirmed = false;
+  const entry = path.join(f.base, "run.mjs");
+  await writeFile(entry, `import childProcess from 'node:child_process';
+    import { writeFileSync } from 'node:fs';
+    import { syncBuiltinESMExports } from 'node:module';
+    const spawn = childProcess.spawn;
+    childProcess.spawn = (file, args, options) => {
+      const child = spawn(file, args, options);
+      if (file === process.execPath && args[0] === ${JSON.stringify(path.join(f.repo, "scripts/verify-package.mjs"))}) {
+        writeFileSync(${JSON.stringify(f.launcher)}, JSON.stringify({ pid: child.pid, tmp: options.env.TMPDIR, args }));
+      }
+      return child;
+    };
+    syncBuiltinESMExports();
+    const { verifyScopedPackage } = await import(${JSON.stringify(new URL('../scripts/scoped-package.mjs', import.meta.url).href)});
+    await verifyScopedPackage(${JSON.stringify({ repo: f.repo, template: f.template })});`);
+  return entry;
+}
+async function cleanupLaunchedVerifier(f) {
+  const launched = await readFile(f.launcher, "utf8").then(JSON.parse).catch(error => {
+    if (error.code === "ENOENT") return null;
+    throw error;
+  });
+  if (!launched) return;
+  assert.ok(Number.isInteger(launched.pid) && launched.pid > 0, "launcher did not record an owned PID");
+  if (process.platform === "win32") {
+    await run("taskkill", ["/pid", String(launched.pid), "/t", "/f"], { timeout: 5000 }).catch(() => {});
+  } else {
+    try { process.kill(-launched.pid, "SIGKILL"); } catch (error) { if (error.code !== "ESRCH") throw error; }
+  }
+  for (let attempt = 0; attempt < 100; attempt++) {
+    try { process.kill(launched.pid, 0); } catch (error) { if (error.code === "ESRCH") break; throw error; }
+    await new Promise(resolve => setTimeout(resolve, 10));
+  }
+  assert.throws(() => process.kill(launched.pid, 0), { code: "ESRCH" }, "owned cleanup did not confirm exit");
+  await removeFixture(launched.tmp);
+  f.cleanupConfirmed = true;
 }
 test("scoped smoke supplies exactly the existing archive and child-only environment, then cleans owned roots", async t => {
   assert.equal(typeof smoke.verifyScopedPackage, "function"); const f = await fixture(t);
@@ -49,16 +92,22 @@ test("missing, multiple, directory and symlink archives refuse smoke", async t =
   }
 });
 test("deadline is bounded and retains interrupted template and child temporary root", async t => {
-  assert.equal(typeof smoke.verifyScopedPackage, "function"); const f = await fixture(t, "setInterval(() => {}, 1000);");
-  const entry = path.join(f.base, "run.mjs");
-  await writeFile(entry, `import { verifyScopedPackage } from ${JSON.stringify(new URL('../scripts/scoped-package.mjs', import.meta.url).href)};
-    await verifyScopedPackage(${JSON.stringify({ repo: f.repo, template: f.template })});`);
-  const result = await run(process.execPath, [entry], { env: { ...process.env, ACC_TEST_FILE_TIMEOUT_MS: "200" }, timeout: 10_000 })
-    .then(() => ({ code: 0 }), error => error);
-  assert.notEqual(result.code, 0); assert.match(result.stderr, /deadline|interrupted/);
-  const evidence = JSON.parse(await readFile(f.evidence)); assert.ok((await lstat(evidence.tmp)).isDirectory());
-  assert.ok((await lstat(f.template)).isDirectory());
-  assert.throws(() => process.kill(evidence.pid, 0), { code: "ESRCH" }); await removeFixture(evidence.tmp);
+  assert.equal(typeof smoke.verifyScopedPackage, "function"); const f = await fixture(t, "", {
+    beforeEvidence: "await new Promise(() => setInterval(() => {}, 1000));",
+  });
+  const entry = await launcherEntry(f);
+  try {
+    const result = await run(process.execPath, [entry], { env: { ...process.env, ACC_TEST_FILE_TIMEOUT_MS: "200" }, timeout: 10_000 })
+      .then(() => ({ code: 0 }), error => error);
+    assert.notEqual(result.code, 0); assert.match(result.stderr, /deadline|interrupted/);
+    const launched = JSON.parse(await readFile(f.launcher));
+    assert.deepEqual(launched.args, [path.join(f.repo, "scripts/verify-package.mjs"), f.archive]);
+    assert.ok((await lstat(launched.tmp)).isDirectory()); assert.ok((await lstat(f.template)).isDirectory());
+    await assert.rejects(lstat(f.evidence), { code: "ENOENT" });
+    assert.throws(() => process.kill(launched.pid, 0), { code: "ESRCH" });
+  } finally {
+    await cleanupLaunchedVerifier(f);
+  }
 });
 test("SIGTERM waits for owned process termination and retains resources", { skip: process.platform === "win32" }, async t => {
   assert.equal(typeof smoke.verifyScopedPackage, "function"); const f = await fixture(t, "setInterval(() => {}, 1000);");
@@ -116,30 +165,19 @@ test("confirmed teardown rejects interruption without waiting for inherited outp
 });
 
 test("unconfirmed termination retains both roots while its owned verifier remains alive", { skip: process.platform === "win32" }, async t => {
-  const f = await fixture(t, "setInterval(() => {}, 1000);");
-  const entry = path.join(f.base, "run.mjs");
-  await writeFile(entry, `import { verifyScopedPackage } from ${JSON.stringify(new URL('../scripts/scoped-package.mjs', import.meta.url).href)};
-    await verifyScopedPackage(${JSON.stringify({ repo: f.repo, template: f.template })});`);
-  let pid;
-  let temporary;
+  const f = await fixture(t, "", { beforeEvidence: "await new Promise(() => setInterval(() => {}, 1000));" });
+  const entry = await launcherEntry(f);
   try {
     // Deny ps discovery without replacing process ownership or teardown code.
     const result = await run(process.execPath, [entry], { env: { ...process.env, PATH: "", ACC_TEST_FILE_TIMEOUT_MS: "200" }, timeout: 10_000 })
       .then(() => ({ code: 0 }), error => error);
     assert.notEqual(result.code, 0); assert.match(result.stderr, /termination unconfirmed/);
-    const evidence = JSON.parse(await readFile(f.evidence)); pid = evidence.pid; temporary = evidence.tmp;
-    assert.doesNotThrow(() => process.kill(pid, 0), "fixture did not retain a live owned process");
-    assert.ok((await lstat(f.template)).isDirectory()); assert.ok((await lstat(temporary)).isDirectory());
+    const launched = JSON.parse(await readFile(f.launcher));
+    assert.deepEqual(launched.args, [path.join(f.repo, "scripts/verify-package.mjs"), f.archive]);
+    assert.doesNotThrow(() => process.kill(launched.pid, 0), "fixture did not retain a live owned process");
+    assert.ok((await lstat(f.template)).isDirectory()); assert.ok((await lstat(launched.tmp)).isDirectory());
+    await assert.rejects(lstat(f.evidence), { code: "ENOENT" });
   } finally {
-    if (!pid) pid = JSON.parse(await readFile(f.evidence).catch(() => "{}")).pid;
-    if (pid) {
-      try { process.kill(-pid, "SIGKILL"); } catch { /* Already stopped. */ }
-      for (let attempt = 0; attempt < 100; attempt++) {
-        try { process.kill(pid, 0); } catch { break; }
-        await new Promise(resolve => setTimeout(resolve, 10));
-      }
-      assert.throws(() => process.kill(pid, 0), { code: "ESRCH" }, "owned cleanup did not confirm exit");
-    }
-    if (temporary) await removeFixture(temporary);
+    await cleanupLaunchedVerifier(f);
   }
 });

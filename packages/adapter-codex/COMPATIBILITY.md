@@ -1,5 +1,40 @@
 # Codex compatibility
 
+## Local command approval context, 2026-10-28
+
+Codex 0.165.0, macOS arm64, ACC 0.12.2. A real IDE session requested an exact
+`sync --scope history --message` read with explicit escalation but no justification.
+Auto-review rejected it before execution as synchronization to an external ACC workspace.
+The reviewer's shortened transcript omitted the skill's local-storage explanation.
+The installed participant rule matched `allow` in `codex execpolicy check`.
+`acc://` actually selects a record in ACC's local data home; the history handler reads
+coordination records, not client conversation transcripts. A justified local read in the
+investigating IDE session subsequently succeeded. This did not replay the earlier user's task.
+
+The new installed-package test ran the real Codex tool loop against a deterministic model
+and reviewer on `127.0.0.1`, with an isolated home and a profile that granted no temp writes:
+
+| Case | Observed result |
+|---|---|
+| Default exact history read, participant rule installed, restricted profile | `state_access_denied`; no reviewer request |
+| Default read, rule removed, explicit ACC state grant | record read; no reviewer request |
+| Retry after sandbox denial, local justification from installed skill | one review; exact justification in reviewed action; record read |
+| Send retry after runtime admission denial, same client key | one review; one new message recorded |
+| Explicit send rejected by fixture reviewer | no new message recorded |
+| Exact history receipts before/after all cases | unchanged |
+
+These observations qualify the older rule-bypass capture below. Rule parsing alone cannot
+prove runtime access or exemption from review. The skill now starts with default permissions
+and supplies operation-specific local facts in any required escalation request. It separates
+reviewer denial from sandbox failure and preserves the existing idempotent retry contract.
+Doctor reports installed configuration separately from unverified runtime approval.
+
+The deterministic fixture proves native routing, context propagation, sandbox enforcement,
+and ACC effects. It does not prove an OpenAI reviewer's judgment or an autonomous model's
+compliance. Its send retry starts before message recording; already-recorded transport retries
+retain their separate tests. Linux CI execution and Windows command-rule behavior were not
+captured locally. No policy, global permission, hook trust, or active user installation changed.
+
 ## Rule-allowed commands leave the sandbox, 2026-10-26
 
 Codex 0.164.0 on macOS arm64, isolated `CODEX_HOME`. The command was a stand-in for

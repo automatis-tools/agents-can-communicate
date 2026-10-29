@@ -104,9 +104,11 @@ unchanged; edited or newly referenced settings remain intact. See
 readiness does not prove that an active session's overrides permit a live offer.
 
 On macOS and Linux, installing the Codex adapter also writes ACC's own Codex rules file. It
-allows ACC's wrapper to run the commands a participant runs, such as `message` and `reply`,
-without an approval, so Codex's auto-review never judges a message to a local peer. Install,
-uninstall, update and config still ask. See
+allows ACC's wrapper and participant commands, such as `message` and `reply`, where the
+active runtime honors it. The rule does not prove runtime approval or override model and
+managed policies. The skill starts with default permissions. Any required escalation
+describes the actual local operation and destination in the approval request. A reviewer
+denial must not be bypassed. Install, uninstall, update and config are outside the rule. See
 [Codex command approval](CONFIGURATION.md#codex-command-approval).
 
 Antigravity CLI asks before each shell command. Installing its adapter adds two rules to that

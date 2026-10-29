@@ -207,7 +207,8 @@ test("the install preview describes what a rule-capable install will do", { skip
   const f = await fixture(t, 'model = "user-model"\n');
   const detected = await f.adapter.detect({ ...f.context, clientVersion: "0.164.0" });
 
-  assert.match(detected.outgoingDelivery.setup, /rules file runs its commands outside the Codex sandbox/);
+  assert.match(detected.outgoingDelivery.setup, /rules file allows participant commands where Codex honors it/);
+  assert.match(detected.outgoingDelivery.setup, /runtime approval remains unverified/);
   assert.doesNotMatch(detected.outgoingDelivery.setup, /default workspace settings gain/);
 });
 

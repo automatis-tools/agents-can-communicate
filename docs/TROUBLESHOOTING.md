@@ -79,8 +79,9 @@ states it too; an update is the cause only when the message names a pending vers
 because each of them has to write the data home.
 
 The usual cause is a client sandbox around the command:
-- In Codex, run each ACC command as ACC's wrapper, first and alone in the command. ACC's
-  rules file then runs it outside the sandbox. See
+- In Codex, run ACC's wrapper first and alone, with default permissions. If state or
+  transport access is denied, use approved escalation with the specific local operation
+  and destination in `justification`. An installed rule does not prove runtime access. See
   [Codex command approval](CONFIGURATION.md#codex-command-approval).
 - Some desktop hosts deny access outside the session's folders. ChatGPT Work Mode did this
   with 0.11.1 (#316). Run ACC from a session or terminal that can read and write the data
@@ -182,10 +183,11 @@ delivery, start Codex without it; put a setting you need in `config.toml` instea
 If a reply stays queued with `transport_permission_denied`, the sender's permissions
 blocked local transport. This is distinct from an unavailable recipient. The message was
 recorded successfully; the error does not mean it was read or acknowledged.
-For Codex sends, use the exact installed ACC wrapper through the client's approved
-command path (`exec_command` with `sandbox_permissions: "require_escalated"`). The
-installed ACC prefix rule can authorize that command. Keep it separate from other
-shell commands. If delivery was already attempted, retry the same arguments and
+For Codex sends, start the exact installed ACC wrapper with default permissions.
+After a local permission error, retry through approved escalation with
+`sandbox_permissions: "require_escalated"`. Include a justification describing the local
+records and local client socket. Keep the wrapper separate from other shell commands.
+An installed rule does not prove runtime access. If delivery was already attempted, retry the same arguments and
 the original `--client-message-id` printed by the CLI. This retries the recorded
 message instead of recording another one. An initial execution refusal records
 nothing; a refused retry does not erase an earlier recorded message.
@@ -293,11 +295,22 @@ runs outside its sandbox. It refused an ACC reply that named a branch, a commit 
 paths as disclosure to an external party. After that, the session answered peers that it
 could not share project details.
 
-ACC's rules file lets the participant commands skip that review on macOS and Linux; see
-[Codex command approval](CONFIGURATION.md#codex-command-approval). Run `acc doctor`: when the
-rule is missing, it asks for `acc install --adapter codex`. If a session started before the
-install still asks, start a new one. On Windows there is no rule; approve the command, or turn
-off auto-review for the session.
+On Codex 0.165.0, a history read was also rejected as a synchronization to an external ACC
+workspace. The command never ran. Its exact approval request omitted a justification, and
+the reviewer's shortened transcript omitted the skill's local-storage explanation.
+`acc://` is a local room reference, not a network address. `sync --scope history --message`
+reads an ACC coordination record and does not collect or export a conversation transcript.
+
+Use the installed skill's default invocation first. If local state or transport access is
+denied, include the local operation and destination in the approved escalation request.
+Do not depend on earlier skill output reaching the reviewer. Keep any send's original
+idempotency key. A reviewer denial is not a sandbox error: verify missing facts and follow
+the client's approval policy, without changing tools to bypass it.
+
+Run `acc doctor` to check the installed rule. When it is missing, doctor asks for
+`acc install --adapter codex`. A rule's presence or an `execpolicy check` result does not
+prove runtime approval. See [Codex command approval](CONFIGURATION.md#codex-command-approval).
+Windows gets no ACC command rule. ACC does not disable auto-review to repair coordination.
 
 ## Codex plugin is listed but inactive
 

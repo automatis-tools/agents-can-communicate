@@ -58,7 +58,9 @@ jobs:
     name: macos-latest · node 24 · full
     needs: plan
     if: needs.plan.outputs.scope == 'full'
-    runs-on: macos-latest
+    # Keep required check/proof identities stable; use standard Intel macOS 26
+    # capacity for the same planned darwin workload.
+    runs-on: macos-26-intel
     timeout-minutes: 30
     outputs:
       proof: ${{ steps.test.outputs.proof }}
@@ -134,7 +136,8 @@ jobs:
     name: macos-latest · node 24 · docs
     needs: plan
     if: needs.plan.outputs.scope == 'docs'
-    runs-on: macos-latest
+    # Match the full darwin worker pool without changing its workload or identity.
+    runs-on: macos-26-intel
     timeout-minutes: 30
     outputs:
       proof: ${{ steps.test.outputs.proof }}
@@ -253,6 +256,25 @@ jobs:
       - name: Authenticate planned auxiliary worker
         run: node scripts/ci-validation.mjs preflight
       - run: npm ci
+      - name: Prepare Linux Codex sandbox
+        if: runner.os == 'Linux'
+        shell: bash
+        # Codex requires distribution bubblewrap and Ubuntu's bwrap userns profile:
+        # https://learn.chatgpt.com/docs/sandboxing#prerequisites
+        # Load only that profile, preserving the runner's global userns policy.
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes bubblewrap apparmor-profiles apparmor-utils
+          if test -f /usr/share/apparmor/extra-profiles/bwrap-userns-restrict; then
+            sudo install -m 0644 /usr/share/apparmor/extra-profiles/bwrap-userns-restrict /etc/apparmor.d/bwrap-userns-restrict
+          fi
+          if test -f /etc/apparmor.d/bwrap-userns-restrict; then
+            sudo apparmor_parser -r /etc/apparmor.d/bwrap-userns-restrict
+          fi
+          command -v bwrap
+          bwrap --version
+          dpkg-query -W bubblewrap apparmor-profiles apparmor-utils
+          bwrap --unshare-user --unshare-net --ro-bind / / /bin/true
       - name: Install the clients
         # Deliberately check current vendor compatibility on both platforms.
         # The logged versions are observations, not new certification captures.
@@ -261,8 +283,8 @@ jobs:
         run: |
           claude --version
           codex --version
-      - name: Hooks, attachment and next-turn delivery through real clients
-        run: node --test tests/acceptance/real-clients-stub.test.mjs
+      - name: Hooks, delivery and command approval through real clients
+        run: node --test tests/acceptance/real-clients-stub.test.mjs tests/acceptance/codex-command-approval.test.mjs
         env:
           ACC_REAL_CLIENTS: '1'
           GIT_DIR: ''

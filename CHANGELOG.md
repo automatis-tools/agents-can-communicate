@@ -1,5 +1,28 @@
 # Changelog
 
+## Unreleased — local context in Codex approval requests
+
+- Codex guidance starts ACC commands with default permissions. A sandbox access failure
+  uses approved escalation with the operation and local destination in that exact request.
+  History reads identify `acc://` as local filesystem state, rather than an external sync
+  destination. Sends identify the user's own local sessions and client socket.
+- Doctor distinguishes an installed participant rule from unverified runtime approval.
+  Existing generated rules migrate their comments; operator edits remain intact.
+- A real Codex command test exercises the installed package through a deterministic local
+  model/reviewer, including restricted state access, exact history receipts, send recording
+  and enforced rejection. It does not establish an OpenAI model's judgment.
+
+| Development artifact | Value |
+|---|---|
+| Built from | `a3765c5807ea272176ae32d1b966e99980251de2` |
+| Tarball | `agents-can-communicate-0.12.2.tgz`, 629,756 bytes, 380 files |
+| sha256 | `1528df809be8bbcb5d04eb10b4e52f7891fb7679d497090aebfdfd655df4bd14` |
+
+The exact archive passed package verification. See
+[development evidence](docs/release-evidence/codex-command-review-2026-10-28.md).
+This is not a published release; the package version remains `0.12.2`.
+Earlier candidate and release records retain their original provenance.
+
 ## Unreleased — reads without the event log
 
 - A transaction that only reads no longer lists the event log (#307). Every transaction found

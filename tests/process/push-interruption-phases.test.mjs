@@ -2,6 +2,7 @@
 // handlers active after cleanup commitment misclassifies a destructive phase.
 import assert from "node:assert/strict";
 import { execFile, spawn } from "node:child_process";
+import { EventEmitter } from "node:events";
 import { mkdir, rm, writeFile } from "node:fs/promises";
 import net from "node:net";
 import path from "node:path";
@@ -18,15 +19,40 @@ function bounded(promise, description) {
   })]).finally(() => clearTimeout(timer));
 }
 function message(child, event) {
-  return bounded(new Promise(resolve => {
+  const received = new Promise(resolve => {
     const listen = value => {
       if (value.event !== event) return;
       child.off("message", listen);
       resolve(value);
     };
     child.on("message", listen);
-  }), `validator did not send ${event}`);
+  });
+  // Subscribe before the event can arrive, but spend this phase's budget only
+  // when the preceding phase has finished.
+  return () => bounded(received, `validator did not send ${event}`);
 }
+
+test("IPC phase budgets start when awaited, retain early events, and still expire", async t => {
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  const child = new EventEmitter();
+  const later = message(child, "later");
+  t.mock.timers.tick(11000); // Preparation belongs to an earlier phase.
+  const waiting = later();
+  t.mock.timers.tick(9000);
+  child.emit("message", { event: "other" });
+  child.emit("message", { event: "later", observed: true });
+  assert.deepEqual(await waiting, { event: "later", observed: true });
+
+  const early = message(child, "early");
+  child.emit("message", { event: "early" });
+  t.mock.timers.tick(11000);
+  assert.deepEqual(await early(), { event: "early" });
+
+  const absent = message(child, "absent")();
+  const expired = assert.rejects(absent, /validator did not send absent/);
+  t.mock.timers.tick(10000);
+  await expired;
+});
 
 for (const phase of ["audit", "remove"]) {
   test(`interruption boundary during final ${phase}`, { timeout: 30000, skip: process.platform === "win32" }, async t => {
@@ -57,14 +83,14 @@ for (const phase of ["audit", "remove"]) {
     `, { mode: 0o755 });
     let connection;
     const server = net.createServer();
-    const reached = bounded(new Promise(resolve => server.once("connection", socket => {
+    const reached = new Promise(resolve => server.once("connection", socket => {
       connection = socket;
       let bytes = "";
       socket.on("data", data => {
         bytes += data;
         if (bytes.includes("\n")) resolve(JSON.parse(bytes.trim()));
       });
-    })), "Git did not reach selected phase");
+    }));
     await new Promise(resolve => server.listen(endpoint, resolve));
     const helper = pathToFileURL(path.resolve(import.meta.dirname, "../../scripts/push-targets.mjs")).href;
     // Programmatic emit observes an absent handler without default OS process
@@ -93,17 +119,17 @@ for (const phase of ["audit", "remove"]) {
     let owned;
     let shimPid;
     try {
-      owned = (await callback).cwd;
-      const paused = await reached;
+      owned = (await callback()).cwd;
+      const paused = await bounded(reached, "Git did not reach selected phase");
       shimPid = paused.pid;
       t.diagnostic(`paused ${phase}: Git shim PID ${paused.pid}, args=${JSON.stringify(paused.args)}`);
       assert.equal(await f.exists(owned), true, "checkout disappeared before paused Git operation");
       const interrupted = message(validator, "interrupt");
       validator.send({ event: "interrupt" });
-      const observed = await interrupted;
+      const observed = await interrupted();
       t.diagnostic(`${phase} interruption: handled=${observed.handled}, controller aborted=${observed.aborted}`);
       connection.end("continue\n");
-      const outcome = await result;
+      const outcome = await result();
       const code = await bounded(closed, `validator did not exit: ${stderr}`);
       if (phase === "audit") {
         assert.equal(observed.handled, true, "final byte audit must remain inside validation interruption handling");

@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import test from "node:test";
+import test, { beforeEach } from "node:test";
 
 import { defineAdapter } from "@agents-can-communicate/adapter-sdk";
 import { AccError, EXIT } from "@agents-can-communicate/protocol";
@@ -7,6 +7,11 @@ import { AccError, EXIT } from "@agents-can-communicate/protocol";
 import { LIVE_POLICIES, establishNativeBinding } from "../src/native-binding.mjs";
 
 const NOW = "2026-09-02T12:00:00.000Z";
+// These fake ports do no timed I/O. Advance budget time explicitly instead of
+// letting CI scheduling consume their 50 ms fixture budget. setTimeout stays
+// real, so unanswered and late handshake tests still exercise the real timer.
+beforeEach(t => t.mock.timers.enable({ apis: ["Date"], now: Date.now() }));
+
 const noop = async () => ({ ok: true, changes: [], diagnostics: [] });
 const HANDSHAKE = {
   supported: true, clientVersion: "2.1.258", protocolContract: "fixture-native-v1",
@@ -243,10 +248,32 @@ test("a refused handshake retires the endpoint the adapter already wrote", async
   const retired = [];
   const adapter = { ...nativeAdapter(async () => ({ ...HANDSHAKE, clientVersion: "2.1.250" })),
     retireNativeSession: async input => { retired.push(input); } };
-  const result = await establish(adapter, serviceWithStore(), { clientVersion: "2.1.250" });
+  const service = serviceWithStore();
+  let paused = false;
+  service.store.ephemeral.get = async () => {
+    if (!paused) {
+      paused = true;
+      // Model a descheduled worker, without advancing the fake ports' clock.
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 125);
+    }
+    return null;
+  };
+  const result = await establish(adapter, service, { clientVersion: "2.1.250" });
   assert.equal(result.state, "unsupported");
   assert.deepEqual(retired.map(item => [item.binding.opaqueEndpointRef, item.runtimeDir]),
     [["adapter-owned-endpoint-id", "/runtime"]]);
+});
+
+test("elapsed retirement budget still prevents a new handshake", async t => {
+  let handshakes = 0;
+  const service = serviceWithStore();
+  service.store.ephemeral.get = async () => { t.mock.timers.tick(51); return null; };
+  const adapter = { ...nativeAdapter(async () => { handshakes += 1; return HANDSHAKE; }),
+    retireNativeSession: async () => {} };
+  const result = await establish(adapter, service);
+  assert.deepEqual(result, { state: "degraded", reasonCode: "handshake_failed", modes: [] });
+  assert.equal(handshakes, 0);
+  assert.equal(service.calls.some(([name]) => name === "publish"), false);
 });
 
 test("a handshake that answers after the budget still has its endpoint retired", async () => {

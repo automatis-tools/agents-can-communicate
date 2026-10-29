@@ -33,14 +33,16 @@ async function relayFor(t, overrides = {}) {
   const where = await place(t);
   const api = overrides.api ?? fakeApi();
   const exits = [];
+  let resolveExit;
+  const exited = new Promise(resolve => { resolveExit = resolve; });
   const relay = createRelay({ ...where, conversationId: CONVERSATION, agyPid: 4242,
     relayPid: process.pid, clientVersion: "1.2.7", api, isAlive: () => true,
-    onExit: reason => exits.push(reason), ...overrides });
+    onExit: reason => { exits.push(reason); resolveExit(reason); }, ...overrides });
   t.after(() => relay.close("test_end"));
   const listening = await relay.listen();
   const record = await readRegistration({ runtimeDir: where.runtimeDir,
     endpointId: listening.endpointId });
-  return { ...where, relay, api, exits, record };
+  return { ...where, relay, api, exits, exited, record };
 }
 
 function ask(socketPath, message) {
@@ -139,11 +141,22 @@ test("renewal writes a later lease and tells ACC about it", async t => {
 });
 
 test("the relay retires itself when its agy is gone", async t => {
+  const close = net.Server.prototype.close;
+  t.mock.method(net.Server.prototype, "close", function (callback) {
+    // Closing the server may finish after an arbitrary short sleep on CI.
+    return close.call(this, () => setTimeout(callback, 200));
+  });
   let alive = true;
-  const { exits, runtimeDir } = await relayFor(t, { isAlive: () => alive, pidCheckMs: 20 });
+  const { exits, exited, runtimeDir } = await relayFor(t, { isAlive: () => alive, pidCheckMs: 20 });
 
   alive = false;
-  await new Promise(resolve => setTimeout(resolve, 120));
+  let timer;
+  try {
+    const reason = await Promise.race([exited, new Promise((_, reject) => {
+      timer = setTimeout(() => reject(Error("relay did not finish retiring its client")), 5000);
+    })]);
+    assert.equal(reason, "client_exited");
+  } finally { clearTimeout(timer); }
 
   assert.deepEqual(exits, ["client_exited"]);
   assert.deepEqual(await listRegistrations({ runtimeDir }), []);
