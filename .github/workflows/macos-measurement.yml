@@ -13,8 +13,10 @@ jobs:
       github.event.repository.full_name == github.repository && github.event.ref == github.ref &&
       github.event.deleted == false &&
       ((github.event.created == true && github.event.before == '0000000000000000000000000000000000000000') ||
-      (github.event.created == false && github.event.before == 'ff9c5f96817dad463f15fe9bbf4b912114c1bffc' &&
-      github.sha != 'ff9c5f96817dad463f15fe9bbf4b912114c1bffc')) &&
+      (github.event.created == false &&
+      (github.event.before == 'ff9c5f96817dad463f15fe9bbf4b912114c1bffc' ||
+      github.event.before == 'f3f01638056ca6719b440c6fb509bd08cc6e59cc') &&
+      github.sha != github.event.before)) &&
       github.event.after == github.sha && (github.run_attempt == 1 || github.run_attempt == 2)
     runs-on: macos-latest
     timeout-minutes: 30

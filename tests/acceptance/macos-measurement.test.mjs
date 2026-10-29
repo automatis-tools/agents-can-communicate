@@ -11,6 +11,7 @@ import { admitMeasurementContext, validateMeasurement, aggregateMeasurements, cr
 // These synthetic fixtures exercise admission and accounting, never native speed.
 const workload = { commit: 'b272ca474b229a84aa06fb25a5a0bf0ae44e245a', tree: '20ac4fa0d8f3362592c3dbcb66c25fe40af4bdf6' };
 const FAILED_CONTROLLER = 'ff9c5f96817dad463f15fe9bbf4b912114c1bffc';
+const ENVIRONMENT_REPAIR_CONTROLLER = 'f3f01638056ca6719b440c6fb509bd08cc6e59cc';
 const controller = { commit: 'c'.repeat(40), tree: 'd'.repeat(40) };
 // Static frozen cohort: no Git history or current-HEAD discovery dependency.
 const frozen = JSON.parse(await readFile(new URL('../fixtures/macos-measurement-b272ca47.json', import.meta.url), 'utf8'));
@@ -45,7 +46,7 @@ function record(profile = 'baseline', attempt = '1') {
       receiptDecision: { reused: false, reason: 'ci-disabled' }, resultCounts: { selected: fileCount, completed: fileCount, passed: fileCount, failed: 0 } },
     rawTimings: files.map(file => ({ file, durationMs: 1, success: true })),
     command: { executable: runtime.nodeExecutable, args: ['scripts/run-tests.mjs', ...(shard ? ['--shard', shard] : [])], exitCode: 0,
-      environment: { CI: 'true', ACC_TEST_REAL_FSYNC: '1', ACC_TEST_FILE_CONCURRENCY: '4', ACC_TEST_TIMEOUT_MS: '300000',
+      environment: { CI: 'true', ACC_TEST_TIMEOUT_MS: '300000',
         ACC_TEST_FILE_TIMEOUT_MS: '600000' } }, walls: { setupMs: 20, runnerMs: 120, wrapperMs: 150 } };
 }
 const copy = value => structuredClone(value);
@@ -115,6 +116,8 @@ for (const [name, change] of [
   ['negative duration', r => { r.manifest.files[0].durationMs = -1; }],
   ['wrong command', r => { r.command.args.push('--if-needed'); }],
   ['fsync override', r => { r.command.environment.ACC_TEST_REAL_FSYNC = '0'; }],
+  ['redundant global fsync flag', r => { r.command.environment.ACC_TEST_REAL_FSYNC = '1'; }],
+  ['redundant global concurrency flag', r => { r.command.environment.ACC_TEST_FILE_CONCURRENCY = '4'; }],
   ['Node override', r => { r.runtime.node = 'v24.4.0'; }],
   ['foreign npm', r => { r.runtime.npmCli = '/other/npm-cli.js'; }],
   ['workload substitution', r => { r.workload = { ...r.workload, commit: controller.commit }; }],
@@ -171,12 +174,11 @@ test('real CLI refuses a forged native environment before running workload tests
 });
 
 
-test('runner environment matches ordinary driver sanitation and preserves real fsync/watchdogs', () => {
+test('runner environment matches ordinary CI defaults and strips global overrides', () => {
   const child = measurementEnvironment({ PATH: '/bin', GIT_DIR: '', GIT_WORK_TREE: '/elsewhere',
-    ACC_TEST_PACKED_TEMPLATE: '/stale', ACC_TEST_FILE_CONCURRENCY: '99', NODE_OPTIONS: '--import=/bad', NODE_TEST_CONTEXT: 'child' });
-  for (const key of ['GIT_DIR', 'GIT_WORK_TREE', 'ACC_TEST_PACKED_TEMPLATE', 'NODE_OPTIONS', 'NODE_TEST_CONTEXT']) assert.equal(child[key], undefined);
-  assert.equal(child.CI, 'true'); assert.equal(child.ACC_TEST_REAL_FSYNC, '1');
-  assert.equal(child.ACC_TEST_FILE_CONCURRENCY, '4');
+    ACC_TEST_PACKED_TEMPLATE: '/stale', ACC_TEST_REAL_FSYNC: '1', ACC_TEST_FILE_CONCURRENCY: '99', NODE_OPTIONS: '--import=/bad', NODE_TEST_CONTEXT: 'child' });
+  for (const key of ['GIT_DIR', 'GIT_WORK_TREE', 'ACC_TEST_PACKED_TEMPLATE', 'ACC_TEST_REAL_FSYNC', 'ACC_TEST_FILE_CONCURRENCY', 'NODE_OPTIONS', 'NODE_TEST_CONTEXT']) assert.equal(child[key], undefined);
+  assert.equal(child.CI, 'true');
   assert.equal(child.ACC_TEST_TIMEOUT_MS, '300000'); assert.equal(child.ACC_TEST_FILE_TIMEOUT_MS, '600000');
 });
 test('output is fresh, outside both trees, and cannot escape through a parent symlink', async () => {
@@ -262,30 +264,32 @@ test('Windows cancellation requests fail before opening logs or spawning a child
 });
 
 
-function repairAdmission(attempt = '1') {
-  const input = admission(attempt); input.event.before = FAILED_CONTROLLER; input.event.created = false; return input;
+function repairAdmission(attempt = '1', before = FAILED_CONTROLLER) {
+  const input = admission(attempt); input.event.before = before; input.event.created = false; return input;
 }
 test('documented macos26 OS identifier passes with independent ARM architecture fields', () => {
   const input = record(); assert.equal(validateMeasurement(input), input);
   assert.equal(aggregateMeasurements([input, record('shard-1'), record('shard-2')]).fileCount, 484);
 });
-test('exact failed-controller repair push is admitted by collector and workflow', () => {
-  for (const attempt of ['1', '2']) {
-    const input = repairAdmission(attempt); assert.equal(admitMeasurementContext(input).runAttempt, attempt); assert.equal(workflowAdmits(input), true);
+test('exact approved repair pushes are admitted by collector and workflow', () => {
+  for (const before of [FAILED_CONTROLLER, ENVIRONMENT_REPAIR_CONTROLLER]) for (const attempt of ['1', '2']) {
+    const input = repairAdmission(attempt, before); assert.equal(admitMeasurementContext(input).runAttempt, attempt); assert.equal(workflowAdmits(input), true);
   }
   const records = [record(), record('shard-1'), record('shard-2')];
-  for (const item of records) item.context = admitMeasurementContext(repairAdmission());
+  for (const item of records) item.context = admitMeasurementContext(repairAdmission('1', ENVIRONMENT_REPAIR_CONTROLLER));
   assert.equal(aggregateMeasurements(records).fileCount, 484);
 });
 for (const [name, change] of [
   ['foreign before', x => { x.event.before = 'e'.repeat(40); }],
   ['creation flag', x => { x.event.created = true; }],
   ['zero before without creation', x => { x.event.before = '0'.repeat(40); }],
-  ['unchanged failed head', x => { x.head = x.env.GITHUB_SHA = x.event.after = FAILED_CONTROLLER; }],
+  ['unchanged failed head', x => { x.head = x.env.GITHUB_SHA = x.event.after = x.event.before; }],
   ['third attempt', x => { x.env.GITHUB_RUN_ATTEMPT = '3'; }],
   ['wrong after', x => { x.event.after = 'e'.repeat(40); }],
 ]) test(`repair rejects ${name}`, () => {
-  const input = repairAdmission(); change(input); assert.throws(() => admitMeasurementContext(input), /measurement/); assert.equal(workflowAdmits(input), false);
+  for (const before of [FAILED_CONTROLLER, ENVIRONMENT_REPAIR_CONTROLLER]) {
+    const input = repairAdmission('1', before); change(input); assert.throws(() => admitMeasurementContext(input), /measurement/); assert.equal(workflowAdmits(input), false);
+  }
 });
 for (const fault of ['imageOS', 'runnerArch', 'node']) test(`preflight retains observed ${fault} before rejecting metadata`, async () => {
   const root = await mkdtemp(path.join(tmpdir(), 'acc-macos-preflight-unit-'));

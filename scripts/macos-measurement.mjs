@@ -16,10 +16,10 @@ const run = promisify(execFile);
 const REPOSITORY = 'automatis-tools/agents-can-communicate';
 const REF = 'refs/heads/measure/macos-shards-353';
 const FAILED_CONTROLLER = 'ff9c5f96817dad463f15fe9bbf4b912114c1bffc';
+const ENVIRONMENT_REPAIR_CONTROLLER = 'f3f01638056ca6719b440c6fb509bd08cc6e59cc';
 const WORKLOAD = { commit: 'b272ca474b229a84aa06fb25a5a0bf0ae44e245a', tree: '20ac4fa0d8f3362592c3dbcb66c25fe40af4bdf6' };
 const PROFILES = ['baseline', 'shard-1', 'shard-2'];
-const CHILD_ENV = { CI: 'true', ACC_TEST_REAL_FSYNC: '1', ACC_TEST_FILE_CONCURRENCY: '4',
-  ACC_TEST_TIMEOUT_MS: '300000', ACC_TEST_FILE_TIMEOUT_MS: '600000' };
+const CHILD_ENV = { CI: 'true', ACC_TEST_TIMEOUT_MS: '300000', ACC_TEST_FILE_TIMEOUT_MS: '600000' };
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 const positive = value => typeof value === 'string' && /^[1-9]\d*$/.test(value);
 const oid = value => typeof value === 'string' && /^[a-f0-9]{40}$/.test(value);
@@ -30,7 +30,7 @@ const shardFor = profile => profile === 'baseline' ? undefined : `${profile.at(-
 const argsFor = profile => ['scripts/run-tests.mjs', ...(profile === 'baseline' ? [] : ['--shard', shardFor(profile)])];
 function contextValid(c, head, platform, arch) {
   const creation = c.created === true && c.before === '0'.repeat(40);
-  const repair = c.created === false && c.before === FAILED_CONTROLLER && c.sha !== FAILED_CONTROLLER;
+  const repair = c.created === false && [FAILED_CONTROLLER, ENVIRONMENT_REPAIR_CONTROLLER].includes(c.before) && c.sha !== c.before;
   requireValid(c.actions === 'true' && c.repository === REPOSITORY && c.eventRepository === REPOSITORY
     && c.ref === REF && c.eventRef === REF && c.eventName === 'push' && (creation || repair)
     && c.deleted === false && oid(c.sha) && c.after === c.sha && head === c.sha
