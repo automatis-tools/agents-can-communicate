@@ -36,7 +36,9 @@ const fire = (shim, args, input = "") => new Promise((resolve, reject) => {
     (error, stdout, stderr) => resolve({ code: error?.code ?? 0, stdout, stderr }));
   // A missing target exits before reading stdin; keep its actual result.
   child.stdin.once("error", error => {
-    if (error.code !== "EPIPE") reject(error);
+    if (error.code === "EPIPE") return;
+    if (process.platform === "win32" && error.code === "EOF" && error.syscall === "write") return;
+    reject(error);
   });
   child.stdin.end(input);
 });
