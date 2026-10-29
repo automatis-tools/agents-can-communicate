@@ -87,8 +87,8 @@ test("real Claude Code and Codex attach through their hooks and carry a message 
 
     await acc(["install", "--adapter", "claude_code", "--adapter", "codex", "--delivery", "off",
       "--home", packed.clientHome]);
-    // The real Codex reads ACC's rule: a coordination command is allowed, so no
-    // approval and no auto-review sees it; install still asks (#260).
+    // This checks rule parsing, not runtime approval. The separate command
+    // acceptance test exercises the actual tool and reviewer loop.
     const rules = path.join(codexHome, "rules", "agents-can-communicate.rules");
     if (process.platform !== "win32") {
       const shim = path.join(packed.clientHome, ".agents", "acc-local", "plugins",

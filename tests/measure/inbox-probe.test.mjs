@@ -9,6 +9,11 @@ const repo = path.resolve(import.meta.dirname, "..", "..");
 const exact = inbox.scenario({ messages: 12, backlog: 10, operation: "exact", seed: 3 });
 // Enough listable messages that the byte budget, not the limit, ends a page.
 const page = inbox.scenario({ messages: 40, backlog: 4, operation: "page", limit: 20, seed: 3 });
+// Each mutation builds its own real store; these need witnesses, not a large backlog.
+const mutationScenarios = [
+  inbox.scenario({ messages: 8, backlog: 4, operation: "exact", seed: 3 }),
+  inbox.scenario({ messages: 12, backlog: 4, operation: "page", limit: 5, seed: 3 }),
+];
 
 async function built(t, scenario) {
   const side = await inbox.load(repo);
@@ -44,8 +49,26 @@ test("a page is the newest listable prefix, its cursor continues it, and nothing
   }
 });
 
+test("mutation fixtures accept real calls and retain conditional mutation witnesses", async t => {
+  for (const scenario of mutationScenarios) {
+    const value = await built(t, scenario);
+    const [first, ...others] = value.reader;
+    assert.equal(first.decision, "superseded", `${scenario.operation}: replaced decision`);
+    assert.equal(first.state, "queued", `${scenario.operation}: receipt can advance`);
+    assert.ok(others.some(item => item.state === "queued" || item.state === "offered"), "unrelated movable receipt");
+    assert.ok(others.some(item => item.state === "retrieved"), "another receipt in the exact result's state");
+    const input = await inbox.prepare(value), result = await inbox.operate(value, input);
+    assert.deepEqual(await inbox.validate(value, result, input), [], scenario.operation);
+    if (scenario.operation === "page") {
+      assert.ok(result.items.length > 1, "order and short-page mutations need multiple items");
+      assert.notEqual(result.nextCursor, null, "over-budget mutation needs another page item");
+      assert.notEqual(result.nextCursor, first.messageId, "garbage cursor differs from the continuation");
+    }
+  }
+});
+
 test("every negative mutation for each operation fails validation", async t => {
-  for (const scenario of [exact, page]) {
+  for (const scenario of mutationScenarios) {
     const mutations = inbox.mutationsFor(scenario);
     assert.ok(Object.keys(mutations).length >= 5, scenario.operation);
     for (const [name, mutate] of Object.entries(mutations)) {
@@ -64,6 +87,10 @@ test("a page the byte budget ends early passes, and one item fewer than fits fai
   assert.deepEqual(await inbox.validate(value, result, input), []);
   const short = await inbox.mutationsFor(scenario)["short-page"](inbox.operate, { side: value.side, scenario });
   assert.match((await call(value, short)).join(), /items where .* fit the 12000-byte page/);
+  const overBudget = await inbox.mutationsFor(scenario)["over-budget"](inbox.operate, { side: value.side, scenario });
+  const fresh = await inbox.prepare(value), oversized = await overBudget(value, fresh);
+  assert.ok(oversized.items.length <= scenario.limit, "byte overflow must stay within the item limit");
+  assert.match((await inbox.validate(value, oversized, fresh)).join(), /over the 12000-byte page/);
 });
 
 test("every index path gives valid work, and its cost is its own", async t => {

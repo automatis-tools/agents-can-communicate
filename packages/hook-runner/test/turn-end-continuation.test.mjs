@@ -4,6 +4,9 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
 
+import { createCoordinationService } from "@agents-can-communicate/core";
+import { openFilesystemStore } from "@agents-can-communicate/storage-filesystem";
+
 import { runHook } from "../src/runner.mjs";
 
 // A client whose end-of-turn hook can hold the turn open, and carries text to
@@ -52,22 +55,43 @@ function harness(place, options) {
     probeClientVersion: async () => "1.0.0", platform });
 }
 
-async function withPeerMessage(t, options) {
+async function withPeerMessage(t, options, afterHooks = () => {}) {
   const place = await workspace(t);
   const invoke = harness(place, options);
   const recipient = await invoke(event("sessionStart", place.root));
   const peer = await invoke(event("sessionStart", place.root, { sessionId: "peer-session" }));
   const participantId = recipient.sessions
     .find(session => session.sessionId === recipient.accSessionId).participantId;
-  const message = await peer.service.sendMessage({ sessionId: peer.accSessionId,
+  await afterHooks({ recipient, peer, participantId });
+  // Peer commands and observations outlive a completed hook invocation. Its
+  // returned service still carries that invocation's publication deadline.
+  const { clock, ids } = recipient.service;
+  const { root, workspaceId } = recipient.service.store;
+  const service = createCoordinationService({ clock, ids,
+    store: await openFilesystemStore({ root, workspaceId, clock, ids }) });
+  const message = await service.sendMessage({ sessionId: peer.accSessionId,
     generation: peer.generation, clientMessageId: "client_turn_end",
     toParticipantIds: [participantId], kind: "question", obligation: "reply",
     subject: "At the end of your turn", body: "arrived while you were finishing" });
-  const receipt = async () => (await recipient.service.sync({
+  const receipt = async () => (await service.sync({
     sessionId: recipient.accSessionId, scope: "full" }))
     .snapshot.receipts.find(item => item.messageId === message.messageId)?.state;
   return { place, invoke, message, receipt };
 }
+
+test("peer setup and receipt observation outlive the completed hooks' budgets", async t => {
+  const { receipt } = await withPeerMessage(t, undefined, async ({ recipient, peer, participantId }) => {
+    t.mock.timers.enable({ apis: ["Date"], now: Math.max(recipient.deadlineAt, peer.deadlineAt) + 1 });
+    await assert.rejects(peer.service.sendMessage({ sessionId: peer.accSessionId,
+      generation: peer.generation, clientMessageId: "expired_hook_probe",
+      toParticipantIds: [participantId], kind: "note", obligation: "none",
+      subject: "Expired hook", body: "must not publish" }),
+    error => error.code === 5 && /deadline/.test(error.message));
+  });
+  assert.equal(await receipt(), "queued");
+  t.mock.timers.tick(6000);
+  assert.equal(await receipt(), "queued");
+});
 
 test("a turn that ends with an unseen peer message is continued with that message", async t => {
   const { place, invoke, message, receipt } = await withPeerMessage(t);

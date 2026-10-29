@@ -7,7 +7,9 @@ import test from "node:test";
 import { fileURLToPath } from "node:url";
 
 const mainUrl = new URL("../src/main.mjs", import.meta.url).href;
-const supported = process.platform === "darwin" && process.arch === "arm64";
+// The client is a Node/shebang fixture, not a native ARM binary or capture.
+// Keep both Darwin architectures exercising actual main and config persistence.
+const supported = process.platform === "darwin";
 for (const json of [false, true]) test(`actual main reports partial service failure in ${json ? "JSON" : "human output"}`,
   { skip: !supported }, async t => {
     const home = await realpath(await mkdtemp(path.join(tmpdir(), "acc-cli-service-")));
