@@ -1,3 +1,5 @@
+// Keep the frozen cohort, collector/workflow admission cases and retained-preflight
+// controls together: they exercise one experimental contract and share its identity fixture.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
@@ -8,10 +10,15 @@ import { admitMeasurementContext, validateMeasurement, aggregateMeasurements, cr
 
 // These synthetic fixtures exercise admission and accounting, never native speed.
 const workload = { commit: 'b272ca474b229a84aa06fb25a5a0bf0ae44e245a', tree: '20ac4fa0d8f3362592c3dbcb66c25fe40af4bdf6' };
+const FAILED_CONTROLLER = 'ff9c5f96817dad463f15fe9bbf4b912114c1bffc';
 const controller = { commit: 'c'.repeat(40), tree: 'd'.repeat(40) };
 // Static frozen cohort: no Git history or current-HEAD discovery dependency.
 const frozen = JSON.parse(await readFile(new URL('../fixtures/macos-measurement-b272ca47.json', import.meta.url), 'utf8'));
 const discovery = frozen.files;
+const workflow = await readFile(new URL('../../.github/workflows/macos-measurement.yml', import.meta.url), 'utf8');
+const workflowCondition = new Function('github', `return (${workflow.match(/^    if: >-\n([\s\S]*?)(?=^    runs-on:)/m)[1]});`);
+const workflowAdmits = x => workflowCondition({ repository: x.env.GITHUB_REPOSITORY, ref: x.env.GITHUB_REF,
+  event_name: x.env.GITHUB_EVENT_NAME, sha: x.env.GITHUB_SHA, run_attempt: x.env.GITHUB_RUN_ATTEMPT, event: x.event });
 function admission(attempt = '1') {
   return { env: { GITHUB_ACTIONS: 'true', GITHUB_REPOSITORY: 'automatis-tools/agents-can-communicate',
     GITHUB_REF: 'refs/heads/measure/macos-shards-353', GITHUB_EVENT_NAME: 'push', GITHUB_SHA: controller.commit,
@@ -28,11 +35,11 @@ function record(profile = 'baseline', attempt = '1') {
     node: 'v24.22.1', scope: 'full', ...(shard ? { shard } : {}), fileCount, concurrency: 4, fsyncMode: 'real' };
   const events = ['fingerprint', 'cache-lookup', 'packed-template', 'batch-execution', 'cleanup', 'total'].map(event =>
     ({ ...identity, event, durationMs: event === 'total' ? 100 : 10, result: ['fingerprint', 'cache-lookup'].includes(event) ? 'ci-disabled' : 'passed' }));
-  const runtime = { node: 'v24.22.1', npm: '11.6.0', nodeExecutable: '/node/bin/node', npmCli: '/node/lib/node_modules/npm/bin/npm-cli.js' };
+  const runtime = { node: 'v24.22.1', npm: '11.19.1', nodeExecutable: '/node/bin/node', npmCli: '/node/lib/node_modules/npm/bin/npm-cli.js' };
   return { schema: 1, kind: 'acc-macos-partition-experiment', status: 'passed', profile,
     context: admitMeasurementContext(admission(attempt)), controller, workload, after: { controller, workload }, runtime,
     host: { platform: 'darwin', arch: 'arm64', runnerOS: 'macOS', runnerArch: 'ARM64', environment: 'github-hosted',
-      imageOS: 'macos26-arm64', imageVersion: '20261020.1', runnerName: `runner-${profile}`,
+      imageOS: 'macos26', imageVersion: '20261020.1', runnerName: `runner-${profile}`,
       hardware: { model: 'Apple M2', cpus: 3, memoryBytes: 14000000000, release: '25.0.0' } },
     discovery: [...discovery], manifest: { schema: 1, events, files: files.map(file => ({ file, durationMs: 1, success: true })),
       receiptDecision: { reused: false, reason: 'ci-disabled' }, resultCounts: { selected: fileCount, completed: fileCount, passed: fileCount, failed: 0 } },
@@ -44,7 +51,9 @@ function record(profile = 'baseline', attempt = '1') {
 const copy = value => structuredClone(value);
 
 test('creation push attempts 1 and 2 are admitted, preserving run identity', () => {
-  for (const attempt of ['1', '2']) assert.equal(admitMeasurementContext(admission(attempt)).runAttempt, attempt);
+  for (const attempt of ['1', '2']) {
+    const input = admission(attempt); assert.equal(admitMeasurementContext(input).runAttempt, attempt); assert.equal(workflowAdmits(input), true);
+  }
 });
 for (const [name, change] of [
   ['main', x => { x.env.GITHUB_REF = x.event.ref = 'refs/heads/main'; }],
@@ -64,6 +73,7 @@ for (const [name, change] of [
   ['non-ARM process', x => { x.arch = 'x64'; }],
 ]) test(`context rejects ${name}`, () => {
   const input = admission(); change(input); assert.throws(() => admitMeasurementContext(input), /measurement/);
+  if (!['wrong checkout', 'local environment', 'missing run', 'non-macOS process', 'non-ARM process', 'noncanonical attempt'].includes(name)) assert.equal(workflowAdmits(input), false);
 });
 
 test('complete baseline and two exhaustive shards preserve actual profile walls', () => {
@@ -109,7 +119,10 @@ for (const [name, change] of [
   ['foreign npm', r => { r.runtime.npmCli = '/other/npm-cli.js'; }],
   ['workload substitution', r => { r.workload = { ...r.workload, commit: controller.commit }; }],
   ['post-run source drift', r => { r.after.workload.tree = controller.tree; }],
-  ['non-ARM image', r => { r.host.imageOS = 'macos26'; }],
+  ['wrong OS identifier', r => { r.host.imageOS = 'ubuntu24'; }],
+  ['display label as OS identifier', r => { r.host.imageOS = 'macos-26-arm64'; }],
+  ['wrong runner architecture', r => { r.host.runnerArch = 'X64'; }],
+  ['wrong process architecture', r => { r.host.arch = 'x64'; }],
   ['missing image version', r => { delete r.host.imageVersion; }],
   ['short discovery', r => { r.discovery.pop(); }],
   ['consistently foreign discovery', r => {
@@ -246,4 +259,56 @@ test('Windows cancellation requests fail before opening logs or spawning a child
     Object.defineProperty(process, 'platform', descriptor);
     await rm(root, { recursive: true, force: true });
   }
+});
+
+
+function repairAdmission(attempt = '1') {
+  const input = admission(attempt); input.event.before = FAILED_CONTROLLER; input.event.created = false; return input;
+}
+test('documented macos26 OS identifier passes with independent ARM architecture fields', () => {
+  const input = record(); assert.equal(validateMeasurement(input), input);
+  assert.equal(aggregateMeasurements([input, record('shard-1'), record('shard-2')]).fileCount, 484);
+});
+test('exact failed-controller repair push is admitted by collector and workflow', () => {
+  for (const attempt of ['1', '2']) {
+    const input = repairAdmission(attempt); assert.equal(admitMeasurementContext(input).runAttempt, attempt); assert.equal(workflowAdmits(input), true);
+  }
+  const records = [record(), record('shard-1'), record('shard-2')];
+  for (const item of records) item.context = admitMeasurementContext(repairAdmission());
+  assert.equal(aggregateMeasurements(records).fileCount, 484);
+});
+for (const [name, change] of [
+  ['foreign before', x => { x.event.before = 'e'.repeat(40); }],
+  ['creation flag', x => { x.event.created = true; }],
+  ['zero before without creation', x => { x.event.before = '0'.repeat(40); }],
+  ['unchanged failed head', x => { x.head = x.env.GITHUB_SHA = x.event.after = FAILED_CONTROLLER; }],
+  ['third attempt', x => { x.env.GITHUB_RUN_ATTEMPT = '3'; }],
+  ['wrong after', x => { x.event.after = 'e'.repeat(40); }],
+]) test(`repair rejects ${name}`, () => {
+  const input = repairAdmission(); change(input); assert.throws(() => admitMeasurementContext(input), /measurement/); assert.equal(workflowAdmits(input), false);
+});
+for (const fault of ['imageOS', 'runnerArch', 'node']) test(`preflight retains observed ${fault} before rejecting metadata`, async () => {
+  const root = await mkdtemp(path.join(tmpdir(), 'acc-macos-preflight-unit-'));
+  try {
+    const input = copy(record()); input.host.extraSecret = 'hidden-value'; input.runtime.environment = { TOKEN: 'hidden-value' };
+    if (fault === 'node') input.runtime.node = 'v24.4.0'; else input.host[fault] = fault === 'imageOS' ? 'ubuntu24' : 'X64';
+    const { retainAndValidatePreflight } = await import('../../scripts/macos-measurement.mjs');
+    await assert.rejects(retainAndValidatePreflight(root, input), /measurement/);
+    const bytes = await readFile(path.join(root, 'preflight.json'), 'utf8'); const observed = JSON.parse(bytes);
+    assert.equal(observed.kind, 'acc-macos-partition-preflight'); assert.equal(observed.status, 'observed');
+    assert.equal(observed.host.imageOS, input.host.imageOS); assert.equal(observed.runtime.node, input.runtime.node); assert.equal(observed.host.runnerArch, input.host.runnerArch);
+    assert.ok(!bytes.includes('hidden-value')); assert.throws(() => validateMeasurement(observed), /measurement/);
+    await assert.rejects(readFile(path.join(root, 'measurement.json')), { code: 'ENOENT' });
+  } finally { await rm(root, { recursive: true, force: true }); }
+});
+
+test('documented ARM preflight retains observations without creating a success proof', async () => {
+  const root = await mkdtemp(path.join(tmpdir(), 'acc-macos-preflight-valid-unit-'));
+  try {
+    const { retainAndValidatePreflight } = await import('../../scripts/macos-measurement.mjs');
+    const observed = await retainAndValidatePreflight(root, record());
+    assert.equal(observed.status, 'observed'); assert.equal(observed.host.imageOS, 'macos26');
+    assert.deepEqual(JSON.parse(await readFile(path.join(root, 'preflight.json'), 'utf8')), observed);
+    await assert.rejects(readFile(path.join(root, 'measurement.json')), { code: 'ENOENT' });
+  } finally { await rm(root, { recursive: true, force: true }); }
 });

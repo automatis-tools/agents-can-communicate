@@ -11,8 +11,10 @@ jobs:
       github.repository == 'automatis-tools/agents-can-communicate' &&
       github.event_name == 'push' && github.ref == 'refs/heads/measure/macos-shards-353' &&
       github.event.repository.full_name == github.repository && github.event.ref == github.ref &&
-      github.event.created == true && github.event.deleted == false &&
-      github.event.before == '0000000000000000000000000000000000000000' &&
+      github.event.deleted == false &&
+      ((github.event.created == true && github.event.before == '0000000000000000000000000000000000000000') ||
+      (github.event.created == false && github.event.before == 'ff9c5f96817dad463f15fe9bbf4b912114c1bffc' &&
+      github.sha != 'ff9c5f96817dad463f15fe9bbf4b912114c1bffc')) &&
       github.event.after == github.sha && (github.run_attempt == 1 || github.run_attempt == 2)
     runs-on: macos-latest
     timeout-minutes: 30

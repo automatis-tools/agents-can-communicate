@@ -15,6 +15,7 @@ import { stopPushProcessTree } from './push-process-tree.mjs';
 const run = promisify(execFile);
 const REPOSITORY = 'automatis-tools/agents-can-communicate';
 const REF = 'refs/heads/measure/macos-shards-353';
+const FAILED_CONTROLLER = 'ff9c5f96817dad463f15fe9bbf4b912114c1bffc';
 const WORKLOAD = { commit: 'b272ca474b229a84aa06fb25a5a0bf0ae44e245a', tree: '20ac4fa0d8f3362592c3dbcb66c25fe40af4bdf6' };
 const PROFILES = ['baseline', 'shard-1', 'shard-2'];
 const CHILD_ENV = { CI: 'true', ACC_TEST_REAL_FSYNC: '1', ACC_TEST_FILE_CONCURRENCY: '4',
@@ -28,10 +29,12 @@ const requireValid = (condition, detail) => { if (!condition) throw Error(`macos
 const shardFor = profile => profile === 'baseline' ? undefined : `${profile.at(-1)}/2`;
 const argsFor = profile => ['scripts/run-tests.mjs', ...(profile === 'baseline' ? [] : ['--shard', shardFor(profile)])];
 function contextValid(c, head, platform, arch) {
+  const creation = c.created === true && c.before === '0'.repeat(40);
+  const repair = c.created === false && c.before === FAILED_CONTROLLER && c.sha !== FAILED_CONTROLLER;
   requireValid(c.actions === 'true' && c.repository === REPOSITORY && c.eventRepository === REPOSITORY
-    && c.ref === REF && c.eventRef === REF && c.eventName === 'push' && c.before === '0'.repeat(40)
-    && c.created === true && c.deleted === false && oid(c.sha) && c.after === c.sha && head === c.sha
-    && positive(c.runId) && ['1', '2'].includes(c.runAttempt) && platform === 'darwin' && arch === 'arm64', 'creation-push context');
+    && c.ref === REF && c.eventRef === REF && c.eventName === 'push' && (creation || repair)
+    && c.deleted === false && oid(c.sha) && c.after === c.sha && head === c.sha
+    && positive(c.runId) && ['1', '2'].includes(c.runAttempt) && platform === 'darwin' && arch === 'arm64', 'creation-or-exact-repair push context');
   return c;
 }
 export function admitMeasurementContext({ env, event, head, platform, arch }) {
@@ -50,8 +53,8 @@ function validateNativeTools(runtime, h) {
     && text(runtime.nodeExecutable) && path.posix.isAbsolute(runtime.nodeExecutable)
     && runtime.npmCli === path.posix.join(path.posix.dirname(path.posix.dirname(runtime.nodeExecutable)), 'lib/node_modules/npm/bin/npm-cli.js'), 'Node/npm installation');
 
-  requireValid(h.runnerOS === 'macOS' && h.runnerArch === 'ARM64' && h.environment === 'github-hosted'
-    && /^macos.*arm64$/.test(h.imageOS) && text(h.imageVersion) && text(h.runnerName)
+  requireValid(h.platform === 'darwin' && h.arch === 'arm64' && h.runnerOS === 'macOS' && h.runnerArch === 'ARM64' && h.environment === 'github-hosted'
+    && /^macos[1-9]\d*$/.test(h.imageOS) && text(h.imageVersion) && text(h.runnerName)
     && text(h.hardware?.model) && Number.isSafeInteger(h.hardware.cpus) && h.hardware.cpus > 0
     && Number.isSafeInteger(h.hardware.memoryBytes) && h.hardware.memoryBytes > 0 && text(h.hardware.release), 'native image/hardware');
 }
@@ -124,10 +127,29 @@ export function aggregateMeasurements(records) {
       sumWrapperMs: shards.reduce((total, r) => total + r.walls.wrapperMs, 0) },
     caveats: ['Experimental evidence only; no ordinary execution proof or reusable receipt.',
       'Native job/queue timing must be joined from GitHub API; wrapper max is not whole workflow time.',
-      'Two authorized attempts are bounded observations, not population or billed-cost estimates.'] };
+      'Authorized launches are bounded observations, not population or billed-cost estimates.'] };
 }
 const json = async file => JSON.parse(await readFile(file, 'utf8'));
 const writeJson = (file, value) => writeFile(file, JSON.stringify(value, null, 2) + '\n', { mode: 0o600 });
+// Retain only named scalar observations. This artifact records an observation,
+// not successful admission, and survives any following metadata rejection.
+export async function retainAndValidatePreflight(output, observation) {
+  const select = (input, keys) => Object.fromEntries(keys.map(key => {
+    const value = input?.[key];
+    return [key, ['string', 'boolean'].includes(typeof value) || (typeof value === 'number' && Number.isFinite(value)) ? value : null];
+  }));
+  const preflight = { schema: 1, kind: 'acc-macos-partition-preflight', status: 'observed',
+    profile: select(observation, ['profile']).profile,
+    context: select(observation.context, ['actions', 'repository', 'eventRepository', 'ref', 'eventRef', 'eventName',
+      'sha', 'before', 'after', 'created', 'deleted', 'runId', 'runAttempt']),
+    controller: select(observation.controller, ['commit', 'tree']), workload: select(observation.workload, ['commit', 'tree']),
+    runtime: select(observation.runtime, ['node', 'npm', 'nodeExecutable', 'npmCli']),
+    host: { ...select(observation.host, ['platform', 'arch', 'runnerOS', 'runnerArch', 'environment', 'imageOS', 'imageVersion', 'runnerName']),
+      hardware: select(observation.host?.hardware, ['model', 'cpus', 'memoryBytes', 'release']) } };
+  await writeFile(path.join(output, 'preflight.json'), JSON.stringify(preflight, null, 2) + '\n', { mode: 0o600, flag: 'wx' });
+  validateNativeTools(preflight.runtime, preflight.host);
+  return preflight;
+}
 const inside = (parent, child) => { const rel = path.relative(parent, child); return rel === '' || (!rel.startsWith('..' + path.sep) && rel !== '..' && !path.isAbsolute(rel)); };
 export function measurementEnvironment(input = process.env) {
   const env = { ...input };
@@ -188,7 +210,7 @@ async function collect() {
     const context = admitMeasurementContext({ env: process.env, event: await json(process.env.GITHUB_EVENT_PATH),
       head: controllerHead, platform: process.platform, arch: process.arch });
     requireValid(PROFILES.includes(process.env.ACC_MACOS_MEASUREMENT_PROFILE)
-      && process.env.ACC_MACOS_MEASUREMENT_WORKLOAD_SHA === WORKLOAD.commit && process.version === 'v24.22.1', 'profile/workload/runtime');
+      && process.env.ACC_MACOS_MEASUREMENT_WORKLOAD_SHA === WORKLOAD.commit, 'profile/workload');
     const controller = await identity(controllerRepo, context.sha, env);
     const workload = await identity(workloadRepo, WORKLOAD.commit, env);
     const npmCli = await realpath(path.join(path.dirname(process.execPath), 'npm'));
@@ -198,8 +220,8 @@ async function collect() {
       runnerArch: process.env.RUNNER_ARCH, environment: process.env.RUNNER_ENVIRONMENT, imageOS: process.env.ImageOS,
       imageVersion: process.env.ImageVersion, runnerName: process.env.RUNNER_NAME,
       hardware: { model: os.cpus()[0]?.model, cpus: os.cpus().length, memoryBytes: os.totalmem(), release: os.release() } };
-    validateNativeTools(runtime, host);
     const profile = process.env.ACC_MACOS_MEASUREMENT_PROFILE;
+    await retainAndValidatePreflight(output, { profile, context, controller, workload, runtime, host });
     const record = { schema: 1, kind: 'acc-macos-partition-experiment', status: 'running', profile,
       context, controller, workload, runtime, host };
     await writeJson(path.join(output, 'capture.json'), record);
