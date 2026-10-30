@@ -1,5 +1,22 @@
 # Changelog
 
+## Unreleased — author attribution and related projects
+
+- Identify Mykola Maksymenko as ACC's creator and maintainer in the README.
+- Link the confirmed LinkedIn profile from README and npm author metadata.
+- Link Agent Policy Kit and Automatis Skills as related open-source projects.
+
+| Development artifact | Value |
+|---|---|
+| Built from | `9c296018aa25a42855653e4b5717fa6a5a22d0aa` |
+| Tarball | `agents-can-communicate-0.12.2.tgz`, 629,986 bytes, 380 files |
+| sha256 | `a01ea1d7416063fee2cf74d79d85ef735130b3b6b2f627325919d2614e4f834e` |
+
+The exact archive passed package verification. See
+[development evidence](docs/release-evidence/author-attribution-2026-10-30.md).
+This is not a published release. The version remains `0.12.2`.
+Earlier candidate and release records retain their original provenance.
+
 ## Unreleased — local context in Codex approval requests
 
 - Codex guidance starts ACC commands with default permissions. A sandbox access failure
