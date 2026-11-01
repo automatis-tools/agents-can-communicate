@@ -1,5 +1,22 @@
 # Changelog
 
+## Unreleased — ChatGPT Work Mode guidance
+
+- Troubleshooting names a terminal session as the supported path for ChatGPT Work
+  Mode. A Work Mode chat gets ACC's `state_access_denied` answer, and its approval
+  policy rejected the request to run outside the sandbox (#316).
+
+| Development artifact | Value |
+|---|---|
+| Built from | `c8da801915fc80154854ccc239f7677cedd77206` |
+| Tarball | `agents-can-communicate-0.12.2.tgz`, 631,478 bytes, 381 files |
+| sha256 | `593b7dc0f160d7dc4011d244f2c6e706e41153a2dce6238786cd2097656877c7` |
+
+The exact archive passed package verification. See
+[development evidence](docs/release-evidence/work-mode-guidance-2026-11-01.md).
+This is not a published release. The version remains `0.12.2`.
+Earlier candidate and release records retain their original provenance.
+
 ## Unreleased — contributing guidance
 
 - `CONTRIBUTING.md` says how to propose a fix or an adapter, what an adapter pull

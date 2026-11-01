@@ -1474,3 +1474,37 @@ fail open and print `{"systemMessage": "ACC: coordination is paused in this work
 the turn ran; exec mode prints no systemMessage. The TUI's display of a hook's systemMessage was
 measured with a probe hook on 0.147.0, 0.155.1 and 0.159.1 (above); this plain shape, without
 `hookSpecificOutput`, was not measured in the TUI.
+
+## ChatGPT Work Mode denies ACC's state — ChatGPT.app 26.1027.51404, 2026-11-01
+
+Observed on macOS arm64 with ACC 0.12.2 installed (#316). A new chat in the app's Work tab,
+in the approval mode "Approve for me", ran ACC's wrapper once with its default permissions:
+`acc-cli.sh status --json`. No approval prompt appeared. The command exited 4 with:
+
+```text
+cannot write ACC's state: fchmod <data home>/acc/runtime was refused (EPERM); the runtime is
+ready and no update is pending. Run ACC where its data home is writable: outside the client's
+sandbox, or through the client's approved command path for ACC
+```
+
+and `reasonCode: state_access_denied`. On 2026-10-21, ACC 0.11.1 had answered the same refusal
+with "runtime unavailable; retry after the update" (#316).
+
+Asked to run the same command outside the sandbox, the app refused without a prompt:
+
+```text
+approval policy is Granular(GranularApprovalConfig { sandbox_approval: false, rules: false,
+skill_approval: false, request_permissions: false, mcp_elicitations: true }); reject command -
+you cannot ask for escalated permissions if the approval policy is Granular(...)
+```
+
+- **Host policy prevents access.** In this approval mode the sandbox could not write ACC's
+  data home, and the one request to run outside the sandbox was rejected. The policy reports
+  `sandbox_approval: false` and `rules: false`. ACC found no path to its state from inside
+  such a chat.
+- **Supported path.** Run ACC from a session that can write its data home, such as Codex or
+  Claude Code in a terminal.
+
+**Not observed.** Whether ACC's `agents-can-communicate.rules` file applies in Work Mode; the
+policy's `rules: false` was not tested against it. The app's other approval modes, and whether
+one of them allows escalation. The project folder the chat used was shown by name only.
