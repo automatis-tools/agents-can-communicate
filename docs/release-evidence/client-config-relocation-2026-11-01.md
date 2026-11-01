@@ -2,9 +2,9 @@
 
 | Development artifact | Value |
 |---|---|
-| Built from | `235fefbdd6eb7fc7ac991e3c7d67d9362deb81eb` |
-| Tarball | `agents-can-communicate-0.12.2.tgz`, 633,255 bytes, 381 files |
-| sha256 | `8074bcfcb353afa2a115c4e5029b633b5cd5f5b521375422497d259c48f652b3` |
+| Built from | `b554a77499ee65eca6250be68981444c2848800d` |
+| Tarball | `agents-can-communicate-0.12.2.tgz`, 633,399 bytes, 381 files |
+| sha256 | `6ff0adcc7d282305e5472bef4bbad7c24e91592d5f9b57912a6fbec82c54ff01` |
 
 The source worktree was clean immediately before packing. The exact archive passed
 `node scripts/verify-package.mjs <exact-tarball>` on macOS arm64 with Node 24.4.0.
@@ -25,6 +25,9 @@ the resolution made the three relocated cases fail. Doctor reports `configHome` 
 client. The same test checks that uninstall leaves no empty directory in the relocated
 client directory, and that doctor names an installation made under another directory;
 recording created directories only inside `HOME` made the three relocated cases fail.
+Doctor compares the recorded paths with those an install in the current environment would
+write, so an old directory nested inside the new one still counts as moved; the earlier
+containment check missed that case for Claude Code and Kimi Code.
 
 Verification covers the exact package inventory and boundaries, installed CLI,
 packed documentation links, doctor, a workspace without Git, and reversible
