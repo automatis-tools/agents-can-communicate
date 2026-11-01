@@ -39,7 +39,7 @@ export async function preparePushDocsFixture(t, { ci } = {}) {
   };
   for (const file of ["scripts/validate-push.mjs", "scripts/check-commit-attribution.mjs", "scripts/check-syntax.mjs",
     "scripts/run-tests.mjs", "scripts/test-skip-fsync.mjs", "scripts/push-npm-probe.mjs",
-    "scripts/test-file-watchdog.mjs", "scripts/test-timing-reporter.mjs"]) await copy(file);
+    "scripts/test-file-watchdog.mjs", "scripts/test-timing-reporter.mjs", "scripts/test-progress-reporter.mjs"]) await copy(file);
   const controls = Object.fromEntries(["docs", "runtime", "smoke", "packs"]
     .map(name => [name, path.join(f.base, name)]));
   const record = name => `appendFileSync(${JSON.stringify(controls[name])}, JSON.stringify({cwd:process.cwd(),args:process.argv.slice(2)})+'\\n');`;
