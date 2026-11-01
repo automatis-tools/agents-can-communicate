@@ -3,14 +3,24 @@
 ## Unreleased — Kimi Stop continuation and Web delivery evidence
 
 - Kimi 2.4.0 continues a busy turn once through the existing Stop outcome, only with an
-  explicit `actionable` or `all` recipient policy. The reason reaches the model as
-  `system_trigger`; ordinary idle TUI remains next-turn only.
+  explicit `actionable` or `all` recipient policy. Kimi gives the reason `system_trigger`
+  standing, so it carries only ACC's fixed notice, the message ids and the commands that read
+  and answer them; the body reaches the model through ordinary next-turn context, framed as
+  untrusted data. Ordinary idle TUI remains next-turn only.
 - Kimi Web 2.4.0 certifies wake-only `livePush` through installed hooks on an existing
   loopback server in `yolo`. Exact packed-client evidence covers idle, busy queue, reply,
   duplicate suppression, restart/rebind and exact binding, plus token rotation, foreign-lock
-  and cold-reaper refusal. `replyRoute` stays false; ordinary idle TUI remains next-turn only.
-- Codex sender permissions can compose an exact `127.0.0.1` grant only when a receiver
-  declares loopback transport. Existing profiles retain their byte shape without a declaration.
+  and cold-reaper refusal. Each offer re-reads the session's permission mode after the warm
+  check, so a session switched from `yolo` to manual or auto after binding gets no wake. A
+  repeated offer reports the first submit's outcome. `replyRoute` stays false; ordinary idle
+  TUI remains next-turn only.
+- Codex sender permissions grant the exact `127.0.0.1` literal only while Kimi's live delivery
+  is recorded as `actionable` or `all`. A Codex domain rule cannot name a port, so the grant
+  opens every local service to the sandbox; with Kimi off or absent, the profile keeps its
+  socket-only shape and a left-over grant is reported by doctor and removed by the next
+  install or update. Turning Kimi's live delivery on or off rewrites an installed Codex profile
+  in the same run. Codex install and detect now receive the composed declaration at all; before
+  this, a real install never wrote the grant.
 
 | Development artifact | Value |
 |---|---|
