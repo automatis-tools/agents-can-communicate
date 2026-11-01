@@ -2,9 +2,9 @@
 
 | Development artifact | Value |
 |---|---|
-| Built from | `85b7e0acc15cf9dfa0d8847d9b442c3280a5c125` |
-| Tarball | `agents-can-communicate-0.12.2.tgz`, 649,094 bytes, 389 files |
-| sha256 | `22f750c60085c989846354eddc81f36c9f9f951415b451ec6dfd14b4a43725ec` |
+| Built from | `7a273a76a4c5f5773e5bbd508f6c1db2b7665379` |
+| Tarball | `agents-can-communicate-0.12.2.tgz`, 650,367 bytes, 389 files |
+| sha256 | `b5d0fafba7e24ac8ad7e285a448faa806da35ee086c3188242f864c599d8c1f7` |
 
 The source worktree was clean immediately before packing. The exact archive passed
 `node scripts/verify-package.mjs <exact-tarball>` on macOS arm64 with Node 24.4.0. The
@@ -29,6 +29,9 @@ data home, installed hooks from the extracted archive, and a deterministic local
 | `kimi -p`, a question arriving mid-turn, Stop continuation | the continuation request carried ACC's notice and the message id, never the body; `acc reply` acknowledged the message |
 
 The recorded run's file keeps the fixture name `kimi-web-2.4.0` its recorder uses; its client
-version field is 2.4.1. Codex sender grants were exercised by the package's unit and command
-tests (`packages/cli/test/codex-loopback-follows-kimi.test.mjs`); no real Codex session sent
-to Kimi Web in this run. No package publication or production deployment was performed.
+version field is 2.4.1. Codex sender grants - added and dropped by Kimi's
+policy, dropped by uninstalling Kimi, never granted for an absent Kimi - and the refusal of a
+duplicate offer while the first is still deciding were exercised by the package's unit and
+command tests (`packages/cli/test/codex-loopback-follows-kimi.test.mjs`,
+`packages/adapter-kimi/test/web-delivery.test.mjs`); no real Codex session sent to Kimi Web in
+this run. No package publication or production deployment was performed.
