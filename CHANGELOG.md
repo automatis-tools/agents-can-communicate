@@ -14,12 +14,15 @@
 
 | Development artifact | Value |
 |---|---|
-| Built from | `d428e40039200ae53c1128284cd29f3a3216a657` |
-| Tarball | `agents-can-communicate-0.12.2.tgz`, 645,884 bytes, 389 files |
-| sha256 | `b91cc4ae53586b45aa35b7ffd49a487f5f52b503d2d395d562f81a409a811395` |
+| Built from | `ab114f0559c81b10b6e612ef355b2ddf0a2f64a0` |
+| Tarball | `agents-can-communicate-0.12.2.tgz`, 646,112 bytes, 389 files |
+| sha256 | `ff2c45b89af322dd0ca43b32f3110f5877ce05ebb63a679567a523af554b61ba` |
 
 The exact archive passed package verification. See
 [Kimi delivery evidence](packages/adapter-kimi/fixtures/delivery/kimi-web-2.4.0.json).
+The real Kimi Web scenarios ran on the archive before `main` was merged (sha256
+`b91cc4ae53586b45aa35b7ffd49a487f5f52b503d2d395d562f81a409a811395`); the merge adds README,
+npm author metadata, tests and scripts, and changes no delivery code.
 This is not a published release; the package version remains `0.12.2`.
 
 ## Unreleased — author attribution and related projects
