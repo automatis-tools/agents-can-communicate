@@ -146,6 +146,19 @@ test("the suite cannot redirect fixture installs into the calling client's home"
   assert.equal(inherited.CODEX_HOME, "/operator/codex", "the caller's environment is unchanged");
 });
 
+// #408: a nested runner that inherited these truncated and removed the outer
+// run's streamed timings, and CI lost every file record.
+test("the suite's processes cannot write the runner's own diagnostics", () => {
+  const inherited = { ACC_TEST_TIMINGS: "/runner/t.jsonl", ACC_GATE_DIAGNOSTIC: "/runner/m.json", KEEP: "1" };
+  for (const platform of ["darwin", "linux", "win32"]) {
+    const env = testEnvironment(inherited, { platform });
+    assert.equal(env.ACC_TEST_TIMINGS, undefined);
+    assert.equal(env.ACC_GATE_DIAGNOSTIC, undefined);
+    assert.equal(env.KEEP, "1");
+  }
+  assert.equal(inherited.ACC_TEST_TIMINGS, "/runner/t.jsonl", "the caller's environment is unchanged");
+});
+
 test("with the preload, no flush reaches the disk and the bytes are still written", async t => {
   const root = await mkdtemp(path.join(tmpdir(), "acc-skip-fsync-"));
   t.after(() => rm(root, { recursive: true, force: true }));
