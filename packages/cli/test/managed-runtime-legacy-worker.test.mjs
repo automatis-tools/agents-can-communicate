@@ -54,3 +54,12 @@ test("a changed observed process identity cannot receive the termination signal"
     signal: () => { signalled = true; } }), false);
   assert.equal(signalled, false);
 });
+
+test("retirement reads the helper's start time as one instant in any local zone", async t => {
+  const f = await fixture(t);
+  const saved = process.env.TZ;
+  process.env.TZ = "Asia/Tokyo"; // Nine hours from UTC: a zone mix-up cannot pass the minute bound.
+  try { assert.equal(await retireLegacyUpdateWorker(f.root), true); }
+  finally { if (saved === undefined) delete process.env.TZ; else process.env.TZ = saved; }
+  assert.deepEqual(await f.exit, [null, "SIGTERM"]);
+});
