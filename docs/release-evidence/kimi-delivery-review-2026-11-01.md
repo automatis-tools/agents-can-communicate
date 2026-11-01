@@ -2,9 +2,9 @@
 
 | Development artifact | Value |
 |---|---|
-| Built from | `b124f4f2e6c71b66a99c28f88ca85525d1c88899` |
-| Tarball | `agents-can-communicate-0.12.2.tgz`, 650,422 bytes, 389 files |
-| sha256 | `f3c3d248f7b05eb730c335b3a202f4d2b6517bccaf4a848926c3d409837a8d7f` |
+| Built from | `ef2d96bbe290d03a2867f630276155568f723ff6` |
+| Tarball | `agents-can-communicate-0.12.2.tgz`, 651,237 bytes, 390 files |
+| sha256 | `af172c2c0c52197f11ccd7e35bcd8686e432e92f69b48b28c207b6d3d140d3f5` |
 
 The source worktree was clean immediately before packing. The exact archive passed
 `node scripts/verify-package.mjs <exact-tarball>` on macOS arm64 with Node 24.4.0. The
