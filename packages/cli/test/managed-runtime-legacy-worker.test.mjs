@@ -1,16 +1,19 @@
 import assert from "node:assert/strict";
-import { spawn } from "node:child_process";
+import { execFile, spawn } from "node:child_process";
 import { once } from "node:events";
-import { mkdir, mkdtemp, realpath, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import { promisify } from "node:util";
 import nodeTest from "node:test";
 const test = (name, fn) => nodeTest(name, { skip: process.platform === "win32" ? "Unix process identity and signals" : false }, fn);
-import { retireLegacyUpdateWorker } from "../src/managed-runtime/management-recovery.mjs";
+import { inspectWorker, retireLegacyUpdateWorker } from "../src/managed-runtime/management-recovery.mjs";
 import { readControl, writeControl } from "../src/managed-runtime/state.mjs";
 
-async function fixture(t, name = "acc-update-worker.mjs") {
-  const root = await realpath(await mkdtemp(path.join(tmpdir(), "acc-legacy-retire-")));
+const execFileAsync = promisify(execFile);
+
+async function fixture(t, name = "acc-update-worker.mjs", prefix = "acc-legacy-retire-") {
+  const root = await realpath(await mkdtemp(path.join(tmpdir(), prefix)));
   const active = { version: "0.4.3", root: path.join(root, "generations/old") };
   await mkdir(path.join(active.root, "bin"), { recursive: true });
   await writeFile(path.join(active.root, "package.json"), JSON.stringify({ name: "agents-can-communicate", version: "0.4.3" }));
@@ -55,11 +58,44 @@ test("a changed observed process identity cannot receive the termination signal"
   assert.equal(signalled, false);
 });
 
-test("retirement reads the helper's start time as one instant in any local zone", async t => {
+// Sets environment variables for one check and restores them afterwards.
+async function withEnv(values, check) {
+  const saved = Object.fromEntries(Object.keys(values).map(key => [key, process.env[key]]));
+  Object.assign(process.env, values);
+  try { return await check(); } finally {
+    for (const [key, value] of Object.entries(saved)) if (value === undefined) delete process.env[key]; else process.env[key] = value;
+  }
+}
+
+// Positive control on the real ps in a zone nine hours from UTC.
+test("retirement reads the real helper's start time in another local zone", async t => {
   const f = await fixture(t);
-  const saved = process.env.TZ;
-  process.env.TZ = "Asia/Tokyo"; // Nine hours from UTC: a zone mix-up cannot pass the minute bound.
-  try { assert.equal(await retireLegacyUpdateWorker(f.root), true); }
-  finally { if (saved === undefined) delete process.env.TZ; else process.env.TZ = saved; }
+  assert.equal(await withEnv({ TZ: "Asia/Tokyo" }, () => retireLegacyUpdateWorker(f.root)), true);
+  assert.deepEqual(await f.exit, [null, "SIGTERM"]);
+});
+
+// When daylight saving time ends, Toronto's 01:30 happens twice; ps without a UTC
+// zone prints the same text for both (seen on 2026-11-01).
+test("retirement accepts a helper that started in the repeated daylight-saving hour", async t => {
+  const f = await fixture(t);
+  const ownerFile = path.join(f.root, "worker", "manager.lock", "owner.json");
+  await writeFile(ownerFile, JSON.stringify({ ...JSON.parse(await readFile(ownerFile, "utf8")),
+    acquiredAt: "2026-11-01T06:30:05.000Z" }));
+  const ps = async (file, args, options) => {
+    const real = await execFileAsync(file, args, options);
+    const start = options.env.TZ === "UTC0" ? "Sun Nov  1 06:30:00 2026" : "Sun Nov  1 01:30:00 2026";
+    return { stdout: real.stdout.replace(/^(\s*\d+\s+).{24}/, `$1${start}`) };
+  };
+  const retired = await withEnv({ TZ: "America/Toronto" },
+    () => retireLegacyUpdateWorker(f.root, { inspect: pid => inspectWorker(pid, { run: ps }) }));
+  assert.equal(retired, true);
+  assert.deepEqual(await f.exit, [null, "SIGTERM"]);
+});
+
+// LC_ALL=C escapes non-ASCII command text, and the helper is then not recognized.
+test("retirement recognizes a helper under a non-ASCII managed root", async t => {
+  const f = await fixture(t, undefined, "acc-legacy-retire-Ніка é-");
+  const utf8 = process.platform === "darwin" ? "en_US.UTF-8" : "C.UTF-8";
+  assert.equal(await withEnv({ LC_ALL: utf8 }, () => retireLegacyUpdateWorker(f.root)), true);
   assert.deepEqual(await f.exit, [null, "SIGTERM"]);
 });

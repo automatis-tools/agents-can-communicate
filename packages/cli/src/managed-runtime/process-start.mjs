@@ -4,8 +4,14 @@
 // while the process had started at 01:15 EST, an hour later. Asking ps for UTC
 // gives one instant for every start time.
 
-/** The environment for a `ps -o lstart` call whose output parseStartTime reads. */
-export const startTimeEnvironment = (env = process.env) => ({ ...env, LC_ALL: "C", TZ: "UTC0" });
+/** The environment for a `ps -o lstart` call whose output parseStartTime reads.
+ * LC_TIME=C keeps English month names. LC_ALL would override it, so its value
+ * moves to LC_CTYPE: a command line in the same output keeps its non-ASCII text,
+ * which LC_ALL=C would escape. */
+export function startTimeEnvironment(env = process.env) {
+  const { LC_ALL, ...rest } = env;
+  return { ...rest, ...(LC_ALL ? { LC_CTYPE: LC_ALL } : {}), LC_TIME: "C", TZ: "UTC0" };
+}
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const LSTART = /^[A-Z][a-z]{2} ([A-Z][a-z]{2}) +(\d{1,2}) (\d\d):(\d\d):(\d\d) (\d{4})$/;

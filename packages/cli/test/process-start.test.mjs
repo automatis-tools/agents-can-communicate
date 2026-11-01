@@ -19,8 +19,10 @@ test("a UTC lstart value is read as UTC, and anything else is unreadable", () =>
     "Sun Nov  1 06:15:19 2026 EST", "2026-11-01T06:15:19Z", null, 1793513719000]) {
     assert.equal(parseStartTime(value), null, String(value));
   }
-  assert.equal(startTimeEnvironment({ PATH: "/bin", TZ: "America/Toronto" }).TZ, "UTC0");
-  assert.equal(startTimeEnvironment({}).LC_ALL, "C");
+  assert.deepEqual(startTimeEnvironment({ PATH: "/bin", TZ: "America/Toronto", LC_ALL: "uk_UA.UTF-8" }),
+    { PATH: "/bin", TZ: "UTC0", LC_TIME: "C", LC_CTYPE: "uk_UA.UTF-8" });
+  assert.deepEqual(startTimeEnvironment({ LANG: "uk_UA.UTF-8", LC_CTYPE: "UTF-8" }),
+    { LANG: "uk_UA.UTF-8", LC_CTYPE: "UTF-8", LC_TIME: "C", TZ: "UTC0" });
 });
 
 // When daylight saving time ends, 01:30 happens twice in Toronto. ps without a
