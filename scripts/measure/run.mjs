@@ -10,7 +10,7 @@
 //
 // A commit side needs git and tar on PATH and installs with npm.
 import { execFileSync, spawn } from "node:child_process";
-import { rmSync } from "node:fs";
+import { mkdtempSync, rmSync } from "node:fs";
 import { mkdir, mkdtemp, readdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -132,7 +132,9 @@ async function child(sideName, entry) {
     samples: settings.samples, warmup: settings.warmup,
     mutation: sideName === "candidate" ? values["candidate-mutation"] : undefined };
   // Its own temporary directory, removed here: a killed child cleans nothing up itself.
-  const scratch = await mkdtemp(path.join(os.tmpdir(), "acc-measure-child-"));
+  // Created and registered in one synchronous step: a signal that arrived after an
+  // asynchronous mkdtemp made the directory, but before registration, left it behind.
+  const scratch = mkdtempSync(path.join(os.tmpdir(), "acc-measure-child-"));
   const loadBefore = os.loadavg(), started = performance.now();
   const ended = fields => ({ loadBefore, loadAfter: os.loadavg(), elapsedMs: Math.round(performance.now() - started), ...fields });
   const running = { process_: null, scratch };
@@ -165,9 +167,10 @@ async function child(sideName, entry) {
       resolve(ended(result));
     });
   });
-  active.delete(running);
   // A directory that will not go is reported with the child; it never costs the run.
+  // It stays registered until removed, so a signal during removal still removes it.
   const cleanup = await rm(scratch, { recursive: true, force: true, maxRetries: 5 }).then(() => null, error => error.message);
+  active.delete(running);
   return cleanup === null ? outcome : { ...outcome, cleanupError: `could not remove ${scratch}: ${cleanup}` };
 }
 
