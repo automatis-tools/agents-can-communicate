@@ -1,5 +1,23 @@
 # Changelog
 
+## Unreleased — Kimi Code plugin installs
+
+- ACC registers its Kimi Code plugin with the source value `local-path`. Before, it wrote
+  `local`, which Kimi Code 2.4.1 rejects. Then `/plugins install` failed for every plugin
+  with "output validation failed for pluginService.listPlugins". Reinstalling ACC repairs
+  an existing record (#409).
+
+| Development artifact | Value |
+|---|---|
+| Built from | `56e3592c91984b776fae335882f64c88712765f2` |
+| Tarball | `agents-can-communicate-0.12.2.tgz`, 631,369 bytes, 381 files |
+| sha256 | `d0d256cd6e5ac41ec8f7f8be8c00b54dfdb1fbcabc5f884c5c4cb89e7e97b95a` |
+
+The exact archive passed package verification. See
+[development evidence](docs/release-evidence/kimi-plugin-source-2026-11-01.md).
+This is not a published release. The version remains `0.12.2`.
+Earlier candidate and release records retain their original provenance.
+
 ## Unreleased — commands right after an update
 
 - Reclaiming old generations after an update no longer blocks ACC commands. The tree
