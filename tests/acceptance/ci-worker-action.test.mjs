@@ -76,7 +76,7 @@ test('literal action deadlines and CI keep the actual runner bounded and durable
   assert.ok(jobs.length > 0);
   for (const job of jobs) {
     const limit = Number(job.match(/^    timeout-minutes: (\d+)$/m)?.[1]);
-    assert.ok(deadline <= (limit - 5) * 60_000, `test deadline leaves under 5 minutes of a ${limit}-minute job`);
+    assert.ok(deadline <= (limit - 10) * 60_000, `test deadline leaves under 10 minutes of a ${limit}-minute job for setup and upload`);
   }
   for (const [platform, os, concurrency] of [['linux', 'Linux', 4], ['darwin', 'macOS', 4], ['win32', 'Windows', 3]]) {
     const env = { ...literal, ACC_TEST_FORCE_EXIT: evaluate(scalar(driver, 'ACC_TEST_FORCE_EXIT'), { runner: { os } }) };

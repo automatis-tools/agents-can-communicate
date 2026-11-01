@@ -141,9 +141,10 @@ memory, image, Node and npm. Before you compare two timings, run
 `node scripts/runner-profile.mjs compare <a> <b>`. A different host or image, or an unavailable
 fact, makes the timings incomparable; the profile never changes a gate result.
 `ACC_TEST_PROGRESS=1` adds an `acc-test-file start|done <file>` line for each test file.
-CI stops its test command after `ACC_CI_TEST_DEADLINE_MS` (24 minutes), under the 30-minute
-job limit. The job log then lists the files still running, and the artifact keeps
-`acc-test-timings.jsonl.running.jsonl` with the files that finished.
+CI stops its test command after `ACC_CI_TEST_DEADLINE_MS` (20 minutes), ten minutes under the
+30-minute job limit. The job log then lists the files still running, and the artifact keeps
+`acc-test-timings.jsonl.running.jsonl` with the files that finished. A stopped run writes no
+gate manifest; its phases appear only as lines in the job log.
 
 Enable the commit-msg and pre-push gates once per clone:
 

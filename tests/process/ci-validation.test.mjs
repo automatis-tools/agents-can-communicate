@@ -379,7 +379,7 @@ setInterval(() => {}, 1000);
 test('a malformed test deadline refuses before any execution', async t => {
   const f = await ciRunnerFixture(t);
   const p = await f.invoke('plan'); assert.equal(p.code, 0, p.stderr);
-  for (const value of ['0', '-1', '1.5', 'soon', '']) {
+  for (const value of ['0', '-1', '1.5', 'soon', '', '2147483648']) {
     noProof(await f.invoke('test', { CI_ROUTE: p.outputs.route, CI_WORKER: f.worker, ACC_CI_TEST_DEADLINE_MS: value }));
   }
   assert.equal((await f.records('docs')).length, 0);

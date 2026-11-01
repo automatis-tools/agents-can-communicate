@@ -224,7 +224,7 @@ test("Release timing upload remains optional and unconditional with distinct art
   const tests = steps.find(step => step.startsWith("run: npm test\n"));
   const job = Number(source.match(/^    timeout-minutes: (\d+)$/m)?.[1]);
   const step = Number(tests?.match(/^        timeout-minutes: (\d+)$/m)?.[1]);
-  assert.ok(Number.isSafeInteger(step) && step <= job - 5, "Release tests must stop before the job limit");
+  assert.ok(Number.isSafeInteger(step) && step <= job - 10, "Release tests must stop well before the job limit");
   assert.equal(tests.match(/^          ACC_TEST_PROGRESS: '(.*)'$/m)?.[1], "1");
   const profile = steps.find(step => step.includes("run: node scripts/runner-profile.mjs record"));
   assert.ok(profile && steps.indexOf(profile) < steps.indexOf(upload), "Release must record its runner profile before upload");

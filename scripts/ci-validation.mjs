@@ -70,7 +70,8 @@ async function main() {
   // diagnostics upload included (#408). The test command stops first, and its
   // output streams live, so the log names the files that were still running.
   const deadlineMs = env.ACC_CI_TEST_DEADLINE_MS === undefined ? null : Number(env.ACC_CI_TEST_DEADLINE_MS);
-  if (deadlineMs !== null && (!Number.isSafeInteger(deadlineMs) || deadlineMs < 1)) fail();
+  // setTimeout fires at once for a delay above 2^31-1 ms.
+  if (deadlineMs !== null && (!Number.isSafeInteger(deadlineMs) || deadlineMs < 1 || deadlineMs > 2 ** 31 - 1)) fail();
   const progress = progressTracker();
   const decoder = new TextDecoder();
   const controller = new AbortController();
