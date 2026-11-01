@@ -24,9 +24,13 @@ jobs:
         env:
           ACC_TEST_TIMEOUT_MS: '300000'
           ACC_TEST_FILE_TIMEOUT_MS: '600000'
+          ACC_TEST_PROGRESS: '1'
           ACC_TEST_TIMINGS: ${{ runner.temp }}/acc-test-timings.jsonl
           GIT_DIR: ''
           GIT_WORK_TREE: ''
+        # Ten minutes under the 30-minute job limit, which also counts the steps
+        # before this one, so the diagnostics below still upload (#408).
+        timeout-minutes: 20
 
       - name: Record runner profile
         continue-on-error: true
@@ -44,6 +48,7 @@ jobs:
           path: |
             ${{ runner.temp }}/acc-test-timings.jsonl
             ${{ runner.temp }}/acc-test-timings.jsonl.manifest.json
+            ${{ runner.temp }}/acc-test-timings.jsonl.running.jsonl
             ${{ runner.temp }}/acc-runner-profile.json
           if-no-files-found: warn
 

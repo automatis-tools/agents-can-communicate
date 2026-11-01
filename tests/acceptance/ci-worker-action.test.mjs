@@ -49,7 +49,8 @@ test('the composite publishes proof only from the production test-driver step', 
     assert.equal(actual, want);
   }
   assert.doesNotMatch(upload, /overwrite: true/);
-  for (const file of ['acc-test-timings.jsonl', 'acc-test-timings.jsonl.manifest.json', 'acc-ci-plan.json', 'acc-ci-proof.json']) {
+  for (const file of ['acc-test-timings.jsonl', 'acc-test-timings.jsonl.manifest.json',
+    'acc-test-timings.jsonl.running.jsonl', 'acc-ci-plan.json', 'acc-ci-proof.json']) {
     assert.ok(upload.includes(`\${{ runner.temp }}/${file}\n`));
   }
 });
@@ -65,6 +66,18 @@ test('literal action deadlines and CI keep the actual runner bounded and durable
   assert.equal(literal.GIT_DIR, '');
   assert.equal(literal.GIT_WORK_TREE, '');
   assert.equal(scalar(driver, 'ACC_TEST_TIMINGS'), '${{ runner.temp }}/acc-test-timings.jsonl');
+  assert.equal(literal.ACC_TEST_PROGRESS, '1');
+  // #408: the test command stops early enough for the upload steps to run in
+  // every job that uses this action, which a job time limit would skip.
+  const deadline = Number(literal.ACC_CI_TEST_DEADLINE_MS);
+  assert.ok(Number.isSafeInteger(deadline) && deadline > 0);
+  const ci = await readFile(path.join(repo, '.github/workflows/ci.yml'), 'utf8');
+  const jobs = ci.split(/^  (?=[\w-]+:$)/m).filter(job => job.includes('uses: ./.github/actions/ci-test'));
+  assert.ok(jobs.length > 0);
+  for (const job of jobs) {
+    const limit = Number(job.match(/^    timeout-minutes: (\d+)$/m)?.[1]);
+    assert.ok(deadline <= (limit - 10) * 60_000, `test deadline leaves under 10 minutes of a ${limit}-minute job for setup and upload`);
+  }
   for (const [platform, os, concurrency] of [['linux', 'Linux', 4], ['darwin', 'macOS', 4], ['win32', 'Windows', 3]]) {
     const env = { ...literal, ACC_TEST_FORCE_EXIT: evaluate(scalar(driver, 'ACC_TEST_FORCE_EXIT'), { runner: { os } }) };
     const actual = testEnvironment(env, { platform });
@@ -72,6 +85,8 @@ test('literal action deadlines and CI keep the actual runner bounded and durable
     assert.equal(fileConcurrency(platform, { fsyncSkipped: skipsFsync({ env: actual, platform }) }), concurrency);
     const args = nodeTestArguments(['probe.test.mjs'], { env: actual });
     assert.ok(args.includes('--test-timeout=300000'));
+    assert.ok(nodeTestArguments(['probe.test.mjs'], { env: actual, timings: 't.jsonl' })
+      .some(argument => argument.endsWith('/test-progress-reporter.mjs')));
     assert.equal(testFileTimeout(actual), 600000);
     assert.equal(args.includes('--test-force-exit'), platform === 'win32');
   }

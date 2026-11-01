@@ -43,6 +43,7 @@ export const skipsFsync = ({ platform = process.platform, env = process.env } = 
 export const SKIP_FSYNC_PRELOAD = new URL("./test-skip-fsync.mjs", import.meta.url).href;
 export const FILE_WATCHDOG_PRELOAD = new URL("./test-file-watchdog.mjs", import.meta.url).href;
 export const TIMING_REPORTER = new URL("./test-timing-reporter.mjs", import.meta.url).href;
+export const PROGRESS_REPORTER = new URL("./test-progress-reporter.mjs", import.meta.url).href;
 export function testFileTimeout(env = process.env) {
   const timeout = Number(env.ACC_TEST_FILE_TIMEOUT_MS ?? 600_000);
   if (!Number.isSafeInteger(timeout) || timeout < 1) throw new Error("ACC_TEST_FILE_TIMEOUT_MS must be a positive integer");
@@ -57,6 +58,11 @@ export function testEnvironment(env = process.env, { platform = process.platform
   env = { ...env };
   delete env.CODEX_HOME;
   delete env.AGENTS_HOME;
+  // The runner's own diagnostic destinations. A test that starts a nested
+  // runner would otherwise write, and then delete, the outer run's streamed
+  // timings (#408: every CI job that ran such a test lost all its records).
+  delete env.ACC_TEST_TIMINGS;
+  delete env.ACC_GATE_DIAGNOSTIC;
   if (!skipsFsync({ platform, env })) return { ...env };
   const preload = `--import=${SKIP_FSYNC_PRELOAD}`;
   const options = env.NODE_OPTIONS ?? "";
@@ -86,7 +92,9 @@ export const nodeTestArguments = (files, { timings, env = process.env } = {}) =>
   ...forceExit(env),
   `--import=${FILE_WATCHDOG_PRELOAD}`,
   ...(timings === undefined ? [] : ["--test-reporter=spec", "--test-reporter-destination=stdout",
-    `--test-reporter=${TIMING_REPORTER}`, `--test-reporter-destination=${timings}`]),
+    `--test-reporter=${TIMING_REPORTER}`, `--test-reporter-destination=${timings}`,
+    ...(env.ACC_TEST_PROGRESS === "1"
+      ? [`--test-reporter=${PROGRESS_REPORTER}`, "--test-reporter-destination=stdout"] : [])]),
   ...files,
 ];
 
