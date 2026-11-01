@@ -1,3 +1,5 @@
+// These owner-read and parent-identity controls share the rename fixture; keeping
+// them together makes the fixture's narrow safety-refusal allowance reviewable.
 import assert from "node:assert/strict";
 import { lstat, mkdir, mkdtemp, open, rename, rm, stat, symlink, unlink, writeFile }
   from "node:fs/promises";
@@ -5,9 +7,10 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
 
-import { EXIT } from "@agents-can-communicate/protocol";
+import { AccError, EXIT } from "@agents-can-communicate/protocol";
 
 import { storePaths } from "../src/index.mjs";
+import { openNoFollow } from "../src/portable-fs.mjs";
 import { withWriterMutex } from "../src/writer-mutex.mjs";
 
 /**
@@ -45,6 +48,74 @@ async function store(t) {
 }
 
 const clock = { now: () => new Date().toISOString() };
+
+// Only the symlink-free rename fixture below may interpret this safety refusal.
+// The same ELOOP must remain fatal for ordinary records and symlink attacks.
+function isWindowsRenameRefusal(error, owner, platform = process.platform) {
+  return platform === "win32" && error instanceof AccError && error.code === EXIT.DATA
+    && error.message === "cannot safely open regular file" && error.details?.filePath === owner
+    && error.details.cause === `ELOOP: too many symbolic links encountered, open '${owner}'`;
+}
+
+test("a symlink-free Windows post-open disappearance is a distinct safety refusal", async t => {
+  const { root, paths } = await store(t);
+  const { readJsonIfPresent } = await import("../src/atomic-json.mjs");
+  const directory = path.join(paths.locks, "writer.lock");
+  const owner = path.join(directory, "owner.json");
+  const value = { token: "stable-owner" };
+  await mkdir(directory);
+  await writeFile(owner, JSON.stringify(value));
+  assert.deepEqual((await readJsonIfPresent(owner, root))?.value, value);
+
+  const handles = [];
+  let missingChecks = 0;
+  let opened = false;
+  const disappearing = (file, flags, mode) => openNoFollow(file, flags, {
+    platform: "win32", mode,
+    open: async (...args) => {
+      const handle = await open(...args);
+      handles.push(handle);
+      opened = true;
+      return handle;
+    },
+    lstat: async (...args) => {
+      if (opened) {
+        opened = false;
+        missingChecks += 1;
+        // Place a real ENOENT after each real open. This models Windows' missing
+        // post-open name without requiring the host to rename an open directory.
+        return lstat(path.join(directory, "absent-owner.json"), { bigint: true });
+      }
+      const named = await lstat(...args);
+      assert.equal(named.isSymbolicLink(), false);
+      return named;
+    },
+  });
+  const refusal = await readJsonIfPresent(owner, root, disappearing).then(
+    () => assert.fail("a post-open disappearance must not serve owner bytes"), error => error);
+  assert.equal(missingChecks, 3);
+  assert.equal(handles.length, 3);
+  assert.ok(handles.every(handle => handle.fd === -1), "every refused handle must close");
+  assert.equal(refusal.code, EXIT.DATA);
+  assert.equal(refusal.message, "cannot safely open regular file");
+  assert.deepEqual(refusal.details, { filePath: owner,
+    cause: `ELOOP: too many symbolic links encountered, open '${owner}'` });
+  assert.equal(isWindowsRenameRefusal(refusal, owner, "win32"), true);
+  for (const platform of ["darwin", "linux"]) {
+    assert.equal(isWindowsRenameRefusal(refusal, owner, platform), false);
+  }
+  const altered = (code, message, details) => new AccError(code, message, details);
+  for (const error of [
+    Object.assign(new Error(refusal.message), { code: refusal.code, details: refusal.details }),
+    altered(EXIT.CONFLICT, refusal.message, refusal.details),
+    altered(EXIT.DATA, "cannot safely access regular file", refusal.details),
+    altered(EXIT.DATA, refusal.message, { ...refusal.details, filePath: `${owner}.other` }),
+    altered(EXIT.DATA, refusal.message, { ...refusal.details, cause: "EIO: read failed" }),
+    altered(EXIT.DATA, refusal.message, { ...refusal.details, cause: `${refusal.details.cause}.other` }),
+    Object.assign(new Error(refusal.details.cause), { code: "ELOOP" }),
+  ]) assert.equal(isWindowsRenameRefusal(error, owner, "win32"), false);
+  assert.deepEqual((await readJsonIfPresent(owner, root))?.value, value);
+});
 
 test("a contender lets a healthy writer finish before giving up", async t => {
   const { root, paths } = await store(t);
@@ -180,7 +251,9 @@ test("a directory swapped under the owner read is retried, not fatal", async t =
  * cannot be interleaved from here: about one read in a thousand on this
  * machine, none at all on Linux, whose realpath resolves lexically. It is
  * bounded by iterations and by wall time so a slow machine pays no more than
- * a fast one, and it cannot fail spuriously - only an escape verdict fails it.
+ * a fast one. Windows can also fail closed when its post-open pathname checks
+ * keep finding the renamed name absent; this fixture constructs no symlinks,
+ * so only its exact safety wrapper is counted separately from moves/escapes.
  */
 test("a lock renamed aside under an owner read is a move, not an escape", async t => {
   const { root, paths } = await store(t);
@@ -188,8 +261,11 @@ test("a lock renamed aside under an owner read is a move, not an escape", async 
   const directory = path.join(paths.locks, "writer.lock");
   const aside = path.join(paths.locks, "writer.reclaimed-fixture.lock");
   const owner = path.join(directory, "owner.json");
+  const value = { pid: 999999, token: "other", acquiredAt: clock.now() };
   await mkdir(directory);
-  await writeFile(owner, JSON.stringify({ pid: 999999, token: "other", acquiredAt: clock.now() }));
+  await writeFile(owner, JSON.stringify(value));
+  assert.deepEqual((await readJsonIfPresent(owner, root))?.value, value,
+    "the stable owner must be readable before the rename race");
 
   let churning = true;
   const churn = (async () => {
@@ -199,19 +275,24 @@ test("a lock renamed aside under an owner read is a move, not an escape", async 
     }
   })();
 
-  const counts = { read: 0, absent: 0, moved: 0, escaped: 0 };
+  const counts = { read: 0, absent: 0, moved: 0, safeRefused: 0, escaped: 0 };
   let sample = null;
   const deadline = Date.now() + 3_000;
   try {
     for (let attempt = 0; attempt < 20_000 && Date.now() < deadline; attempt += 1) {
       try {
-        if (await readJsonIfPresent(owner, root) === null) counts.absent += 1;
-        else counts.read += 1;
+        const record = await readJsonIfPresent(owner, root);
+        if (record === null) counts.absent += 1;
+        else {
+          assert.deepEqual(record.value, value, "the race served another owner's bytes");
+          counts.read += 1;
+        }
       } catch (error) {
         if (/escapes the canonical store root/.test(error.message)) {
           counts.escaped += 1;
           sample ??= error.details;
         } else if (/parent directory changed/.test(error.message)) counts.moved += 1;
+        else if (isWindowsRenameRefusal(error, owner)) counts.safeRefused += 1;
         else throw error;
       }
     }
@@ -223,6 +304,9 @@ test("a lock renamed aside under an owner read is a move, not an escape", async 
   assert.ok(counts.read + counts.absent > 0, `the read loop never ran: ${JSON.stringify(counts)}`);
   assert.equal(counts.escaped, 0,
     `a rename inside the store was called an escape: ${JSON.stringify({ counts, sample })}`);
+  assert.deepEqual((await readJsonIfPresent(owner, root))?.value, value,
+    "the stable owner must be readable after the rename race");
+  t.diagnostic(`rename outcomes: ${JSON.stringify(counts)}`);
 });
 
 // The same rule seen without a race: where the filesystem keeps one directory

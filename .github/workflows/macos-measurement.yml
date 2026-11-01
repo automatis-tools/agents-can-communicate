@@ -1,0 +1,59 @@
+name: Experimental macOS partitions
+on:
+  push:
+    branches: [measure/macos-shards-353]
+permissions:
+  contents: read
+jobs:
+  measure:
+    name: Experimental macOS · ${{ matrix.profile }}
+    if: >-
+      github.repository == 'automatis-tools/agents-can-communicate' &&
+      github.event_name == 'push' && github.ref == 'refs/heads/measure/macos-shards-353' &&
+      github.event.repository.full_name == github.repository && github.event.ref == github.ref &&
+      github.event.deleted == false &&
+      ((github.event.created == true && github.event.before == '0000000000000000000000000000000000000000') ||
+      (github.event.created == false &&
+      (github.event.before == 'ff9c5f96817dad463f15fe9bbf4b912114c1bffc' ||
+      github.event.before == 'f3f01638056ca6719b440c6fb509bd08cc6e59cc') &&
+      github.sha != github.event.before)) &&
+      github.event.after == github.sha && (github.run_attempt == 1 || github.run_attempt == 2)
+    runs-on: macos-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        profile: [baseline, shard-1, shard-2]
+    steps:
+      - name: Check out experimental controller
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          path: controller
+          persist-credentials: false
+      - name: Check out frozen workload
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: b272ca474b229a84aa06fb25a5a0bf0ae44e245a
+          path: workload
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24.22.1'
+      - name: Install and collect experimental workload
+        run: node controller/scripts/macos-measurement.mjs
+        env:
+          GIT_DIR: ''
+          GIT_WORK_TREE: ''
+          ACC_MACOS_MEASUREMENT_REPO: ${{ github.workspace }}/workload
+          ACC_MACOS_MEASUREMENT_OUTPUT: ${{ runner.temp }}/macos353-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.profile }}
+          ACC_MACOS_MEASUREMENT_PROFILE: ${{ matrix.profile }}
+          ACC_MACOS_MEASUREMENT_WORKLOAD_SHA: b272ca474b229a84aa06fb25a5a0bf0ae44e245a
+      - name: Retain every experimental observation
+        if: ${{ always() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: macos353-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.profile }}
+          path: ${{ runner.temp }}/macos353-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.profile }}/
+          if-no-files-found: warn

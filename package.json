@@ -37,7 +37,10 @@
     "check": "node scripts/check-syntax.mjs"
   },
   "license": "MIT",
-  "author": "Mykola Maksymenko",
+  "author": {
+    "name": "Mykola Maksymenko",
+    "url": "https://www.linkedin.com/in/nick-maximenko/"
+  },
   "engines": {
     "node": ">=24"
   },

@@ -6,6 +6,8 @@
 
 **The message your clients can’t send each other.**
 
+Created and maintained by [Mykola Maksymenko](https://www.linkedin.com/in/nick-maximenko/).
+
 Claude Code can message your other Claude Code sessions, and Codex can queue a message for
 another Codex session. From Claude Code, OpenAI’s Codex plugin can ask Codex for a review,
 hand it a task or move the conversation into Codex; it runs Codex under Claude Code, in that
@@ -145,3 +147,10 @@ about the next one. Longer write-ups and setups are welcome in
 
 [Documentation](docs/index.md) ·
 [Contributing](https://github.com/automatis-tools/agents-can-communicate/blob/main/AGENTS.md)
+
+## Related projects
+
+Other open-source projects by [Mykola Maksymenko](https://www.linkedin.com/in/nick-maximenko/):
+
+- [Agent Policy Kit](https://github.com/automatis-tools/agent-policy-kit) configures native subagent roles, models, and effort in supported coding tools, then exits.
+- [Automatis Skills](https://github.com/automatis-tools/automatis-skills) provides reusable engineering skills for GitHub workflows, Git cleanup, port conflicts, and technical writing.

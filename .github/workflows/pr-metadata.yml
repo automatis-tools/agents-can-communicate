@@ -1,0 +1,22 @@
+name: PR metadata
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, edited]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  pr-metadata:
+    name: PR metadata
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Check pull request description
+        env:
+          # Passed through the environment, never interpolated into the command.
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: node scripts/check-commit-attribution.mjs --text-env PR_BODY

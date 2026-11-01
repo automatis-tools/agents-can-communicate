@@ -38,7 +38,7 @@ async function repository(t) {
 // These are actual files and Git listings: omitting content, modes, newly listed
 // inputs, or environment state must invalidate a previously successful suite.
 test("full-suite receipts cover content, modes, file membership and environment", async t => {
-  const { root, fingerprint } = await repository(t);
+  const { root, env, fingerprint } = await repository(t);
   await writeFile(path.join(root, "existing-extra.txt"), "existing relevant input\n");
   const initial = await fingerprint();
   assert.ok(initial?.key);
@@ -61,7 +61,7 @@ test("full-suite receipts cover content, modes, file membership and environment"
     await cache.savePassed("tests", next);
     previous = next;
   }
-  assert.notEqual((await fingerprint({ ACC_TEST_REAL_FSYNC: "1" })).key, previous.key);
+  assert.notEqual((await fingerprint({ ACC_TEST_REAL_FSYNC: env.ACC_TEST_REAL_FSYNC === "1" ? "0" : "1" })).key, previous.key);
   assert.notEqual((await fingerprint({ NODE_OPTIONS: "--no-warnings" })).key, previous.key);
   assert.notEqual((await fingerprint({ ACC_CACHE_TEST_SECRET: "secret-value" })).key, previous.key);
   assert.equal((await fingerprint({ PWD: "/different", SHLVL: "42", GIT_DIR: "/wrong" })).key, previous.key);
