@@ -9,9 +9,9 @@
 
 | Development artifact | Value |
 |---|---|
-| Built from | `cdb84f4df5563589b0ae03dbe64805e7dfe36c4f` |
-| Tarball | `agents-can-communicate-0.12.2.tgz`, 630,664 bytes, 381 files |
-| sha256 | `fc0e0dc6b27f78a610e54d6f2d28edc96a46b2563f06c580fb5e9198eeabbfc4` |
+| Built from | `0f1ef42a5eca437702c53e13cf97cd5e072c2336` |
+| Tarball | `agents-can-communicate-0.12.2.tgz`, 630,786 bytes, 381 files |
+| sha256 | `e3c01c49d72f25d779ababf7fd51af308f7e0949e1adce1afaa19871ef61ab47` |
 
 The exact archive passed package verification. See
 [development evidence](docs/release-evidence/process-start-utc-2026-11-01.md).
