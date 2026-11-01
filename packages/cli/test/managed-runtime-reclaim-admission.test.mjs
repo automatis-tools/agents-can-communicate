@@ -56,3 +56,21 @@ test("a reclaimed generation left by an interrupted pass is deleted by the next 
   assert.deepEqual(await fs.readdir(path.join(root, "reclaimed")), []);
   assert.deepEqual(await fs.readdir(path.join(root, "generations")), ["0.4.1-active"]);
 });
+
+test("a generation whose rename is refused as busy is kept for a later pass", async t => {
+  const root = await fixtureRoot(t, "acc-reclaim-busy-");
+  const active = path.join(root, "generations", "0.4.1-active");
+  await fs.mkdir(active, { recursive: true });
+  await fs.mkdir(path.join(root, "generations", "0.4.0-busy"), { recursive: true });
+  await writeControl(root, { schemaVersion: 1, active: { version: "0.4.1", root: active }, pending: null,
+    phase: "ready", auto: true, pin: null, checkedAt: null, home: root, targets: [], notice: null });
+  const original = fs.rename;
+  t.after(() => { fs.rename = original; syncBuiltinESMExports(); });
+  fs.rename = async (from, to) => {
+    if (path.basename(from) === "0.4.0-busy") throw Object.assign(new Error("EBUSY: resource busy"), { code: "EBUSY" });
+    return original(from, to);
+  };
+  syncBuiltinESMExports();
+  assert.deepEqual((await reclaimGenerations({ root, active, pidIsAlive: () => true })).removed, []);
+  assert.deepEqual((await fs.readdir(path.join(root, "generations"))).sort(), ["0.4.0-busy", "0.4.1-active"]);
+});

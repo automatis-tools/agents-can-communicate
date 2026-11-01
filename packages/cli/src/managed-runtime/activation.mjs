@@ -324,13 +324,19 @@ const POSTPONED = Object.freeze({ removed: [], postponed: true });
 // deleted after the lock is released. Everything here was proven unreferenced
 // under the lock, so any later pass may delete what an earlier one left behind.
 const RECLAIMED = "reclaimed";
+// A pass has already committed its decision; nothing here may replace that outcome.
 async function deleteReclaimed(root) {
-  const directory = path.join(root, RECLAIMED);
-  if (!await managedDirectory(directory)) return;
-  for (const name of await readdir(directory)) {
-    try { await removeTree(path.join(directory, name)); } catch { /* The next pass retries. */ }
-  }
+  try {
+    const directory = path.join(root, RECLAIMED);
+    if (!await managedDirectory(directory)) return;
+    for (const name of await readdir(directory)) {
+      try { await removeTree(path.join(directory, name)); } catch { /* The next pass retries. */ }
+    }
+  } catch { /* The next pass retries. */ }
 }
+// A busy generation is kept for a later pass: on Windows a handle open inside it
+// refuses the rename, and retrying here would hold the lock admission waits for.
+const BUSY_RENAME = new Set(["EPERM", "EBUSY", "EACCES"]);
 
 export async function reclaimGenerations({ root, active = null, pidIsAlive = defaultPidIsAlive,
   zombie = processIsZombie } = {}) {
@@ -429,7 +435,13 @@ export async function reclaimGenerations({ root, active = null, pidIsAlive = def
       if (referenced.has(directory)) continue;
       const reclaimed = path.join(root, RECLAIMED);
       await managedDirectory(reclaimed, { create: true });
-      await renameEntry(directory, path.join(reclaimed, `${entry.name}-${randomUUID()}`));
+      try {
+        await renameEntry(directory, path.join(reclaimed, `${entry.name}-${randomUUID()}`),
+          { deadlineAt: Date.now() + 250 });
+      } catch (error) {
+        if (BUSY_RENAME.has(error.code)) continue;
+        throw error;
+      }
       removed.push(entry.name);
     }
     if (removed.length) {
