@@ -251,7 +251,7 @@ const plannedLivePolicy = operation => operation.action !== "install" ? "off"
  * uninstall takes each client it removes to off. The returned context carries
  * the policies this run leaves, so a sender inside the run is written for them.
  */
-function followReceivers({ action, adapters, detected, decided, recorded, home, dataHome, runtime,
+function followReceivers({ adapters, detected, decided, recorded, home, dataHome, runtime,
   planWith }) {
   const build = livePolicies => clientContext(home, path.join(dataHome, "acc"),
     { env: runtime.env ?? {}, dataHome, platform: runtime.platform, livePolicies });
@@ -343,7 +343,7 @@ export async function runInstallCommand({ options, runtime, action = "install" }
     accVersion, allowDowngrade: options.downgrade === true, requested,
     allowServiceSetup: action === "install" });
   // The receivers this run leaves activated decide the sender grants it writes.
-  const following = followReceivers({ action, adapters, detected, decided, recorded,
+  const following = followReceivers({ adapters, detected, decided, recorded,
     home, dataHome, runtime, planWith });
   const plan = planWith({ adapters, detected, context: following.context,
     deliveryByAdapter: decided.deliveryByAdapter,

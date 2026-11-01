@@ -167,8 +167,10 @@ test("an ambiguous submit is never blindly retried and token rotates per offer",
   await writeFile(path.join(f.home, "server.token"), "rotated-token", { mode: 0o600 });
   const second = await offerMessage({ ...f.options, binding: bound,
     message: { messageId: "message_test" } });
-  assert.equal(second.accepted, true);
-  assert.equal(second.queueStatus, "queued");
+  // The prompt may not exist, so the duplicate claims no queued wake either.
+  assert.equal(second.accepted, false);
+  assert.equal(second.safeErrorCode, "transport_error");
+  assert.equal(second.queueStatus, undefined);
   assert.equal(f.calls.filter(call => call.method === "POST").length, posts);
   assert.equal(JSON.stringify(await readFile(path.join(f.runtimeDir, "kimi-web-endpoints",
     `${bound.opaqueEndpointRef}.json`), "utf8")).includes("rotated-token"), false);

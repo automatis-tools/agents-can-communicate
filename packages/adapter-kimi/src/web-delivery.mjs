@@ -192,6 +192,9 @@ export async function offerMessage({ binding, message, runtimeDir, now = Date.no
     // answer, which only costs a wake the next turn still delivers.
     const outcome = await readWakeOutcome(wake);
     if (outcome === null) return rejected(binding, "recipient_busy");
+    // The first submit ended without an answer: the prompt may or may not
+    // exist, so a duplicate neither submits again nor claims a queued wake.
+    if (outcome === "ambiguous") return rejected(binding, "transport_error");
     return accepted(outcome === "running" ? {} : { queueStatus: "queued" });
   }
   const token = await readServerToken({ homeDir: endpoint.kimiHome });
@@ -231,9 +234,9 @@ export async function offerMessage({ binding, message, runtimeDir, now = Date.no
   }
   // Only a definite rejection releases the marker. After a timeout/reset the
   // prompt may exist, so a blind retry could spend another turn.
-  // An ambiguous one is recorded as queued, the most it can claim: a later
-  // duplicate reports that rather than submitting again.
+  // An ambiguous one is recorded as such: a later duplicate neither submits
+  // again nor reports a wake nobody confirmed.
   if (submitted.definite) await releaseWake(wake);
-  else await recordWake({ ...wake, outcome: "queued" });
+  else await recordWake({ ...wake, outcome: "ambiguous" });
   return rejected(binding, errorCode(submitted.reason));
 }

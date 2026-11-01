@@ -169,7 +169,7 @@ export async function claimWake({ runtimeDir, endpointId, messageId, platform = 
   }
 }
 
-const OUTCOMES = ["queued", "running"];
+const OUTCOMES = ["queued", "running", "ambiguous"];
 // Beside the marker, never inside it: a message id has no dot, so the name
 // cannot be another message's marker.
 const outcomeName = messageId => `${messageId}.outcome`;
