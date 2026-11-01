@@ -94,7 +94,10 @@ test('record writes the real runner profile into RUNNER_TEMP without following a
     const profile = JSON.parse(await readFile(file, 'utf8'));
     assert.ok(validProfile(profile));
     assert.ok(!JSON.stringify(profile).includes(SECRET));
-    const head = (await run('git', ['rev-parse', 'HEAD'], { cwd: repo })).stdout.trim();
+    // Release runs the suite with empty GIT_DIR/GIT_WORK_TREE; git reads those as a path.
+    const gitEnv = { ...process.env };
+    delete gitEnv.GIT_DIR; delete gitEnv.GIT_WORK_TREE;
+    const head = (await run('git', ['rev-parse', 'HEAD'], { cwd: repo, env: gitEnv })).stdout.trim();
     assert.equal(profile.source.commit, head);
     assert.equal(profile.run.worker, 'full-macos');
     assert.equal(profile.cohort.node, process.version);
