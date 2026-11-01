@@ -128,18 +128,32 @@ export function injectOutcome(context) {
 
 export const STOP_CONTINUATION_MIN_VERSION = "2.4.0";
 
+const MESSAGE_ID = /^[A-Za-z0-9_-]{1,200}$/;
+
+// What the continuation says: the message ids and the commands that read and
+// answer them, never a peer's words. Kimi gives a Stop reason system_trigger
+// standing, above the data a hook injects, so a body there would let a peer
+// speak with that standing.
+export const stopWakeText = messageIds => messageIds.map(messageId =>
+  `ACC: new peer message ${messageId} for this session. Read it with `
+  + `acc inbox --message ${messageId}. Answer through ACC with acc reply --message ${messageId}.`)
+  .join("\n");
+
 // Kimi parses the same structured denial at Stop as at PreToolUse, then appends
 // its reason as a system_trigger. The client permits one continuation per turn;
 // its 2.4.0 payload keeps stop_hook_active false, so the vendor limit is the
-// ceiling rather than a counter ACC invents. Anything unknown releases the turn.
-export function stopResponse({ reason, payload, clientVersion, livePolicy } = {}) {
+// ceiling rather than a counter ACC invents. The projected text is ignored:
+// only the offered ids reach the reason. Anything unknown releases the turn.
+export function stopResponse({ reason, messageIds, payload, clientVersion, livePolicy } = {}) {
   if (typeof reason !== "string" || reason.trim() === ""
+    || !Array.isArray(messageIds) || messageIds.length === 0
+    || !messageIds.every(id => typeof id === "string" && MESSAGE_ID.test(id))
     || payload?.hook_event_name !== "Stop" || payload.stop_hook_active !== false
     || !["actionable", "all"].includes(livePolicy)
     || compareVersionOrder(versionOrder(clientVersion),
       versionOrder(STOP_CONTINUATION_MIN_VERSION)) < 0) return {};
   return { hookSpecificOutput: { hookEventName: "Stop", permissionDecision: "deny",
-    permissionDecisionReason: reason } };
+    permissionDecisionReason: stopWakeText(messageIds) } };
 }
 
 export function stopOutcome(input) {

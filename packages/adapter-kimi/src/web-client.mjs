@@ -193,29 +193,6 @@ function validPromptItem(data) {
 }
 
 /**
- * GET /api/v1/sessions/<id>/prompts. The route resolves the session through
- * resumeSessionById, so it is only safe after a warm disk verification: the
- * lock then proves the session is held, and the read cannot wake a cold one.
- */
-export async function listPrompts({ host, port, token, sessionId, timeoutMs = 5_000,
-  request = httpRequest }) {
-  if (!SESSION_ID.test(sessionId)) return failure("invalid", true);
-  const result = await call({ request, method: "GET", host, port,
-    path: `/api/v1/sessions/${encodeURIComponent(sessionId)}/prompts`, token, timeoutMs });
-  if (!result.ok) return result;
-  const data = result.data;
-  if (data === null || typeof data !== "object" || Array.isArray(data)
-    || !Object.keys(data).every(key => ["active", "queued"].includes(key))
-    || !Array.isArray(data.queued) || data.queued.length > 100) return failure("invalid", false);
-  const active = data.active === null ? null : validPromptItem(data.active);
-  const queued = data.queued.map(validPromptItem);
-  if ((data.active !== null && active === null) || queued.includes(null)) {
-    return failure("invalid", false);
-  }
-  return { ok: true, prompts: { active, queued } };
-}
-
-/**
  * POST /api/v1/sessions/<id>/prompts with a wake: exactly the fixed notice as
  * one text part and the deterministic prompt id. No peer body, no steer, and
  * no model, profile, permission, or swarm field - a wake changes nothing

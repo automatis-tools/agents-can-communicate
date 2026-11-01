@@ -178,7 +178,7 @@ const adoptionGrants = context => ({ sockets: sockets(context),
 
 export async function installCodexPlugin({ home, agentsHome = home,
   codexHome = path.join(home, ".codex"), dataHome, stateRoot, runner, node, cli, keepPreviousVersion = null,
-  requestedLivePolicy, livePolicy, clientVersion, platform, receiverSockets,
+  requestedLivePolicy, livePolicy, clientVersion, platform, receiverSockets, receiverLoopback,
   hostPlatform = process.platform }) {
   // Read before writing, so a manifest that will not parse is found before a
   // plugin tree is laid down that nothing will then be able to remove.
@@ -202,6 +202,9 @@ export async function installCodexPlugin({ home, agentsHome = home,
   }
   const permissions = prepareLivePermissions(foreign.source, { home, codexHome, stateRoot,
     file: config, requestedLivePolicy, livePolicy, clientVersion, platform, receiverSockets,
+    // The installer's composed loopback declaration. Dropped here, the grant a
+    // declared receiver needs was never written and an excess one never left.
+    receiverLoopback,
     ruleAllowsCommands: await ruleAllowsCommands({ codexHome,
       cliShim: path.join(pluginPath(agentsHome), "acc-cli.sh"), hostPlatform }) });
   const theirSandbox = permissions.skipLegacy || inspectConfig(permissions.source, config).sandbox;
@@ -370,7 +373,7 @@ export async function uninstallCodexPlugin({ home, agentsHome = home,
 
 export async function detectCodex({ home, agentsHome = home,
   codexHome = path.join(home, ".codex"), stateRoot, clientVersion, platform, nativeDelivery,
-  receiverSockets, hostPlatform = process.platform }) {
+  receiverSockets, receiverLoopback, hostPlatform = process.platform }) {
   const marketplace = await readJson(marketplacePath(agentsHome), null);
   const published = (marketplace?.plugins ?? []).some(entry => entry.name === PLUGIN_NAME);
   const config = await readFile(configPath(codexHome), "utf8").catch(() => "");
@@ -382,7 +385,7 @@ export async function detectCodex({ home, agentsHome = home,
     ? await inspectAllowRule({ codexHome, cliShim: path.join(pluginPath(agentsHome), "acc-cli.sh"), hostPlatform })
     : { state: "none", diagnostic: null };
   const statusContext = { home, codexHome, stateRoot, file: configPath(codexHome), clientVersion,
-    platform, receiverSockets };
+    platform, receiverSockets, receiverLoopback };
   // The present state is judged by the rule that exists now; the setup note
   // describes what an install would do, which writes the rule where it can.
   const outgoingDelivery = { ...outgoingStatus(config,

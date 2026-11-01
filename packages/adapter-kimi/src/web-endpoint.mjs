@@ -1,8 +1,10 @@
 import { randomBytes } from "node:crypto";
+import { constants } from "node:fs";
 import { lstat, mkdir, open, readdir, realpath, rename, rm } from "node:fs/promises";
 import path from "node:path";
 import { closedTo, openRegularNoFollow, versionOrder } from "@agents-can-communicate/adapter-sdk";
 
+import { processAlive } from "./web-registry.mjs";
 import { LOOPBACK_HOSTS, PROTOCOL_CONTRACT, SERVER_ID, SESSION_ID } from "./web-contract.mjs";
 
 // One private record per hook binding, the way the other adapters keep their
@@ -113,18 +115,9 @@ export async function removeWebEndpoint({ runtimeDir, endpointId, platform = pro
   } catch { /* the same */ }
 }
 
-const processExists = pid => {
-  try {
-    process.kill(pid, 0);
-    return true;
-  } catch (error) {
-    return error.code === "EPERM";
-  }
-};
-
 // A crashed server ran no shutdown, so its bindings were never retired. Only
 // a record whose process is gone is removed.
-export async function sweepDeadEndpoints({ runtimeDir, exists = processExists, limit = 64,
+export async function sweepDeadEndpoints({ runtimeDir, exists = processAlive, limit = 64,
   platform = process.platform }) {
   let names;
   try {
@@ -173,6 +166,40 @@ export async function claimWake({ runtimeDir, endpointId, messageId, platform = 
   } catch (error) {
     if (error.code === "EEXIST") return false;
     throw error;
+  }
+}
+
+const OUTCOMES = ["queued", "running"];
+
+/** Persist how the first submit ended, so a duplicate offer can repeat it. */
+export async function recordWake({ runtimeDir, endpointId, messageId, outcome,
+  platform = process.platform }) {
+  if (!ENDPOINT.test(endpointId) || !WAKE_MESSAGE.test(messageId) || !OUTCOMES.includes(outcome)) return;
+  // The marker claimWake created, opened without following a link and never
+  // created here: a missing marker stays missing.
+  let handle;
+  try {
+    handle = await openRegularNoFollow(path.join(await wakesDirectory(runtimeDir, false, platform),
+      endpointId, messageId), constants.O_WRONLY | constants.O_TRUNC, { platform });
+    await handle.writeFile(outcome);
+  } catch { /* an empty marker only makes a duplicate answer conservatively */ } finally {
+    await handle?.close().catch(() => null);
+  }
+}
+
+/** Recorded outcome of the claim, or null while the first offer is unresolved. */
+export async function readWakeOutcome({ runtimeDir, endpointId, messageId, platform = process.platform }) {
+  if (!ENDPOINT.test(endpointId) || !WAKE_MESSAGE.test(messageId)) return null;
+  let handle;
+  try {
+    handle = await openRegularNoFollow(path.join(await wakesDirectory(runtimeDir, false, platform),
+      endpointId, messageId), constants.O_RDONLY, { platform });
+    const text = await handle.readFile("utf8");
+    return OUTCOMES.includes(text) ? text : null;
+  } catch {
+    return null;
+  } finally {
+    await handle?.close().catch(() => null);
   }
 }
 

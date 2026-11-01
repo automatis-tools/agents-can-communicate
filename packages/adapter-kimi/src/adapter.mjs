@@ -56,7 +56,11 @@ export function createKimiAdapter() {
       activationKinds: ["native-service"], policySource: "installation-record", offerKind: "wake",
     },
     probeNativeDelivery, planNativeActivation, bindNativeSession, retireNativeSession, offerMessage,
-    inboundLoopback: () => true,
+    // Kimi Web listens on 127.0.0.1, and a Codex domain rule cannot name a
+    // port: declaring it hands a sandboxed sender every local service. So the
+    // declaration follows Kimi's own recorded opt-in; with live delivery off,
+    // nothing would ever be pushed over it.
+    inboundLoopback: context => ["actionable", "all"].includes(context?.livePolicies?.kimi),
     deliveryFallback: { diagnostic:
       "Kimi Code next-turn delivery is certified from 0.36.1 onward, on every platform; "
       + "an older client keeps durable acc inbox access, and live push is unavailable" },

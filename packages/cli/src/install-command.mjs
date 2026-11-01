@@ -7,13 +7,13 @@ import { createCodexAdapter } from "@agents-can-communicate/adapter-codex";
 import { createGeminiCliAdapter } from "@agents-can-communicate/adapter-gemini-cli";
 import { createGrokAdapter } from "@agents-can-communicate/adapter-grok";
 import { createKimiAdapter } from "@agents-can-communicate/adapter-kimi";
-import { applyPlan, detectInstallation, loadOwnership, planInstallation, receiverLoopback,
-  receiverSockets } from "@agents-can-communicate/installer";
+import { applyPlan, detectInstallation, livePolicyOf, loadOwnership, planInstallation,
+  receiverLoopback, receiverSockets } from "@agents-can-communicate/installer";
 import { AccError, EXIT } from "@agents-can-communicate/protocol";
 
 import { platformPaths } from "./platform-paths.mjs";
 import { installManaged, uninstallManaged } from "./managed-runtime/install.mjs";
-import { decideDelivery } from "./install-delivery-consent.mjs";
+import { decideDelivery, decisionOf } from "./install-delivery-consent.mjs";
 
 export { decideDelivery } from "./install-delivery-consent.mjs";
 
@@ -28,8 +28,11 @@ export { decideDelivery } from "./install-delivery-consent.mjs";
 // pointed at the home itself writes beside them rather than inside them. That
 // install reports success and the client never reads a byte of it.
 export const clientContext = (home, stateRoot,
-  { env = {}, dataHome, cwd = process.cwd(), platform } = {}) => withReceivers({
+  { env = {}, dataHome, cwd = process.cwd(), platform, livePolicies = {} } = {}) => withReceivers({
   home,
+  // Each client's recorded live-delivery policy. A receiver's loopback
+  // declaration depends on it: a grant for a listener nobody enabled is a hole.
+  livePolicies,
   ...(dataHome === undefined ? {} : { dataHome }),
   configDir: path.join(home, ".claude"),
   agentsHome: home,
@@ -66,7 +69,9 @@ export const clientContext = (home, stateRoot,
 // written and diagnosed from this list, so it covers Claude Code's inbox even
 // when an install names Codex alone (issue #213). A declared loopback receiver
 // composes the same way (issue #390): any adapter's inboundLoopback allows the
-// exact 127.0.0.1 literal in the sender's profile, and nothing broader.
+// exact 127.0.0.1 literal in the sender's profile, and nothing broader. Unlike
+// a socket path, that literal opens every local port, so a receiver declares
+// it only while its own live delivery is enabled in `context.livePolicies`.
 const withReceivers = (context, platform) => ({ ...context,
   receiverSockets: receiverSockets(ALL_ADAPTERS(), { ...context, platform }),
   receiverLoopback: receiverLoopback(ALL_ADAPTERS(), { ...context, platform }) });
@@ -226,6 +231,43 @@ export function actedOn(result) {
         + (operation.changes?.length ?? 0) > 0)).length;
 }
 
+// Each client's live policy as ACC recorded it, then as this run leaves it.
+export const recordedLivePolicies = recorded => Object.fromEntries(recorded
+  .map(install => [install.adapterId, livePolicyOf(install)]));
+
+/**
+ * A receiver's live policy changes the sender grants Codex needs: Kimi Web's
+ * loopback listener is declared only while Kimi's live delivery is on. When an
+ * install changes that and Codex is installed but not named, Codex joins the
+ * run with its own recorded policy and decision, so its permission profile
+ * gains or drops 127.0.0.1 now rather than at the next update. An uninstall
+ * never adds a client; doctor reports the grant that is left over.
+ */
+async function followReceivers({ action, adapters, detected, decided, recorded, home, dataHome,
+  runtime }) {
+  const before = recordedLivePolicies(recorded);
+  const after = { ...before };
+  for (const adapter of adapters) {
+    after[adapter.id] = action === "install" ? decided.deliveryByAdapter[adapter.id] ?? "off" : "off";
+  }
+  const build = livePolicies => clientContext(home, path.join(dataHome, "acc"),
+    { env: runtime.env ?? {}, dataHome, platform: runtime.platform, livePolicies });
+  const context = build(after);
+  const unchanged = { adapters, detected, context, deliveryByAdapter: decided.deliveryByAdapter,
+    deliveryDecisionByAdapter: decided.deliveryDecisionByAdapter };
+  const codexRecord = recorded.find(install => install.adapterId === "codex");
+  if (action !== "install" || codexRecord === undefined
+    || adapters.some(adapter => adapter.id === "codex")
+    || build(before).receiverLoopback === context.receiverLoopback) return unchanged;
+  const codex = ALL_ADAPTERS().find(adapter => adapter.id === "codex");
+  const [codexDetected] = await detectInstallation({ adapters: [codex], context,
+    probeTimeoutMs: probeTimeout(runtime.env) });
+  return { adapters: [...adapters, codex], detected: [...detected, codexDetected], context,
+    deliveryByAdapter: { ...decided.deliveryByAdapter, codex: livePolicyOf(codexRecord) },
+    deliveryDecisionByAdapter: { ...decided.deliveryDecisionByAdapter,
+      codex: decisionOf(codexRecord) } };
+}
+
 export async function runInstallCommand({ options, runtime, action = "install" }) {
   if (options.indicator !== undefined && !["on", "off"].includes(options.indicator)) {
     throw new AccError(EXIT.USAGE, "--indicator must be on or off");
@@ -266,14 +308,18 @@ export async function runInstallCommand({ options, runtime, action = "install" }
   const decided = action === "install"
     ? await decideDelivery({ options, detected, recorded, runtime, dryRun })
     : { deliveryByAdapter: {}, asked: [], notes: [] };
-  const plan = planInstallation({ adapters, detected, context, action, recorded,
+  // The receivers this run leaves enabled decide the sender grants it writes.
+  const following = await followReceivers({ action, adapters, detected, decided, recorded,
+    home, dataHome, runtime });
+  const plan = planInstallation({ adapters: following.adapters, detected: following.detected,
+    context: following.context, action, recorded,
     indicator: options.indicator,
     accVersion, allowDowngrade: options.downgrade === true, requested,
-    deliveryByAdapter: decided.deliveryByAdapter,
-    deliveryDecisionByAdapter: decided.deliveryDecisionByAdapter,
+    deliveryByAdapter: following.deliveryByAdapter,
+    deliveryDecisionByAdapter: following.deliveryDecisionByAdapter,
     allowServiceSetup: action === "install" });
-  const apply = (paths = {}) => applyPlan({ plan, adapters, context: { ...context, ...paths },
-    dataHome, dryRun, accVersion });
+  const apply = (paths = {}) => applyPlan({ plan, adapters: following.adapters,
+    context: { ...following.context, ...paths }, dataHome, dryRun, accVersion });
   const result = action === "install" && !dryRun && runtime.packageRoot
     ? await installManaged({ packageRoot: runtime.packageRoot,
       managerRoot: path.join(dataHome, "acc", "runtime"), dataHome, home, cwd: options.cwd ?? runtime.cwd,

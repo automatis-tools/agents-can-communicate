@@ -37,7 +37,8 @@ const configured = (source, context) => {
     && value(["permissions", profile, "network", "enabled"]) === "true"
     && literal(value(["permissions", profile, "filesystem", context.stateRoot])) === "write"
     && missingSockets(entries, profile, context).length === 0
-    && !missingLoopback(entries, profile, context);
+    && !missingLoopback(entries, profile, context)
+    && !excessLoopback(entries, profile, context);
 };
 // The grants a profile lacks for the sockets ACC delivers to.
 const missingSockets = (entries, profile, context) => sockets(context).filter(socket =>
@@ -58,6 +59,10 @@ export const loopbackDeclared = context => context.receiverLoopback === true;
 const missingLoopback = (entries, profile, context) => loopbackDeclared(context)
   && literal(entries.find(entry => !entry.header
     && equal(entry.keys, ["permissions", profile, "network", "domains", LOOPBACK_DOMAIN]))?.value) !== "allow";
+// Whether the profile still grants network domains no receiver declares - the
+// loopback grant after Kimi's live delivery was turned off. Rewriting drops it.
+const excessLoopback = (entries, profile, context) => !loopbackDeclared(context)
+  && entries.some(entry => equal(entry.keys.slice(0, 4), ["permissions", profile, "network", "domains"]));
 
 const hasCustomPolicy = (source, context) => {
   const ownership = inspectPermissions(source);
@@ -171,6 +176,10 @@ function incomplete(source, context) {
   if (missingLoopback(entries, PROFILE, context)) {
     return "ACC outgoing grants do not cover the declared loopback receiver; "
       + `missing ${LOOPBACK_DOMAIN}`;
+  }
+  if (excessLoopback(entries, PROFILE, context)) {
+    return `ACC outgoing grants allow ${LOOPBACK_DOMAIN}, which no receiver with live delivery `
+      + "enabled declares";
   }
   return "ACC outgoing grants are out of date";
 }

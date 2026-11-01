@@ -199,6 +199,12 @@ an explicit `actionable` or `all` recipient policy and a 2.4.0 floor. Ordinary i
 remains next-turn only; no idle-wake claim is added. See `fixtures/Stop-2.4.0.json` and its
 provenance.
 
+That capture carried the projected peer body in the reason. Because a `system_trigger` stands
+above the data a hook injects, a peer's words there would speak with that standing, so the
+reason is now ACC's fixed notice only: each offered message id with the `acc inbox --message`
+and `acc reply --message` commands. The body reaches the model through ordinary next-turn
+context, framed as untrusted peer data, and its receipt stays offered until something reads it.
+
 `kimi web` has a separate, certified wake-only transport. An exact packed candidate passed
 all six installed-product cases: idle wake, busy `queued_after_turn`, `acc reply` and an
 acknowledged receipt, one wake for a repeated logical message, durable fallback and rebind
@@ -210,7 +216,9 @@ Hooks run under the packaged `kimi-code` process. ACC resolves that process, che
 instance registry generation and serving version, then independently pins `/meta` server id
 and start time. Binding and every offer verify native session id and canonical cwd. ACC never
 starts or restarts the server and never changes permission mode: only an existing loopback
-server in `yolo` is eligible; manual and auto are not.
+server in `yolo` is eligible; manual and auto are not. The mode is read again for every offer,
+after the warm lock check proves the session is held (the status route resumes a cold
+session), so a session switched out of `yolo` after binding is refused before any POST.
 
 The POST carries only fixed ACC text and a message id. `UserPromptSubmit` projects the actual
 untrusted body and records the `next-turn` offer. A busy response with `status: "queued"` is

@@ -1,7 +1,8 @@
 import path from "node:path";
 import { applyPlan, detectInstallation, livePolicyOf, loadOwnership, planInstallation }
   from "@agents-can-communicate/installer";
-import { ALL_ADAPTERS, clientContext, probeTimeout } from "../install-command.mjs";
+import { ALL_ADAPTERS, clientContext, probeTimeout, recordedLivePolicies }
+  from "../install-command.mjs";
 import { processIsZombie } from "@agents-can-communicate/adapter-sdk";
 import { sweepStaleBindings } from "./activation.mjs";
 import { listRuntimeHolds } from "./leases.mjs";
@@ -25,10 +26,10 @@ export async function prepareRefresh({ control, root, env = process.env, callerP
   // its version record one path per plugin and read it once per session, so a
   // session open across the update keeps running from the outgoing copy until it
   // restarts. Naming it here keeps that copy; everything older than it goes.
-  const context = { ...clientContext(control.home, path.join(dataHome, "acc"),
-    { env, dataHome }), ...stablePaths(root),
-  keepPreviousVersion: control.active.version };
   const recorded = (await loadOwnership({ dataHome })).installs;
+  const context = { ...clientContext(control.home, path.join(dataHome, "acc"),
+    { env, dataHome, livePolicies: recordedLivePolicies(recorded) }), ...stablePaths(root),
+  keepPreviousVersion: control.active.version };
   const detected = await detectInstallation({ adapters, context, probeTimeoutMs: probeTimeout(env) });
   const deliveryByAdapter = Object.fromEntries(adapters.map(adapter => [adapter.id,
     livePolicyOf(recorded.find(record => record.adapterId === adapter.id))]));

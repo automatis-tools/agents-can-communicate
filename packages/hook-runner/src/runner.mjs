@@ -395,7 +395,10 @@ async function projectTurn({ binding, context, adapter, adapterId, render = null
   // The entry point owns the transport boundary. This handler only prepares
   // offer inputs; recording them here would claim delivery before stdout's
   // callback proves that the bytes crossed.
-  const outcome = { stdout: "", ...renderText(projected) };
+  // A renderer that must not carry peer text - a continuation the client
+  // promotes above ordinary data - builds its own words from these ids alone.
+  const outcome = { stdout: "", ...renderText(projected,
+    { messageIds: offerInputs.map(input => input.messageId) }) };
   const writableOffers = outcome.stdout === "" ? [] : offerInputs;
   // A message left for an ended session is told to each session once (#320).
   // Like an offer, the notice is remembered only after stdout carried it.
@@ -768,7 +771,8 @@ const HANDLERS = {
     const { policy: livePolicy } = await readInstalledLivePolicyState({
       dataHome: context.dataHome, adapterId: adapter.id });
     const turn = await projectTurn({ ...input, repeats: false,
-      render: text => adapter.continueTurnOutcome({ reason: text, payload, livePolicy,
+      render: (text, { messageIds = [] } = {}) => adapter.continueTurnOutcome({ reason: text,
+        messageIds, payload, livePolicy,
         clientVersion: binding.clientVersion, platform: binding.platform }) });
     return (turn.offerInputs ?? []).length === 0 ? {} : turn;
   },

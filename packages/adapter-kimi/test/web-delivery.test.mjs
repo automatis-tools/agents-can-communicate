@@ -7,7 +7,7 @@ import test from "node:test";
 
 import { bindNativeSession, offerMessage, refreshNativeSession } from "../src/web-delivery.mjs";
 import { httpRequest } from "../src/web-client.mjs";
-import { readWebEndpoint } from "../src/web-endpoint.mjs";
+import { claimWake, readWakeOutcome, readWebEndpoint, recordWake } from "../src/web-endpoint.mjs";
 
 const SERVER = "01JZX4A6E7M8V0R3Q0N2K2M5Q9";
 const META_SERVER = "01JZX4A6E7M8V0R3Q0N2K2M5QA";
@@ -78,8 +78,10 @@ test("idle delivery posts only a fixed wake and message id", async t => {
     message: { messageId: "message_test" } });
   assert.equal(result.accepted, true);
   assert.equal(result.queueStatus, undefined);
-  assert.equal(f.calls.slice(beforeOffer).some(call => call.path.endsWith("/status")), false,
-    "an offer must not resume a cold session through the status route");
+  const offerCalls = f.calls.slice(beforeOffer);
+  const statusAt = offerCalls.findIndex(call => call.path.endsWith("/status"));
+  const postAt = offerCalls.findIndex(call => call.method === "POST");
+  assert.ok(statusAt >= 0 && statusAt < postAt, "permission is read just before the wake is submitted");
   const submitted = f.calls.find(call => call.method === "POST");
   const body = JSON.parse(submitted.body);
   assert.equal(body.prompt_id, "message_test");
@@ -210,4 +212,78 @@ test("an expired or mismatched lease cannot submit a prompt", async t => {
   assert.equal(mismatched.safeErrorCode, "recipient_unavailable");
   assert.equal(f.calls.length, beforeOffers,
     "a superseded lease must not resume a session through a status probe");
+});
+
+test("a session switched out of yolo after binding gets no wake", async t => {
+  for (const permission of ["manual", "auto"]) {
+    const f = await fixture(t);
+    const bound = await bind(f);
+    f.state.permission = permission;
+    f.calls.length = 0;
+    const result = await offerMessage({ ...f.options, binding: bound,
+      message: { messageId: "message_test" } });
+    assert.equal(result.accepted, false, permission);
+    assert.equal(result.safeErrorCode, "recipient_unavailable");
+    assert.equal(f.calls.some(call => call.method === "POST"), false);
+    // The marker was released: a later yolo offer for the same message submits.
+    f.state.permission = "yolo";
+    const retry = await offerMessage({ ...f.options, binding: bound,
+      message: { messageId: "message_test" } });
+    assert.equal(retry.accepted, true);
+    assert.equal(f.calls.some(call => call.method === "POST"), true);
+  }
+});
+
+test("a cold session is rejected before the status route is read", async t => {
+  const f = await fixture(t);
+  const bound = await bind(f);
+  f.state.cold = true;
+  f.calls.length = 0;
+  const result = await offerMessage({ ...f.options, binding: bound,
+    message: { messageId: "message_test" } });
+  assert.equal(result.accepted, false);
+  assert.equal(f.calls.some(call => call.path.endsWith("/status")), false);
+});
+
+test("a duplicate offer repeats the first submit outcome", async t => {
+  for (const [overrides, queued] of [[{}, false], [{ busy: true }, true]]) {
+    const f = await fixture(t, overrides);
+    const bound = await bind(f);
+    const message = { messageId: "message_test" };
+    const first = await offerMessage({ ...f.options, binding: bound, message });
+    const posts = f.calls.filter(call => call.method === "POST").length;
+    const second = await offerMessage({ ...f.options, binding: bound, message });
+    assert.equal(second.accepted, true);
+    assert.equal(first.queueStatus, queued ? "queued" : undefined);
+    assert.equal(second.queueStatus, first.queueStatus);
+    assert.equal(f.calls.filter(call => call.method === "POST").length, posts);
+  }
+});
+
+test("a wake outcome is written only into the marker itself, never through a link", {
+  skip: process.platform === "win32" ? "symbolic links need privileges on Windows" : false,
+}, async t => {
+  const { symlink } = await import("node:fs/promises");
+  const root = await realpath(await mkdtemp(path.join(tmpdir(), "acc-kimi-wake-")));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const runtimeDir = path.join(root, "workspace", "runtime");
+  await mkdir(runtimeDir, { recursive: true, mode: 0o700 });
+  const wake = { runtimeDir, endpointId: `kimi_web_${"a".repeat(32)}`, messageId: "message_link" };
+  assert.equal(await claimWake(wake), true);
+  await recordWake({ ...wake, outcome: "running" });
+  assert.equal(await readWakeOutcome(wake), "running");
+
+  // A marker replaced by a link to someone else's file is neither read nor written.
+  const victim = path.join(root, "victim");
+  await writeFile(victim, "running");
+  const marker = path.join(runtimeDir, "kimi-web-wakes", wake.endpointId, wake.messageId);
+  await rm(marker);
+  await symlink(victim, marker);
+  assert.equal(await readWakeOutcome(wake), null);
+  await recordWake({ ...wake, outcome: "queued" });
+  assert.equal(await readFile(victim, "utf8"), "running");
+  // An outcome is never invented for a marker that does not exist.
+  const missing = { ...wake, messageId: "message_absent" };
+  await recordWake({ ...missing, outcome: "running" });
+  assert.equal(await readWakeOutcome(missing), null);
 });

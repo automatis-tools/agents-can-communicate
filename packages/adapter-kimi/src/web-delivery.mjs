@@ -4,7 +4,7 @@ import { compareVersionOrder, runExecutable, versionOrder } from "@agents-can-co
 import { MIN_VERSION, PROTOCOL_CONTRACT, TRANSPORT, WEB_MODES } from "./web-contract.mjs";
 import { getMeta, getSessionFacts, getSessionStatus, submitPrompt } from "./web-client.mjs";
 import { canonicalCwd, kimiHomeDir, readServerToken, verifyWebSession } from "./web-registry.mjs";
-import { claimWake, newEndpointId, readWebEndpoint, releaseWake, removeWebEndpoint,
+import { claimWake, newEndpointId, readWakeOutcome, readWebEndpoint, recordWake, releaseWake, removeWebEndpoint,
   sweepDeadEndpoints, writeWebEndpoint } from "./web-endpoint.mjs";
 
 const LEASE_MS = 120_000;
@@ -155,10 +155,9 @@ export const retireNativeSession = ({ binding, runtimeDir }) =>
 const rejected = (binding, safeErrorCode) => ({ accepted: false, transport: TRANSPORT,
   clientVersion: binding?.clientVersion ?? null, safeErrorCode });
 const errorCode = reason => reason === "permission" ? "transport_permission_denied"
-  : reason === "recipient_busy" ? "recipient_busy"
-    : ["unavailable", "unauthorized", "session_not_found", "session_unavailable",
-      "native_endpoint_unavailable", "native_session_unavailable"].includes(reason)
-      ? "recipient_unavailable" : "transport_error";
+  : ["unavailable", "unauthorized", "session_not_found", "session_unavailable",
+    "native_endpoint_unavailable", "native_session_unavailable"].includes(reason)
+    ? "recipient_unavailable" : "transport_error";
 
 export async function offerMessage({ binding, message, runtimeDir, now = Date.now,
   timeoutMs = 2_000, ...options } = {}) {
@@ -168,7 +167,8 @@ export async function offerMessage({ binding, message, runtimeDir, now = Date.no
   const recorded = await readWebEndpoint({ runtimeDir, endpointId: binding?.opaqueEndpointRef });
   if (recorded === null) return rejected(binding, "recipient_unavailable");
   // The lease gate precedes every HTTP request. An expired or superseded
-  // binding gets no opportunity to reach a resume-capable route.
+  // binding gets no opportunity to reach a resume-capable route. /status is
+  // read only later, after the warm check below.
   if (Date.parse(binding?.leaseUntil) !== Date.parse(recorded.leaseUntil)
     || Date.parse(recorded.leaseUntil) <= now()) return rejected(binding, "recipient_unavailable");
   const verified = await verifyEndpoint(recorded, { ...options, now, timeoutMs,
@@ -184,7 +184,13 @@ export async function offerMessage({ binding, message, runtimeDir, now = Date.no
   } catch {
     return rejected(binding, "transport_error");
   }
-  if (!first) return accepted({ queueStatus: "queued" });
+  if (!first) {
+    // A duplicate repeats the first submit's recorded outcome. While that
+    // first offer is still unresolved (or ended ambiguously) nothing proves a
+    // turn started, so the honest answer is "queued", never a running claim.
+    const outcome = await readWakeOutcome(wake);
+    return accepted(outcome === "running" ? {} : { queueStatus: "queued" });
+  }
   const token = await readServerToken({ homeDir: endpoint.kimiHome });
   if (token === null) {
     await releaseWake(wake);
@@ -199,12 +205,25 @@ export async function offerMessage({ binding, message, runtimeDir, now = Date.no
     await releaseWake(wake);
     return rejected(binding, "recipient_unavailable");
   }
+  // The warm check proves the lock holds the session, so /status cannot wake a
+  // cold one. A session that bound in yolo may have switched since: a wake
+  // submitted into manual or auto mode would stall on an approval prompt.
+  const status = await getSessionStatus({ host: endpoint.host, port: endpoint.port, token,
+    sessionId: endpoint.sessionId, request: options.request, timeoutMs });
+  if (!status.ok || status.permission !== "yolo") {
+    await releaseWake(wake);
+    return rejected(binding, "recipient_unavailable");
+  }
   const submitted = await submitPrompt({ host: endpoint.host, port: endpoint.port, token,
     sessionId: endpoint.sessionId, promptId: message.messageId, text: wakeText(message.messageId),
     timeoutMs, request: options.request });
-  if (submitted.ok) return accepted(["queued", "blocked"].includes(submitted.item.status)
-    ? { queueStatus: "queued" } : {});
+  if (submitted.ok) {
+    const queued = ["queued", "blocked"].includes(submitted.item.status);
+    await recordWake({ ...wake, outcome: queued ? "queued" : "running" });
+    return accepted(queued ? { queueStatus: "queued" } : {});
+  }
   if (["prompt_id_conflict", "prompt_id_completed"].includes(submitted.reason)) {
+    await recordWake({ ...wake, outcome: "queued" });
     return accepted({ queueStatus: "queued" });
   }
   // Only a definite rejection releases the marker. After a timeout/reset the

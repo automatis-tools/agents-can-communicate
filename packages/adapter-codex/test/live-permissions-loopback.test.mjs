@@ -84,11 +84,21 @@ test("an owned profile from before the declaration is reported and rewritten", (
   assert.equal(removeLivePermissions(repaired.source).source, BEFORE);
 });
 
-test("a profile carrying the grant stays configured without the declaration", () => {
+test("a grant left after the receiver's live delivery went off is reported and dropped", () => {
+  // 127.0.0.1 opens every local port to the sandbox; with no enabled receiver
+  // declaring it, the grant is a hole, so a stale profile loses it.
   const granted = prepareLivePermissions(BEFORE, loopback);
   const status = outgoingStatus(granted.source, context);
-  assert.equal(status.state, "configured");
-  assert.equal(prepareLivePermissions(granted.source, context).source, granted.source);
+  assert.equal(status.state, "unverified");
+  assert.match(status.diagnostic, /allow 127\.0\.0\.1, which no receiver with live delivery enabled/);
+  assert.match(status.diagnostic, /run acc install --adapter codex, then start a new session/);
+  const plain = prepareLivePermissions(BEFORE, context).source;
+  for (const change of [{}, { requestedLivePolicy: "off", livePolicy: "off" }]) {
+    const repaired = prepareLivePermissions(granted.source, { ...context, ...change });
+    assert.equal(repaired.status.state, "configured");
+    assert.equal(repaired.source, plain);
+    assert.doesNotMatch(repaired.source, /domains|127\.0\.0\.1/);
+  }
 });
 
 test("a custom policy over ACC's profile is preserved, grant or no grant", () => {
