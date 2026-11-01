@@ -42,6 +42,9 @@ runs:
         CI_WORKER: ${{ inputs.worker }}
         ACC_TEST_TIMEOUT_MS: '300000'
         ACC_TEST_FILE_TIMEOUT_MS: '600000'
+        # Under the 30-minute job limit, so the steps below still run (#408).
+        ACC_CI_TEST_DEADLINE_MS: '1440000'
+        ACC_TEST_PROGRESS: '1'
         ACC_TEST_TIMINGS: ${{ runner.temp }}/acc-test-timings.jsonl
         ACC_TEST_FORCE_EXIT: ${{ runner.os == 'Windows' && '1' || '' }}
         GIT_DIR: ''
@@ -63,6 +66,7 @@ runs:
         path: |
           ${{ runner.temp }}/acc-test-timings.jsonl
           ${{ runner.temp }}/acc-test-timings.jsonl.manifest.json
+          ${{ runner.temp }}/acc-test-timings.jsonl.running.jsonl
           ${{ runner.temp }}/acc-ci-plan.json
           ${{ runner.temp }}/acc-ci-proof.json
           ${{ runner.temp }}/acc-runner-profile.json
