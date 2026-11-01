@@ -17,6 +17,7 @@ import { reapPins } from "./pins.mjs";
 import { reapStagingHolds } from "./staging.mjs";
 import { removeTree } from "./portable-fs.mjs";
 import { canonicalManagerRoot, managedDirectory, readControl, readManagedJson, syncDirectory, writeControl } from "./state.mjs";
+import { parseStartTime, startTimeEnvironment } from "./process-start.mjs";
 
 /** The staged generation states its own contract in its manifest, so the
  * manager never imports code from a generation it has not activated. */
@@ -64,9 +65,8 @@ export async function processStartedAt(pid, { platform = process.platform, run =
       return Number(BigInt(found.start) / 10_000n) - 11_644_473_600_000;
     }
     const { stdout } = await run("/bin/ps", ["-p", String(pid), "-o", "lstart="],
-      { timeout: 2_000, env: { ...process.env, LC_ALL: "C" } });
-    const started = Date.parse(stdout.trim());
-    return Number.isFinite(started) ? started : null;
+      { timeout: 2_000, env: startTimeEnvironment() });
+    return parseStartTime(stdout);
   } catch { return null; }
 }
 
