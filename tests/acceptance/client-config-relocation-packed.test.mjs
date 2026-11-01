@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { stat } from "node:fs/promises";
+import { readdir, stat } from "node:fs/promises";
 import path from "node:path";
 import test from "node:test";
 
@@ -18,6 +18,19 @@ const CLIENTS = [
   { adapterId: "kimi", variable: "KIMI_CODE_HOME", marker: dir => path.join(dir, "config.toml"),
     relocated: root => path.join(root, "relocated kimi"), fallback: home => path.join(home, ".kimi-code") },
 ];
+
+// Directories under `root` that hold nothing: what an uninstall left behind.
+async function emptyDirectories(root) {
+  const entries = await readdir(root, { withFileTypes: true }).catch(error => {
+    if (error.code === "ENOENT") return null;
+    throw error;
+  });
+  if (entries === null) return [];
+  const nested = await Promise.all(entries.filter(entry => entry.isDirectory())
+    .map(entry => emptyDirectories(path.join(root, entry.name))));
+  const below = nested.flat();
+  return entries.length === 0 ? [root] : below;
+}
 
 test("packed install, doctor, and uninstall follow each client's relocation variable", async t => {
   const place = await createPackedAcc(t);
@@ -51,10 +64,16 @@ test("packed install, doctor, and uninstall follow each client's relocation vari
           const moved = await place.acc(["doctor"], { ...env, [client.variable]: undefined });
           assert.equal(moved.adapters.find(item => item.adapterId === client.adapterId).installed, false,
             "doctor inferred registration from ownership instead of the client's directory");
+          assert.ok(moved.adapters.find(item => item.adapterId === client.adapterId).remediation
+            .some(line => line.includes("was installed outside")), "doctor did not name the moved installation");
         }
 
         const removed = await place.acc(["uninstall", "--adapter", client.adapterId], env);
         assert.deepEqual(removed.failed, []);
+        if (setting === "explicit") {
+          assert.deepEqual((await emptyDirectories(dir)).filter(item => item !== dir), [],
+            "uninstall left the directories it created in the relocated client");
+        }
         const after = await place.acc(["doctor"], env);
         assert.equal(after.adapters.find(item => item.adapterId === client.adapterId).installed, false);
       });

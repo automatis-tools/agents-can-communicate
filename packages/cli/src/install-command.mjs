@@ -61,6 +61,10 @@ export const clientContext = (home, stateRoot,
     ? env.CODEX_HOME : path.join(home, ".codex"),
   geminiHome: absoluteEnv(env, "GEMINI_CLI_HOME") ?? home,
   kimiHome: absoluteEnv(env, "KIMI_CODE_HOME") ?? path.join(home, ".kimi-code"),
+  // Every directory a client reads, for directories ACC creates outside the
+  // home when a variable moved one there.
+  clientRoots: [absoluteEnv(env, "CLAUDE_CONFIG_DIR"), env.CODEX_HOME || null, absoluteEnv(env, "GEMINI_CLI_HOME"),
+    absoluteEnv(env, "KIMI_CODE_HOME"), env.GROK_HOME || null].filter(Boolean),
   grokHome: typeof env.GROK_HOME === "string" && env.GROK_HOME !== ""
     ? env.GROK_HOME : path.join(home, ".grok"),
   // The user's PATH, for finding the real client executable to probe.

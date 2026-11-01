@@ -329,7 +329,9 @@ configuration (measured on 2026-11-01 with Claude Code 2.1.316, Codex 0.166.0, G
 0.60.0, Antigravity CLI 1.4.12, Kimi Code 2.4.1 and Grok 1.0.70). Antigravity CLI has no
 relocation variable. `acc doctor` shows a relocated client's directory and the variable that
 moved it. Set the variable for ACC commands too, not only for the client: an install or
-update run without it writes to the default directory.
+update run without it writes to the default directory. When the variable changed after an
+install, `acc doctor` says that ACC's integration lies outside the current directory and names
+the uninstall to run with the environment used at install.
 
 | Variable | Purpose |
 |---|---|

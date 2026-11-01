@@ -173,14 +173,21 @@ async function hasSymlinkAncestor(home, candidate) {
   return false;
 }
 
+// The home, then each client directory a relocation variable moved outside it
+// (#148). A directory ACC creates is owned within the first root holding it.
+const ownedRoots = (home, roots = []) => [home, ...roots]
+  .filter(root => typeof root === "string" && root !== "").map(root => path.resolve(root));
+const rootFor = (roots, candidate) => roots.find(root => inside(root, candidate)) ?? null;
+
 /** Return planned artifact parents that do not yet exist under the client home. */
-export async function missingArtifactParents({ home, artifacts }) {
+export async function missingArtifactParents({ home, roots = [], artifacts }) {
   if (typeof home !== "string") return [];
-  const root = path.resolve(home);
+  const candidates = ownedRoots(home, roots);
   const missing = new Set();
   for (const artifact of artifacts) {
     let directory = path.dirname(path.resolve(artifact.path));
-    while (inside(root, directory)) {
+    const root = rootFor(candidates, directory);
+    while (root !== null && inside(root, directory)) {
       try {
         await lstat(directory);
         break;
@@ -196,13 +203,14 @@ export async function missingArtifactParents({ home, artifacts }) {
 }
 
 /** Remove recorded parents deepest-first, but only while each remains an empty directory. */
-export async function removeEmptyOwnedDirectories({ home, directories = [] }) {
+export async function removeEmptyOwnedDirectories({ home, roots = [], directories = [] }) {
   const result = { removed: [], kept: [], missing: [] };
-  const root = typeof home === "string" ? path.resolve(home) : null;
+  const candidates = typeof home === "string" ? ownedRoots(home, roots) : [];
   const ordered = [...new Set(directories)].sort((left, right) =>
     right.split(path.sep).length - left.split(path.sep).length || left.localeCompare(right));
   for (const directory of ordered) {
-    if (root === null || !inside(root, path.resolve(directory))) {
+    const root = rootFor(candidates, path.resolve(directory));
+    if (root === null) {
       result.kept.push(directory);
       continue;
     }

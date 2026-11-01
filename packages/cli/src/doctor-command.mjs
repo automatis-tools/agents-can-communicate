@@ -202,6 +202,16 @@ export async function diagnoseAdapters({ options, runtime, detect = detectInstal
     // trust prompt, most of all. It goes where a person reads, not into --json.
     remediation.push(...(entry.needsAction ?? []));
     const installed = record.installs.find(one => one.adapterId === entry.adapterId);
+    // Recorded under one client directory while this environment resolves
+    // another: the relocation variable changed since install (#148).
+    const configHome = clientConfigHome(clients, entry.adapterId, runtime?.env ?? {});
+    const within = file => { const relative = path.relative(configHome.path, file);
+      return relative !== "" && !relative.startsWith("..") && !path.isAbsolute(relative); };
+    const recordedFiles = (installed?.artifacts ?? []).map(artifact => artifact.path).filter(file => typeof file === "string");
+    if (configHome && recordedFiles.length > 0 && !recordedFiles.some(within)) {
+      remediation.push(`acc uninstall --adapter ${entry.adapterId}  # ACC's integration was installed outside `
+        + `${configHome.path}; run this with the environment used at install, then install again here`);
+    }
     const bundleVersion = installed?.accVersion ?? null;
     const stale = staleInstall({ recorded: bundleVersion, running });
     if (stale !== null) {
@@ -230,7 +240,7 @@ export async function diagnoseAdapters({ options, runtime, detect = detectInstal
     // an npm upgrade with no `acc install`, and reporting both is what makes the
     // divergence legible rather than hidden behind a single reassuring number.
     return { ...entry, stale, wired, bundleVersion,
-      configHome: clientConfigHome(clients, entry.adapterId, runtime?.env ?? {}),
+      configHome,
       deliveryDecision: installed === undefined ? null : decisionOf(installed),
       owned: { modified: owned.modified,
       missing: owned.missing, intact: owned.intact.length },
@@ -359,14 +369,14 @@ export async function runDoctor({ options, context, runtime }) {
     && adapter.nativeDelivery.reasonCode === "native_delivery_unsupported"
     && typeof adapter.deliveryDiagnostic === "string")
     .map(adapter => `  ${adapter.deliveryDiagnostic}`),
-  // One concise native-delivery line per detected client, distinguishing
-  // eligibility, the recorded policy, and the live runtime state. It never
-  // claims that "active" means a model read anything.
   // Only a relocated client gets a line: the default needs no mention, and a
   // moved one explains why the integration lives where it does (#148).
   ...adapters.filter(adapter => (adapter.present || adapter.installed) && adapter.configHome?.variable)
     .map(adapter => `  ${adapter.displayName} configuration: ${adapter.configHome.path}`
       + ` (${adapter.configHome.variable})`),
+  // One concise native-delivery line per detected client, distinguishing
+  // eligibility, the recorded policy, and the live runtime state. It never
+  // claims that "active" means a model read anything.
   ...adapters.filter(adapter => adapter.present)
     .map(adapter => `  ${adapter.displayName} live delivery: `
       + `${describeNative(adapter.nativeDelivery, { clientVersion: adapter.version })}; `
