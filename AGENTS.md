@@ -136,6 +136,10 @@ Native CI observations are needed to measure the resulting runtime; scoped succe
 (`ACC_TEST_FILE_TIMEOUT_MS`) in addition to the five-minute default per-test deadline
 (`ACC_TEST_TIMEOUT_MS`), so leaked handles cannot silently hold a gate forever. The runner
 prints the slowest files; `ACC_TEST_TIMINGS` saves file timings as JSONL to the specified path.
+Each CI timing artifact also carries an optional `acc-runner-profile.json` with the runner's CPU,
+memory, image, Node and npm. Before you compare two timings, run
+`node scripts/runner-profile.mjs compare <a> <b>`. A different host or image, or an unavailable
+fact, makes the timings incomparable; the profile never changes a gate result.
 
 Enable the commit-msg and pre-push gates once per clone:
 
