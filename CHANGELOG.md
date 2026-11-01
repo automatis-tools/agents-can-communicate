@@ -12,16 +12,18 @@
   duplicate suppression, restart/rebind and exact binding, plus token rotation, foreign-lock
   and cold-reaper refusal. Each offer re-reads the session's permission mode after the warm
   check, so a session switched from `yolo` to manual or auto after binding gets no wake. A
-  repeated offer reports the first submit's outcome. `replyRoute` stays false; ordinary idle
+  repeated offer reports the first submit's outcome, and one that arrives while the first is
+  still deciding is refused as busy, so the message stays queued. `replyRoute` stays false; ordinary idle
   TUI remains next-turn only.
 - Codex sender permissions grant the exact `127.0.0.1` literal only while Kimi's live delivery
   is activated as `actionable` or `all`. A Codex domain rule cannot name a port, so the grant
   opens every local service to the sandbox; with Kimi off, absent, skipped by the install or
-  below the Web floor, the profile keeps its socket-only shape, and a left-over grant is
-  reported by doctor and removed by the next install or update. Turning Kimi's live delivery
-  on or off rewrites an installed Codex profile in the same run, without setting up any Codex
-  service. Codex install and detect now receive the composed declaration at all; before this,
-  a real install never wrote the grant.
+  below the Web floor, the profile keeps its socket-only shape. Turning Kimi's live delivery on
+  or off, or uninstalling Kimi, rewrites only ACC's permission units in an installed Codex
+  profile in the same command; Codex is not reinstalled and no service is set up. A grant left
+  by anything else is reported by doctor and removed by the next install or update. Codex
+  install and detect now receive the composed declaration at all; before this, a real install
+  never wrote the grant.
 
 | Development artifact | Value |
 |---|---|
