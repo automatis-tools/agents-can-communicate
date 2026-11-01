@@ -833,14 +833,16 @@ test("an uncertified client drops an optional count before an exact inbox recove
 test("SessionEnd retires core binding before adapter endpoint cleanup", async t => {
   // This case checks retirement order, not wall-clock I/O speed under the full
   // suite. Deadline behavior is exercised by the focused retirement fixtures.
-  t.mock.timers.enable({ apis: ["setTimeout"] });
+  // Retirement measures its 200 ms budget with Date.now(), so the clock is held
+  // too: a slow runner once spent it before cleanup and cleaned nothing.
+  t.mock.timers.enable({ apis: ["setTimeout", "Date"], now: Date.now() });
   const place = await workspace(t);
   const cleaned = [];
   let service;
   const native = { ...nativeHookAdapter(), retireNativeSession: async input => {
+    // Record what cleanup saw: retirement swallows an adapter's thrown error.
     const stored = await service.store.ephemeral.get("deliveryBinding", input.binding.sessionId);
-    assert.ok(stored.retiredAt, "core retirement must precede adapter cleanup");
-    cleaned.push(input.binding.opaqueEndpointRef);
+    cleaned.push(stored.retiredAt ? input.binding.opaqueEndpointRef : "cleanup-before-core-retirement");
   } };
   const table = new Map([[process.pid, { ppid: 900, comm: "node" }],
     [900, { ppid: 1, comm: "native-client" }]]);
