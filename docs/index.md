@@ -48,7 +48,8 @@ decides what its task requires.
 
 ## Project work
 
-- [Contributing](https://github.com/automatis-tools/agents-can-communicate/blob/main/AGENTS.md) — invariants and the mutation-proof gate.
+- [Contributing](https://github.com/automatis-tools/agents-can-communicate/blob/main/CONTRIBUTING.md) — how to propose a change, what a pull request carries, and what is merged.
+- [Repository rules](https://github.com/automatis-tools/agents-can-communicate/blob/main/AGENTS.md) — invariants and the mutation-proof gate.
 - [Design decisions](DESIGN_DECISIONS.md) — architectural decisions and reversals.
 - [Releasing](RELEASING.md) — packed-artifact verification.
 
