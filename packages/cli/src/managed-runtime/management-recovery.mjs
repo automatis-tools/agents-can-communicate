@@ -8,6 +8,7 @@ import { verifyGeneration } from "./install.mjs";
 import { confirmedDead, withManagerLock } from "./mutex.mjs";
 import { readControl, readManagedJson, writeControl } from "./state.mjs";
 import { releaseStagingHold } from "./staging.mjs";
+import { parseStartTime, startTimeEnvironment } from "./process-start.mjs";
 
 /** A newly installed global CLI can supersede an older pending release locally.
  * No workspace code or integration is admitted until normal activation passes.
@@ -38,10 +39,10 @@ export async function stageNewerManagementRuntime(root, { packageRoot, env }) {
   }
 }
 
-async function inspectWorker(pid) {
+export async function inspectWorker(pid, { run = promisify(execFile) } = {}) {
   try {
-    const { stdout } = await promisify(execFile)("/bin/ps", ["-p", String(pid), "-o", "uid=,lstart=,command="],
-      { timeout: 2000, maxBuffer: 16384 });
+    const { stdout } = await run("/bin/ps", ["-p", String(pid), "-o", "uid=,lstart=,command="],
+      { timeout: 2000, maxBuffer: 16384, env: startTimeEnvironment() });
     const match = /^\s*(\d+)\s+(.{24})\s+(.+)\s*$/.exec(stdout);
     return match ? { uid: Number(match[1]), start: match[2], command: match[3] } : null;
   } catch { return null; }
@@ -65,7 +66,7 @@ export async function retireLegacyUpdateWorker(root, { inspect = inspectWorker,
     const observed = await inspect(owner.pid);
     const suffix = ` ${path.join(control.active.root, "bin", "acc-update-worker.mjs")} ${root}`;
     const executable = observed?.command.endsWith(suffix) ? observed.command.slice(0, -suffix.length) : null;
-    const elapsed = Date.parse(owner.acquiredAt) - Date.parse(observed?.start);
+    const elapsed = Date.parse(owner.acquiredAt) - (parseStartTime(observed?.start) ?? NaN);
     if (!executable || !path.isAbsolute(executable) || path.basename(executable) !== "node"
       || observed.uid !== process.getuid?.() || !Number.isFinite(elapsed) || elapsed < 0 || elapsed > 60_000) return false;
     if (JSON.stringify(await readManagedJson(ownerFile)) !== JSON.stringify(owner)
