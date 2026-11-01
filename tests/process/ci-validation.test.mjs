@@ -199,18 +199,24 @@ test('CLI rejects output aliasing its event and unsafe ancestor temp contexts',a
 import { spawn } from 'node:child_process';
 import { waitForOwnedProcessExit } from '../helpers/push-fixture.mjs';
 test('interrupted real test execution never emits proof',{skip:process.platform==='win32'},async t=>{
+  // The probe waits until it is killed: a fixed sleep could end before the other
+  // files finish on a loaded machine, and then nothing would be interrupted.
   const f=await ciRunnerFixture(t,{testSuffix:`\nappendFileSync(process.env.CI_TEST_STARTED,JSON.stringify({pid:process.pid,parent:process.ppid}));
-    await new Promise(resolve=>setTimeout(resolve,10000));`});
+    await new Promise(()=>setInterval(()=>{},1000));`});
   const p=await f.invoke('plan'); assert.equal(p.code,0,p.stderr);
   const started=path.join(f.base,'started');
   await writeFile(f.outputPath,'');
   const child=spawn(process.execPath,[path.join(f.root,'scripts/ci-validation.mjs'),'test'],{cwd:f.root,
     env:{...f.env,CI_ROUTE:p.outputs.route,CI_WORKER:f.worker,CI_TEST_STARTED:started},stdio:'ignore'});
   const closed=new Promise(resolve=>child.once('close',(code,signal)=>resolve({code,signal})));
+  // Wait on what actually happens, not a wall-clock budget: under load, packing
+  // the template alone once took longer than ten seconds. The per-file watchdog
+  // still bounds a run that never starts.
+  let exited=false;
+  child.once('exit',()=>{exited=true;});
   let owned;
   try {
-    const deadline=Date.now()+10000;
-    while(Date.now()<deadline) {
+    while(!exited) {
       const bytes=await readFile(started,'utf8').catch(()=>null);
       if(bytes){owned=JSON.parse(bytes);break;}
       await new Promise(resolve=>setTimeout(resolve,20));
@@ -219,7 +225,7 @@ test('interrupted real test execution never emits proof',{skip:process.platform=
     // Observe all other files complete before interrupting a stable tree.
     const plan=JSON.parse(await readFile(path.join(f.temporary,'acc-ci-plan.json'),'utf8'));
     let completed=0;
-    while(Date.now()<deadline) {
+    while(!exited) {
       const reports=(await readdir(f.temporary)).filter(name=>name.startsWith('acc-test-report-'));
       for(const report of reports) {
         const bytes=await readFile(path.join(f.temporary,report,'batch-1.jsonl'),'utf8').catch(()=>'');
