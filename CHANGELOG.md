@@ -1,5 +1,23 @@
 # Changelog
 
+## Unreleased — contributing guidance
+
+- `CONTRIBUTING.md` says how to propose a fix or an adapter, what an adapter pull
+  request carries, and what is merged. Contributions are accepted under MIT with no
+  separate sign-off. The README and docs index link it, and the README no longer
+  calls the project noncommercial (#175).
+
+| Development artifact | Value |
+|---|---|
+| Built from | `c4ee4c159c25db8a8aaf927aa8ea9352f7f7a07a` |
+| Tarball | `agents-can-communicate-0.12.2.tgz`, 631,384 bytes, 381 files |
+| sha256 | `b26b3f0de88c7b1ba98536ba39746619cb040d137d65a832d161c85443f48399` |
+
+The exact archive passed package verification. See
+[development evidence](docs/release-evidence/contributing-2026-11-01.md).
+This is not a published release. The version remains `0.12.2`.
+Earlier candidate and release records retain their original provenance.
+
 ## Unreleased — Kimi Code plugin installs
 
 - ACC registers its Kimi Code plugin with the source value `local-path`. Before, it wrote
