@@ -19,10 +19,13 @@ async function fixture(t, source = "", { beforeEvidence = "" } = {}) {
   await mkdir(path.join(repo, "scripts"), { recursive: true }); await mkdir(path.join(template, "pack"), { recursive: true });
   const archive = path.join(template, "pack/exact.tgz"); await writeFile(archive, "exact bytes");
   const evidence = path.join(base, "evidence.json");
-  await writeFile(path.join(repo, "scripts/verify-package.mjs"), `import { readFile, writeFile } from 'node:fs/promises';
+  // Evidence appears whole or not at all: a reader that saw an empty file once
+  // interrupted the writer mid-write and failed to parse it (macOS CI).
+  await writeFile(path.join(repo, "scripts/verify-package.mjs"), `import { readFile, rename, writeFile } from 'node:fs/promises';
     ${beforeEvidence}
-    await writeFile(${JSON.stringify(evidence)}, JSON.stringify({ args: process.argv.slice(2), tmp: process.env.TMPDIR,
-      temp: process.env.TEMP, tmp2: process.env.TMP, pid: process.pid, update: process.env.ACC_NO_UPDATE_CHECK, bytes: await readFile(process.argv[2], 'utf8') })); ${source}`);
+    await writeFile(${JSON.stringify(evidence + ".tmp")}, JSON.stringify({ args: process.argv.slice(2), tmp: process.env.TMPDIR,
+      temp: process.env.TEMP, tmp2: process.env.TMP, pid: process.pid, update: process.env.ACC_NO_UPDATE_CHECK, bytes: await readFile(process.argv[2], 'utf8') }));
+    await rename(${JSON.stringify(evidence + ".tmp")}, ${JSON.stringify(evidence)}); ${source}`);
   return Object.assign(f, { repo, template, archive, evidence, launcher: path.join(base, "launcher.json") });
 }
 async function launcherEntry(f) {
@@ -115,11 +118,10 @@ test("SIGTERM waits for owned process termination and retains resources", { skip
   await writeFile(entry, `import { verifyScopedPackage } from ${JSON.stringify(new URL('../scripts/scoped-package.mjs', import.meta.url).href)};
     await verifyScopedPackage(${JSON.stringify({ repo: f.repo, template: f.template })});`);
   const child = spawn(process.execPath, [entry], { stdio: "ignore" });
-  const completed = new Promise(resolve => child.once("exit", resolve));
-  for (let attempt = 0; attempt < 100; attempt++) {
-    if (await lstat(f.evidence).catch(() => false)) break;
-    await new Promise(resolve => setTimeout(resolve, 20));
-  }
+  let exited = false;
+  const completed = new Promise(resolve => child.once("exit", value => { exited = true; resolve(value); }));
+  // Wait for the verifier's evidence, not a two-second budget a loaded runner can miss.
+  while (!exited && !await lstat(f.evidence).catch(() => false)) await new Promise(resolve => setTimeout(resolve, 20));
   child.kill("SIGTERM");
   await Promise.race([completed, new Promise((_, reject) => { const timer = setTimeout(() => reject(Error("cancellation hung")), 8000); timer.unref(); })]);
   const evidence = JSON.parse(await readFile(f.evidence)); assert.ok((await lstat(f.template)).isDirectory());
