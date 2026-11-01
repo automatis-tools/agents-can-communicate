@@ -280,7 +280,9 @@ listener declares it with the optional `inboundLoopback(context)`, composed into
 `context.receiverLoopback`. A sender's domain rule cannot name a port, so that grant opens
 every local service: return true only while the adapter's own live delivery is activated,
 read from `context.livePolicies[adapterId]`, which carries each client's recorded native
-activation policy. Declare a new receiving transport
+activation policy. When an install or uninstall flips that declaration, the installer calls
+an installed sender's optional `refreshSenderPermissions(context)` - outside the run that named
+other clients - to rewrite only the sender's own grants, never to reinstall it. Declare a new receiving transport
 here, or every Codex sender gets `transport_permission_denied` against it.
 
 A package-shipped passing Codex installed-hook capture additionally references its

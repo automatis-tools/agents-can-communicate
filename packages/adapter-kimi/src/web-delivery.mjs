@@ -185,10 +185,13 @@ export async function offerMessage({ binding, message, runtimeDir, now = Date.no
     return rejected(binding, "transport_error");
   }
   if (!first) {
-    // A duplicate repeats the first submit's recorded outcome. While that
-    // first offer is still unresolved (or ended ambiguously) nothing proves a
-    // turn started, so the honest answer is "queued", never a running claim.
+    // A duplicate repeats the first submit's recorded outcome. With none yet,
+    // the first offer is still deciding - it may still refuse and release the
+    // marker - so nothing has been accepted to repeat: the message stays queued
+    // for its next offer or turn. A first offer that died here leaves the same
+    // answer, which only costs a wake the next turn still delivers.
     const outcome = await readWakeOutcome(wake);
+    if (outcome === null) return rejected(binding, "recipient_busy");
     return accepted(outcome === "running" ? {} : { queueStatus: "queued" });
   }
   const token = await readServerToken({ homeDir: endpoint.kimiHome });
@@ -228,6 +231,9 @@ export async function offerMessage({ binding, message, runtimeDir, now = Date.no
   }
   // Only a definite rejection releases the marker. After a timeout/reset the
   // prompt may exist, so a blind retry could spend another turn.
+  // An ambiguous one is recorded as queued, the most it can claim: a later
+  // duplicate reports that rather than submitting again.
   if (submitted.definite) await releaseWake(wake);
+  else await recordWake({ ...wake, outcome: "queued" });
   return rejected(binding, errorCode(submitted.reason));
 }

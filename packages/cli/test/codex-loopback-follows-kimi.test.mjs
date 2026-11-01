@@ -93,24 +93,43 @@ test("turning Kimi's live delivery on or off rewrites an installed Codex profile
     const previous = process.env.PATH;
     process.env.PATH = `${bin}${path.delimiter}${previous}`;
     t.after(() => { process.env.PATH = previous; });
-    const install = delivery => runInstallCommand({
-      options: { home, adapter: "kimi", delivery },
-      runtime: { platform: process.platform, env: { ...process.env, ...env } }, action: "install" });
+    const run = (action, delivery) => runInstallCommand({
+      options: { home, adapter: "kimi", ...(delivery === undefined ? {} : { delivery }) },
+      runtime: { platform: process.platform, env: { ...process.env, ...env } }, action });
+    const codexRefreshed = result => result.data.senders
+      .some(sender => sender.adapterId === "codex" && sender.changed === true);
+    // Codex is never reinstalled for a receiver change: only its grants move.
+    const codexNotPlanned = result => assert.equal(result.data.plan.operations
+      .some(operation => operation.adapterId === "codex"), false);
 
-    const on = await install("actionable");
-    assert.ok(on.data.plan.operations.some(operation => operation.adapterId === "codex"),
-      "Codex joined the run because its receiver set changed");
+    const on = await run("install", "actionable");
+    codexNotPlanned(on);
+    assert.ok(codexRefreshed(on), JSON.stringify(on.data.senders));
+    assert.match(on.text, /codex: updated sender permissions/);
     assert.match(await readFile(config, "utf8"), GRANT);
 
-    // Unchanged receivers: an install naming Kimi leaves Codex out of the run.
-    const again = await install("actionable");
-    assert.equal(again.data.plan.operations.some(operation => operation.adapterId === "codex"), false);
+    // Unchanged receivers: nothing to refresh.
+    const again = await run("install", "actionable");
+    assert.deepEqual(again.data.senders, []);
 
-    const off = await install("off");
-    assert.ok(off.data.plan.operations.some(operation => operation.adapterId === "codex"));
+    const off = await run("install", "off");
+    codexNotPlanned(off);
+    assert.ok(codexRefreshed(off));
     const source = await readFile(config, "utf8");
     assert.doesNotMatch(source, /127\.0\.0\.1|network\.domains/);
     assert.match(source, /^model = "mine"$/m);
+
+    // Removing Kimi after its live delivery was on takes the grant with it.
+    await run("install", "actionable");
+    assert.match(await readFile(config, "utf8"), GRANT);
+    const removed = await run("uninstall");
+    codexNotPlanned(removed);
+    assert.ok(codexRefreshed(removed), JSON.stringify(removed.data.senders));
+    const after = await readFile(config, "utf8");
+    assert.doesNotMatch(after, /127\.0\.0\.1|network\.domains/);
+    assert.match(after, /^model = "mine"$/m);
+    assert.match(after, /\[permissions\.acc-workspace\.network\.unix_sockets\]/,
+      "the rest of Codex's grants stay");
   });
 
 test("a delivery choice for a Kimi that is not on the machine grants Codex nothing",

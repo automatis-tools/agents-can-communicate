@@ -107,8 +107,9 @@ Kimi Web receives on a loopback HTTP server. A Codex network rule names a host, 
 so allowing `127.0.0.1` lets a sandboxed command reach every local service on the machine, not
 only Kimi. ACC therefore writes that exact literal - never a wildcard, range or private
 netblock - only while Kimi's live delivery is activated as `actionable` or `all`. With Kimi off
-or absent the profile carries no domain rule; a grant left over from an earlier policy is
-reported by `acc doctor` and removed by the next install or update.
+or absent the profile carries no domain rule. Turning Kimi's live delivery off or uninstalling
+Kimi removes the grant from an installed Codex profile in the same command; one left over any
+other way is reported by `acc doctor` and removed by the next install or update.
 
 On macOS and Linux, installing the Codex adapter also writes ACC's own Codex rules file. It
 allows ACC's wrapper and participant commands, such as `message` and `reply`, where the

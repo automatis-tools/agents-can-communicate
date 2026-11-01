@@ -170,19 +170,24 @@ export async function claimWake({ runtimeDir, endpointId, messageId, platform = 
 }
 
 const OUTCOMES = ["queued", "running"];
+// Beside the marker, never inside it: a message id has no dot, so the name
+// cannot be another message's marker.
+const outcomeName = messageId => `${messageId}.outcome`;
 
 /** Persist how the first submit ended, so a duplicate offer can repeat it. */
 export async function recordWake({ runtimeDir, endpointId, messageId, outcome,
   platform = process.platform }) {
   if (!ENDPOINT.test(endpointId) || !WAKE_MESSAGE.test(messageId) || !OUTCOMES.includes(outcome)) return;
-  // The marker claimWake created, opened without following a link and never
-  // created here: a missing marker stays missing.
   let handle;
   try {
-    handle = await openRegularNoFollow(path.join(await wakesDirectory(runtimeDir, false, platform),
-      endpointId, messageId), constants.O_WRONLY | constants.O_TRUNC, { platform });
+    const dir = path.join(await wakesDirectory(runtimeDir, false, platform), endpointId);
+    // Only beside a marker this binding claimed; an outcome is never invented.
+    if (!(await lstat(path.join(dir, messageId))).isFile()) return;
+    // Exclusive creation follows no link and replaces nothing, on every
+    // platform; the first outcome recorded is the one a duplicate repeats.
+    handle = await open(path.join(dir, outcomeName(messageId)), "wx", 0o600);
     await handle.writeFile(outcome);
-  } catch { /* an empty marker only makes a duplicate answer conservatively */ } finally {
+  } catch { /* no outcome only makes a duplicate answer conservatively */ } finally {
     await handle?.close().catch(() => null);
   }
 }
@@ -193,7 +198,7 @@ export async function readWakeOutcome({ runtimeDir, endpointId, messageId, platf
   let handle;
   try {
     handle = await openRegularNoFollow(path.join(await wakesDirectory(runtimeDir, false, platform),
-      endpointId, messageId), constants.O_RDONLY, { platform });
+      endpointId, outcomeName(messageId)), constants.O_RDONLY, { platform });
     const text = await handle.readFile("utf8");
     return OUTCOMES.includes(text) ? text : null;
   } catch {
@@ -206,7 +211,8 @@ export async function readWakeOutcome({ runtimeDir, endpointId, messageId, platf
 export async function releaseWake({ runtimeDir, endpointId, messageId, platform = process.platform }) {
   if (!ENDPOINT.test(endpointId) || !WAKE_MESSAGE.test(messageId)) return;
   try {
-    await rm(path.join(await wakesDirectory(runtimeDir, false, platform), endpointId, messageId),
-      { force: true });
+    const dir = path.join(await wakesDirectory(runtimeDir, false, platform), endpointId);
+    await rm(path.join(dir, outcomeName(messageId)), { force: true });
+    await rm(path.join(dir, messageId), { force: true });
   } catch { /* a marker left behind only suppresses a repeat wake */ }
 }

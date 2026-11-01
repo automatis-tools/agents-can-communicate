@@ -7,7 +7,8 @@ import test from "node:test";
 
 import { bindNativeSession, offerMessage, refreshNativeSession } from "../src/web-delivery.mjs";
 import { httpRequest } from "../src/web-client.mjs";
-import { claimWake, readWakeOutcome, readWebEndpoint, recordWake } from "../src/web-endpoint.mjs";
+import { claimWake, readWakeOutcome, readWebEndpoint, recordWake, releaseWake }
+  from "../src/web-endpoint.mjs";
 
 const SERVER = "01JZX4A6E7M8V0R3Q0N2K2M5Q9";
 const META_SERVER = "01JZX4A6E7M8V0R3Q0N2K2M5QA";
@@ -173,7 +174,9 @@ test("an ambiguous submit is never blindly retried and token rotates per offer",
     `${bound.opaqueEndpointRef}.json`), "utf8")).includes("rotated-token"), false);
 });
 
-test("file permissions are private where the client requires them", async t => {
+test("file permissions are private where the client requires them", {
+  skip: process.platform === "win32" ? "Windows does not enforce POSIX file modes" : false,
+}, async t => {
   const f = await fixture(t);
   await chmod(path.join(f.home, "server.token"), 0o644);
   const bound = await bind(f);
@@ -260,30 +263,75 @@ test("a duplicate offer repeats the first submit outcome", async t => {
   }
 });
 
-test("a wake outcome is written only into the marker itself, never through a link", {
-  skip: process.platform === "win32" ? "symbolic links need privileges on Windows" : false,
-}, async t => {
-  const { symlink } = await import("node:fs/promises");
+const wakeFixture = async t => {
   const root = await realpath(await mkdtemp(path.join(tmpdir(), "acc-kimi-wake-")));
   t.after(() => rm(root, { recursive: true, force: true }));
   const runtimeDir = path.join(root, "workspace", "runtime");
   await mkdir(runtimeDir, { recursive: true, mode: 0o700 });
   const wake = { runtimeDir, endpointId: `kimi_web_${"a".repeat(32)}`, messageId: "message_link" };
+  const file = name => path.join(runtimeDir, "kimi-web-wakes", wake.endpointId, name);
+  return { root, wake, file };
+};
+
+test("a wake outcome is kept once beside its marker and leaves with it", async t => {
+  const { wake, file } = await wakeFixture(t);
   assert.equal(await claimWake(wake), true);
+  assert.equal(await readWakeOutcome(wake), null, "unresolved until the first submit ends");
   await recordWake({ ...wake, outcome: "running" });
   assert.equal(await readWakeOutcome(wake), "running");
-
-  // A marker replaced by a link to someone else's file is neither read nor written.
-  const victim = path.join(root, "victim");
-  await writeFile(victim, "running");
-  const marker = path.join(runtimeDir, "kimi-web-wakes", wake.endpointId, wake.messageId);
-  await rm(marker);
-  await symlink(victim, marker);
-  assert.equal(await readWakeOutcome(wake), null);
+  // The first outcome is the one a duplicate repeats; a later write changes nothing.
   await recordWake({ ...wake, outcome: "queued" });
-  assert.equal(await readFile(victim, "utf8"), "running");
+  assert.equal(await readWakeOutcome(wake), "running");
+  assert.equal(await readFile(file(wake.messageId), "utf8"), "", "the marker itself stays empty");
   // An outcome is never invented for a marker that does not exist.
   const missing = { ...wake, messageId: "message_absent" };
   await recordWake({ ...missing, outcome: "running" });
   assert.equal(await readWakeOutcome(missing), null);
+  // Releasing the wake takes its outcome too, so a new claim starts unresolved.
+  await releaseWake(wake);
+  assert.equal(await claimWake(wake), true);
+  assert.equal(await readWakeOutcome(wake), null);
+});
+
+test("a wake outcome is never read or written through a link", {
+  skip: process.platform === "win32" ? "symbolic links need privileges on Windows" : false,
+}, async t => {
+  const { symlink } = await import("node:fs/promises");
+  const { root, wake, file } = await wakeFixture(t);
+  const victim = path.join(root, "victim");
+  await writeFile(victim, "running");
+  assert.equal(await claimWake(wake), true);
+  // A link planted where the outcome goes is neither followed nor replaced.
+  await symlink(victim, file(`${wake.messageId}.outcome`));
+  await recordWake({ ...wake, outcome: "queued" });
+  assert.equal(await readFile(victim, "utf8"), "running");
+  assert.equal(await readWakeOutcome(wake), null);
+  // A marker replaced by a link is no claim to record against.
+  const other = { ...wake, messageId: "message_other" };
+  assert.equal(await claimWake(other), true);
+  await rm(file(other.messageId));
+  await symlink(victim, file(other.messageId));
+  await recordWake({ ...other, outcome: "queued" });
+  assert.equal(await readWakeOutcome(other), null);
+  assert.equal(await readFile(victim, "utf8"), "running");
+});
+
+test("a duplicate of an offer still deciding is not reported as accepted", async t => {
+  const f = await fixture(t);
+  const bound = await bind(f);
+  // The first offer holds the marker and has not yet submitted or refused.
+  assert.equal(await claimWake({ runtimeDir: f.runtimeDir, endpointId: bound.opaqueEndpointRef,
+    messageId: "message_test" }), true);
+  const posts = f.calls.filter(call => call.method === "POST").length;
+  const duplicate = await offerMessage({ ...f.options, binding: bound,
+    message: { messageId: "message_test" } });
+  assert.equal(duplicate.accepted, false);
+  assert.equal(duplicate.safeErrorCode, "recipient_busy");
+  assert.equal(f.calls.filter(call => call.method === "POST").length, posts);
+  // Once that first offer refuses and releases its claim, the next offer submits.
+  await releaseWake({ runtimeDir: f.runtimeDir, endpointId: bound.opaqueEndpointRef,
+    messageId: "message_test" });
+  const next = await offerMessage({ ...f.options, binding: bound, message: { messageId: "message_test" } });
+  assert.equal(next.accepted, true);
+  assert.equal(f.calls.filter(call => call.method === "POST").length, posts + 1);
 });

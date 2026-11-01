@@ -188,6 +188,13 @@ export function defineAdapter(manifest) {
   if (manifest.inboundLoopback !== undefined && typeof manifest.inboundLoopback !== "function") {
     usage("optional inboundLoopback must be a function", { id: manifest.id });
   }
+  // `refreshSenderPermissions(context)` rewrites only a sandboxed sender's own
+  // outgoing grants after a receiver change; the installer calls it instead of
+  // reinstalling the sender.
+  if (manifest.refreshSenderPermissions !== undefined
+    && typeof manifest.refreshSenderPermissions !== "function") {
+    usage("optional refreshSenderPermissions must be a function", { id: manifest.id });
+  }
   // `failOpenNotice({ kind, message })` renders a line the user sees when a hook
   // fails open for a reason the user can act on, or returns null. Only a client
   // whose hook output reaches the user declares it.

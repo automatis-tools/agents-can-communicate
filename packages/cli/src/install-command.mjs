@@ -13,7 +13,7 @@ import { AccError, EXIT } from "@agents-can-communicate/protocol";
 
 import { platformPaths } from "./platform-paths.mjs";
 import { installManaged, uninstallManaged } from "./managed-runtime/install.mjs";
-import { decideDelivery, decisionOf } from "./install-delivery-consent.mjs";
+import { decideDelivery } from "./install-delivery-consent.mjs";
 
 export { decideDelivery } from "./install-delivery-consent.mjs";
 
@@ -247,38 +247,56 @@ const plannedLivePolicy = operation => operation.action !== "install" ? "off"
  * A receiver's live policy changes the sender grants Codex needs: Kimi Web's
  * loopback listener is declared only while Kimi's live delivery is activated.
  * The run's own plan says which clients it actually changes - a client that is
- * absent, blocked or downgrade-guarded is skipped and keeps its record. When
- * that flips the declaration and Codex is on the machine and installed but not
- * named, Codex joins the run with its own recorded policy and decision, so its
- * profile gains or drops 127.0.0.1 now rather than at the next update. It joins
- * for its configuration only: no service is set up for a client nobody named.
- * An uninstall never adds a client; doctor reports a grant left over.
+ * absent, blocked or downgrade-guarded is skipped and keeps its record - and an
+ * uninstall takes each client it removes to off. The returned context carries
+ * the policies this run leaves, so a sender inside the run is written for them.
  */
-async function followReceivers({ action, adapters, detected, decided, recorded, home, dataHome,
-  runtime, planWith }) {
+function followReceivers({ action, adapters, detected, decided, recorded, home, dataHome, runtime,
+  planWith }) {
   const build = livePolicies => clientContext(home, path.join(dataHome, "acc"),
     { env: runtime.env ?? {}, dataHome, platform: runtime.platform, livePolicies });
   const before = recordedLivePolicies(recorded);
-  const base = { adapters, detected, deliveryByAdapter: decided.deliveryByAdapter,
-    deliveryDecisionByAdapter: decided.deliveryDecisionByAdapter };
-  const preliminary = planWith({ ...base, context: build(before) });
+  const preliminary = planWith({ adapters, detected, context: build(before),
+    deliveryByAdapter: decided.deliveryByAdapter,
+    deliveryDecisionByAdapter: decided.deliveryDecisionByAdapter });
   const after = { ...before };
   for (const operation of preliminary.operations) after[operation.adapterId] = plannedLivePolicy(operation);
-  const context = build(after);
-  const unchanged = { ...base, context, followed: null };
-  const codexRecord = recorded.find(install => install.adapterId === "codex");
-  if (action !== "install" || codexRecord === undefined
-    || adapters.some(adapter => adapter.id === "codex")
-    || build(before).receiverLoopback === context.receiverLoopback) return unchanged;
-  const codex = ALL_ADAPTERS().find(adapter => adapter.id === "codex");
-  const [codexDetected] = await detectInstallation({ adapters: [codex], context,
-    probeTimeoutMs: probeTimeout(runtime.env) });
-  if (codexDetected?.present !== true) return unchanged;
-  return { adapters: [...adapters, codex], detected: [...detected, codexDetected], context,
-    deliveryByAdapter: { ...decided.deliveryByAdapter, codex: livePolicyOf(codexRecord) },
-    deliveryDecisionByAdapter: { ...decided.deliveryDecisionByAdapter,
-      codex: decisionOf(codexRecord) }, followed: "codex" };
+  return { context: build(after), loopbackChanged: build(before).receiverLoopback
+    !== build(after).receiverLoopback };
 }
+
+/**
+ * When the run flips the loopback declaration and an installed sandboxed sender
+ * is not part of it, that sender's own grants are brought up to date in the same
+ * command - the 127.0.0.1 grant added when Kimi's live delivery comes on, and
+ * removed when it goes off or Kimi is uninstalled. Only the sender's owned
+ * permission units change; its integration, record and service stay as they are.
+ */
+async function refreshSenders({ adapters, recorded, context, dryRun }) {
+  const named = new Set(adapters.map(adapter => adapter.id));
+  const results = [];
+  for (const sender of ALL_ADAPTERS()) {
+    const record = recorded.find(install => install.adapterId === sender.id);
+    if (typeof sender.refreshSenderPermissions !== "function" || record === undefined
+      || named.has(sender.id)) continue;
+    try {
+      const result = await sender.refreshSenderPermissions({ ...context,
+        requestedLivePolicy: livePolicyOf(record),
+        livePolicy: activated(record.nativeActivation?.livePolicy),
+        clientVersion: record.version ?? null, dryRun });
+      results.push({ adapterId: sender.id, ...result });
+    } catch (error) {
+      results.push({ adapterId: sender.id, changed: false, error: error.message });
+    }
+  }
+  return results;
+}
+
+const describeSenders = (senders, dryRun) => senders.flatMap(sender =>
+  sender.error !== undefined
+    ? [`${sender.adapterId}: sender permissions not updated (${sender.error}); run acc install --adapter ${sender.adapterId}`]
+    : sender.changed ? [`${sender.adapterId}: ${dryRun ? "would update" : "updated"} sender permissions `
+      + `for the changed loopback receiver in ${sender.file}`] : []);
 
 export async function runInstallCommand({ options, runtime, action = "install" }) {
   if (options.indicator !== undefined && !["on", "off"].includes(options.indicator)) {
@@ -325,17 +343,12 @@ export async function runInstallCommand({ options, runtime, action = "install" }
     accVersion, allowDowngrade: options.downgrade === true, requested,
     allowServiceSetup: action === "install" });
   // The receivers this run leaves activated decide the sender grants it writes.
-  const following = await followReceivers({ action, adapters, detected, decided, recorded,
+  const following = followReceivers({ action, adapters, detected, decided, recorded,
     home, dataHome, runtime, planWith });
-  const planned = planWith(following);
-  // A client that joined only for its sender grants gets no service setup.
-  const plan = following.followed === null ? planned : { ...planned,
-    operations: planned.operations.map(operation => {
-      if (operation.adapterId !== following.followed) return operation;
-      const { nativeServiceSetup: _unasked, ...rest } = operation;
-      return rest;
-    }) };
-  const apply = (paths = {}) => applyPlan({ plan, adapters: following.adapters,
+  const plan = planWith({ adapters, detected, context: following.context,
+    deliveryByAdapter: decided.deliveryByAdapter,
+    deliveryDecisionByAdapter: decided.deliveryDecisionByAdapter });
+  const apply = (paths = {}) => applyPlan({ plan, adapters,
     context: { ...following.context, ...paths }, dataHome, dryRun, accVersion });
   const result = action === "install" && !dryRun && runtime.packageRoot
     ? await installManaged({ packageRoot: runtime.packageRoot,
@@ -346,18 +359,30 @@ export async function runInstallCommand({ options, runtime, action = "install" }
       : await apply();
 
   const acted = actedOn(result);
+  // Judged from what the run actually recorded, so a client that failed to
+  // install or uninstall leaves the senders as they were.
+  const left = dryRun ? recorded : (await loadOwnership({ dataHome })).installs;
+  const leftContext = dryRun ? following.context : clientContext(home, path.join(dataHome, "acc"),
+    { env: runtime.env ?? {}, dataHome, platform: runtime.platform,
+      livePolicies: recordedLivePolicies(left) });
+  const loopbackBefore = clientContext(home, path.join(dataHome, "acc"),
+    { env: runtime.env ?? {}, dataHome, platform: runtime.platform,
+      livePolicies: recordedLivePolicies(recorded) }).receiverLoopback;
+  const senders = (dryRun ? following.loopbackChanged : leftContext.receiverLoopback !== loopbackBefore)
+    ? await refreshSenders({ adapters, recorded: left, context: leftContext, dryRun }) : [];
   if (dryRun) {
     return { data: { ...result, plan, dataHome, deliveryByAdapter: decided.deliveryByAdapter,
-      deliveryDecisionByAdapter: decided.deliveryDecisionByAdapter },
+      deliveryDecisionByAdapter: decided.deliveryDecisionByAdapter, senders },
       text: [`would ${action}:`, ...plan.operations.flatMap(operation => operation.summary),
         ...plan.skipped.map(entry => `skip ${entry.adapterId}: ${entry.reason}`),
-        ...decided.notes].join("\n") };
+        ...describeSenders(senders, true), ...decided.notes].join("\n") };
   }
 
   return { data: { ...result, plan, dataHome, deliveryByAdapter: decided.deliveryByAdapter,
-    deliveryDecisionByAdapter: decided.deliveryDecisionByAdapter, asked: decided.asked },
-  text: describeOutcome({ action, acted, failed: result.failed,
+    deliveryDecisionByAdapter: decided.deliveryDecisionByAdapter, asked: decided.asked, senders },
+  text: [describeOutcome({ action, acted, failed: result.failed,
     skipped: plan.skipped, operations: result.operations, home }),
+  ...describeSenders(senders, false)].filter(line => line !== "").join("\n"),
   error: failureOf({ action, acted, failed: result.failed, operations: result.operations,
     skipped: plan.skipped, home }) };
 }
