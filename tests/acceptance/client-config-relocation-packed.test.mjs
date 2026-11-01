@@ -66,6 +66,10 @@ test("packed install, doctor, and uninstall follow each client's relocation vari
             "doctor inferred registration from ownership instead of the client's directory");
           assert.ok(moved.adapters.find(item => item.adapterId === client.adapterId).remediation
             .some(line => line.includes("was installed outside")), "doctor did not name the moved installation");
+          // The old directory nested inside the new one is still a move (#414 review).
+          const parent = await place.acc(["doctor"], { ...env, [client.variable]: path.dirname(dir) });
+          assert.ok(parent.adapters.find(item => item.adapterId === client.adapterId).remediation
+            .some(line => line.includes("was installed outside")), "doctor missed a move to an ancestor directory");
         }
 
         const removed = await place.acc(["uninstall", "--adapter", client.adapterId], env);

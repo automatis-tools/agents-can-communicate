@@ -167,6 +167,16 @@ async function findShims(root, depth) {
   return found;
 }
 
+// The paths an install in this environment would write, or none when the
+// adapter cannot say.
+function plannedPaths(adapter, context) {
+  try {
+    const artifacts = typeof adapter?.planInstall === "function" ? adapter.planInstall(context) : [];
+    return new Set((Array.isArray(artifacts) ? artifacts : []).map(artifact => artifact?.path)
+      .filter(file => typeof file === "string").map(file => path.resolve(file)));
+  } catch { return new Set(); }
+}
+
 export async function diagnoseAdapters({ options, runtime, detect = detectInstallation }) {
   // The same home `acc install --home` writes to, or the real one. Reading a
   // different home than install wrote to reports every adapter as missing.
@@ -202,13 +212,16 @@ export async function diagnoseAdapters({ options, runtime, detect = detectInstal
     // trust prompt, most of all. It goes where a person reads, not into --json.
     remediation.push(...(entry.needsAction ?? []));
     const installed = record.installs.find(one => one.adapterId === entry.adapterId);
-    // Recorded under one client directory while this environment resolves
-    // another: the relocation variable changed since install (#148).
+    // Recorded where this environment would not install: the relocation
+    // variable changed since install (#148). Compared with the paths an install
+    // here would write, so an old directory nested inside the new one still
+    // counts as moved.
     const configHome = clientConfigHome(clients, entry.adapterId, runtime?.env ?? {});
-    const within = file => { const relative = path.relative(configHome.path, file);
-      return relative !== "" && !relative.startsWith("..") && !path.isAbsolute(relative); };
-    const recordedFiles = (installed?.artifacts ?? []).map(artifact => artifact.path).filter(file => typeof file === "string");
-    if (configHome && recordedFiles.length > 0 && !recordedFiles.some(within)) {
+    const recordedFiles = (installed?.artifacts ?? []).map(artifact => artifact.path)
+      .filter(file => typeof file === "string").map(file => path.resolve(file));
+    const planned = plannedPaths(adapters.find(adapter => adapter.id === entry.adapterId), clients);
+    if (configHome && recordedFiles.length > 0 && planned.size > 0
+      && !recordedFiles.some(file => planned.has(file))) {
       remediation.push(`acc uninstall --adapter ${entry.adapterId}  # ACC's integration was installed outside `
         + `${configHome.path}; run this with the environment used at install, then install again here`);
     }
