@@ -89,3 +89,22 @@ test('all Windows workers use local fixture temp before the driver', async () =>
   for (const key of ['TEMP', 'TMP']) assert.ok(temporary.includes(`"${key}=$dir" >> $env:GITHUB_ENV`));
   assert.ok(steps.indexOf(temporary) < steps.findIndex(s => s.includes('id: test')));
 });
+
+test('the optional runner profile follows the driver and joins the timing artifact', async () => {
+  const source = await action();
+  const steps = source.split(/^    - /m).slice(1);
+  const driver = steps.findIndex(s => s.includes('id: test'));
+  const profile = steps.find(s => s.includes('scripts/runner-profile.mjs'));
+  const upload = steps.find(s => s.includes('uses: actions/upload-artifact@'));
+  assert.ok(profile && driver < steps.indexOf(profile) && steps.indexOf(profile) < steps.indexOf(upload));
+  assert.equal(scalar(profile, 'run'), 'node scripts/runner-profile.mjs record');
+  // A failed or missing profile must never change the worker's gate result.
+  assert.equal(scalar(profile, 'continue-on-error'), 'true');
+  assert.match(scalar(profile, 'if'), /^\$\{\{\s*always\(\)\s*\}\}$/);
+  assert.equal(scalar(profile, 'CI_WORKER'), '${{ inputs.worker }}');
+  assert.doesNotMatch(profile, /^\s+id:|GITHUB_OUTPUT|proof/m);
+  for (const [os, want] of [['Windows', 'pwsh'], ['Linux', 'bash'], ['macOS', 'bash']]) {
+    assert.equal(evaluate(scalar(profile, 'shell'), { runner: { os } }), want);
+  }
+  assert.ok(upload.includes('${{ runner.temp }}/acc-runner-profile.json\n'));
+});
