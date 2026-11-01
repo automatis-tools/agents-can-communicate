@@ -28,6 +28,13 @@ jobs:
           GIT_DIR: ''
           GIT_WORK_TREE: ''
 
+      - name: Record runner profile
+        continue-on-error: true
+        if: ${{ always() }}
+        run: node scripts/runner-profile.mjs record
+        env:
+          CI_WORKER: release
+
       - name: Preserve timing diagnostics
         continue-on-error: true
         if: ${{ always() }}
@@ -37,6 +44,7 @@ jobs:
           path: |
             ${{ runner.temp }}/acc-test-timings.jsonl
             ${{ runner.temp }}/acc-test-timings.jsonl.manifest.json
+            ${{ runner.temp }}/acc-runner-profile.json
           if-no-files-found: warn
 
       - name: Prepare output directory

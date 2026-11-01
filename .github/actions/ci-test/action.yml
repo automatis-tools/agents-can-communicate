@@ -46,6 +46,14 @@ runs:
         ACC_TEST_FORCE_EXIT: ${{ runner.os == 'Windows' && '1' || '' }}
         GIT_DIR: ''
         GIT_WORK_TREE: ''
+    # Optional host facts for timing comparison; never part of the gate result.
+    - name: Record runner profile
+      continue-on-error: true
+      if: ${{ always() }}
+      shell: ${{ runner.os == 'Windows' && 'pwsh' || 'bash' }}
+      run: node scripts/runner-profile.mjs record
+      env:
+        CI_WORKER: ${{ inputs.worker }}
     - name: Preserve timing and routing diagnostics
       continue-on-error: true
       if: ${{ always() }}
@@ -57,4 +65,5 @@ runs:
           ${{ runner.temp }}/acc-test-timings.jsonl.manifest.json
           ${{ runner.temp }}/acc-ci-plan.json
           ${{ runner.temp }}/acc-ci-proof.json
+          ${{ runner.temp }}/acc-runner-profile.json
         if-no-files-found: warn
