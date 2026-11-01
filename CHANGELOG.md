@@ -1,5 +1,26 @@
 # Changelog
 
+## Unreleased — clients with a relocated configuration
+
+- `acc install`, `acc doctor` and `acc uninstall` use `CLAUDE_CONFIG_DIR`,
+  `GEMINI_CLI_HOME` and `KIMI_CODE_HOME` when they hold an absolute path, as the
+  clients themselves do. Before, ACC wrote these integrations under the default
+  directory, where a relocated client never reads them. `CODEX_HOME` and `GROK_HOME`
+  were already honoured. None of the supported clients reads `XDG_CONFIG_HOME` for its
+  configuration. Doctor reports each client's `configHome` and names a relocated
+  client's directory and variable (#148).
+
+| Development artifact | Value |
+|---|---|
+| Built from | `6afeff3949973367b9dcb5b69e63dc08976019fd` |
+| Tarball | `agents-can-communicate-0.12.2.tgz`, 632,713 bytes, 381 files |
+| sha256 | `2cdbb631eeb6a54f36da01bc9fd119b3540678568f3e275f2064587a2daa5299` |
+
+The exact archive passed package verification. See
+[development evidence](docs/release-evidence/client-config-relocation-2026-11-01.md).
+This is not a published release. The version remains `0.12.2`.
+Earlier candidate and release records retain their original provenance.
+
 ## Unreleased — ChatGPT Work Mode guidance
 
 - Troubleshooting names a terminal session as the supported path for ChatGPT Work
