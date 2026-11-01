@@ -1,5 +1,22 @@
 # Changelog
 
+## Unreleased — commands right after an update
+
+- Reclaiming old generations after an update no longer blocks ACC commands. The tree
+  is deleted after the manager lock is released. Before, a command in that window could
+  fail with "runtime unavailable; retry after the update" (#406).
+
+| Development artifact | Value |
+|---|---|
+| Built from | `8bf0b72b1efdc8d033d2470f1c1747764382c0b8` |
+| Tarball | `agents-can-communicate-0.12.2.tgz`, 631,085 bytes, 381 files |
+| sha256 | `1d4c8c7ad66b5403d50e6766975dd84dde7dd55b817b34d658ceb82f30f37cf2` |
+
+The exact archive passed package verification. See
+[development evidence](docs/release-evidence/reclaim-outside-lock-2026-11-01.md).
+This is not a published release. The version remains `0.12.2`.
+Earlier candidate and release records retain their original provenance.
+
 ## Unreleased — process start times across the repeated DST hour
 
 - The managed runtime reads a process start time as UTC. When daylight saving time ended,
