@@ -70,12 +70,32 @@ test('consumers can identify every incomparable cohort difference', () => {
   assert.equal(compareProfiles(baseline(), rerun).comparable, true, 'run and source are not host facts');
   const unknown = baseline();
   unknown.cohort.npm = null;
+  unknown.unavailable = ['cohort.npm'];
   assert.deepEqual(compareProfiles(baseline(), unknown), { comparable: false, differences: ['unavailable:npm'] });
   const extended = { ...baseline(), env: {} };
   assert.deepEqual(compareProfiles(baseline(), extended), { comparable: false, differences: ['invalid-profile'] });
   const nested = baseline();
   nested.cohort.cpus = { count: 3 };
   assert.deepEqual(compareProfiles(nested, baseline()), { comparable: false, differences: ['invalid-profile'] });
+});
+
+test('stored profiles must hold values that recording could have produced', () => {
+  const tampered = [
+    profile => { profile.cohort.cpus = 0; },
+    profile => { profile.cohort.memoryBytes = 7.5; },
+    profile => { profile.cohort.cpuModel = '/Users/runner/cpu'; },
+    profile => { profile.cohort.cpuModel = ' Apple M1 (Virtual)'; },
+    profile => { profile.run.attempt = 1; },
+    profile => { profile.source.commit = 'HEAD'; },
+    profile => { profile.cohort.npm = null; },
+    profile => { profile.unavailable = ['cohort.npm']; },
+  ];
+  for (const change of tampered) {
+    const [a, b] = [baseline(), baseline()];
+    change(a); change(b);
+    assert.equal(validProfile(a), false, change.toString());
+    assert.deepEqual(compareProfiles(a, b), { comparable: false, differences: ['invalid-profile'] }, change.toString());
+  }
 });
 
 test('record writes the real runner profile into RUNNER_TEMP without following an existing link', async () => {
@@ -110,6 +130,8 @@ test('record refuses to guess a destination and compare reports through its exit
   delete childEnv.RUNNER_TEMP; delete childEnv.NODE_TEST_CONTEXT;
   await assert.rejects(run(process.execPath, [script, 'record'], { cwd: repo, env: childEnv }),
     error => error.code === 1 && /RUNNER_TEMP/.test(error.stderr));
+  await assert.rejects(run(process.execPath, [script, 'record', path.join(tmpdir(), 'elsewhere.json')],
+    { cwd: repo, env: { ...childEnv, RUNNER_TEMP: tmpdir() } }), error => error.code === 1 && /usage/.test(error.stderr));
   const temp = await mkdtemp(path.join(tmpdir(), 'acc-runner-compare-'));
   try {
     const [a, b] = [path.join(temp, 'a.json'), path.join(temp, 'b.json')];

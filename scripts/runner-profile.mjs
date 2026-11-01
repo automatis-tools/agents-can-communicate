@@ -11,11 +11,6 @@ import { promisify } from 'node:util';
 
 const run = promisify(execFile);
 export const PROFILE_FILE = 'acc-runner-profile.json';
-export const COHORT_FIELDS = ['platform', 'arch', 'release', 'runnerOS', 'runnerArch', 'runnerEnvironment',
-  'imageOS', 'imageVersion', 'cpuModel', 'cpus', 'memoryBytes', 'node', 'npm'];
-const RUN_FIELDS = ['id', 'attempt', 'job', 'worker'];
-const SOURCE_FIELDS = ['commit', 'tree'];
-
 // Each accepted value is a short printable scalar. Path-like text is refused so
 // that a home directory, workspace or tool location never enters the artifact.
 const text = value => typeof value === 'string' && /^[\x20-\x7e]{1,200}$/.test(value.trim())
@@ -25,40 +20,47 @@ const number = value => typeof value === 'string' && /^[1-9]\d{0,19}$/.test(valu
 const count = value => Number.isSafeInteger(value) && value > 0 ? value : null;
 const oid = value => typeof value === 'string' && /^([a-f0-9]{40}|[a-f0-9]{64})$/.test(value) ? value : null;
 const version = value => typeof value === 'string' && /^v?\d+\.\d+\.\d+$/.test(value) ? value : null;
+// One closed field table drives both recording and reading, so a stored profile
+// is accepted only with the values that recording itself could have produced.
+const FIELDS = {
+  run: { id: number, attempt: number, job: name, worker: name },
+  source: { commit: oid, tree: oid },
+  cohort: { platform: name, arch: name, release: text, runnerOS: name, runnerArch: name, runnerEnvironment: name,
+    imageOS: name, imageVersion: name, cpuModel: text, cpus: count, memoryBytes: count, node: version, npm: version },
+};
+export const COHORT_FIELDS = Object.keys(FIELDS.cohort);
+const unavailableIn = profile => Object.entries(FIELDS).flatMap(([group, fields]) =>
+  Object.keys(fields).filter(key => profile[group][key] === null).map(key => `${group}.${key}`));
 
 // Builds the profile from raw observations. Every field is named here; a value
 // that is missing or fails its check becomes null and is listed as unavailable.
 export function buildProfile(observed = {}) {
   const env = observed.env ?? {};
   const cpus = Array.isArray(observed.cpus) ? observed.cpus : [];
-  const profile = {
-    schema: 1,
-    kind: 'acc-runner-profile',
-    run: { id: number(env.GITHUB_RUN_ID), attempt: number(env.GITHUB_RUN_ATTEMPT),
-      job: name(env.GITHUB_JOB), worker: name(env.CI_WORKER) },
-    source: { commit: oid(observed.commit), tree: oid(observed.tree) },
-    cohort: { platform: name(observed.platform), arch: name(observed.arch), release: text(observed.release),
-      runnerOS: name(env.RUNNER_OS), runnerArch: name(env.RUNNER_ARCH), runnerEnvironment: name(env.RUNNER_ENVIRONMENT),
-      imageOS: name(env.ImageOS), imageVersion: name(env.ImageVersion), cpuModel: text(cpus[0]?.model),
-      cpus: count(cpus.length), memoryBytes: count(observed.memoryBytes), node: version(observed.node),
-      npm: version(observed.npm) },
+  const raw = {
+    run: { id: env.GITHUB_RUN_ID, attempt: env.GITHUB_RUN_ATTEMPT, job: env.GITHUB_JOB, worker: env.CI_WORKER },
+    source: { commit: observed.commit, tree: observed.tree },
+    cohort: { platform: observed.platform, arch: observed.arch, release: observed.release, runnerOS: env.RUNNER_OS,
+      runnerArch: env.RUNNER_ARCH, runnerEnvironment: env.RUNNER_ENVIRONMENT, imageOS: env.ImageOS,
+      imageVersion: env.ImageVersion, cpuModel: cpus[0]?.model, cpus: cpus.length, memoryBytes: observed.memoryBytes,
+      node: observed.node, npm: observed.npm },
   };
-  profile.unavailable = ['run', 'source', 'cohort'].flatMap(group =>
-    Object.entries(profile[group]).filter(([, value]) => value === null).map(([key]) => `${group}.${key}`));
+  const profile = { schema: 1, kind: 'acc-runner-profile', ...Object.fromEntries(Object.entries(FIELDS).map(
+    ([group, fields]) => [group, Object.fromEntries(Object.entries(fields).map(([key, check]) => [key, check(raw[group][key])]))])) };
+  profile.unavailable = unavailableIn(profile);
   return profile;
 }
 
 const exactKeys = (value, keys) => value !== null && typeof value === 'object' && !Array.isArray(value)
   && JSON.stringify(Object.keys(value).sort()) === JSON.stringify([...keys].sort());
-// A profile is valid only with the closed shape above and scalar or null values.
+// A profile is valid only with the closed shape, values that pass their field
+// check unchanged, and an unavailable list that names exactly its null fields.
 export function validProfile(profile) {
-  return exactKeys(profile, ['schema', 'kind', 'run', 'source', 'cohort', 'unavailable'])
+  return exactKeys(profile, ['schema', 'kind', ...Object.keys(FIELDS), 'unavailable'])
     && profile.schema === 1 && profile.kind === 'acc-runner-profile'
-    && exactKeys(profile.run, RUN_FIELDS) && exactKeys(profile.source, SOURCE_FIELDS)
-    && exactKeys(profile.cohort, COHORT_FIELDS)
-    && [profile.run, profile.source, profile.cohort].every(group => Object.values(group)
-      .every(value => value === null || ['string', 'number'].includes(typeof value)))
-    && Array.isArray(profile.unavailable) && profile.unavailable.every(item => typeof item === 'string');
+    && Object.entries(FIELDS).every(([group, fields]) => exactKeys(profile[group], Object.keys(fields))
+      && Object.entries(fields).every(([key, check]) => profile[group][key] === null || check(profile[group][key]) === profile[group][key]))
+    && Array.isArray(profile.unavailable) && JSON.stringify(profile.unavailable) === JSON.stringify(unavailableIn(profile));
 }
 
 // Two timings are comparable only when every cohort fact is known and equal.
@@ -100,12 +102,12 @@ export async function recordProfile(output, profile) {
 
 async function cli(args) {
   const [command, ...rest] = args;
-  if (command === 'record' && rest.length <= 1) {
+  if (command === 'record' && rest.length === 0) {
     const temp = process.env.RUNNER_TEMP;
-    const output = rest[0] ?? (temp && path.isAbsolute(temp) ? path.join(temp, PROFILE_FILE) : null);
-    if (!output) throw Error('runner-profile: RUNNER_TEMP or an output path is required');
+    if (!temp || !path.isAbsolute(temp)) throw Error('runner-profile: an absolute RUNNER_TEMP is required');
+    const output = path.join(temp, PROFILE_FILE);
     const profile = buildProfile(await observeRunner());
-    await recordProfile(path.resolve(output), profile);
+    await recordProfile(output, profile);
     const { cpuModel, cpus, memoryBytes, imageOS, imageVersion } = profile.cohort;
     const memory = memoryBytes === null ? 'unknown' : `${(memoryBytes / 2 ** 30).toFixed(1)} GiB`;
     console.log(`runner profile: ${cpuModel ?? 'unknown CPU'} x${cpus ?? '?'}, ${memory}, `
@@ -119,7 +121,7 @@ async function cli(args) {
     console.log(JSON.stringify(result));
     return result.comparable ? 0 : 2;
   }
-  throw Error('usage: runner-profile.mjs record [output] | compare <a.json> <b.json>');
+  throw Error('usage: runner-profile.mjs record | compare <a.json> <b.json>');
 }
 if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
   cli(process.argv.slice(2)).then(code => { process.exitCode = code; },
