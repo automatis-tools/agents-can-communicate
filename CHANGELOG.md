@@ -8,13 +8,15 @@
   directory, where a relocated client never reads them. `CODEX_HOME` and `GROK_HOME`
   were already honoured. None of the supported clients reads `XDG_CONFIG_HOME` for its
   configuration. Doctor reports each client's `configHome` and names a relocated
-  client's directory and variable (#148).
+  client's directory and variable. Uninstall removes the directories ACC created in a
+  relocated client directory, and doctor says when the variable changed after an
+  install (#148).
 
 | Development artifact | Value |
 |---|---|
-| Built from | `6afeff3949973367b9dcb5b69e63dc08976019fd` |
-| Tarball | `agents-can-communicate-0.12.2.tgz`, 632,713 bytes, 381 files |
-| sha256 | `2cdbb631eeb6a54f36da01bc9fd119b3540678568f3e275f2064587a2daa5299` |
+| Built from | `235fefbdd6eb7fc7ac991e3c7d67d9362deb81eb` |
+| Tarball | `agents-can-communicate-0.12.2.tgz`, 633,255 bytes, 381 files |
+| sha256 | `8074bcfcb353afa2a115c4e5029b633b5cd5f5b521375422497d259c48f652b3` |
 
 The exact archive passed package verification. See
 [development evidence](docs/release-evidence/client-config-relocation-2026-11-01.md).

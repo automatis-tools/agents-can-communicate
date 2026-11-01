@@ -2,9 +2,9 @@
 
 | Development artifact | Value |
 |---|---|
-| Built from | `6afeff3949973367b9dcb5b69e63dc08976019fd` |
-| Tarball | `agents-can-communicate-0.12.2.tgz`, 632,713 bytes, 381 files |
-| sha256 | `2cdbb631eeb6a54f36da01bc9fd119b3540678568f3e275f2064587a2daa5299` |
+| Built from | `235fefbdd6eb7fc7ac991e3c7d67d9362deb81eb` |
+| Tarball | `agents-can-communicate-0.12.2.tgz`, 633,255 bytes, 381 files |
+| sha256 | `8074bcfcb353afa2a115c4e5029b633b5cd5f5b521375422497d259c48f652b3` |
 
 The source worktree was clean immediately before packing. The exact archive passed
 `node scripts/verify-package.mjs <exact-tarball>` on macOS arm64 with Node 24.4.0.
@@ -22,7 +22,9 @@ ACC now resolves `CLAUDE_CONFIG_DIR`, `GEMINI_CLI_HOME` and `KIMI_CODE_HOME` whe
 hold an absolute path (#148). A packed test installs, diagnoses and uninstalls each of
 the three clients with the variable set, unset, and set to a relative path. Reverting
 the resolution made the three relocated cases fail. Doctor reports `configHome` for each
-client.
+client. The same test checks that uninstall leaves no empty directory in the relocated
+client directory, and that doctor names an installation made under another directory;
+recording created directories only inside `HOME` made the three relocated cases fail.
 
 Verification covers the exact package inventory and boundaries, installed CLI,
 packed documentation links, doctor, a workspace without Git, and reversible
