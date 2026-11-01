@@ -47,9 +47,12 @@ export function progressTracker() {
       const lines = (partial + chunk).split(/\r?\n/);
       partial = lines.pop();
       for (const line of lines) {
-        const match = /^acc-test-file (start|done) (\S+)/.exec(line);
-        if (match?.[1] === "start") running.add(match[2]);
-        else if (match) running.delete(match[2]);
+        // A path may contain spaces: a start line ends with it, and a done
+        // line ends with its fixed duration and result after it.
+        const start = /^acc-test-file start (.+)$/.exec(line);
+        const done = /^acc-test-file done (.+) \d+\.\d s (?:passed|failed)$/.exec(line);
+        if (start) running.add(start[1]);
+        else if (done) running.delete(done[1]);
       }
     },
     running: () => [...running],

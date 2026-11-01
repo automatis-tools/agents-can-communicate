@@ -42,6 +42,15 @@ test("the tracker follows lines split across chunks and reports unfinished files
   assert.deepEqual(tracker.running(), ["tests/b.test.mjs", "tests/c.test.mjs"]);
 });
 
+test("the tracker keeps a path with spaces whole", () => {
+  const tracker = progressTracker();
+  tracker.feed("acc-test-file start tests/my test.test.mjs\nacc-test-file start tests/other one.test.mjs\n");
+  tracker.feed("acc-test-file done tests/other one.test.mjs 2.5 s failed\n");
+  assert.deepEqual(tracker.running(), ["tests/my test.test.mjs"]);
+  tracker.feed("acc-test-file done tests/my test.test.mjs 0.1 s passed\n");
+  assert.deepEqual(tracker.running(), []);
+});
+
 test("ACC_TEST_PROGRESS adds the reporter only beside the timing reporter", () => {
   const with_ = nodeTestArguments(["x.test.mjs"], { timings: "t.jsonl", env: { ACC_TEST_PROGRESS: "1" } });
   assert.deepEqual(with_.slice(-3), [`--test-reporter=${PROGRESS_REPORTER}`, "--test-reporter-destination=stdout", "x.test.mjs"]);
