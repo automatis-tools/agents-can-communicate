@@ -31,9 +31,14 @@ fixture.
 
 ## Include these in an adapter pull request
 
-- `certification.json` with an entry for every claimed capability, each one pointing to its
-  provenance.
-- The captured fixtures under `fixtures/`, from the client version that the claim names.
+- `certification.json` with an entry for every claimed capability. Each entry names its
+  captured fixture (`fixture`) and one capture record (`provenance` and `provenanceId`).
+- The captured fixtures under `fixtures/`, from the client version that the claim names, and
+  `fixtures/certification-provenance.json` with the capture records (client, version,
+  platform, digest).
+- Every fixture and provenance file listed by exact path in the adapter's `package.json`
+  `files`. A `fixtures/` wildcard is refused.
+- An audited pass expectation for the adapter in `tests/conformance/certification-audit.mjs`.
 - `COMPATIBILITY.md` with the client version, platform, what you observed, and what you
   could not observe.
 - Passing conformance tests: `node --test tests/conformance/*.test.mjs`.
@@ -65,10 +70,11 @@ The maintainer does not merge a pull request that:
 - claims a capability without a capture;
 - adds a central coordinator, or makes one session the manager of others;
 - collects or shares raw session transcripts;
-- makes Git, a network service or an account a requirement;
+- makes Git a requirement;
 - lets a hook fail closed, so that ACC is the reason a session stops;
-- adds a runtime dependency without a reason that Node built-ins cannot meet;
-- weakens or skips a test to make a gate pass.
+- bypasses a gate instead of fixing the failure.
+
+Prefer Node built-ins. A new dependency is pinned exactly to its latest stable release.
 
 ## License of contributions
 
@@ -81,11 +87,10 @@ to submit under this license.
 ## Credit for outside work
 
 - A capture you contribute is credited by your GitHub handle and the issue or pull request
-  in the capture section of the adapter's `COMPATIBILITY.md`. Its `certification.json`
-  provenance points to the fixture you captured, so the credit and the evidence stay
-  together.
+  in the dated entry for that capture in the adapter's `COMPATIBILITY.md`. Its capture
+  record in `fixtures/certification-provenance.json` keeps the evidence next to it.
 - A correction to an issue, a reproduction or a reported bug is credited by handle in the
   issue or pull request that resolves it.
-- The release notes in `CHANGELOG.md` name the outside contributors to each release.
+- The release notes in `CHANGELOG.md` may name outside contributors to a release.
 
 If you prefer to stay unnamed, say so in the issue or pull request.
