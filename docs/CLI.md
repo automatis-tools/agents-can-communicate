@@ -281,7 +281,10 @@ The delivery outcome `woken` means ACC woke a Claude Code session through its in
 Human output prints it as `woke models via claude-inbox; the message arrives with its next turn`.
 The wake carries only fixed ACC text and the message id. The receipt stays `queued`. The
 session's next-turn hook then shows the body and records the receipt as `offered` via
-`next-turn`.
+`next-turn`. A wake accepted into the client's own busy queue instead returns
+`outcome: "queued"` with `busyQueue: true` and its native transport name; human output says
+`queued a wake for models via <transport> behind its current turn; the message arrives when
+that queued turn runs`, never `woke`.
 
 A Claude Code session that bypasses permission prompts holds each wake for its user's
 approval, unless its `crossSessionInbound` setting is `accept`. The outcome then carries

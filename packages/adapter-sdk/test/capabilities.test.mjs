@@ -149,3 +149,13 @@ test("the inbound socket declaration must be callable", () => {
   assert.equal(typeof defineAdapter(base({ inboundSockets: () => [] })).inboundSockets, "function");
   assert.equal(defineAdapter(base()).inboundSockets, undefined);
 });
+
+// Same contract as the socket declaration: a boolean where a function belongs
+// would read as "no loopback receiver" and the sender's profile would be
+// reported complete without the grant a receiver needs (issue #390).
+test("the loopback receiver declaration must be callable", () => {
+  assert.throws(() => defineAdapter(base({ inboundLoopback: true })),
+    error => error.code === EXIT.USAGE && /inboundLoopback/.test(error.message));
+  assert.equal(typeof defineAdapter(base({ inboundLoopback: () => false })).inboundLoopback, "function");
+  assert.equal(defineAdapter(base()).inboundLoopback, undefined);
+});

@@ -106,13 +106,15 @@ exposes and whether its lease is current, while recipient policy says whether it
 turn.
 
 The Claude Code inbox wake has installed-client evidence on 2.1.282. Codex LocalDaemon
-has it on 0.152.1 and 0.153.4. Antigravity CLI has it on 1.2.7 and later through a relay
-the agent starts in its own shell. All three use a captured minimum that applies on every
-platform, a current probe and an exact session handshake; a prerelease is judged by its
-release triple. Claude Code and Codex preserve the ordinary
-client launch. Claude Code verifies its session registry, and Codex verifies its registered
-thread and workspace. Native delivery owns no vendor daemon lifecycle. Gemini CLI and Kimi
-Code have exact-version next-turn evidence only. Grok and generic MCP use inbox polling.
+has it on 0.152.1 and 0.153.4. Kimi Web has it on 2.4.0. Antigravity CLI has it on 1.2.7
+and later through a relay the agent starts in its own shell. All four use a captured minimum
+that applies on every platform, a current probe and an exact session handshake; a prerelease
+is judged by its release triple. Claude Code and Codex preserve the ordinary
+client launch. Claude Code verifies its session registry, Codex verifies its registered
+thread and workspace, and Kimi verifies its Web server, live session and workspace. Native
+delivery owns no vendor daemon lifecycle. Gemini CLI has exact-version next-turn evidence
+only. Kimi Code additionally continues a busy turn once on 2.4.0 with explicit recipient
+opt-in; ordinary idle TUI stays next-turn only. Grok and generic MCP use inbox polling.
 Antigravity CLI additionally attaches a session only where the client reports an open
 workspace.
 

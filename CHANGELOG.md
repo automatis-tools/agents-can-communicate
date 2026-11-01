@@ -1,5 +1,28 @@
 # Changelog
 
+## Unreleased — Kimi Stop continuation and Web delivery evidence
+
+- Kimi 2.4.0 continues a busy turn once through the existing Stop outcome, only with an
+  explicit `actionable` or `all` recipient policy. The reason reaches the model as
+  `system_trigger`; ordinary idle TUI remains next-turn only.
+- Kimi Web 2.4.0 certifies wake-only `livePush` through installed hooks on an existing
+  loopback server in `yolo`. Exact packed-client evidence covers idle, busy queue, reply,
+  duplicate suppression, restart/rebind and exact binding, plus token rotation, foreign-lock
+  and cold-reaper refusal. `replyRoute` stays false; ordinary idle TUI remains next-turn only.
+- Codex sender permissions can compose an exact `127.0.0.1` grant only when a receiver
+  declares loopback transport. Existing profiles retain their byte shape without a declaration.
+
+| Development artifact | Value |
+|---|---|
+| Built from | `d428e40039200ae53c1128284cd29f3a3216a657` |
+| Tarball | `agents-can-communicate-0.12.2.tgz`, 645,884 bytes, 389 files |
+| sha256 | `b91cc4ae53586b45aa35b7ffd49a487f5f52b503d2d395d562f81a409a811395` |
+
+The exact archive passed package verification. See
+[Kimi delivery evidence](packages/adapter-kimi/fixtures/delivery/kimi-web-2.4.0.json).
+This is not a published release; the package version remains `0.12.2`.
+Earlier candidate and release records retain their original provenance.
+
 ## Unreleased — local context in Codex approval requests
 
 - Codex guidance starts ACC commands with default permissions. A sandbox access failure

@@ -5,7 +5,7 @@ import { lastNativeReason } from "./native-reason.mjs";
 import { refreshExpiredBinding } from "./refresh-binding.mjs";
 
 const SAFE_ERRORS = new Set(OFFER_ERRORS);
-const NAMED_LIVE_TRANSPORTS = new Set(["claude-inbox", "codex-app-server"]);
+const NAMED_LIVE_TRANSPORTS = new Set(["claude-inbox", "codex-app-server", "kimi-web"]);
 
 const adaptersById = adapters => adapters instanceof Map
   ? adapters
@@ -227,6 +227,12 @@ export function createDeliveryRouter({ service, adapters, loadAdapter, clock, re
     // stays queued; the hook records the offer once its stdout carried the body.
     if (adapter.nativeDelivery?.offerKind === "wake") {
       observeOffer(binding, response.pendingApproval === true ? "inbound_approval_required" : null);
+      // Acceptance into the client's own busy queue is not an immediate wake.
+      // The body still arrives only when that queued prompt runs its hooks.
+      if (response.queueStatus === "queued") {
+        return { recipientParticipantId: participantId, outcome: "queued", transport,
+          busyQueue: true };
+      }
       // The client took the wake but holds it for its user's approval.
       return { recipientParticipantId: participantId, outcome: "woken", transport,
         ...(response.pendingApproval === true ? { pendingApproval: true } : {}) };

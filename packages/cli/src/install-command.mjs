@@ -7,8 +7,8 @@ import { createCodexAdapter } from "@agents-can-communicate/adapter-codex";
 import { createGeminiCliAdapter } from "@agents-can-communicate/adapter-gemini-cli";
 import { createGrokAdapter } from "@agents-can-communicate/adapter-grok";
 import { createKimiAdapter } from "@agents-can-communicate/adapter-kimi";
-import { applyPlan, detectInstallation, loadOwnership, planInstallation, receiverSockets }
-  from "@agents-can-communicate/installer";
+import { applyPlan, detectInstallation, loadOwnership, planInstallation, receiverLoopback,
+  receiverSockets } from "@agents-can-communicate/installer";
 import { AccError, EXIT } from "@agents-can-communicate/protocol";
 
 import { platformPaths } from "./platform-paths.mjs";
@@ -64,9 +64,12 @@ export const clientContext = (home, stateRoot,
 // Every socket ACC can deliver to, as each receiving adapter declares it, for
 // the one sender that sandboxes its shell: the Codex permission profile is
 // written and diagnosed from this list, so it covers Claude Code's inbox even
-// when an install names Codex alone (issue #213).
+// when an install names Codex alone (issue #213). A declared loopback receiver
+// composes the same way (issue #390): any adapter's inboundLoopback allows the
+// exact 127.0.0.1 literal in the sender's profile, and nothing broader.
 const withReceivers = (context, platform) => ({ ...context,
-  receiverSockets: receiverSockets(ALL_ADAPTERS(), { ...context, platform }) });
+  receiverSockets: receiverSockets(ALL_ADAPTERS(), { ...context, platform }),
+  receiverLoopback: receiverLoopback(ALL_ADAPTERS(), { ...context, platform }) });
 
 export const ALL_ADAPTERS = () => [createAntigravityAdapter(), createClaudeCodeAdapter(),
   createCodexAdapter(), createGeminiCliAdapter(), createGrokAdapter(), createKimiAdapter()];

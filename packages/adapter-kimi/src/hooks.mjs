@@ -1,4 +1,5 @@
-import { normalizedEvent, shellWriteTargets } from "@agents-can-communicate/adapter-sdk";
+import { compareVersionOrder, normalizedEvent, shellWriteTargets, versionOrder }
+  from "@agents-can-communicate/adapter-sdk";
 import { AccError, EXIT } from "@agents-can-communicate/protocol";
 
 // Not read from documentation and not guessed: this client validates its config
@@ -123,4 +124,26 @@ export function denyOutcome(reason) {
 export function injectOutcome(context) {
   const rendered = injectResponse(context);
   return { stdout: rendered ?? "", stderr: "", exitCode: 0 };
+}
+
+export const STOP_CONTINUATION_MIN_VERSION = "2.4.0";
+
+// Kimi parses the same structured denial at Stop as at PreToolUse, then appends
+// its reason as a system_trigger. The client permits one continuation per turn;
+// its 2.4.0 payload keeps stop_hook_active false, so the vendor limit is the
+// ceiling rather than a counter ACC invents. Anything unknown releases the turn.
+export function stopResponse({ reason, payload, clientVersion, livePolicy } = {}) {
+  if (typeof reason !== "string" || reason.trim() === ""
+    || payload?.hook_event_name !== "Stop" || payload.stop_hook_active !== false
+    || !["actionable", "all"].includes(livePolicy)
+    || compareVersionOrder(versionOrder(clientVersion),
+      versionOrder(STOP_CONTINUATION_MIN_VERSION)) < 0) return {};
+  return { hookSpecificOutput: { hookEventName: "Stop", permissionDecision: "deny",
+    permissionDecisionReason: reason } };
+}
+
+export function stopOutcome(input) {
+  const response = stopResponse(input);
+  return { stdout: Object.keys(response).length === 0 ? "" : `${JSON.stringify(response)}\n`,
+    stderr: "", exitCode: 0 };
 }

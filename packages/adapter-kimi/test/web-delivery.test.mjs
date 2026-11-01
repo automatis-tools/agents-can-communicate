@@ -1,0 +1,213 @@
+import assert from "node:assert/strict";
+import { chmod, mkdir, mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import os from "node:os";
+import path from "node:path";
+import test from "node:test";
+
+import { bindNativeSession, offerMessage, refreshNativeSession } from "../src/web-delivery.mjs";
+import { httpRequest } from "../src/web-client.mjs";
+import { readWebEndpoint } from "../src/web-endpoint.mjs";
+
+const SERVER = "01JZX4A6E7M8V0R3Q0N2K2M5Q9";
+const META_SERVER = "01JZX4A6E7M8V0R3Q0N2K2M5QA";
+const SESSION = "session_test";
+const VERSION = "2.4.0";
+const envelope = (data, code = 0) => ({ status: 200,
+  text: JSON.stringify({ code, msg: "success", data, request_id: "request_test" }) });
+const prompt = (promptId, status) => ({ prompt_id: promptId, user_message_id: promptId,
+  status, content: [{ type: "text", text: "wake" }], created_at: new Date().toISOString() });
+
+async function fixture(t, overrides = {}) {
+  const root = await realpath(await mkdtemp(path.join(tmpdir(), "acc-kimi-web-")));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const home = path.join(root, "home"), runtimeDir = path.join(root, "runtime"), cwd = path.join(root, "cwd");
+  const now = Date.now(), startedAt = now - 1_000;
+  await Promise.all([mkdir(path.join(home, "server", "instances"), { recursive: true }),
+    mkdir(path.join(home, "locks", "sessions"), { recursive: true }), mkdir(runtimeDir), mkdir(cwd)]);
+  await writeFile(path.join(home, "server", "instances", `${SERVER}.json`), JSON.stringify({
+    server_id: SERVER, pid: process.pid, host: "127.0.0.1", port: 59631, started_at: startedAt,
+    heartbeat_at: now, host_version: VERSION }), { mode: 0o600 });
+  await writeFile(path.join(home, "locks", "sessions", `${SESSION}.lock`), JSON.stringify({
+    version: 1, token: `${process.pid}:123e4567-e89b-42d3-a456-426614174000`, pid: process.pid,
+    hostname: os.hostname(), startedAt: now, clientIdentity: "kimi_code_cli",
+    clientDisplayName: "Kimi Code Web", ...overrides.lock }), { mode: 0o600 });
+  await writeFile(path.join(home, "server.token"), "first-token", { mode: 0o600 });
+  const calls = [];
+  const request = async input => {
+    calls.push(input);
+    if (input.path === "/api/v1/meta") return envelope({ server_version: VERSION,
+      server_id: META_SERVER, started_at: new Date(startedAt + 145).toISOString(),
+      dangerous_bypass_auth: overrides.bypass === true });
+    if (input.path.endsWith("/status")) return envelope({ permission: overrides.permission ?? "yolo" });
+    if (input.path === `/api/v1/sessions/${SESSION}`) return envelope({ id: SESSION,
+      archived: false, metadata: { cwd: overrides.foreignCwd ? path.join(root, "other") : cwd },
+      agent_config: { model: overrides.cold ? "" : "local" } });
+    if (input.method === "GET") return envelope({ active: overrides.busy ? prompt("user", "running") : null,
+      queued: [] });
+    if (overrides.submitTimeout) return { error: { code: "ETIMEDOUT" } };
+    return envelope(prompt("message_test", overrides.blocked ? "blocked"
+      : overrides.queued || overrides.busy ? "queued" : "running"));
+  };
+  const options = { env: { KIMI_CODE_HOME: home }, runtimeDir, request, hostname: os.hostname(),
+    exists: () => true, now: () => now };
+  return { root, home, runtimeDir, cwd, now, startedAt, calls, options, state: overrides };
+}
+
+const event = cwd => ({ sessionId: SESSION, cwd });
+const bind = f => bindNativeSession({ ...f.options, event: event(f.cwd), clientPid: process.pid,
+  clientVersion: VERSION });
+
+test("bind verifies the generation and stores no token", async t => {
+  const f = await fixture(t);
+  const bound = await bind(f);
+  assert.equal(bound.supported, true, bound.reasonCode);
+  assert.deepEqual(bound.modes, ["livePush", "idleWake"]);
+  const record = await readWebEndpoint({ runtimeDir: f.runtimeDir,
+    endpointId: bound.opaqueEndpointRef });
+  assert.equal(record.cwd, f.cwd);
+  assert.equal(JSON.stringify(record).includes("first-token"), false);
+  assert.equal((await refreshNativeSession({ ...f.options, binding: bound })).supported, true);
+});
+
+test("idle delivery posts only a fixed wake and message id", async t => {
+  const f = await fixture(t);
+  const bound = await bind(f);
+  const beforeOffer = f.calls.length;
+  const result = await offerMessage({ ...f.options, binding: bound,
+    message: { messageId: "message_test" } });
+  assert.equal(result.accepted, true);
+  assert.equal(result.queueStatus, undefined);
+  assert.equal(f.calls.slice(beforeOffer).some(call => call.path.endsWith("/status")), false,
+    "an offer must not resume a cold session through the status route");
+  const submitted = f.calls.find(call => call.method === "POST");
+  const body = JSON.parse(submitted.body);
+  assert.equal(body.prompt_id, "message_test");
+  assert.match(body.content[0].text, /message_test/);
+  assert.deepEqual(Object.keys(body), ["content", "prompt_id"]);
+});
+
+test("a wake accepted behind busy work is queued, never woken", async t => {
+  for (const overrides of [{ busy: true }, { queued: true }, { blocked: true }]) {
+    const f = await fixture(t, overrides);
+    const bound = await bind(f);
+    const result = await offerMessage({ ...f.options, binding: bound,
+      message: { messageId: "message_test" } });
+    assert.equal(result.accepted, true);
+    assert.equal(result.queueStatus, "queued");
+    assert.equal(f.calls.some(call => call.method === "POST"), true);
+  }
+});
+
+test("lock mismatch and unsafe auth fail closed without prompt APIs", async t => {
+  for (const overrides of [{ lock: { pid: process.ppid,
+    token: `${process.ppid}:123e4567-e89b-42d3-a456-426614174000` } }, { bypass: true },
+  { permission: "manual" }]) {
+    const f = await fixture(t, overrides);
+    const bound = await bind(f);
+    assert.equal(bound.supported, false);
+    assert.equal(f.calls.some(call => call.path.includes("/prompts")), false);
+  }
+});
+
+test("a missing initial lock fails closed but a later warm lease survives lock release", async t => {
+  const cold = await fixture(t);
+  await rm(path.join(cold.home, "locks", "sessions", `${SESSION}.lock`));
+  const refused = await bindNativeSession({ ...cold.options, event: { ...event(cold.cwd),
+    kind: "sessionStart" }, clientPid: process.pid, clientVersion: VERSION });
+  assert.equal(refused.supported, false);
+  assert.equal(cold.calls.some(call => call.path.includes("/prompts")), false);
+
+  const warm = await fixture(t);
+  const bound = await bind(warm);
+  await rm(path.join(warm.home, "locks", "sessions", `${SESSION}.lock`));
+  const result = await offerMessage({ ...warm.options, binding: bound,
+    message: { messageId: "message_test" } });
+  assert.equal(result.accepted, true);
+});
+
+test("initial model selection may finish after binding, but no offer runs before it", async t => {
+  const f = await fixture(t, { cold: true });
+  const bound = await bindNativeSession({ ...f.options, event: { ...event(f.cwd), kind: "sessionStart" },
+    clientPid: process.pid, clientVersion: VERSION });
+  assert.equal(bound.supported, true, bound.reasonCode);
+  f.calls.length = 0;
+  const result = await offerMessage({ ...f.options, binding: bound,
+    message: { messageId: "message_test" } });
+  assert.equal(result.accepted, false);
+  assert.equal(f.calls.some(call => call.path.endsWith("/status")), false);
+  assert.equal(f.calls.some(call => call.path.includes("/prompts")), false);
+});
+
+test("a reclaimed session or changed cwd is refused before any resume-capable request", async t => {
+  for (const change of ["cold", "foreignCwd"]) {
+    const f = await fixture(t);
+    const bound = await bind(f);
+    f.state[change] = true;
+    f.calls.length = 0;
+    const result = await offerMessage({ ...f.options, binding: bound,
+      message: { messageId: "message_test" } });
+    assert.equal(result.accepted, false);
+    assert.equal(result.safeErrorCode, "recipient_unavailable");
+    assert.equal(f.calls.some(call => call.path.endsWith("/status")), false);
+    assert.equal(f.calls.some(call => call.path.includes("/prompts")), false);
+  }
+});
+
+test("an ambiguous submit is never blindly retried and token rotates per offer", async t => {
+  const f = await fixture(t, { submitTimeout: true });
+  const bound = await bind(f);
+  const first = await offerMessage({ ...f.options, binding: bound,
+    message: { messageId: "message_test" } });
+  assert.equal(first.safeErrorCode, "transport_error");
+  const posts = f.calls.filter(call => call.method === "POST").length;
+  await writeFile(path.join(f.home, "server.token"), "rotated-token", { mode: 0o600 });
+  const second = await offerMessage({ ...f.options, binding: bound,
+    message: { messageId: "message_test" } });
+  assert.equal(second.accepted, true);
+  assert.equal(second.queueStatus, "queued");
+  assert.equal(f.calls.filter(call => call.method === "POST").length, posts);
+  assert.equal(JSON.stringify(await readFile(path.join(f.runtimeDir, "kimi-web-endpoints",
+    `${bound.opaqueEndpointRef}.json`), "utf8")).includes("rotated-token"), false);
+});
+
+test("file permissions are private where the client requires them", async t => {
+  const f = await fixture(t);
+  await chmod(path.join(f.home, "server.token"), 0o644);
+  const bound = await bind(f);
+  assert.equal(bound.supported, false);
+  assert.equal(f.calls.length, 0);
+});
+
+test("an authorization failure uses the closed handshake reason vocabulary", async t => {
+  const f = await fixture(t);
+  const bound = await bindNativeSession({ ...f.options,
+    request: async () => ({ status: 401, text: "" }), event: event(f.cwd),
+    clientPid: process.pid, clientVersion: VERSION });
+  assert.equal(bound.supported, false);
+  assert.equal(bound.reasonCode, "handshake_failed");
+});
+
+test("a non-loopback host is refused before any socket is opened", async () => {
+  const result = await httpRequest({ method: "GET", host: "example.com", port: 443, path: "/" });
+  assert.equal(result.error.code, "EACCES");
+});
+
+test("an expired or mismatched lease cannot submit a prompt", async t => {
+  const f = await fixture(t);
+  const bound = await bind(f);
+  const beforeOffers = f.calls.length;
+  const expired = await offerMessage({ ...f.options,
+    binding: { ...bound, leaseUntil: new Date(f.now - 1).toISOString() },
+    message: { messageId: "message_test" } });
+  assert.equal(expired.safeErrorCode, "recipient_unavailable");
+  assert.equal(f.calls.length, beforeOffers,
+    "an expired lease must not resume a session through a status probe");
+
+  const mismatched = await offerMessage({ ...f.options,
+    binding: { ...bound, leaseUntil: new Date(f.now + 60_000).toISOString() },
+    message: { messageId: "message_test" } });
+  assert.equal(mismatched.safeErrorCode, "recipient_unavailable");
+  assert.equal(f.calls.length, beforeOffers,
+    "a superseded lease must not resume a session through a status probe");
+});

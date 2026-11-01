@@ -4,8 +4,12 @@ import { defineAdapter, projectContext, projectContextResult }
   from "@agents-can-communicate/adapter-sdk";
 import certification from "../certification.json" with { type: "json" };
 
-import { denyOutcome, injectOutcome, normalizeKimiHook } from "./hooks.mjs";
+import { denyOutcome, injectOutcome, normalizeKimiHook, stopOutcome } from "./hooks.mjs";
 import { planKimiInstall, detectKimi, installKimiPlugin, uninstallKimiPlugin } from "./install.mjs";
+import { clientVersionOf, identifyClientProcess } from "./client-process.mjs";
+import { MIN_VERSION, PROTOCOL_CONTRACT } from "./web-contract.mjs";
+import { probeNativeDelivery, planNativeActivation, bindNativeSession, retireNativeSession,
+  offerMessage } from "./web-delivery.mjs";
 
 /** The installer works in this client's own home, wherever the caller put it. */
 const forClient = context => ({ ...context, home: context.kimiHome ?? context.home });
@@ -37,13 +41,22 @@ export function createKimiAdapter() {
     // real command rather than the adapter id: `0.36.1`.
     client: { command: "kimi", package: "@moonshot-ai/kimi-code", certificationName: "kimi",
       versionArgs: ["--version"] },
+    identifyClientProcess,
+    clientVersionOf,
     certification,
     capabilities: {
       lifecycle: { sessionStart: true, heartbeat: true },
       context: { beforeTurnInjection: true },
       guards: { beforeWrite: true, beforeShell: true },
-      delivery: { nextTurn: true },
+      delivery: { nextTurn: true, livePush: true },
     },
+    nativeDelivery: {
+      minimum: MIN_VERSION,
+      anchors: [{ version: MIN_VERSION, protocolContract: PROTOCOL_CONTRACT }], knownBad: [],
+      activationKinds: ["native-service"], policySource: "installation-record", offerKind: "wake",
+    },
+    probeNativeDelivery, planNativeActivation, bindNativeSession, retireNativeSession, offerMessage,
+    inboundLoopback: () => true,
     deliveryFallback: { diagnostic:
       "Kimi Code next-turn delivery is certified from 0.36.1 onward, on every platform; "
       + "an older client keeps durable acc inbox access, and live push is unavailable" },
@@ -68,6 +81,8 @@ export function createKimiAdapter() {
       return { ok: true, changes: [], diagnostics: [
         ...detected.diagnostics,
         `lifecycle, guard and heartbeat payloads captured from Kimi Code ${KIMI_CODE_VERSION}`,
+        "Stop continuation captured on 2.4.0; requires recipient delivery policy and never wakes idle TUI",
+        "Kimi Web 2.4.0 wake-only delivery captured through installed hooks; requires loopback, yolo and a live session",
         "SessionHeartbeat fires every 60s, so presence stays accurate while idle",
         "SessionEnd is in this client's event enum but was never observed firing, "
           + "so the handoff must be written while the session is still working",
@@ -77,6 +92,7 @@ export function createKimiAdapter() {
 
     denyOutcome,
     injectOutcome,
+    continueTurnOutcome: stopOutcome,
     normalizeHook: payload => normalizeKimiHook(payload),
     renderContext: (sync, options) => projectContext(sync, options),
     renderContextResult: (sync, options) => projectContextResult(sync, options),

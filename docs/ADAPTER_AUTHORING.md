@@ -53,9 +53,11 @@ it cannot create a session or advance receipts. Grok uses it to supply CLI owner
 arguments after a terminal result. This does not certify general context or peer
 delivery, and a tool such as `finish` can close the owner before the line arrives.
 
-`continueTurnOutcome({ reason, payload })` is optional. A client whose end-of-turn hook can
+`continueTurnOutcome({ reason, payload, livePolicy, clientVersion, platform })` is optional. A client whose end-of-turn hook can
 hold a turn open implements it, and the runner's `turnEnd` handler calls it with the projected
-peer context when - and only when - a peer body no invocation has shown yet is waiting. It
+peer context when - and only when - a peer body no invocation has shown yet is waiting. The
+installed recipient policy and current binding facts let the adapter refuse an unconsented or
+uncaptured model invocation; unreadable policy fails to `off`. It
 returns `{ stdout, stderr?, exitCode? }` in the client's own continuation shape, and prints
 nothing to let the turn end. `payload` is the raw hook payload handed back unread, so the
 adapter can apply its own ceiling from a counter the client supplies; nothing in core reads it.

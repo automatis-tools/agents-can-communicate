@@ -17,24 +17,23 @@ const repo = path.resolve(import.meta.dirname, "..", "..");
  * Enforced structurally rather than by intention: the packages a hook loads may
  * not name a remote network module, call `fetch`, or import the one file that does.
  *
- * Native delivery is the one bounded exception, and only to a *local* Unix
- * socket. The hook's native-binding retry and the delivery router open a
- * session-scoped Unix domain socket to a vendor process on the same machine,
- * always raced against a sub-second timeout and always failing open. That is
- * categorically different from a remote fetch that can stall unbounded, so
- * `node:net` is allowed - but only in the named native-transport files below,
- * which connect to a socket path and never to a host and port, and never touch
- * a remote module or `fetch`.
+ * Native delivery is the bounded exception: a session-scoped local Unix socket,
+ * or Kimi Web's loopback-only HTTP client. The hook's native-binding retry and
+ * the delivery router open only a vendor endpoint on this machine, always with
+ * a short timeout and fail-open behavior. That is categorically different from
+ * a remote fetch that can stall unbounded, so `node:net` is allowed only in the
+ * named native-transport files below, and `node:http` only in the client that
+ * rejects every non-loopback host before opening a socket.
  */
 const HOOK_PATH = ["hook-runner", "adapter-sdk", "adapter-claude-code", "adapter-codex",
   "adapter-gemini-cli", "adapter-grok", "adapter-kimi", "core", "storage-filesystem",
   "protocol"];
 
 // Reached only by the delivery router, or by the hook's bounded fail-open
-// native handshake; each connects to a local Unix socket path. The Claude inbox
-// wake writes one line to the session's own socket and reads nothing back.
+// native handshake. Unix files connect to a socket path; web-client enforces
+// numeric loopback hosts and never follows redirects or reads remote content.
 const NATIVE_TRANSPORT = new Set(["inbox-delivery.mjs", "native-delivery.mjs", "ws-json-rpc.mjs",
-  "app-server-client.mjs"]);
+  "app-server-client.mjs", "web-client.mjs"]);
 
 // Remote reachability is forbidden everywhere on the hook path. A local Unix
 // socket (node:net) is forbidden too, except in the named native-transport
@@ -94,7 +93,8 @@ test("nothing a turn runs can reach the network", async () => {
         && !BOOTSTRAP_MODULES.some(name => dependency === `./${name}`)) {
         offenders.push(`${path.relative(repo, file)} reaches outside the closed launcher module set`);
       }
-      if (/^(?:node:)?(?:https?|tls|dgram|dns)$/.test(dependency)) {
+      if (/^(?:node:)?(?:https?|tls|dgram|dns)$/.test(dependency)
+        && !(/^(?:node:)?http$/.test(dependency) && path.basename(file) === "web-client.mjs")) {
         offenders.push(`${path.relative(repo, file)} imports a remote network module`);
       }
       if (/^(?:node:)?net$/.test(dependency) && !NATIVE_TRANSPORT.has(path.basename(file))) {

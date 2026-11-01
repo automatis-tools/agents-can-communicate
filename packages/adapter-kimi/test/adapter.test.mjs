@@ -171,8 +171,14 @@ test("only capabilities observed firing are declared true", () => {
   assert.equal(capabilities.lifecycle.childSessions, false);
   assert.equal(capabilities.guards.beforeRead, false);
   assert.equal(capabilities.delivery.nextTurn, true);
-  assert.equal(capabilities.delivery.livePush, false);
+  assert.equal(capabilities.delivery.livePush, true);
   assert.equal(capabilities.delivery.replyRoute, false);
+  const adapter = createKimiAdapter();
+  assert.equal(adapter.nativeDelivery.offerKind, "wake");
+  assert.equal(adapter.nativeDelivery.minimum, "2.4.0");
+  assert.equal(adapter.inboundLoopback(), true);
+  assert.equal(typeof adapter.bindNativeSession, "function");
+  assert.equal(typeof adapter.refreshNativeSession, "undefined");
 });
 
 test("next-turn delivery downgrades visibly below the captured version", () => {

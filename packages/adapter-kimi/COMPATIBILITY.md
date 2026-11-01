@@ -189,14 +189,42 @@ The client speaks OpenAI chat completions with `stream: true` to a provider of
 `type = "openai"`, imported through `kimi provider add <registry-url>`. Accepted provider
 types are `openai`, `anthropic` and `kimi`.
 
-## Native delivery boundary (2026-09-02)
+## Stop continuation and native delivery — 2.4.0, 2026-10-31
 
-Kimi Code stays fallback-only for native delivery. It exposes server and queue APIs, but no
-capture proves a transparent binding to an independently opened ordinary TUI session: the
-supported surfaces reach a server ACC would own or launch, not the session a user started
-themselves. The adapter declares no `nativeDelivery` contract and keeps `delivery.livePush`
-and `delivery.replyRoute` false; messages remain durable for the certified next-turn hook
-and heartbeat or for `acc inbox`.
+A real 2.4.0 session accepted ACC's structured Stop denial and made one continuation. Its
+reason reached the next provider request as a user message with `system_trigger` origin;
+Kimi emitted no second continuation in that turn. The payload still carried
+`stop_hook_active: false`, so that field is not the vendor's continuation counter. ACC uses
+an explicit `actionable` or `all` recipient policy and a 2.4.0 floor. Ordinary idle TUI
+remains next-turn only; no idle-wake claim is added. See `fixtures/Stop-2.4.0.json` and its
+provenance.
+
+`kimi web` has a separate, certified wake-only transport. An exact packed candidate passed
+all six installed-product cases: idle wake, busy `queued_after_turn`, `acc reply` and an
+acknowledged receipt, one wake for a repeated logical message, durable fallback and rebind
+after restart, and exact receiver selection. Token rotation with a fresh binding also passed.
+Manual mode and a foreign lock were refused. The packed candidate's SHA-256 and all six cases
+are retained in `fixtures/delivery/kimi-web-2.4.0-product-evidence.json`.
+
+Hooks run under the packaged `kimi-code` process. ACC resolves that process, checks its live
+instance registry generation and serving version, then independently pins `/meta` server id
+and start time. Binding and every offer verify native session id and canonical cwd. ACC never
+starts or restarts the server and never changes permission mode: only an existing loopback
+server in `yolo` is eligible; manual and auto are not.
+
+The POST carries only fixed ACC text and a message id. `UserPromptSubmit` projects the actual
+untrusted body and records the `next-turn` offer. A busy response with `status: "queued"` is
+reported as queued, never as already woken. The agent answers through installed `acc reply`,
+so native `delivery.replyRoute` remains false. Tokens are read per operation and are absent
+from endpoint records, evidence and diagnostics.
+
+The session lock is released after active work, so heartbeat and before-turn hooks rebind the
+lease. A present malformed or foreign lock fails closed. The warm-only session-metadata check
+retains only id, cwd and live model; an empty model after initialization identifies a reaped
+session and prevents both the resume-capable status request and prompt POST. A real reclaimed
+session stayed queued in the capture. The remaining lock/lease-check-to-submit reaper race is
+documented because 2.4.0 has no conditional warm-only submit. See
+`fixtures/delivery/kimi-web-2.4.0.json`.
 
 ## Status indicator — 2.1.1, 2026-10-10
 

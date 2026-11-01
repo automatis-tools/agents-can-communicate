@@ -17,3 +17,18 @@ export function receiverSockets(adapters, context) {
     typeof adapter.inboundSockets === "function" ? adapter.inboundSockets(context) ?? [] : []);
   return [...new Set(paths.filter(item => typeof item === "string" && path.isAbsolute(item)))].sort();
 }
+
+/**
+ * Whether any adapter's sessions receive on a loopback (127.0.0.1) listener.
+ *
+ * A sandboxed sender - Codex - allows network peers by domain, and a domain
+ * rule cannot port-restrict: allowing a host allows every port on it. So the
+ * sender's profile may name the exact literal 127.0.0.1 only, never a wildcard
+ * or a private range, and only when a receiving adapter explicitly declares
+ * `inboundLoopback(context) === true`. The sender's adapter receives the
+ * composed boolean as `context.receiverLoopback`.
+ */
+export function receiverLoopback(adapters, context) {
+  return [...adapters].some(adapter => typeof adapter.inboundLoopback === "function"
+    && adapter.inboundLoopback(context) === true);
+}

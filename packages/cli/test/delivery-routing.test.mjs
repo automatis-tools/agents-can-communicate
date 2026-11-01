@@ -24,6 +24,13 @@ test("a wake held for the receiver's approval is reported as held, not as woken"
     + "because it bypasses permission prompts; the message arrives with its next turn");
 });
 
+test("a wake in the busy vendor queue is distinguished from an immediate wake", () => {
+  assert.equal(recordedText(message, [{ recipientParticipantId: "models", outcome: "queued",
+    transport: "kimi-web", busyQueue: true }]),
+  "recorded message_a; queued a wake for models via kimi-web behind its current turn; "
+    + "the message arrives when that queued turn runs");
+});
+
 test("a recipient with no live transport is told why when its session said", () => {
   assert.equal(recordedText(message, [{ recipientParticipantId: "codex-x", outcome: "queued",
     transport: "durable", errorCode: "no_live_transport", nativeReasonCode: "client_session_embedded" }]),

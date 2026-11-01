@@ -181,6 +181,13 @@ export function defineAdapter(manifest) {
   if (manifest.inboundSockets !== undefined && typeof manifest.inboundSockets !== "function") {
     usage("optional inboundSockets must be a function", { id: manifest.id });
   }
+  // `inboundLoopback(context)` declares that this adapter's sessions receive on
+  // a loopback (127.0.0.1) listener. A sandboxed sender's installer allows
+  // exactly that literal for any adapter declaring it, so a value that is not
+  // a function would silently read as "no loopback receiver".
+  if (manifest.inboundLoopback !== undefined && typeof manifest.inboundLoopback !== "function") {
+    usage("optional inboundLoopback must be a function", { id: manifest.id });
+  }
   // `failOpenNotice({ kind, message })` renders a line the user sees when a hook
   // fails open for a reason the user can act on, or returns null. Only a client
   // whose hook output reaches the user declares it.
