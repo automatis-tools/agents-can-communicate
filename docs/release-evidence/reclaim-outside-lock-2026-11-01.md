@@ -2,9 +2,9 @@
 
 | Development artifact | Value |
 |---|---|
-| Built from | `8bf0b72b1efdc8d033d2470f1c1747764382c0b8` |
-| Tarball | `agents-can-communicate-0.12.2.tgz`, 631,085 bytes, 381 files |
-| sha256 | `1d4c8c7ad66b5403d50e6766975dd84dde7dd55b817b34d658ceb82f30f37cf2` |
+| Built from | `3f921d2f11ae8f04da152136d4df9e90f132f56f` |
+| Tarball | `agents-can-communicate-0.12.2.tgz`, 631,235 bytes, 381 files |
+| sha256 | `df561d10785a1b8d403baa237d61f2d92215a782986d93d1611fcbf7adfe41a9` |
 
 The source worktree was clean immediately before packing. The exact archive passed
 `node scripts/verify-package.mjs <exact-tarball>` on macOS arm64 with Node 24.4.0.
@@ -12,7 +12,8 @@ The supplied-archive verifier reports its source revision as unknown. The table
 records the clean source commit captured before packing.
 
 Reclaim now proves a generation unreferenced and moves it into `reclaimed/` under the
-manager lock, then deletes the tree after the lock is released (#406). Admission waits
+manager lock, then deletes the tree after the lock is released (#406). A generation whose rename
+stays busy for 250 ms, as an open handle on Windows makes it, is kept for a later pass. Admission waits
 one second for that lock. Before this change, deleting a generation on a loaded Mac
 held the lock longer, and `acc uninstall` right after a background update returned
 "runtime unavailable; retry after the update".

@@ -8,9 +8,9 @@
 
 | Development artifact | Value |
 |---|---|
-| Built from | `8bf0b72b1efdc8d033d2470f1c1747764382c0b8` |
-| Tarball | `agents-can-communicate-0.12.2.tgz`, 631,085 bytes, 381 files |
-| sha256 | `1d4c8c7ad66b5403d50e6766975dd84dde7dd55b817b34d658ceb82f30f37cf2` |
+| Built from | `3f921d2f11ae8f04da152136d4df9e90f132f56f` |
+| Tarball | `agents-can-communicate-0.12.2.tgz`, 631,235 bytes, 381 files |
+| sha256 | `df561d10785a1b8d403baa237d61f2d92215a782986d93d1611fcbf7adfe41a9` |
 
 The exact archive passed package verification. See
 [development evidence](docs/release-evidence/reclaim-outside-lock-2026-11-01.md).
