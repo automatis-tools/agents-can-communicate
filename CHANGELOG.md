@@ -12,8 +12,9 @@
   duplicate suppression, restart/rebind and exact binding, plus token rotation, foreign-lock
   and cold-reaper refusal. Each offer re-reads the session's permission mode after the warm
   check, so a session switched from `yolo` to manual or auto after binding gets no wake. A
-  repeated offer reports the first submit's outcome, and one that arrives while the first is
-  still deciding is refused as busy, so the message stays queued. `replyRoute` stays false; ordinary idle
+  repeated offer reports the first submit's outcome; one that arrives while the first is still
+  deciding is refused as busy, and one after an unanswered submit is refused rather than
+  reported as a queued wake, so the message stays queued. `replyRoute` stays false; ordinary idle
   TUI remains next-turn only.
 - Codex sender permissions grant the exact `127.0.0.1` literal only while Kimi's live delivery
   is activated as `actionable` or `all`. A Codex domain rule cannot name a port, so the grant
