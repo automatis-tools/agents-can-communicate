@@ -15,12 +15,13 @@
   repeated offer reports the first submit's outcome. `replyRoute` stays false; ordinary idle
   TUI remains next-turn only.
 - Codex sender permissions grant the exact `127.0.0.1` literal only while Kimi's live delivery
-  is recorded as `actionable` or `all`. A Codex domain rule cannot name a port, so the grant
-  opens every local service to the sandbox; with Kimi off or absent, the profile keeps its
-  socket-only shape and a left-over grant is reported by doctor and removed by the next
-  install or update. Turning Kimi's live delivery on or off rewrites an installed Codex profile
-  in the same run. Codex install and detect now receive the composed declaration at all; before
-  this, a real install never wrote the grant.
+  is activated as `actionable` or `all`. A Codex domain rule cannot name a port, so the grant
+  opens every local service to the sandbox; with Kimi off, absent, skipped by the install or
+  below the Web floor, the profile keeps its socket-only shape, and a left-over grant is
+  reported by doctor and removed by the next install or update. Turning Kimi's live delivery
+  on or off rewrites an installed Codex profile in the same run, without setting up any Codex
+  service. Codex install and detect now receive the composed declaration at all; before this,
+  a real install never wrote the grant.
 
 | Development artifact | Value |
 |---|---|

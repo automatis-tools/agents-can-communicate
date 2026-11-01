@@ -106,7 +106,7 @@ readiness does not prove that an active session's overrides permit a live offer.
 Kimi Web receives on a loopback HTTP server. A Codex network rule names a host, never a port,
 so allowing `127.0.0.1` lets a sandboxed command reach every local service on the machine, not
 only Kimi. ACC therefore writes that exact literal - never a wildcard, range or private
-netblock - only while Kimi's live delivery is recorded as `actionable` or `all`. With Kimi off
+netblock - only while Kimi's live delivery is activated as `actionable` or `all`. With Kimi off
 or absent the profile carries no domain rule; a grant left over from an earlier policy is
 reported by `acc doctor` and removed by the next install or update.
 

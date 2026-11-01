@@ -5,6 +5,7 @@ import path from "node:path";
 import test from "node:test";
 
 import { prepareLivePermissions } from "../../adapter-codex/src/live-permissions.mjs";
+import { PROTOCOL_CONTRACT } from "../../adapter-kimi/src/web-contract.mjs";
 import { recordInstall } from "@agents-can-communicate/installer";
 
 import { clientContext, runInstallCommand } from "../src/install-command.mjs";
@@ -29,7 +30,7 @@ test("the loopback declaration follows Kimi's recorded live policy", () => {
   assert.equal(at({ kimi: "all" }), true);
 });
 
-async function machine(t) {
+async function machine(t, { kimi = true } = {}) {
   const base = await realpath(await mkdtemp(path.join(tmpdir(), "acc-kimi-loopback-")));
   t.after(() => rm(base, { recursive: true, force: true }));
   const home = path.join(base, "home");
@@ -40,7 +41,7 @@ async function machine(t) {
   await mkdir(codexHome, { recursive: true });
   await mkdir(path.join(home, ".kimi-code"), { recursive: true });
   await writeFakeClient(bin, "codex", { output: "codex-cli 0.157.1" });
-  await writeFakeClient(bin, "kimi", { output: "kimi, version 2.4.0" });
+  if (kimi) await writeFakeClient(bin, "kimi", { output: "kimi, version 2.4.0" });
   const config = path.join(codexHome, "config.toml");
   // An owned Codex profile ACC wrote before any loopback receiver was enabled.
   const written = prepareLivePermissions('model = "mine"\n', { home, codexHome,
@@ -59,10 +60,12 @@ async function machine(t) {
 test("a managed refresh grants 127.0.0.1 only while Kimi's live delivery is on",
   { skip: POSIX_LIVE_TRANSPORT }, async t => {
     const { home, dataHome, config, env } = await machine(t);
-    const refreshWith = async kimiPolicy => {
+    const refreshWith = async (kimiPolicy, { activated = kimiPolicy !== "off" } = {}) => {
       await recordInstall({ dataHome, adapterId: "kimi", version: "2.4.0", artifacts: [],
         deliveryPolicy: kimiPolicy,
-        deliveryDecision: { source: "explicit-option", completeSetup: kimiPolicy !== "off" } });
+        deliveryDecision: { source: "explicit-option", completeSetup: kimiPolicy !== "off" },
+        nativeActivation: activated
+          ? { livePolicy: kimiPolicy, protocolContract: PROTOCOL_CONTRACT, mechanisms: [] } : null });
       const control = { home, targets: ["codex"], active: { version: "0.12.2", root: process.cwd() },
         pending: { version: "0.12.3", root: process.cwd() } };
       const refresh = await prepareRefresh({ control, root: path.join(dataHome, "acc", "runtime"),
@@ -73,6 +76,8 @@ test("a managed refresh grants 127.0.0.1 only while Kimi's live delivery is on",
     };
 
     assert.doesNotMatch(await refreshWith("off"), /127\.0\.0\.1/);
+    // Requested but never activated - a Kimi below the Web floor - opens nothing.
+    assert.doesNotMatch(await refreshWith("actionable", { activated: false }), /127\.0\.0\.1/);
     const enabled = await refreshWith("actionable");
     assert.match(enabled, GRANT);
     assert.match(enabled, /^model = "mine"$/m);
@@ -106,4 +111,21 @@ test("turning Kimi's live delivery on or off rewrites an installed Codex profile
     const source = await readFile(config, "utf8");
     assert.doesNotMatch(source, /127\.0\.0\.1|network\.domains/);
     assert.match(source, /^model = "mine"$/m);
+  });
+
+test("a delivery choice for a Kimi that is not on the machine grants Codex nothing",
+  { skip: POSIX_LIVE_TRANSPORT }, async t => {
+    const { home, bin, config, env } = await machine(t, { kimi: false });
+    const previous = process.env.PATH;
+    process.env.PATH = `${bin}${path.delimiter}${previous}`;
+    t.after(() => { process.env.PATH = previous; });
+    const before = await readFile(config, "utf8");
+    // Every client, one explicit answer: the plan skips the absent Kimi.
+    const result = await runInstallCommand({ options: { home, delivery: "actionable" },
+      runtime: { platform: process.platform, env: { ...process.env, ...env } }, action: "install" });
+    assert.ok(result.data.plan.skipped.some(entry => entry.adapterId === "kimi"));
+    const after = await readFile(config, "utf8");
+    assert.doesNotMatch(after, /127\.0\.0\.1|network\.domains/);
+    assert.match(before, /^model = "mine"$/m);
+    assert.match(after, /^model = "mine"$/m);
   });

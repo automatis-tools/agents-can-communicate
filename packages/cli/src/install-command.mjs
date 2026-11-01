@@ -231,30 +231,41 @@ export function actedOn(result) {
         + (operation.changes?.length ?? 0) > 0)).length;
 }
 
-// Each client's live policy as ACC recorded it, then as this run leaves it.
+// Each client's live policy as it is actually activated: the recorded native
+// activation, not the requested policy. A Kimi below the Web floor records the
+// request and activates nothing, and declares no listener either.
+const activated = policy => ["actionable", "all"].includes(policy) ? policy : "off";
 export const recordedLivePolicies = recorded => Object.fromEntries(recorded
-  .map(install => [install.adapterId, livePolicyOf(install)]));
+  .map(install => [install.adapterId, livePolicyOf(install) === "off" ? "off"
+    : activated(install.nativeActivation?.livePolicy)]));
+// The same, for what one planned operation leaves behind.
+const plannedLivePolicy = operation => operation.action !== "install" ? "off"
+  : activated(operation.nativeActivation?.livePolicy
+    ?? operation.retainedNativeActivation?.livePolicy);
 
 /**
  * A receiver's live policy changes the sender grants Codex needs: Kimi Web's
- * loopback listener is declared only while Kimi's live delivery is on. When an
- * install changes that and Codex is installed but not named, Codex joins the
- * run with its own recorded policy and decision, so its permission profile
- * gains or drops 127.0.0.1 now rather than at the next update. An uninstall
- * never adds a client; doctor reports the grant that is left over.
+ * loopback listener is declared only while Kimi's live delivery is activated.
+ * The run's own plan says which clients it actually changes - a client that is
+ * absent, blocked or downgrade-guarded is skipped and keeps its record. When
+ * that flips the declaration and Codex is on the machine and installed but not
+ * named, Codex joins the run with its own recorded policy and decision, so its
+ * profile gains or drops 127.0.0.1 now rather than at the next update. It joins
+ * for its configuration only: no service is set up for a client nobody named.
+ * An uninstall never adds a client; doctor reports a grant left over.
  */
 async function followReceivers({ action, adapters, detected, decided, recorded, home, dataHome,
-  runtime }) {
-  const before = recordedLivePolicies(recorded);
-  const after = { ...before };
-  for (const adapter of adapters) {
-    after[adapter.id] = action === "install" ? decided.deliveryByAdapter[adapter.id] ?? "off" : "off";
-  }
+  runtime, planWith }) {
   const build = livePolicies => clientContext(home, path.join(dataHome, "acc"),
     { env: runtime.env ?? {}, dataHome, platform: runtime.platform, livePolicies });
-  const context = build(after);
-  const unchanged = { adapters, detected, context, deliveryByAdapter: decided.deliveryByAdapter,
+  const before = recordedLivePolicies(recorded);
+  const base = { adapters, detected, deliveryByAdapter: decided.deliveryByAdapter,
     deliveryDecisionByAdapter: decided.deliveryDecisionByAdapter };
+  const preliminary = planWith({ ...base, context: build(before) });
+  const after = { ...before };
+  for (const operation of preliminary.operations) after[operation.adapterId] = plannedLivePolicy(operation);
+  const context = build(after);
+  const unchanged = { ...base, context, followed: null };
   const codexRecord = recorded.find(install => install.adapterId === "codex");
   if (action !== "install" || codexRecord === undefined
     || adapters.some(adapter => adapter.id === "codex")
@@ -262,10 +273,11 @@ async function followReceivers({ action, adapters, detected, decided, recorded, 
   const codex = ALL_ADAPTERS().find(adapter => adapter.id === "codex");
   const [codexDetected] = await detectInstallation({ adapters: [codex], context,
     probeTimeoutMs: probeTimeout(runtime.env) });
+  if (codexDetected?.present !== true) return unchanged;
   return { adapters: [...adapters, codex], detected: [...detected, codexDetected], context,
     deliveryByAdapter: { ...decided.deliveryByAdapter, codex: livePolicyOf(codexRecord) },
     deliveryDecisionByAdapter: { ...decided.deliveryDecisionByAdapter,
-      codex: decisionOf(codexRecord) } };
+      codex: decisionOf(codexRecord) }, followed: "codex" };
 }
 
 export async function runInstallCommand({ options, runtime, action = "install" }) {
@@ -308,16 +320,21 @@ export async function runInstallCommand({ options, runtime, action = "install" }
   const decided = action === "install"
     ? await decideDelivery({ options, detected, recorded, runtime, dryRun })
     : { deliveryByAdapter: {}, asked: [], notes: [] };
-  // The receivers this run leaves enabled decide the sender grants it writes.
-  const following = await followReceivers({ action, adapters, detected, decided, recorded,
-    home, dataHome, runtime });
-  const plan = planInstallation({ adapters: following.adapters, detected: following.detected,
-    context: following.context, action, recorded,
+  const planWith = input => planInstallation({ ...input, action, recorded,
     indicator: options.indicator,
     accVersion, allowDowngrade: options.downgrade === true, requested,
-    deliveryByAdapter: following.deliveryByAdapter,
-    deliveryDecisionByAdapter: following.deliveryDecisionByAdapter,
     allowServiceSetup: action === "install" });
+  // The receivers this run leaves activated decide the sender grants it writes.
+  const following = await followReceivers({ action, adapters, detected, decided, recorded,
+    home, dataHome, runtime, planWith });
+  const planned = planWith(following);
+  // A client that joined only for its sender grants gets no service setup.
+  const plan = following.followed === null ? planned : { ...planned,
+    operations: planned.operations.map(operation => {
+      if (operation.adapterId !== following.followed) return operation;
+      const { nativeServiceSetup: _unasked, ...rest } = operation;
+      return rest;
+    }) };
   const apply = (paths = {}) => applyPlan({ plan, adapters: following.adapters,
     context: { ...following.context, ...paths }, dataHome, dryRun, accVersion });
   const result = action === "install" && !dryRun && runtime.packageRoot

@@ -53,13 +53,16 @@ it cannot create a session or advance receipts. Grok uses it to supply CLI owner
 arguments after a terminal result. This does not certify general context or peer
 delivery, and a tool such as `finish` can close the owner before the line arrives.
 
-`continueTurnOutcome({ reason, payload, livePolicy, clientVersion, platform })` is optional. A client whose end-of-turn hook can
+`continueTurnOutcome({ reason, messageIds, payload, livePolicy, clientVersion, platform })` is optional. A client whose end-of-turn hook can
 hold a turn open implements it, and the runner's `turnEnd` handler calls it with the projected
 peer context when - and only when - a peer body no invocation has shown yet is waiting. The
 installed recipient policy and current binding facts let the adapter refuse an unconsented or
 uncaptured model invocation; unreadable policy fails to `off`. It
 returns `{ stdout, stderr?, exitCode? }` in the client's own continuation shape, and prints
-nothing to let the turn end. `payload` is the raw hook payload handed back unread, so the
+nothing to let the turn end. `messageIds` names the complete peer messages the projection
+offered. A client that gives a continuation more standing than injected data - Kimi appends
+it as a `system_trigger` - builds its reason from these ids and ACC's own words and ignores
+`reason`, so a peer body never speaks with that standing. `payload` is the raw hook payload handed back unread, so the
 adapter can apply its own ceiling from a counter the client supplies; nothing in core reads it.
 An empty `stdout` records no offer, so the body stays queued for the next invocation. A
 continuation costs the operator a model invocation, which is why an owner header or an
@@ -272,7 +275,12 @@ reads its endpoint records there, and keeps each read bounded. The installer
 composes every known adapter's declaration into `context.receiverSockets`. An adapter whose
 client sandboxes the sender's shell allows exactly that list, and reports its outgoing
 permissions configured only while every entry is allowed. It never names another vendor's
-paths itself. Codex does this in its permission profile. Declare a new receiving transport
+paths itself. Codex does this in its permission profile. A receiver on a loopback TCP
+listener declares it with the optional `inboundLoopback(context)`, composed into
+`context.receiverLoopback`. A sender's domain rule cannot name a port, so that grant opens
+every local service: return true only while the adapter's own live delivery is activated,
+read from `context.livePolicies[adapterId]`, which carries each client's recorded native
+activation policy. Declare a new receiving transport
 here, or every Codex sender gets `transport_permission_denied` against it.
 
 A package-shipped passing Codex installed-hook capture additionally references its
