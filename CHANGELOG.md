@@ -1,5 +1,23 @@
 # Changelog
 
+## Unreleased — process start times across the repeated DST hour
+
+- The managed runtime reads a process start time as UTC. When daylight saving time ended,
+  start times in the repeated hour were read one hour early. The reused-pid check then
+  misjudged running clients, and legacy update-helper retirement refused a verified
+  helper (#402).
+
+| Development artifact | Value |
+|---|---|
+| Built from | `cdb84f4df5563589b0ae03dbe64805e7dfe36c4f` |
+| Tarball | `agents-can-communicate-0.12.2.tgz`, 630,664 bytes, 381 files |
+| sha256 | `fc0e0dc6b27f78a610e54d6f2d28edc96a46b2563f06c580fb5e9198eeabbfc4` |
+
+The exact archive passed package verification. See
+[development evidence](docs/release-evidence/process-start-utc-2026-11-01.md).
+This is not a published release. The version remains `0.12.2`.
+Earlier candidate and release records retain their original provenance.
+
 ## Unreleased — author attribution and related projects
 
 - Identify Mykola Maksymenko as ACC's creator and maintainer in the README.
