@@ -10,14 +10,16 @@ import { storeSessionBinding } from "@agents-can-communicate/adapter-sdk";
 import { createDeliveryRouter } from "@agents-can-communicate/delivery-router";
 import { createClaudeCodeAdapter } from "@agents-can-communicate/adapter-claude-code";
 
+// performance.now(), not Date.now(): one test moves Date, and this bound only
+// reports a publication that never arrives.
 async function waitForLabel(f, expected) {
-  const deadline = Date.now() + 5000;
+  const deadline = performance.now() + 60_000;
   let actual;
   do {
     actual = (await f.read()).label;
     if (actual === expected) return;
     await setTimeout(10);
-  } while (Date.now() < deadline);
+  } while (performance.now() < deadline);
   assert.equal(actual, expected, "the asynchronously published offer observation did not appear");
 }
 
@@ -110,6 +112,11 @@ test("corrupt local data produces actionable failure without leaking its content
 });
 
 test("an actual recorded offer failure changes the badge until a later successful offer", async t => {
+  // The router publishes this observation from a worker that drops it after a
+  // 1.5 s real-time budget, measured from this thread's Date.now(). A Windows CI
+  // runner stalled past that budget and the badge never changed. This test is
+  // about the badge, not the budget, so the clock here starts an hour ahead.
+  t.mock.timers.enable({ apis: ["Date"], now: Date.now() + 3_600_000 });
   const f = await fixture(t);
   await f.service.publishDeliveryBinding(f.binding);
   await f.attempt("active");
