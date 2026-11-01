@@ -13,6 +13,15 @@ export function reviewedAction(body) {
   return null;
 }
 
+// Codex 0.165 sent automatic approval reviews to a separate codex-auto-review
+// model. Codex 0.166.0 sends them to the session's own model and marks them only
+// by the assessment output schema (observed 2026-11-01).
+export function isApprovalReview(body) {
+  const format = body.text?.format;
+  return body.model === "codex-auto-review" || (format?.name === "codex_output_schema"
+    && Object.hasOwn(format.schema?.properties ?? {}, "outcome"));
+}
+
 export async function startCommandModel({ nextCall, review = () => false }) {
   const requests = [];
   const actions = [];
@@ -25,7 +34,7 @@ export async function startCommandModel({ nextCall, review = () => false }) {
       const body = JSON.parse(raw);
       requests.push(body);
       let item;
-      if (body.model === "codex-auto-review") {
+      if (isApprovalReview(body)) {
         const action = reviewedAction(body);
         actions.push(action);
         const allowed = review(action);
