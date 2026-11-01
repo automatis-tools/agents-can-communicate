@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 // Kept above 300 lines because activation and generation retirement must use
 // the same validated runtime/native hold definitions under the admission mutex.
 // Splitting their safety rules risks disagreeing about which users are live.
@@ -15,7 +15,7 @@ import { listRuntimeHolds } from "./leases.mjs";
 import { confirmedDead, defaultPidIsAlive, withManagerLock } from "./mutex.mjs";
 import { reapPins } from "./pins.mjs";
 import { reapStagingHolds } from "./staging.mjs";
-import { removeTree } from "./portable-fs.mjs";
+import { removeTree, renameEntry } from "./portable-fs.mjs";
 import { canonicalManagerRoot, managedDirectory, readControl, readManagedJson, syncDirectory, writeControl } from "./state.mjs";
 import { parseStartTime, startTimeEnvironment } from "./process-start.mjs";
 
@@ -318,12 +318,26 @@ async function resolveCandidate(value) {
 // reclaimed need to tell that from a pass that found nothing to remove.
 const POSTPONED = Object.freeze({ removed: [], postponed: true });
 
+// Deleting a generation tree can take seconds on a loaded machine, and admission
+// waits only one second for the manager lock. Under the lock a reclaim pass only
+// decides and moves an unreferenced generation here with one rename; the tree is
+// deleted after the lock is released. Everything here was proven unreferenced
+// under the lock, so any later pass may delete what an earlier one left behind.
+const RECLAIMED = "reclaimed";
+async function deleteReclaimed(root) {
+  const directory = path.join(root, RECLAIMED);
+  if (!await managedDirectory(directory)) return;
+  for (const name of await readdir(directory)) {
+    try { await removeTree(path.join(directory, name)); } catch { /* The next pass retries. */ }
+  }
+}
+
 export async function reclaimGenerations({ root, active = null, pidIsAlive = defaultPidIsAlive,
   zombie = processIsZombie } = {}) {
   root = await canonicalManagerRoot(root);
   // A lease or a pin of a client that exited uncollected keeps no generation (#280).
   const zombieNow = perPass(zombie);
-  return withManagerLock(root, async () => {
+  const outcome = await withManagerLock(root, async () => {
     const generations = path.join(root, "generations");
     if (!await managedDirectory(generations)) return { removed: [] };
     // Candidates are captured before any holder is read, not after. A hold
@@ -413,12 +427,19 @@ export async function reclaimGenerations({ root, active = null, pidIsAlive = def
       if (!entry.isDirectory() || entry.name.startsWith(".")) continue;
       const directory = path.join(generations, entry.name);
       if (referenced.has(directory)) continue;
-      await removeTree(directory);
+      const reclaimed = path.join(root, RECLAIMED);
+      await managedDirectory(reclaimed, { create: true });
+      await renameEntry(directory, path.join(reclaimed, `${entry.name}-${randomUUID()}`));
       removed.push(entry.name);
     }
-    if (removed.length) await syncDirectory(generations);
+    if (removed.length) {
+      await syncDirectory(generations);
+      await syncDirectory(path.join(root, RECLAIMED));
+    }
     return { removed };
   }, { pidIsAlive });
+  await deleteReclaimed(root);
+  return outcome;
 }
 
 async function prepareCandidate(control, root, env) {
