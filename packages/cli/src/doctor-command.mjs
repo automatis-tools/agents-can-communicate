@@ -13,7 +13,7 @@ import { describeDeliveryDecision, describeNative, nativeRemediation, nativeStat
   updateNativeRuntime } from "./native-delivery-status.mjs";
 export { describeNative } from "./native-delivery-status.mjs";
 import { nativeSessionLines, updateNativeSessions } from "./native-session-diagnostics.mjs";
-import { ALL_ADAPTERS, clientContext, probeTimeout } from "./install-command.mjs";
+import { ALL_ADAPTERS, clientConfigHome, clientContext, probeTimeout } from "./install-command.mjs";
 import { decisionOf } from "./install-delivery-consent.mjs";
 import { describePresence, presenceBreakdown, registerNativeSessions } from "./main.mjs";
 import { platformPaths } from "./platform-paths.mjs";
@@ -230,6 +230,7 @@ export async function diagnoseAdapters({ options, runtime, detect = detectInstal
     // an npm upgrade with no `acc install`, and reporting both is what makes the
     // divergence legible rather than hidden behind a single reassuring number.
     return { ...entry, stale, wired, bundleVersion,
+      configHome: clientConfigHome(clients, entry.adapterId, runtime?.env ?? {}),
       deliveryDecision: installed === undefined ? null : decisionOf(installed),
       owned: { modified: owned.modified,
       missing: owned.missing, intact: owned.intact.length },
@@ -361,6 +362,11 @@ export async function runDoctor({ options, context, runtime }) {
   // One concise native-delivery line per detected client, distinguishing
   // eligibility, the recorded policy, and the live runtime state. It never
   // claims that "active" means a model read anything.
+  // Only a relocated client gets a line: the default needs no mention, and a
+  // moved one explains why the integration lives where it does (#148).
+  ...adapters.filter(adapter => (adapter.present || adapter.installed) && adapter.configHome?.variable)
+    .map(adapter => `  ${adapter.displayName} configuration: ${adapter.configHome.path}`
+      + ` (${adapter.configHome.variable})`),
   ...adapters.filter(adapter => adapter.present)
     .map(adapter => `  ${adapter.displayName} live delivery: `
       + `${describeNative(adapter.nativeDelivery, { clientVersion: adapter.version })}; `
