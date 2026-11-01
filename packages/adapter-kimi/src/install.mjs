@@ -120,10 +120,14 @@ export function renderBlock(runner, node = process.execPath, platform = process.
   return [BEGIN, ...entries, END].join("\n");
 }
 
+// Kimi Code 2.4.1 validates each listed plugin's `source` against the values it
+// writes itself: "local-path", "zip-url" and "github". One record outside that set
+// fails the whole list, so `/plugins install` then fails for every plugin.
+// Replacing ACC's own record also repairs a "local" left by an earlier release.
 const registerPlugin = (registry, root) => {
   const plugins = (registry.plugins ?? []).filter(entry => entry.id !== PLUGIN_NAME);
   return { ...registry, version: registry.version ?? 1,
-    plugins: [...plugins, { id: PLUGIN_NAME, root, source: "local", enabled: true }] };
+    plugins: [...plugins, { id: PLUGIN_NAME, root, source: "local-path", enabled: true }] };
 };
 
 export async function installKimiPlugin(context) {
