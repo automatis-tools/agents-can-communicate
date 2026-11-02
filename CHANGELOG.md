@@ -25,6 +25,10 @@
   by anything else is reported by doctor and removed by the next install or update. Codex
   install and detect now receive the composed declaration at all; before this, a real install
   never wrote the grant.
+- On Windows, a client's status-line badge returned to active after a failed offer only if no
+  reader held the previous observation open; Windows refuses to replace an open file, and the
+  update was dropped. The observation writer now waits for the reader's handle to close, within
+  its existing budget.
 
 | Development artifact | Value |
 |---|---|

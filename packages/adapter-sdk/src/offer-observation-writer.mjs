@@ -1,8 +1,8 @@
 import { randomUUID } from "node:crypto";
-import { mkdir, rename, rm, writeFile } from "node:fs/promises";
+import { mkdir, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { parentPort, workerData as input } from "node:worker_threads";
-import { readSessionRecord, withWriterMutex } from "@agents-can-communicate/storage-filesystem";
+import { readSessionRecord, renameReplacing, withWriterMutex } from "@agents-can-communicate/storage-filesystem";
 import { loadOfferObservation, offerObservationPath, OFFER_ERRORS } from "./offer-observation.mjs";
 import { validOfferOrder } from "./offer-observation-order.mjs";
 
@@ -29,7 +29,9 @@ async function write() {
         await writeFile(temporary, JSON.stringify({ schemaVersion: 1, sessionId, generation,
           at, order, state, reasonCode }) + "\n", { mode: 0o600 });
         check();
-        await rename(temporary, file);
+        // A status line reading the previous observation holds it open, and
+        // Windows refuses to replace an open file until that handle closes.
+        await renameReplacing(temporary, file, { deadlineAt });
         return true;
       } finally { await rm(temporary, { force: true }).catch(() => {}); }
     });

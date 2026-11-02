@@ -4,5 +4,5 @@ export { diagnoseFilesystemStore, repairFilesystemStore } from "./recovery.mjs";
 export { readStoreIdentity, requireStoreIdentity, STORE_VERSION } from "./identity.mjs";
 export { withWriterMutex } from "./writer-mutex.mjs";
 export { readSessionRecord, readDeliveryBindingRecord } from "./session-read.mjs";
-export { openNoFollow } from "./portable-fs.mjs";
+export { openNoFollow, renameReplacing } from "./portable-fs.mjs";
 export { migrateFilesystemStore } from "./store-migration.mjs";

@@ -1,11 +1,12 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { once } from "node:events";
-import { mkdtemp, realpath, writeFile } from "node:fs/promises";
+import { mkdtemp, open, realpath, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
-import { loadOfferObservation } from "@agents-can-communicate/adapter-sdk";
+import { loadOfferObservation, storeOfferObservation } from "@agents-can-communicate/adapter-sdk";
+import { offerObservationPath } from "../../adapter-sdk/src/offer-observation.mjs";
 import { createCoordinationService } from "@agents-can-communicate/core";
 import { openFilesystemStore, withWriterMutex } from "@agents-can-communicate/storage-filesystem";
 import { createDeliveryRouter } from "../src/router.mjs";
@@ -147,4 +148,27 @@ test("an unawaited observation survives a short-lived caller after it reports di
   assert.deepEqual(await exited, [0, null], stderr);
   assert.equal((await loadOfferObservation(input))?.state, "active",
     "the bounded SDK lifetime must preserve a diagnostic after the caller returns");
+});
+
+// Windows refuses a rename over a file while any handle is open on it, and the
+// status line reads this file on every refresh. The first observation creates
+// the file, so only a later one - the badge going back to active - met that
+// refusal, and the badge stayed degraded (Windows CI, PR #400).
+test("a later observation replaces one a reader holds open", async t => {
+  const f = await fixture(t, "success");
+  const input = { runtimeDir: f.root, workspaceId: WORKSPACE, ...owner(f.sessions.second) };
+  assert.equal(await storeOfferObservation({ ...input, at: NOW, state: "degraded",
+    reasonCode: "recipient_busy" }), true);
+  const reader = await open(offerObservationPath(f.root, f.sessions.second.sessionId), "r");
+  let closed = false;
+  const close = async () => { if (!closed) { closed = true; await reader.close(); } };
+  f.cleanup(close);
+  const stored = storeOfferObservation({ ...input, at: "2026-10-09T04:00:01.000Z", state: "active",
+    reasonCode: null });
+  await new Promise(resolve => { setTimeout(resolve, 200); });
+  await close();
+  assert.equal(await stored, true, "the replacement waited out the reader's handle");
+  const observation = await loadOfferObservation(input);
+  assert.equal(observation.state, "active");
+  assert.equal(observation.reasonCode, null);
 });
