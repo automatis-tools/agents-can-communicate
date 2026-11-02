@@ -28,16 +28,16 @@
 
 | Development artifact | Value |
 |---|---|
-| Built from | `ef2d96bbe290d03a2867f630276155568f723ff6` |
-| Tarball | `agents-can-communicate-0.12.2.tgz`, 651,237 bytes, 390 files |
-| sha256 | `af172c2c0c52197f11ccd7e35bcd8686e432e92f69b48b28c207b6d3d140d3f5` |
+| Built from | `fc53c7bad447bfefac89ac417e8d8b5c19458e14` |
+| Tarball | `agents-can-communicate-0.13.0.tgz`, 654,122 bytes, 390 files |
+| sha256 | `c9fc316883db15c6deef90566b187946e1134b978d37effbaf95bb3447edcb0b` |
 
 The exact archive passed package verification and the real Kimi Code 2.4.1 cases in the
 [review evidence](docs/release-evidence/kimi-delivery-review-2026-11-01.md), including a
 session switched out of `yolo` after binding and a body-free Stop continuation. Earlier Kimi
 Web 2.4.0 scenarios are in
 [Kimi delivery evidence](packages/adapter-kimi/fixtures/delivery/kimi-web-2.4.0.json).
-This is not a published release; the package version remains `0.12.2`.
+This is not a published release; the package version remains `0.13.0`.
 
 ## 0.13.0 — release candidate
 
