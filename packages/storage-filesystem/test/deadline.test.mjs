@@ -14,6 +14,7 @@ const WORKSPACE = "workspace_deadline";
 // Shorter than the writer lock's own 2.5 s acquire timeout, so a caller waiting
 // for another writer meets the store deadline first.
 const BUDGET_MS = 1_000;
+const LOCK_ACQUIRE_TIMEOUT_MS = 2_500;
 // A case that crosses the deadline at a journal seam needs everything before
 // that seam to fit inside it. On a loaded windows-latest runner one second
 // expired while the case was still taking the uncontended writer lock, before
@@ -90,11 +91,19 @@ for (const operation of ["transaction", "put", "update", "delete"]) {
         callbackEntered = true; return true;
       }),
     }[operation];
+    const invokedAt = performance.now();
     const waiting = settle(invoke());
     let atDeadline;
     try {
       await crossDeadline(f.deadlineAt);
-      atDeadline = await Promise.race([waiting, delay(500).then(() => null)]);
+      // The holder keeps the lock until this race ends. A caller that honours
+      // its deadline settles within milliseconds; one that ignores it settles
+      // only when the lock's own acquire timeout gives up, so the bound ends
+      // just before that. A fixed 500 ms missed on an ubuntu-latest runner that
+      // was slow by hundreds of milliseconds at that moment (PR #416).
+      const untilLockGivesUp = invokedAt + LOCK_ACQUIRE_TIMEOUT_MS - 300 - performance.now();
+      atDeadline = await Promise.race([waiting,
+        delay(Math.max(0, untilLockGivesUp)).then(() => null)]);
     } finally {
       release.release();
       await holder;
