@@ -5,9 +5,9 @@
   "phase": "product",
   "clientVersion": "2.4.1",
   "platform": "darwin-arm64",
-  "packageSha256": "c9fc316883db15c6deef90566b187946e1134b978d37effbaf95bb3447edcb0b",
-  "startedAt": "2026-11-02T02:08:27.157Z",
-  "finishedAt": "2026-11-02T02:08:27.399Z",
+  "packageSha256": "d49eaeed3257b70cd137adf4f145799380248c899d20a16187a7b0f79cb28602",
+  "startedAt": "2026-11-02T02:36:44.438Z",
+  "finishedAt": "2026-11-02T02:36:44.623Z",
   "scenarioCount": 6,
   "passedCount": 6,
   "failedCount": 0,
@@ -21,134 +21,134 @@
     {
       "caseId": "C01",
       "outcome": "passed",
-      "startedAt": "2026-11-02T02:08:27.157Z",
-      "finishedAt": "2026-11-02T02:08:27.157Z",
-      "messageId": "message_vD85PNCLQdUJ3pepUz2rgw",
+      "startedAt": "2026-11-02T02:36:44.438Z",
+      "finishedAt": "2026-11-02T02:36:44.438Z",
+      "messageId": "message_nsxPnIoZ3AXntO2xPwxzDw",
       "observations": [
         {
           "kind": "delivery",
           "outcome": "woken",
-          "at": "2026-11-02T02:08:27.157Z"
+          "at": "2026-11-02T02:36:44.438Z"
         },
         {
           "kind": "wake",
           "outcome": "started-turn",
-          "at": "2026-11-02T02:08:27.157Z"
+          "at": "2026-11-02T02:36:44.438Z"
         },
         {
           "kind": "projection",
           "outcome": "body-shown",
-          "at": "2026-11-02T02:08:27.157Z"
+          "at": "2026-11-02T02:36:44.438Z"
         },
         {
           "kind": "offer",
           "outcome": "next-turn",
-          "at": "2026-11-02T02:08:27.157Z"
+          "at": "2026-11-02T02:36:44.438Z"
         }
       ]
     },
     {
       "caseId": "C02",
       "outcome": "passed",
-      "startedAt": "2026-11-02T02:08:27.215Z",
-      "finishedAt": "2026-11-02T02:08:27.215Z",
-      "messageId": "message_4YmSqxwxtEXD48rH4DMtbg",
+      "startedAt": "2026-11-02T02:36:44.507Z",
+      "finishedAt": "2026-11-02T02:36:44.507Z",
+      "messageId": "message_WeIkiyp3GmySI6vUHr31bw",
       "observations": [
         {
           "kind": "delivery",
           "outcome": "queued",
-          "at": "2026-11-02T02:08:27.215Z"
+          "at": "2026-11-02T02:36:44.507Z"
         },
         {
           "kind": "projection",
           "outcome": "body-shown",
-          "at": "2026-11-02T02:08:27.215Z"
+          "at": "2026-11-02T02:36:44.507Z"
         },
         {
           "kind": "offer",
           "outcome": "next-turn",
-          "at": "2026-11-02T02:08:27.215Z"
+          "at": "2026-11-02T02:36:44.507Z"
         }
       ]
     },
     {
       "caseId": "C03",
       "outcome": "passed",
-      "startedAt": "2026-11-02T02:08:27.257Z",
-      "finishedAt": "2026-11-02T02:08:27.257Z",
-      "messageId": "message_xE5JsrWvidjE94MFpO1MBQ",
+      "startedAt": "2026-11-02T02:36:44.533Z",
+      "finishedAt": "2026-11-02T02:36:44.533Z",
+      "messageId": "message_fiiL40p6hpkFckJOnZfsvg",
       "observations": [
         {
           "kind": "answer",
           "outcome": "recorded",
-          "at": "2026-11-02T02:08:27.257Z"
+          "at": "2026-11-02T02:36:44.533Z"
         },
         {
           "kind": "receipt",
           "outcome": "acknowledged",
-          "at": "2026-11-02T02:08:27.257Z"
+          "at": "2026-11-02T02:36:44.533Z"
         }
       ]
     },
     {
       "caseId": "C04",
       "outcome": "passed",
-      "startedAt": "2026-11-02T02:08:27.298Z",
-      "finishedAt": "2026-11-02T02:08:27.298Z",
-      "messageId": "message_vD85PNCLQdUJ3pepUz2rgw",
+      "startedAt": "2026-11-02T02:36:44.558Z",
+      "finishedAt": "2026-11-02T02:36:44.558Z",
+      "messageId": "message_nsxPnIoZ3AXntO2xPwxzDw",
       "observations": [
         {
           "kind": "logical-message",
           "outcome": "same-message-id",
-          "at": "2026-11-02T02:08:27.298Z"
+          "at": "2026-11-02T02:36:44.558Z"
         },
         {
           "kind": "wake",
           "outcome": "delivered-once",
-          "at": "2026-11-02T02:08:27.298Z"
+          "at": "2026-11-02T02:36:44.558Z"
         }
       ]
     },
     {
       "caseId": "C05",
       "outcome": "passed",
-      "startedAt": "2026-11-02T02:08:27.347Z",
-      "finishedAt": "2026-11-02T02:08:27.347Z",
-      "messageId": "message_m0LyZo-B3y1HO41ZKZkP_w",
+      "startedAt": "2026-11-02T02:36:44.584Z",
+      "finishedAt": "2026-11-02T02:36:44.584Z",
+      "messageId": "message_w4qzIy1RlPHOYxmb0xpybg",
       "observations": [
         {
           "kind": "client",
           "outcome": "exited",
-          "at": "2026-11-02T02:08:27.347Z"
+          "at": "2026-11-02T02:36:44.584Z"
         },
         {
           "kind": "delivery",
           "outcome": "queued",
-          "at": "2026-11-02T02:08:27.347Z"
+          "at": "2026-11-02T02:36:44.584Z"
         }
       ]
     },
     {
       "caseId": "C06",
       "outcome": "passed",
-      "startedAt": "2026-11-02T02:08:27.399Z",
-      "finishedAt": "2026-11-02T02:08:27.399Z",
-      "messageId": "message_yI2s04c_6eZRfqAn7-OUIA",
+      "startedAt": "2026-11-02T02:36:44.623Z",
+      "finishedAt": "2026-11-02T02:36:44.623Z",
+      "messageId": "message_BSYx4QpCdeyPuIwwXSltAA",
       "observations": [
         {
           "kind": "delivery",
           "outcome": "woken",
-          "at": "2026-11-02T02:08:27.399Z"
+          "at": "2026-11-02T02:36:44.623Z"
         },
         {
           "kind": "wake",
           "outcome": "started-turn",
-          "at": "2026-11-02T02:08:27.399Z"
+          "at": "2026-11-02T02:36:44.623Z"
         },
         {
           "kind": "other-session",
           "outcome": "not-woken",
-          "at": "2026-11-02T02:08:27.399Z"
+          "at": "2026-11-02T02:36:44.623Z"
         }
       ]
     }

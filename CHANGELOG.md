@@ -32,9 +32,9 @@
 
 | Development artifact | Value |
 |---|---|
-| Built from | `fc53c7bad447bfefac89ac417e8d8b5c19458e14` |
-| Tarball | `agents-can-communicate-0.13.0.tgz`, 654,122 bytes, 390 files |
-| sha256 | `c9fc316883db15c6deef90566b187946e1134b978d37effbaf95bb3447edcb0b` |
+| Built from | `fac30443a029239b78389904e4ac7be68a542113` |
+| Tarball | `agents-can-communicate-0.13.0.tgz`, 654,201 bytes, 390 files |
+| sha256 | `d49eaeed3257b70cd137adf4f145799380248c899d20a16187a7b0f79cb28602` |
 
 The exact archive passed package verification and the real Kimi Code 2.4.1 cases in the
 [review evidence](docs/release-evidence/kimi-delivery-review-2026-11-01.md), including a
