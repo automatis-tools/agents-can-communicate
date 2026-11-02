@@ -1,5 +1,22 @@
 # Changelog
 
+## Unreleased — website changelog step in the release procedure
+
+- The release procedure ends with a step that adds the release to the changelog at getacc.dev,
+  after the tag and the GitHub release, written for users from the release notes and the
+  repository at the tag.
+
+| Development artifact | Value |
+|---|---|
+| Built from | `ab8a25a715abc99ddbd0e5838237ca0bcbddd963` |
+| Tarball | `agents-can-communicate-0.14.0.tgz`, 654,965 bytes, 390 files |
+| sha256 | `f5a54bc2e43761b230b3c517215b66afcf6663085b7c6fd6e1750185104cc097` |
+
+The exact archive passed package verification. See
+[development evidence](docs/release-evidence/website-changelog-step-2026-11-02.md).
+This is not a published release. The version remains `0.14.0`.
+Earlier candidate and release records retain their original provenance.
+
 ## 0.14.0 — release candidate
 
 This release carries the work merged to main after 0.13.0, from #400, and one update fix found
