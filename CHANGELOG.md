@@ -21,15 +21,17 @@ while preparing it. Each has its own `Unreleased` section below.
 
 | Candidate artifact | Value |
 |---|---|
-| Built from | `b0aad336d79171c4618d09f26fe59c42df39f3c5` |
-| Tarball | `agents-can-communicate-0.14.0.tgz`, 654,531 bytes, 390 files |
-| sha256 | `d27a2a5063bd3e0f7a8450b6e05bb38668acfbf6a5c9a98c6f8d00fc30937c90` |
+| Built from | `d2df34a4116dccdd40d2380aa492c926ccf4932e` |
+| Tarball | `agents-can-communicate-0.14.0.tgz`, 654,879 bytes, 390 files |
+| sha256 | `605a8727d15270b7a0f04291e9c4cc07885181a801dfa58f999a10129247e18a` |
 
-The exact archive passed package verification and an upgrade from published 0.13.0, in which a
-question crossed the update and the store stayed on contract 8. On the same archive, the real
-Kimi Code 2.4.1 cases passed, and source packed from commit A passed 25 managed-update checks and
-two real-client model-stub checks with Claude Code 2.1.316 and Codex 0.166.0. See
-[release evidence](docs/release-evidence/v0.14.0.md). This candidate is not published.
+The exact archive passed package verification and two upgrades from published 0.13.0. In the
+first, a question crossed the update and the store stayed on contract 8. In the second, Kimi was
+recorded as `actionable`; the update activated Kimi Web and wrote the Codex `127.0.0.1` rule in
+the same refresh. On the same archive, the real Kimi Code 2.4.1 cases passed, and source packed
+from commit A passed 25 managed-update checks and two real-client model-stub checks with Claude
+Code 2.1.316 and Codex 0.166.0. See [release evidence](docs/release-evidence/v0.14.0.md). This
+candidate is not published.
 
 ## Unreleased — Kimi live delivery that an update turns on
 
