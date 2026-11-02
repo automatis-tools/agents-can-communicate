@@ -21,7 +21,7 @@ while preparing it. Each has its own `Unreleased` section below.
 
 | Candidate artifact | Value |
 |---|---|
-| Built from | `d2df34a4116dccdd40d2380aa492c926ccf4932e` |
+| Built from | `4af90d816f391d9e4adb7786f8ffd1758240930c` |
 | Tarball | `agents-can-communicate-0.14.0.tgz`, 654,879 bytes, 390 files |
 | sha256 | `605a8727d15270b7a0f04291e9c4cc07885181a801dfa58f999a10129247e18a` |
 
