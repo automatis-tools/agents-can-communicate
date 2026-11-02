@@ -268,7 +268,7 @@ export const recordedLivePolicies = recorded => Object.fromEntries(recorded
   .map(install => [install.adapterId, livePolicyOf(install) === "off" ? "off"
     : activated(install.nativeActivation?.livePolicy)]));
 // The same, for what one planned operation leaves behind.
-const plannedLivePolicy = operation => operation.action !== "install" ? "off"
+export const plannedLivePolicy = operation => operation.action !== "install" ? "off"
   : activated(operation.nativeActivation?.livePolicy
     ?? operation.retainedNativeActivation?.livePolicy);
 

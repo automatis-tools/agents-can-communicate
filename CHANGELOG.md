@@ -2,18 +2,20 @@
 
 ## 0.14.0 — release candidate
 
-This release carries the work merged to main after 0.13.0, all from #400. Its `Unreleased`
-section below has the details.
+This release carries the work merged to main after 0.13.0, from #400, and one update fix found
+while preparing it. Each has its own `Unreleased` section below.
 
 - **Kimi Code live delivery (#390).** With `acc install --adapter kimi --delivery actionable`
   (or `all`), a busy Kimi Code 2.4.0 turn continues once for a new peer message through its
   `Stop` outcome. A Kimi Web 2.4.0 session that already runs a loopback server in `yolo` mode is
   woken for a new message. Both carry only ACC's notice and the message ids; the body reaches the
-  model in the next turn's context. Ordinary idle TUI sessions stay next-turn only. See
+  model in the next turn's context. Ordinary idle TUI sessions stay next-turn only. An earlier
+  `acc install --delivery actionable|all` for every client was recorded for Kimi too, so the
+  update turns Kimi's live delivery on for those installs. See
   [Upgrading](docs/UPGRADING.md#from-013x-to-0140).
 - **Codex sender permissions.** A sandboxed Codex sender gets the exact `127.0.0.1` rule only
-  while Kimi's live delivery is on, and loses it in the same command when that delivery is turned
-  off or Kimi is uninstalled.
+  while Kimi's live delivery is on, including in the update that first turns it on, and loses it
+  in the same command when that delivery is turned off or Kimi is uninstalled.
 - **Windows.** A client's status-line badge returns to active after a failed offer even while a
   reader holds the previous observation open.
 
@@ -28,6 +30,16 @@ question crossed the update and the store stayed on contract 8. On the same arch
 Kimi Code 2.4.1 cases passed, and source packed from commit A passed 25 managed-update checks and
 two real-client model-stub checks with Claude Code 2.1.316 and Codex 0.166.0. See
 [release evidence](docs/release-evidence/v0.14.0.md). This candidate is not published.
+
+## Unreleased — Kimi live delivery that an update turns on
+
+- An update can turn on a client's live delivery for the first time: ACC 0.13.0 recorded an
+  explicit `acc install --delivery actionable|all` for Kimi even though it could not deliver to
+  Kimi live, and 0.14.0 activates Kimi Web from that record. The managed refresh wrote Codex's
+  sender permissions from the records as they were before the update, so it removed the
+  `127.0.0.1` rule while Kimi Web came on. Codex then could not reach Kimi Web until the next
+  install or update. The refresh now plans the senders again for the policies it leaves
+  behind, as `acc install` already did.
 
 ## Unreleased — Kimi Stop continuation and Web delivery evidence
 
