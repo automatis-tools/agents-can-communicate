@@ -13,7 +13,8 @@ import { describeDeliveryDecision, describeNative, nativeRemediation, nativeStat
   updateNativeRuntime } from "./native-delivery-status.mjs";
 export { describeNative } from "./native-delivery-status.mjs";
 import { nativeSessionLines, updateNativeSessions } from "./native-session-diagnostics.mjs";
-import { ALL_ADAPTERS, clientConfigHome, clientContext, probeTimeout } from "./install-command.mjs";
+import { ALL_ADAPTERS, clientConfigHome, clientContext, probeTimeout, recordedLivePolicies }
+  from "./install-command.mjs";
 import { decisionOf } from "./install-delivery-consent.mjs";
 import { describePresence, presenceBreakdown, registerNativeSessions } from "./main.mjs";
 import { platformPaths } from "./platform-paths.mjs";
@@ -183,13 +184,16 @@ export async function diagnoseAdapters({ options, runtime, detect = detectInstal
   const home = options?.home ?? runtime?.env?.HOME ?? homedir();
   const { data: dataHome } = platformPaths({ platform: runtime?.platform,
     env: runtime?.env ?? {} });
+  // Read first: the recorded live policies decide which receivers declare a
+  // loopback listener, and so which sender grants are current.
+  const record = await loadOwnership({ dataHome });
   // The same environment install reads, so detection probes the same client.
   const clients = clientContext(home, path.join(dataHome, "acc"),
-    { env: runtime?.env ?? {}, platform: runtime?.platform });
+    { env: runtime?.env ?? {}, platform: runtime?.platform,
+      livePolicies: recordedLivePolicies(record.installs) });
   const adapters = ALL_ADAPTERS();
   const detected = await detect({ adapters, context: clients,
     probeTimeoutMs: probeTimeout(runtime?.env) });
-  const record = await loadOwnership({ dataHome });
   const running = typeof runtime?.version === "function"
     ? await runtime.version().catch(() => null)
     : null;

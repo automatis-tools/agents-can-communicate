@@ -7,8 +7,8 @@ import { createCodexAdapter } from "@agents-can-communicate/adapter-codex";
 import { createGeminiCliAdapter } from "@agents-can-communicate/adapter-gemini-cli";
 import { createGrokAdapter } from "@agents-can-communicate/adapter-grok";
 import { createKimiAdapter } from "@agents-can-communicate/adapter-kimi";
-import { applyPlan, detectInstallation, loadOwnership, planInstallation, receiverSockets }
-  from "@agents-can-communicate/installer";
+import { applyPlan, detectInstallation, livePolicyOf, loadOwnership, planInstallation,
+  receiverLoopback, receiverSockets } from "@agents-can-communicate/installer";
 import { AccError, EXIT } from "@agents-can-communicate/protocol";
 
 import { platformPaths } from "./platform-paths.mjs";
@@ -52,8 +52,11 @@ export function clientConfigHome(context, adapterId, env = {}) {
     ? variable : null };
 }
 export const clientContext = (home, stateRoot,
-  { env = {}, dataHome, cwd = process.cwd(), platform } = {}) => withReceivers({
+  { env = {}, dataHome, cwd = process.cwd(), platform, livePolicies = {} } = {}) => withReceivers({
   home,
+  // Each client's recorded live-delivery policy. A receiver's loopback
+  // declaration depends on it: a grant for a listener nobody enabled is a hole.
+  livePolicies,
   ...(dataHome === undefined ? {} : { dataHome }),
   configDir: absoluteEnv(env, "CLAUDE_CONFIG_DIR") ?? path.join(home, ".claude"),
   agentsHome: home,
@@ -93,9 +96,14 @@ export const clientContext = (home, stateRoot,
 // Every socket ACC can deliver to, as each receiving adapter declares it, for
 // the one sender that sandboxes its shell: the Codex permission profile is
 // written and diagnosed from this list, so it covers Claude Code's inbox even
-// when an install names Codex alone (issue #213).
+// when an install names Codex alone (issue #213). A declared loopback receiver
+// composes the same way (issue #390): any adapter's inboundLoopback allows the
+// exact 127.0.0.1 literal in the sender's profile, and nothing broader. Unlike
+// a socket path, that literal opens every local port, so a receiver declares
+// it only while its own live delivery is enabled in `context.livePolicies`.
 const withReceivers = (context, platform) => ({ ...context,
-  receiverSockets: receiverSockets(ALL_ADAPTERS(), { ...context, platform }) });
+  receiverSockets: receiverSockets(ALL_ADAPTERS(), { ...context, platform }),
+  receiverLoopback: receiverLoopback(ALL_ADAPTERS(), { ...context, platform }) });
 
 export const ALL_ADAPTERS = () => [createAntigravityAdapter(), createClaudeCodeAdapter(),
   createCodexAdapter(), createGeminiCliAdapter(), createGrokAdapter(), createKimiAdapter()];
@@ -252,6 +260,73 @@ export function actedOn(result) {
         + (operation.changes?.length ?? 0) > 0)).length;
 }
 
+// Each client's live policy as it is actually activated: the recorded native
+// activation, not the requested policy. A Kimi below the Web floor records the
+// request and activates nothing, and declares no listener either.
+const activated = policy => ["actionable", "all"].includes(policy) ? policy : "off";
+export const recordedLivePolicies = recorded => Object.fromEntries(recorded
+  .map(install => [install.adapterId, livePolicyOf(install) === "off" ? "off"
+    : activated(install.nativeActivation?.livePolicy)]));
+// The same, for what one planned operation leaves behind.
+const plannedLivePolicy = operation => operation.action !== "install" ? "off"
+  : activated(operation.nativeActivation?.livePolicy
+    ?? operation.retainedNativeActivation?.livePolicy);
+
+/**
+ * A receiver's live policy changes the sender grants Codex needs: Kimi Web's
+ * loopback listener is declared only while Kimi's live delivery is activated.
+ * The run's own plan says which clients it actually changes - a client that is
+ * absent, blocked or downgrade-guarded is skipped and keeps its record - and an
+ * uninstall takes each client it removes to off. The returned context carries
+ * the policies this run leaves, so a sender inside the run is written for them.
+ */
+function followReceivers({ adapters, detected, decided, recorded, home, dataHome, runtime,
+  planWith }) {
+  const build = livePolicies => clientContext(home, path.join(dataHome, "acc"),
+    { env: runtime.env ?? {}, dataHome, platform: runtime.platform, livePolicies });
+  const before = recordedLivePolicies(recorded);
+  const preliminary = planWith({ adapters, detected, context: build(before),
+    deliveryByAdapter: decided.deliveryByAdapter,
+    deliveryDecisionByAdapter: decided.deliveryDecisionByAdapter });
+  const after = { ...before };
+  for (const operation of preliminary.operations) after[operation.adapterId] = plannedLivePolicy(operation);
+  return { context: build(after), loopbackChanged: build(before).receiverLoopback
+    !== build(after).receiverLoopback };
+}
+
+/**
+ * When the run flips the loopback declaration and an installed sandboxed sender
+ * is not part of it, that sender's own grants are brought up to date in the same
+ * command - the 127.0.0.1 grant added when Kimi's live delivery comes on, and
+ * removed when it goes off or Kimi is uninstalled. Only the sender's owned
+ * permission units change; its integration, record and service stay as they are.
+ */
+async function refreshSenders({ adapters, recorded, context, dryRun }) {
+  const named = new Set(adapters.map(adapter => adapter.id));
+  const results = [];
+  for (const sender of ALL_ADAPTERS()) {
+    const record = recorded.find(install => install.adapterId === sender.id);
+    if (typeof sender.refreshSenderPermissions !== "function" || record === undefined
+      || named.has(sender.id)) continue;
+    try {
+      const result = await sender.refreshSenderPermissions({ ...context,
+        requestedLivePolicy: livePolicyOf(record),
+        livePolicy: activated(record.nativeActivation?.livePolicy),
+        clientVersion: record.version ?? null, dryRun });
+      results.push({ adapterId: sender.id, ...result });
+    } catch (error) {
+      results.push({ adapterId: sender.id, changed: false, error: error.message });
+    }
+  }
+  return results;
+}
+
+const describeSenders = (senders, dryRun) => senders.flatMap(sender =>
+  sender.error !== undefined
+    ? [`${sender.adapterId}: sender permissions not updated (${sender.error}); run acc install --adapter ${sender.adapterId}`]
+    : sender.changed ? [`${sender.adapterId}: ${dryRun ? "would update" : "updated"} sender permissions `
+      + `for the changed loopback receiver in ${sender.file}`] : []);
+
 export async function runInstallCommand({ options, runtime, action = "install" }) {
   if (options.indicator !== undefined && !["on", "off"].includes(options.indicator)) {
     throw new AccError(EXIT.USAGE, "--indicator must be on or off");
@@ -292,14 +367,18 @@ export async function runInstallCommand({ options, runtime, action = "install" }
   const decided = action === "install"
     ? await decideDelivery({ options, detected, recorded, runtime, dryRun })
     : { deliveryByAdapter: {}, asked: [], notes: [] };
-  const plan = planInstallation({ adapters, detected, context, action, recorded,
+  const planWith = input => planInstallation({ ...input, action, recorded,
     indicator: options.indicator,
     accVersion, allowDowngrade: options.downgrade === true, requested,
-    deliveryByAdapter: decided.deliveryByAdapter,
-    deliveryDecisionByAdapter: decided.deliveryDecisionByAdapter,
     allowServiceSetup: action === "install" });
-  const apply = (paths = {}) => applyPlan({ plan, adapters, context: { ...context, ...paths },
-    dataHome, dryRun, accVersion });
+  // The receivers this run leaves activated decide the sender grants it writes.
+  const following = followReceivers({ adapters, detected, decided, recorded,
+    home, dataHome, runtime, planWith });
+  const plan = planWith({ adapters, detected, context: following.context,
+    deliveryByAdapter: decided.deliveryByAdapter,
+    deliveryDecisionByAdapter: decided.deliveryDecisionByAdapter });
+  const apply = (paths = {}) => applyPlan({ plan, adapters,
+    context: { ...following.context, ...paths }, dataHome, dryRun, accVersion });
   const result = action === "install" && !dryRun && runtime.packageRoot
     ? await installManaged({ packageRoot: runtime.packageRoot,
       managerRoot: path.join(dataHome, "acc", "runtime"), dataHome, home, cwd: options.cwd ?? runtime.cwd,
@@ -309,18 +388,30 @@ export async function runInstallCommand({ options, runtime, action = "install" }
       : await apply();
 
   const acted = actedOn(result);
+  // Judged from what the run actually recorded, so a client that failed to
+  // install or uninstall leaves the senders as they were.
+  const left = dryRun ? recorded : (await loadOwnership({ dataHome })).installs;
+  const leftContext = dryRun ? following.context : clientContext(home, path.join(dataHome, "acc"),
+    { env: runtime.env ?? {}, dataHome, platform: runtime.platform,
+      livePolicies: recordedLivePolicies(left) });
+  const loopbackBefore = clientContext(home, path.join(dataHome, "acc"),
+    { env: runtime.env ?? {}, dataHome, platform: runtime.platform,
+      livePolicies: recordedLivePolicies(recorded) }).receiverLoopback;
+  const senders = (dryRun ? following.loopbackChanged : leftContext.receiverLoopback !== loopbackBefore)
+    ? await refreshSenders({ adapters, recorded: left, context: leftContext, dryRun }) : [];
   if (dryRun) {
     return { data: { ...result, plan, dataHome, deliveryByAdapter: decided.deliveryByAdapter,
-      deliveryDecisionByAdapter: decided.deliveryDecisionByAdapter },
+      deliveryDecisionByAdapter: decided.deliveryDecisionByAdapter, senders },
       text: [`would ${action}:`, ...plan.operations.flatMap(operation => operation.summary),
         ...plan.skipped.map(entry => `skip ${entry.adapterId}: ${entry.reason}`),
-        ...decided.notes].join("\n") };
+        ...describeSenders(senders, true), ...decided.notes].join("\n") };
   }
 
   return { data: { ...result, plan, dataHome, deliveryByAdapter: decided.deliveryByAdapter,
-    deliveryDecisionByAdapter: decided.deliveryDecisionByAdapter, asked: decided.asked },
-  text: describeOutcome({ action, acted, failed: result.failed,
+    deliveryDecisionByAdapter: decided.deliveryDecisionByAdapter, asked: decided.asked, senders },
+  text: [describeOutcome({ action, acted, failed: result.failed,
     skipped: plan.skipped, operations: result.operations, home }),
+  ...describeSenders(senders, false)].filter(line => line !== "").join("\n"),
   error: failureOf({ action, acted, failed: result.failed, operations: result.operations,
     skipped: plan.skipped, home }) };
 }

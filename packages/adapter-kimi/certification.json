@@ -47,6 +47,27 @@
       "provenance": "fixtures/certification-provenance.json", "provenanceId": "user-prompt-submit",
       "busyBehavior": "does not interrupt an in-progress turn", "authorityLevel": "context",
       "limitations": ["delivery requires the next normal user turn"], "result": "pass"
+    },
+    {
+      "client": "kimi", "version": "2.4.0", "platform": "darwin-arm64",
+      "observedAt": "2026-10-29", "capability": "delivery.nextTurn",
+      "fixture": "fixtures/Stop-2.4.0.json", "idleBehavior": "ordinary idle TUI remains next-turn only",
+      "provenance": "fixtures/certification-provenance.json", "provenanceId": "stop-continuation-2-4-0",
+      "busyBehavior": "one peer body continues the current response as system_trigger", "authorityLevel": "context",
+      "limitations": ["continuation requires an explicit actionable or all recipient policy", "Kimi permits one continuation per turn", "no ordinary idle-TUI wake is claimed"], "result": "pass"
+    },
+    {
+      "client": "kimi", "version": "2.4.0", "platform": "darwin-arm64",
+      "observedAt": "2026-10-31T17:20:24.369Z", "capability": "delivery.livePush",
+      "fixture": "fixtures/delivery/kimi-web-2.4.0.json", "idleBehavior": "offered",
+      "provenance": "fixtures/certification-provenance.json", "provenanceId": "kimi-web-2-4-0",
+      "busyBehavior": "queued_after_turn", "authorityLevel": "experimental",
+      "limitations": [
+        "captured only with a pre-existing loopback Kimi Web 2.4.0 server on darwin-arm64 and yolo permission mode",
+        "the session lock or lease check to prompt submit reaper race remains because the client has no conditional warm-only submit",
+        "the observed reply loop uses the installed acc reply CLI; native delivery.replyRoute remains false",
+        "server restart or token rotation requires a fresh installed-hook binding before another wake"
+      ], "result": "pass"
     }
   ]
 }

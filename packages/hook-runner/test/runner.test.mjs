@@ -619,6 +619,17 @@ test("a native adapter binds at start and retries on a later turn under a live p
   assert.equal(turn.nativeBinding.state, "active");
   assert.deepEqual(handshakes, ["sessionStart", "beforeTurn"]);
 
+  const beat = await runNative("heartbeat");
+  assert.equal(beat.nativeBinding.state, "active");
+  assert.deepEqual(handshakes, ["sessionStart", "beforeTurn", "heartbeat"]);
+
+  await beat.service.closeSession({ sessionId: started.accSessionId, generation: started.generation,
+    endReason: "test-close" });
+  const closedBeat = await runNative("heartbeat");
+  assert.equal(closedBeat.sessions.every(session => session.sessionId === started.accSessionId), true,
+    "a heartbeat must not open a replacement generation");
+  assert.deepEqual(handshakes, ["sessionStart", "beforeTurn", "heartbeat"]);
+
   // With the policy recorded off a turn never handshakes, but still retires
   // any binding that an earlier consented turn published.
   handshakes.length = 0;

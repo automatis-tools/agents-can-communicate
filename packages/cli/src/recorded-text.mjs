@@ -9,6 +9,9 @@ export function recordedText(message, delivery) {
         + "for approval because it bypasses permission prompts; the message arrives with its next turn"
     : item.outcome === "woken"
       ? `woke ${item.recipientParticipantId} via ${item.transport}; the message arrives with its next turn`
+    : item.outcome === "queued" && item.busyQueue === true
+      ? `queued a wake for ${item.recipientParticipantId} via ${item.transport} behind its current turn; `
+        + "the message arrives when that queued turn runs"
     : item.outcome === "queued"
       ? item.errorCode === "transport_permission_denied"
         ? "live offer blocked by sender permissions; message remains queued; retry the same command "

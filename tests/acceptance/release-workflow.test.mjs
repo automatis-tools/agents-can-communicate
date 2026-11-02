@@ -24,6 +24,7 @@ const NATIVE_PROCESS_TEST = Object.freeze({
   antigravity: "tests/process/antigravity-native-delivery.test.mjs",
   claude_code: "tests/process/claude-native-delivery.test.mjs",
   codex: "tests/process/codex-native-delivery.test.mjs",
+  kimi: "tests/process/kimi-native-delivery.test.mjs",
 });
 
 test("a shipped livePush capability has a capture, a matching anchor, and an acceptance test",

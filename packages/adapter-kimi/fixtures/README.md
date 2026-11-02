@@ -27,3 +27,17 @@ A guard that only ever sees one kind of call is not evidence that it covers both
 Eleven of the twenty events in this client's enum are absent. `SessionEnd` was wired in
 every run and never fired. The rest need a subagent, an interrupt, a compaction or a
 permission prompt that prompt mode does not produce.
+
+## 2.4.0 delivery captures
+
+`Stop-2.4.0.json` normalizes a real Stop payload captured on 2026-10-29. The installed
+client accepted one structured continuation and delivered its reason with `system_trigger`
+origin; no second continuation occurred in that turn. No conversation content is retained.
+
+`delivery/kimi-web-2.4.0.json` is the passing native-delivery capture from an exact packed
+candidate running ordinary `kimi web` with installed hooks. All six installed-product cases
+passed: idle wake, busy queue, reply and acknowledgement, duplicate suppression, fallback with
+restart/rebind, and exact receiver binding. The adjacent `-product-evidence.json` retains only
+closed delivery facts and the candidate SHA-256, never prompts, answers, transcripts, paths or
+tokens. Additional real runs passed token rotation and refused manual mode, a foreign lock and
+a reclaimed session. The remaining lock/lease-check-to-submit race is recorded in the fixture.

@@ -54,10 +54,10 @@ child sessions, startup or safe-point injection, and before-read guards.
 
 The native rows are `no` at the hook versions this matrix names.
 Separate installed-client captures establish Codex `livePush` on 0.152.1 and
-0.153.4, Claude Code `livePush` on 2.1.282 through the session inbox, and
-Antigravity CLI `livePush` on 1.2.7 and later through a relay the agent starts in its own shell.
-Native eligibility uses the captured minimum, a current feature probe, and an exact
-per-session handshake. It is experimental and requires recipient opt-in.
+0.153.4, Claude Code `livePush` on 2.1.282 through the session inbox, Kimi Web `livePush` on
+2.4.0, and Antigravity CLI `livePush` on 1.2.7 and later through a relay the agent starts in
+its own shell. Native eligibility uses the captured minimum, a current feature probe, and an
+exact per-session handshake. It is experimental and requires recipient opt-in.
 
 What may refuse live delivery is exactly three things:
 
@@ -67,8 +67,8 @@ What may refuse live delivery is exactly three things:
 
 Nothing else: not the platform, not a prerelease suffix, not where the evidence was taken.
 A platform whose transport is technically different is refused by the probe as a fact about
-that transport. Codex, Claude Code and Antigravity CLI reply through `acc reply`. Their native
-`replyRoute` remains false.
+that transport. Codex, Claude Code, Kimi Web and Antigravity CLI reply through `acc reply`.
+Their native `replyRoute` remains false.
 
 The limitations belong next to the adapters they affect:
 
@@ -80,7 +80,7 @@ The limitations belong next to the adapters they affect:
 | Claude Code | 2.1.233 next-turn delivery waits for the next user prompt. From 2.1.282, captured on darwin-arm64 and applied on every platform, `delivery.livePush` is a live capability behind the native contract (experimental, off until opted in). ACC wakes the session through the inbox socket that Claude Code opens for every session, with one line of fixed ACC text and the message id. An idle session starts a turn. A busy session takes the wake between two tool calls. Each delivered wake fires `UserPromptSubmit`, so the next-turn hook shows the body and records the receipt `offered` via `next-turn`. The model answers with `acc reply`, so `delivery.replyRoute` stays false. A session in `bypassPermissions` mode holds each wake for approval unless `crossSessionInbound` is `accept`, and `refuse` drops wakes. Claude.app runs a local Code session on a Claude Code build of its own with the same `~/.claude`: such a session registers the same inbox (`entrypoint: claude-desktop`), and on 2.1.286 (2026-10-04) an idle one woke and answered with `acc reply` with no adapter change. Its Cloud, SSH and Cowork sessions run on another machine. ACC takes a session's version from the record Claude Code keeps for that process, because the `claude` on `PATH` can be another build. On native Windows the inbox is a named pipe, `\\.\pipe\LOCAL\cc-msg-<32 hex>`, that drops a frame without an auth line; ACC authenticates with the peer key Claude Code publishes beside the session record for other sessions of the same user, never the session's own token, so the recipient's inbound settings apply as on POSIX. Measured on 2.1.286; the real-clients CI job wakes an idle interactive Claude Code on Linux and on Windows. |
 | Gemini CLI | Package-shipped next-turn certification starts at 0.57.0. Its TUI has no captured external wake or queue interface and `--acp` changes launch ownership, so native delivery is fallback-only; live push and reply routing remain false. |
 | Grok | The Grok 1.0.24 installed-client check observed own CLI arguments after a terminal result, followed by owned work, message, and finish calls. This identity-only path does not certify peer-context injection. Documentation-shaped payloads do not count as real captures. The public leader surface exposed no proven addressed injection into an ordinary TUI session, so native delivery is `awaiting_compatibility_capture`; all capabilities remain false. |
-| Kimi Code | Next-turn and guard evidence was captured on 0.36.1, plus a 60-second heartbeat. Its server/queue APIs do not prove a transparent binding to an independently opened session, so native delivery is fallback-only. |
+| Kimi Code | Next-turn and guard evidence was captured on 0.36.1, plus a 60-second heartbeat. On 2.4.0, one structured `Stop` continuation was captured; Kimi gives its reason `system_trigger` standing, so ACC's reason names only the message ids and the commands that read and answer them, and the body arrives through ordinary next-turn context. It requires an explicit `actionable` or `all` recipient policy and is limited by Kimi to one continuation per turn. Ordinary idle TUI stays next-turn only. Kimi Web 2.4.0 adds experimental `livePush` behind recipient opt-in, a pre-existing loopback server, `yolo`, and an exact live-session handshake. ACC posts only a fixed wake and message id; `UserPromptSubmit` shows the body and records `next-turn`, while the agent answers with `acc reply`, so native `replyRoute` stays false. Busy vendor acceptance is reported queued. Every offer re-reads the permission mode after the warm check, so a session switched out of `yolo` after binding gets no wake. A sandboxed Codex sender may reach the loopback server only while Kimi's live delivery is activated (see the security model). Installed-product captures passed idle, busy, reply, duplicate, fallback/restart and exact binding; token rotation, foreign-lock refusal and cold-reaper refusal were also observed. ACC never starts a server or resumes a reclaimed session. The lock/lease-check-to-submit race remains because Kimi has no conditional warm-only submit. |
 | Generic MCP | As a receiver, tool polling is not next-turn injection, live push, or a native reply route. It has no write guard or client-lifecycle evidence. Outgoing messages may use an eligible recipient's opted-in native adapter. |
 
 `certification.json` beside each adapter is machine-readable. `COMPATIBILITY.md` records the
@@ -106,8 +106,8 @@ demand without a client heartbeat. Retirement is final: neither route may revive
 retired binding, a closed session or an old generation. Delivery lease refresh does
 not renew participant presence.
 
-Codex LocalDaemon, the Claude Code inbox wake and the Antigravity CLI relay have captured
-experimental live delivery, on darwin-arm64. Those captures set the minimum that applies on
+Codex LocalDaemon, the Claude Code inbox wake, Kimi Web and the Antigravity CLI relay have
+captured experimental live delivery, on darwin-arm64. Those captures set the minimum that applies on
 every platform; on a host they never named, the probe and the per-session handshake decide,
 and a transport that does not answer keeps the durable inbox. Other adapters retain their
 separately certified next-turn paths or inbox polling.

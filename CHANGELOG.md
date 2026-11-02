@@ -1,5 +1,48 @@
 # Changelog
 
+## Unreleased — Kimi Stop continuation and Web delivery evidence
+
+- Kimi 2.4.0 continues a busy turn once through the existing Stop outcome, only with an
+  explicit `actionable` or `all` recipient policy. Kimi gives the reason `system_trigger`
+  standing, so it carries only ACC's fixed notice, the message ids and the commands that read
+  and answer them; the body reaches the model through ordinary next-turn context, framed as
+  untrusted data. Ordinary idle TUI remains next-turn only.
+- Kimi Web 2.4.0 certifies wake-only `livePush` through installed hooks on an existing
+  loopback server in `yolo`. Exact packed-client evidence covers idle, busy queue, reply,
+  duplicate suppression, restart/rebind and exact binding, plus token rotation, foreign-lock
+  and cold-reaper refusal. Each offer re-reads the session's permission mode after the warm
+  check, so a session switched from `yolo` to manual or auto after binding gets no wake. A
+  repeated offer reports the first submit's outcome; one that arrives while the first is still
+  deciding is refused as busy, and one after an unanswered submit is refused rather than
+  reported as a queued wake, so the message stays queued. `replyRoute` stays false; ordinary idle
+  TUI remains next-turn only.
+- Codex sender permissions grant the exact `127.0.0.1` literal only while Kimi's live delivery
+  is activated as `actionable` or `all`. A Codex domain rule cannot name a port, so the grant
+  opens every local service to the sandbox; with Kimi off, absent, skipped by the install or
+  below the Web floor, the profile keeps its socket-only shape. Turning Kimi's live delivery on
+  or off, or uninstalling Kimi, rewrites only ACC's permission units in an installed Codex
+  profile in the same command; Codex is not reinstalled and no service is set up. A grant left
+  by anything else is reported by doctor and removed by the next install or update. Codex
+  install and detect now receive the composed declaration at all; before this, a real install
+  never wrote the grant.
+- On Windows, a client's status-line badge returned to active after a failed offer only if no
+  reader held the previous observation open; Windows refuses to replace an open file, and the
+  update was dropped. The observation writer now waits for the reader's handle to close, within
+  its existing budget.
+
+| Development artifact | Value |
+|---|---|
+| Built from | `fac30443a029239b78389904e4ac7be68a542113` |
+| Tarball | `agents-can-communicate-0.13.0.tgz`, 654,201 bytes, 390 files |
+| sha256 | `d49eaeed3257b70cd137adf4f145799380248c899d20a16187a7b0f79cb28602` |
+
+The exact archive passed package verification and the real Kimi Code 2.4.1 cases in the
+[review evidence](docs/release-evidence/kimi-delivery-review-2026-11-01.md), including a
+session switched out of `yolo` after binding and a body-free Stop continuation. Earlier Kimi
+Web 2.4.0 scenarios are in
+[Kimi delivery evidence](packages/adapter-kimi/fixtures/delivery/kimi-web-2.4.0.json).
+This is not a published release; the package version remains `0.13.0`.
+
 ## 0.13.0 — release candidate
 
 This release carries the work merged to main after 0.12.2. Each item has its own

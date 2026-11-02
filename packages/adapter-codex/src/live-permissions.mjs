@@ -36,12 +36,33 @@ const configured = (source, context) => {
     && value(["features", "network_proxy"]) === "true"
     && value(["permissions", profile, "network", "enabled"]) === "true"
     && literal(value(["permissions", profile, "filesystem", context.stateRoot])) === "write"
-    && missingSockets(entries, profile, context).length === 0;
+    && missingSockets(entries, profile, context).length === 0
+    && !missingLoopback(entries, profile, context)
+    && !excessLoopback(entries, profile, context);
 };
 // The grants a profile lacks for the sockets ACC delivers to.
 const missingSockets = (entries, profile, context) => sockets(context).filter(socket =>
   literal(entries.find(entry => !entry.header
     && equal(entry.keys, ["permissions", profile, "network", "unix_sockets", socket]))?.value) !== "allow");
+
+// Kimi Web #390. Codex's network domain rules cannot port-restrict: allowing
+// a domain allows every port on that host, so ACC never writes a wildcard, a
+// range or a private netblock. The exact literal 127.0.0.1 is granted only
+// when a receiving adapter explicitly declares a loopback listener through
+// `inboundLoopback(context)`, which the installer composes as
+// `context.receiverLoopback`; every other domain stays denied. Codex's
+// permission reference accepts this exact local literal under
+// `[permissions.<profile>.network.domains]` without allow_local_binding.
+export const LOOPBACK_DOMAIN = "127.0.0.1";
+export const loopbackDeclared = context => context.receiverLoopback === true;
+// Whether the profile lacks the loopback grant a declared receiver needs.
+const missingLoopback = (entries, profile, context) => loopbackDeclared(context)
+  && literal(entries.find(entry => !entry.header
+    && equal(entry.keys, ["permissions", profile, "network", "domains", LOOPBACK_DOMAIN]))?.value) !== "allow";
+// Whether the profile still grants network domains no receiver declares - the
+// loopback grant after Kimi's live delivery was turned off. Rewriting drops it.
+const excessLoopback = (entries, profile, context) => !loopbackDeclared(context)
+  && entries.some(entry => equal(entry.keys.slice(0, 4), ["permissions", profile, "network", "domains"]));
 
 const hasCustomPolicy = (source, context) => {
   const ownership = inspectPermissions(source);
@@ -149,9 +170,18 @@ export function outgoingStatus(source, context) {
 function incomplete(source, context) {
   const entries = scanConfig(source);
   const missing = missingSockets(entries, PROFILE, context);
-  return missing.length > 0
-    ? `ACC outgoing grants do not cover every socket ACC delivers to; missing ${missing.join(", ")}`
-    : "ACC outgoing grants are out of date";
+  if (missing.length > 0) {
+    return `ACC outgoing grants do not cover every socket ACC delivers to; missing ${missing.join(", ")}`;
+  }
+  if (missingLoopback(entries, PROFILE, context)) {
+    return "ACC outgoing grants do not cover the declared loopback receiver; "
+      + `missing ${LOOPBACK_DOMAIN}`;
+  }
+  if (excessLoopback(entries, PROFILE, context)) {
+    return `ACC outgoing grants allow ${LOOPBACK_DOMAIN}, which no receiver with live delivery `
+      + "enabled declares";
+  }
+  return "ACC outgoing grants are out of date";
 }
 
 export function prepareLivePermissions(source, context) {
@@ -210,12 +240,18 @@ export function prepareLivePermissions(source, context) {
   if (last && !source.endsWith("\n") && !edits.some(edit => edit.start <= last.start && edit.end >= last.end)) {
     edits.push({ id: "tail", start: last.start, end: last.end, body: `${last.raw}\n` });
   }
+  // The domains table appears only for an explicitly declared loopback
+  // receiver: domain rules cannot port-restrict, so the exact 127.0.0.1
+  // literal is the whole grant and external domains stay denied. Without the
+  // declaration the profile keeps the byte shape every earlier ACC wrote.
   edits.push({ id: "profile", start: source.length, end: source.length, body:
     `[permissions.${PROFILE}]\nextends = ":workspace"\n`
     + `[permissions.${PROFILE}.filesystem]\n${tomlString(context.stateRoot)} = "write"\n`
     + `[permissions.${PROFILE}.network]\nenabled = true\n`
     + `[permissions.${PROFILE}.network.unix_sockets]\n`
-    + sockets(context).map(socket => `${tomlString(socket)} = "allow"\n`).join("") });
+    + sockets(context).map(socket => `${tomlString(socket)} = "allow"\n`).join("")
+    + (loopbackDeclared(context)
+      ? `[permissions.${PROFILE}.network.domains]\n${tomlString(LOOPBACK_DOMAIN)} = "allow"\n` : "") });
   const prepared = addPermissions(source, edits);
   return { source: prepared, skipLegacy: true, status: outgoingStatus(prepared, context) };
 }

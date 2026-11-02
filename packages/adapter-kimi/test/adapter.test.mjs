@@ -198,8 +198,21 @@ test("only capabilities observed firing are declared true", () => {
   assert.equal(capabilities.lifecycle.childSessions, false);
   assert.equal(capabilities.guards.beforeRead, false);
   assert.equal(capabilities.delivery.nextTurn, true);
-  assert.equal(capabilities.delivery.livePush, false);
+  assert.equal(capabilities.delivery.livePush, true);
   assert.equal(capabilities.delivery.replyRoute, false);
+  const adapter = createKimiAdapter();
+  assert.equal(adapter.nativeDelivery.offerKind, "wake");
+  assert.equal(adapter.nativeDelivery.minimum, "2.4.0");
+  // The loopback listener is declared only while Kimi's live delivery is on.
+  for (const policy of ["actionable", "all"]) {
+    assert.equal(adapter.inboundLoopback({ livePolicies: { kimi: policy } }), true, policy);
+  }
+  for (const context of [undefined, {}, { livePolicies: {} }, { livePolicies: { kimi: "off" } },
+    { livePolicies: { codex: "all" } }, { livePolicies: { kimi: "yes" } }]) {
+    assert.equal(adapter.inboundLoopback(context), false, JSON.stringify(context));
+  }
+  assert.equal(typeof adapter.bindNativeSession, "function");
+  assert.equal(typeof adapter.refreshNativeSession, "undefined");
 });
 
 test("next-turn delivery downgrades visibly below the captured version", () => {

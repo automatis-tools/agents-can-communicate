@@ -12,7 +12,7 @@ import { CODEX_QUEUE_MINIMUM, PROTOCOL_CONTRACT } from "./app-server-client.mjs"
 import { allowOutcome, denyOutcome, failOpenNotice, injectOutcome, normalizeCodexHook }
   from "./hooks.mjs";
 import { planCodexInstall, detectCodex, installCodexPlugin, preflightCodexUninstall,
-  uninstallCodexPlugin } from "./install.mjs";
+  refreshCodexSenderPermissions, uninstallCodexPlugin } from "./install.mjs";
 import { controlSocket } from "./live-permissions.mjs";
 // Public native wiring is enabled only with installed-product capture evidence.
 
@@ -90,6 +90,9 @@ export function createCodexAdapter() {
       livePolicy: context.livePolicy ?? "off" }),
     preflightUninstall: context => preflightCodexUninstall(context),
     uninstall: context => uninstallCodexPlugin(context),
+    // Only ACC's own outgoing permission units, for a receiver change that
+    // leaves this integration as it is.
+    refreshSenderPermissions: context => refreshCodexSenderPermissions(context),
 
     doctor: async context => {
       const detected = await detectCodex(context);

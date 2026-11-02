@@ -61,6 +61,37 @@
         "outcome": { "kind": "tool-denied-before-execution", "idle": "no shell call exists to guard",
           "busy": "denies Bash before execution", "authority": "blocking",
           "limitations": ["only tool calls reaching PreToolUse are guarded"] } }]
+    },
+    {
+      "id": "stop-continuation-2-4-0", "client": "kimi", "version": "2.4.0",
+      "platform": "darwin-arm64", "observedAt": "2026-10-29",
+      "fixture": "fixtures/Stop-2.4.0.json",
+      "sha256": "523b052b77155bfad8209685fe8296abdf646344efbc76ccb2423249c016405a",
+      "event": "Stop", "tool": null,
+      "claims": [{ "capability": "delivery.nextTurn", "result": "pass",
+        "outcome": { "kind": "model-context-observed", "idle": "ordinary idle TUI remains next-turn only",
+          "busy": "one peer body continues the current response as system_trigger", "authority": "context",
+          "limitations": ["continuation requires an explicit actionable or all recipient policy", "Kimi permits one continuation per turn", "no ordinary idle-TUI wake is claimed"] } }]
+    },
+    {
+      "id": "kimi-web-2-4-0", "client": "kimi", "version": "2.4.0",
+      "platform": "darwin-arm64", "observedAt": "2026-10-31T17:20:24.369Z",
+      "fixture": "fixtures/delivery/kimi-web-2.4.0.json",
+      "sha256": "dad1e9ac451fe7ea3182df9bb1dc23392b2eebc4e6d0e884db9d3a6c7ab12476",
+      "event": null, "tool": null,
+      "claims": [{ "capability": "delivery.livePush", "result": "pass",
+        "outcome": { "kind": "native-delivery-observed", "idle": "offered",
+          "busy": "queued_after_turn", "authority": "experimental",
+          "limitations": [
+            "captured only with a pre-existing loopback Kimi Web 2.4.0 server on darwin-arm64 and yolo permission mode",
+            "the session lock or lease check to prompt submit reaper race remains because the client has no conditional warm-only submit",
+            "the observed reply loop uses the installed acc reply CLI; native delivery.replyRoute remains false",
+            "server restart or token rotation requires a fresh installed-hook binding before another wake"
+          ] } }],
+      "productEvidence": {
+        "fixture": "fixtures/delivery/kimi-web-2.4.0-product-evidence.json",
+        "sha256": "333e44eef280f4a9981618ac0a33a40de99b9afe4a199024c80d492e06787daf"
+      }
     }
   ]
 }

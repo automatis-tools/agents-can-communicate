@@ -1,4 +1,5 @@
 import { inspectConfig } from "./config-block.mjs";
+import { LOOPBACK_DOMAIN } from "./live-permissions.mjs";
 import { inspectPermissions } from "./permission-ownership.mjs";
 import { scanConfig } from "./toml-scan.mjs";
 
@@ -84,8 +85,9 @@ function adopt(source, { marketplaceRoot, stateRoot, sockets = [], controlSocket
 
   if (inspectPermissions(source).state === "absent") {
     const tables = [["permissions", PROFILE], ["permissions", PROFILE, "filesystem"],
-      ["permissions", PROFILE, "network"], ["permissions", PROFILE, "network", "unix_sockets"]].map(table);
-    const [root, filesystem, network, socketTable] = tables;
+      ["permissions", PROFILE, "network"], ["permissions", PROFILE, "network", "unix_sockets"],
+      ["permissions", PROFILE, "network", "domains"]].map(table);
+    const [root, filesystem, network, socketTable, domains] = tables;
     const granted = new Set(sockets);
     const selections = entries.filter(entry => entry.code && !entry.header && same(entry.keys, ["default_permissions"]));
     const selection = selections.length === 1 && [PROFILE, ":workspace"].includes(literal(selections[0].value))
@@ -93,14 +95,18 @@ function adopt(source, { marketplaceRoot, stateRoot, sockets = [], controlSocket
     // Another setting that names the profile would be left naming none.
     const named = entries.some(entry => entry.code && !entry.header && entry !== selection
       && literal(entry.value) === PROFILE);
-    // Every ACC that wrote the profile wrote all four tables, Codex's own
-    // control socket among its sockets; a profile of that name without them is
-    // the user's, even when the sockets it does grant are ACC's receivers.
+    // Every ACC that wrote the profile wrote all four grant tables, Codex's
+    // own control socket among its sockets; a profile of that name without
+    // them is the user's, even when the sockets it does grant are ACC's
+    // receivers. The domains table is optional: only an ACC composed with a
+    // declared loopback receiver (#390) wrote one, and then it holds exactly
+    // the 127.0.0.1 literal - any other domain makes the profile the user's.
     const ours = !named && within(["permissions", PROFILE], tables) && exactly(root, { extends: ":workspace" })
       && exactly(filesystem, { [stateRoot]: "write" }) && exactly(network, { enabled: true })
       && socketTable !== null && socketTable.body.some(entry => entry.keys.at(-1) === controlSocket)
       && socketTable.body.every(entry =>
-        direct(socketTable, entry) && granted.has(entry.keys.at(-1)) && literal(entry.value) === "allow");
+        direct(socketTable, entry) && granted.has(entry.keys.at(-1)) && literal(entry.value) === "allow")
+      && (domains === null || exactly(domains, { [LOOPBACK_DOMAIN]: "allow" }));
     if (ours) {
       spans.push(...tables.filter(found => found !== null).flatMap(found => found.spans));
       if (selection) spans.push(selection);

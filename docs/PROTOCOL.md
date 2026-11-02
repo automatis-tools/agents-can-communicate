@@ -233,7 +233,9 @@ wake and returns this delivery outcome:
 
 An adapter whose client took the wake but holds it for its user's approval adds
 `"pendingApproval": true` to its acceptance, and the outcome carries it. Nothing about it is
-stored.
+stored. A wake accepted into the client's own busy queue instead returns
+`{ "outcome": "queued", "transport": "<native-transport>", "busyQueue": true }`; this is not
+reported as `woken`, and no event is recorded until the queued turn's hook projects the body.
 
 The receipt stays `queued`. The recipient's next-turn hook shows the body and records
 `message.offer_succeeded` with `transport: "next-turn"` after its output carried the body.

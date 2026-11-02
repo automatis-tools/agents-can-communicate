@@ -8,7 +8,8 @@ import { capabilityEvidence, clearNativeAttempt, clearSessionBinding, effectiveC
   loadSessionBinding, normalizedEvent, storeSessionBinding }
   from "@agents-can-communicate/adapter-sdk";
 import { createCoordinationService } from "@agents-can-communicate/core";
-import { loadOwnership } from "@agents-can-communicate/installer/hook-support";
+import { loadOwnership, readInstalledLivePolicyState }
+  from "@agents-can-communicate/installer/hook-support";
 import { AccError, createId } from "@agents-can-communicate/protocol";
 import { openFilesystemStore } from "@agents-can-communicate/storage-filesystem";
 import { clearPin, createGitProbe, resolveHookWorkspace, platformDataHome, runtimePaths,
@@ -394,7 +395,10 @@ async function projectTurn({ binding, context, adapter, adapterId, render = null
   // The entry point owns the transport boundary. This handler only prepares
   // offer inputs; recording them here would claim delivery before stdout's
   // callback proves that the bytes crossed.
-  const outcome = { stdout: "", ...renderText(projected) };
+  // A renderer that must not carry peer text - a continuation the client
+  // promotes above ordinary data - builds its own words from these ids alone.
+  const outcome = { stdout: "", ...renderText(projected,
+    { messageIds: offerInputs.map(input => input.messageId) }) };
   const writableOffers = outcome.stdout === "" ? [] : offerInputs;
   // A message left for an ended session is told to each session once (#320).
   // Like an offer, the notice is remembered only after stdout carried it.
@@ -624,11 +628,20 @@ const HANDLERS = {
       ...clientFacts, capabilities, nativeBinding: await native(hookBinding) };
   },
 
-  async heartbeat({ binding, context }) {
+  async heartbeat(input) {
+    const { binding, context, adapter } = input;
     if (binding === null) return {};
     await context.service.heartbeatSession({ sessionId: binding.accSessionId,
       generation: binding.generation });
-    return {};
+    if (adapter.nativeDelivery === undefined) return {};
+    const current = await context.service.locateSession(binding.accSessionId);
+    if (current?.record.state !== "open" || current.record.generation !== binding.generation) return {};
+    // Kimi is the first native transport with a real idle heartbeat. Rebind
+    // from that fresh client event instead of renewing a lease through the
+    // resume-capable HTTP status route. The heartbeat is lifecycle-locked and
+    // an open generation is required, so it cannot open a replacement session.
+    const { nativeBinding } = await HANDLERS.sessionStart(input);
+    return { nativeBinding };
   },
 
   async sessionEnd({ binding, context, event, paths, adapter, deadline }) {
@@ -753,9 +766,14 @@ const HANDLERS = {
     if (current === null || current.record.state !== "open"
       || current.record.generation !== binding.generation) return {};
     // A repeat is a body the model may already have. It rides on the next
-    // turn that happens anyway and never buys a model call of its own.
+    // turn that happens anyway and never buys a model call of its own. Clients
+    // that charge for continuation decide from the recorded recipient opt-in.
+    const { policy: livePolicy } = await readInstalledLivePolicyState({
+      dataHome: context.dataHome, adapterId: adapter.id });
     const turn = await projectTurn({ ...input, repeats: false,
-      render: text => adapter.continueTurnOutcome({ reason: text, payload }) });
+      render: (text, { messageIds = [] } = {}) => adapter.continueTurnOutcome({ reason: text,
+        messageIds, payload, livePolicy,
+        clientVersion: binding.clientVersion, platform: binding.platform }) });
     return (turn.offerInputs ?? []).length === 0 ? {} : turn;
   },
 
@@ -869,7 +887,8 @@ export async function runHook({ adapterId, payload, adapters, dataHome, env,
     const context = await openContext({ event, adapterId, dataHome, runtime, env, deadline });
     assertOwnerQuotable(context.workspaceCwd, context.workspaceRef, String(platform).split("-")[0]);
     const handler = HANDLERS[event.kind];
-    const lifecycle = ["sessionStart", "sessionEnd", "beforeTurn"].includes(event.kind);
+    const lifecycle = ["sessionStart", "sessionEnd", "beforeTurn"].includes(event.kind)
+      || (event.kind === "heartbeat" && adapter.nativeDelivery !== undefined);
     const invoke = async () => {
       assertHookBudget(deadline);
       if (lifecycle) {

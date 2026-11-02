@@ -1,0 +1,92 @@
+{
+  "schemaVersion": 1,
+  "source": "real-client-capture",
+  "client": "kimi",
+  "phase": "product",
+  "clientVersion": "2.4.0",
+  "platform": "darwin-arm64",
+  "packageSha256": "40bf4517f08219b874bdb19ca39a146ed26a167ca880026bffff31468be164e4",
+  "startedAt": "2026-10-31T17:20:24.185Z",
+  "finishedAt": "2026-10-31T17:20:24.369Z",
+  "scenarioCount": 6,
+  "passedCount": 6,
+  "failedCount": 0,
+  "cleanup": {
+    "attempted": true,
+    "outcome": "passed",
+    "ownedProcesses": "stopped",
+    "temporaryState": "removed"
+  },
+  "scenarios": [
+    {
+      "caseId": "C01",
+      "outcome": "passed",
+      "startedAt": "2026-10-31T17:20:24.185Z",
+      "finishedAt": "2026-10-31T17:20:24.185Z",
+      "messageId": "message_thKJmB5PT_bQhZMTVAqQ8Q",
+      "observations": [
+        { "kind": "delivery", "outcome": "woken", "at": "2026-10-31T17:20:24.185Z" },
+        { "kind": "wake", "outcome": "started-turn", "at": "2026-10-31T17:20:24.185Z" },
+        { "kind": "projection", "outcome": "body-shown", "at": "2026-10-31T17:20:24.185Z" },
+        { "kind": "offer", "outcome": "next-turn", "at": "2026-10-31T17:20:24.185Z" }
+      ]
+    },
+    {
+      "caseId": "C02",
+      "outcome": "passed",
+      "startedAt": "2026-10-31T17:20:24.221Z",
+      "finishedAt": "2026-10-31T17:20:24.221Z",
+      "messageId": "message_vNGaaEWPSlxyfP51YllYGw",
+      "observations": [
+        { "kind": "delivery", "outcome": "queued", "at": "2026-10-31T17:20:24.221Z" },
+        { "kind": "projection", "outcome": "body-shown", "at": "2026-10-31T17:20:24.221Z" },
+        { "kind": "offer", "outcome": "next-turn", "at": "2026-10-31T17:20:24.221Z" }
+      ]
+    },
+    {
+      "caseId": "C03",
+      "outcome": "passed",
+      "startedAt": "2026-10-31T17:20:24.258Z",
+      "finishedAt": "2026-10-31T17:20:24.258Z",
+      "messageId": "message_IVzR_39JES-Mf0Zf5lkYtQ",
+      "observations": [
+        { "kind": "answer", "outcome": "recorded", "at": "2026-10-31T17:20:24.258Z" },
+        { "kind": "receipt", "outcome": "acknowledged", "at": "2026-10-31T17:20:24.258Z" }
+      ]
+    },
+    {
+      "caseId": "C04",
+      "outcome": "passed",
+      "startedAt": "2026-10-31T17:20:24.295Z",
+      "finishedAt": "2026-10-31T17:20:24.295Z",
+      "messageId": "message_thKJmB5PT_bQhZMTVAqQ8Q",
+      "observations": [
+        { "kind": "logical-message", "outcome": "same-message-id", "at": "2026-10-31T17:20:24.295Z" },
+        { "kind": "wake", "outcome": "delivered-once", "at": "2026-10-31T17:20:24.295Z" }
+      ]
+    },
+    {
+      "caseId": "C05",
+      "outcome": "passed",
+      "startedAt": "2026-10-31T17:20:24.333Z",
+      "finishedAt": "2026-10-31T17:20:24.333Z",
+      "messageId": "message_KMJhZe2HFWrarQERjj5FrQ",
+      "observations": [
+        { "kind": "client", "outcome": "exited", "at": "2026-10-31T17:20:24.333Z" },
+        { "kind": "delivery", "outcome": "queued", "at": "2026-10-31T17:20:24.333Z" }
+      ]
+    },
+    {
+      "caseId": "C06",
+      "outcome": "passed",
+      "startedAt": "2026-10-31T17:20:24.369Z",
+      "finishedAt": "2026-10-31T17:20:24.369Z",
+      "messageId": "message_RLtWGMuqRReRU2cXGsLu9w",
+      "observations": [
+        { "kind": "delivery", "outcome": "woken", "at": "2026-10-31T17:20:24.369Z" },
+        { "kind": "wake", "outcome": "started-turn", "at": "2026-10-31T17:20:24.369Z" },
+        { "kind": "other-session", "outcome": "not-woken", "at": "2026-10-31T17:20:24.369Z" }
+      ]
+    }
+  ]
+}

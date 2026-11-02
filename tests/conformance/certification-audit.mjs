@@ -230,7 +230,7 @@ export const PASS_EXPECTATIONS = Object.freeze({
       "delivery requires the next normal user turn"),
   ], "2026-09-03"),
   "adapter-grok": [],
-  "adapter-kimi": withFacts("kimi", "0.36.1", [
+  "adapter-kimi": [...withFacts("kimi", "0.36.1", [
     row("lifecycle.sessionStart", "fixtures/SessionStart.json", "SessionStart", null,
       "event-observed", "fires when a session starts", "fires before the first model turn",
       "advisory", ["prompt-mode session end is not emitted"]),
@@ -252,5 +252,18 @@ export const PASS_EXPECTATIONS = Object.freeze({
       ["only tool calls reaching PreToolUse are guarded"]),
     nextTurn("fixtures/UserPromptSubmit.json", "UserPromptSubmit",
       "delivery requires the next normal user turn"),
-  ]),
+  ]), ...withFacts("kimi", "2.4.0", [
+    row("delivery.nextTurn", "fixtures/Stop-2.4.0.json", "Stop", null, "model-context-observed",
+      "ordinary idle TUI remains next-turn only", "one peer body continues the current response as system_trigger",
+      "context", ["continuation requires an explicit actionable or all recipient policy",
+        "Kimi permits one continuation per turn", "no ordinary idle-TUI wake is claimed"]),
+  ], "2026-10-29"),
+  ...nativeDelivery("kimi", "2.4.0", "2026-10-31T17:20:24.369Z",
+    "fixtures/delivery/kimi-web-2.4.0.json", "kimi-web-prompt-wake-v1", "offered", "queued_after_turn", [
+    "captured only with a pre-existing loopback Kimi Web 2.4.0 server on darwin-arm64 and yolo permission mode",
+    "the session lock or lease check to prompt submit reaper race remains because the client has no conditional warm-only submit",
+    "the observed reply loop uses the installed acc reply CLI; native delivery.replyRoute remains false",
+    "server restart or token rotation requires a fresh installed-hook binding before another wake",
+  ], ["delivery.livePush"]).map(entry => ({ ...entry,
+    launchMode: "ordinary-command-with-installed-hooks" }))],
 });
