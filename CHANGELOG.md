@@ -1,5 +1,40 @@
 # Changelog
 
+## 0.13.0 — release candidate
+
+This release carries the work merged to main after 0.12.2. Each item has its own
+`Unreleased` section below.
+
+- **Store contract 8.** An inbox read no longer reads the workspace's backlog (#306). The
+  update waits until no client session runs older ACC, then moves every workspace's store to
+  contract 8 by itself. ACC 0.12.x and older refuse a contract-8
+  store. See [Upgrading](docs/UPGRADING.md#from-012x-to-0130).
+- **Faster reads.** A read-only transaction no longer lists the event log (#307), and
+  attention reads each receipt once (#305).
+- **Updates.** ACC commands keep working while an update deletes an old runtime generation
+  (#406). Process start times stay unambiguous during the repeated daylight-saving hour (#402).
+- **Clients.**
+  - Install, doctor and uninstall follow `CLAUDE_CONFIG_DIR`, `GEMINI_CLI_HOME` and
+    `KIMI_CODE_HOME` (#148).
+  - Kimi Code accepts ACC's plugin record (#409).
+  - Codex guidance starts ACC commands with default permissions.
+  - Troubleshooting names the supported path when ChatGPT Work Mode denies ACC's state (#316).
+- **Project.** `CONTRIBUTING.md` and a pull request template (#175), and author attribution in
+  the README.
+
+| Candidate artifact | Value |
+|---|---|
+| Built from | `57197f1c513b392034ae67c4a787f3f238f6f975` |
+| Tarball | `agents-can-communicate-0.13.0.tgz`, 633,651 bytes, 381 files |
+| sha256 | `195d41811ea5a868a8e1aae6ae533e6f9310da045bdfd7a5e272708c912f02d6` |
+
+The exact archive passed package verification. It also passed an upgrade from published
+0.12.2, in which a contract-7 question crossed the update and its store moved to contract 8.
+On a copy of the maintainer's data home, all 73 workspace stores migrated with unchanged
+message bytes. Source packed from commit A passed 25 managed-update checks and two real-client
+model-stub checks with Claude Code 2.1.316 and Codex 0.166.0. See
+[release evidence](docs/release-evidence/v0.13.0.md). This candidate is not published.
+
 ## Unreleased — clients with a relocated configuration
 
 - `acc install`, `acc doctor` and `acc uninstall` use `CLAUDE_CONFIG_DIR`,

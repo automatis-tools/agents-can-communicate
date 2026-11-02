@@ -1,5 +1,18 @@
 # Upgrading
 
+## From 0.12.x to 0.13.0
+
+Update as usual with `acc update`, or let the automatic update run. Version 0.13.0 moves every
+workspace's store to contract 8, as [Store contract 7 to 8](#store-contract-7-to-8) describes:
+activation waits until client sessions that started under 0.12.x end, and each store then
+migrates by itself. ACC 0.12.x and older refuse a contract-8 store, so update or stop any other
+copy of ACC on your `PATH`.
+
+If you moved a client's configuration with `CLAUDE_CONFIG_DIR`, `GEMINI_CLI_HOME` or
+`KIMI_CODE_HOME`, run `acc install` again with that variable set. Earlier versions wrote those
+integrations under the default directory. `acc doctor` names an integration that lies outside
+the directory the client now reads.
+
 ## From 0.10.3
 
 Update as usual with `acc update`. Version 0.10.4 preserves sender permission
