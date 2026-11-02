@@ -157,4 +157,10 @@ Add `--otp` only when the current authenticated npm route requires it. Compare t
 SHA-1 with the local `shasum`, allowing for registry propagation delay, before creating the
 tag or release record.
 
+## Update the website changelog
+
+This is the last step. After the tag and the GitHub release exist, add the release to the
+changelog at <https://getacc.dev/changelog/>. Write the entry for users, from the release notes
+and from the repository at the tag.
+
 See also: [documentation map](index.md) · [Security model](SECURITY_MODEL.md)
