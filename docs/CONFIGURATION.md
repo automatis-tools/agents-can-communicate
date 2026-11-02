@@ -317,6 +317,22 @@ Nothing in `acc.workspace.json` says where state is stored, and nothing there ca
 the job of these variables, or the platform's own locations, and ACC refuses any of them
 that resolves inside a workspace.
 
+ACC writes each client's integration where that client reads its configuration. The order is:
+
+1. The client's own variable: `CODEX_HOME` or `GROK_HOME` when set and not empty, and
+   `CLAUDE_CONFIG_DIR`, `GEMINI_CLI_HOME` or `KIMI_CODE_HOME` when it holds an absolute path. A
+   relative value of the last three is ignored.
+2. Otherwise, the client's default directory under `HOME`.
+
+`XDG_CONFIG_HOME` is not in the order: none of the supported clients reads it for its own
+configuration (measured on 2026-11-01 with Claude Code 2.1.316, Codex 0.166.0, Gemini CLI
+0.60.0, Antigravity CLI 1.4.12, Kimi Code 2.4.1 and Grok 1.0.70). Antigravity CLI has no
+relocation variable. `acc doctor` shows a relocated client's directory and the variable that
+moved it. Set the variable for ACC commands too, not only for the client: an install or
+update run without it writes to the default directory. When the variable changed after an
+install, `acc doctor` says that ACC's integration lies outside the current directory and names
+the uninstall to run with the environment used at install.
+
 | Variable | Purpose |
 |---|---|
 | `ACC_DATA_HOME` | Base directory under which ACC creates `acc/` for runtime and coordination state. Defaults: `~/Library/Application Support` on macOS; `~/.local/share` on Linux, or `XDG_DATA_HOME`; `%LOCALAPPDATA%` on Windows |
@@ -330,6 +346,9 @@ that resolves inside a workspace.
 | `ACC_NO_UPDATE_CHECK=1` | Disables update networking and background scheduling; manual recovery of an already downloaded update remains available |
 | `ACC_PROBE_TIMEOUT_MS` | How long to wait for a client to print its version. Three seconds by default: generous on an idle machine, and not always enough on a busy one, where a client that overruns it is reported as not installed |
 | `ACC_ANTIGRAVITY_HOOKS` | Where `acc install` registers Antigravity CLI hooks. `global`, the default, writes `~/.gemini/config/hooks.json`, which always loads and applies to every Antigravity session on the machine. `workspace` writes `<project>/.agents/hooks.json`, which is scoped to the project the command ran in and loads only while that project is an open Antigravity workspace - in print mode, only when it is passed with `--add-dir`. Any other value is refused by name rather than replaced by the default, and that client is skipped. The two cannot be combined: both files use the namespace `acc`, and a name in both is kept only once |
-| `CODEX_HOME` | Codex's own home, honoured when locating the Codex App Server daemon's control socket for native delivery. Codex sets it; ACC only reads it |
-| `CLAUDE_CONFIG_DIR` | Claude Code's own configuration directory, `~/.claude` by default. ACC reads the session registry `sessions/<pid>.json` under it to verify a session's inbox. ACC reads the value from the hook environment and never sets it |
+| `CODEX_HOME` | Codex's own home. `acc install`, `acc doctor` and `acc uninstall` use it for the Codex integration, and native delivery locates the Codex App Server daemon's control socket under it. ACC only reads it |
+| `CLAUDE_CONFIG_DIR` | Claude Code's own configuration directory, `~/.claude` by default. `acc install`, `acc doctor` and `acc uninstall` use it for the Claude Code plugin, and ACC reads the session registry `sessions/<pid>.json` under it to verify a session's inbox. ACC reads the value and never sets it |
+| `GEMINI_CLI_HOME` | The directory that holds Gemini CLI's `.gemini`, the user's home by default. Used for the Gemini CLI integration |
+| `KIMI_CODE_HOME` | Kimi Code's own directory, `~/.kimi-code` by default. Used for the Kimi Code integration |
+| `GROK_HOME` | Grok's own directory, `~/.grok` by default. Used for the Grok integration |
 | `CLAUDE_CODE_MESSAGING_SOCKET` | The inbox socket of one Claude Code session, which Claude Code exports to that session's hooks. ACC reads it in the hook environment and checks it against the session registry. ACC never reads `CLAUDE_CODE_MESSAGING_TOKEN` |

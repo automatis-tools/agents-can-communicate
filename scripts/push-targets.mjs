@@ -124,7 +124,7 @@ export async function resolvePushTrees(repo, refs, { planForRef } = {}) {
 // Optional executor/platform overrides are solely a command-boundary test seam;
 // production always uses native spawn/platform and fixed taskkill arguments.
 export async function runPushCommand(file, args, { cwd, signal, input, quiet = false,
-  platform = process.platform, spawnCommand = spawn, env = {} } = {}) {
+  platform = process.platform, spawnCommand = spawn, env = {}, onOutput } = {}) {
   if (signal?.aborted) throw Error("push validation interrupted");
   const inheritedEnv = pushEnvironment();
   let commandEnv = { ...inheritedEnv, ...env };
@@ -145,7 +145,7 @@ export async function runPushCommand(file, args, { cwd, signal, input, quiet = f
     }
   }
   if (signal?.aborted) throw Error("push validation interrupted");
-  return runRawPushCommand(file, args, { cwd, signal, input, quiet, platform, spawnCommand, env: commandEnv });
+  return runRawPushCommand(file, args, { cwd, signal, input, quiet, platform, spawnCommand, env: commandEnv, onOutput });
 }
 
 function runRawPushCommand(file, args, { cwd, signal, input, quiet, platform, spawnCommand, env: commandEnv, onOutput }) {
@@ -183,8 +183,8 @@ function runRawPushCommand(file, args, { cwd, signal, input, quiet, platform, sp
       });
     };
     signal?.addEventListener("abort", abort, { once: true });
-    child.stdout.on("data", bytes => { onOutput?.(bytes); if (!signal?.aborted) stdout += bytes; });
-    child.stderr.on("data", bytes => { onOutput?.(bytes); if (!signal?.aborted) stderr += bytes; });
+    child.stdout.on("data", bytes => { onOutput?.(bytes, "stdout"); if (!signal?.aborted) stdout += bytes; });
+    child.stderr.on("data", bytes => { onOutput?.(bytes, "stderr"); if (!signal?.aborted) stderr += bytes; });
     child.once("error", error => {
       signal?.removeEventListener("abort", abort);
       // An error after cancellation must not outrun the owned-tree result.

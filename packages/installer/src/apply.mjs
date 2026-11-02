@@ -37,7 +37,7 @@ export async function applyPlan({ plan, adapters, context, dataHome, dryRun = fa
     try {
       if (plan.action === "install") {
         const createdDirectories = await missingArtifactParents({ home: context.home,
-          artifacts: operation.artifacts });
+          roots: context.clientRoots, artifacts: operation.artifacts });
         const installContext = { ...context,
           indicator: operation.indicator,
           clientVersion: operation.clientVersion, platform: operation.platform,
@@ -107,7 +107,7 @@ export async function applyPlan({ plan, adapters, context, dataHome, dryRun = fa
         // ACC created, and a recognised path is not a reason to delete it.
         const outcome = await adapter.uninstall({ ...context, keep: owned.kept });
         const directories = await removeEmptyOwnedDirectories({ home: context.home,
-          directories: owned.createdDirectories });
+          roots: context.clientRoots, directories: owned.createdDirectories });
         await finalizeRemoval({ dataHome, adapterId: adapter.id,
           retainedNativeActivation: retainedMechanisms.length === 0 ? null
             : { ...operation.deactivation, mechanisms: retainedMechanisms } });

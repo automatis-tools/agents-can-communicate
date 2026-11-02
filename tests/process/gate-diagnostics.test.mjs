@@ -215,6 +215,21 @@ test("Release timing upload remains optional and unconditional with distinct art
   // Without a status function, Actions implicitly adds success(), even for true.
   assert.match(expression ?? "", /^\$\{\{\s*always\(\)\s*\}\}$/,
     "Release diagnostics must explicitly run after failed validation");
+  assert.ok(upload.includes("${{ runner.temp }}/acc-runner-profile.json\n"), "Release timing must carry its runner profile");
+  assert.ok(upload.includes("${{ runner.temp }}/acc-test-timings.jsonl.running.jsonl\n"),
+    "Release timing must keep the finished files of a stopped run");
+  const steps = source.split(/^      - /m);
+  // #408: the test step stops early enough for the diagnostics to upload,
+  // which the job's own time limit would skip.
+  const tests = steps.find(step => step.startsWith("run: npm test\n"));
+  const job = Number(source.match(/^    timeout-minutes: (\d+)$/m)?.[1]);
+  const step = Number(tests?.match(/^        timeout-minutes: (\d+)$/m)?.[1]);
+  assert.ok(Number.isSafeInteger(step) && step <= job - 10, "Release tests must stop well before the job limit");
+  assert.equal(tests.match(/^          ACC_TEST_PROGRESS: '(.*)'$/m)?.[1], "1");
+  const profile = steps.find(step => step.includes("run: node scripts/runner-profile.mjs record"));
+  assert.ok(profile && steps.indexOf(profile) < steps.indexOf(upload), "Release must record its runner profile before upload");
+  assert.equal(profile.match(/^        continue-on-error: (.+)$/m)?.[1], "true", "a failed profile would fail the Release job");
+  assert.match(profile.match(/^        if: (.+)$/m)?.[1] ?? "", /^\$\{\{\s*always\(\)\s*\}\}$/);
   const names = uploads.map(step => step.match(/^          name: (.+)$/m)?.[1]);
   assert.ok(names.length > timings.length, "Release must also preserve its candidate artifact");
   assert.ok(names.every(name => typeof name === "string" && name.length > 0));

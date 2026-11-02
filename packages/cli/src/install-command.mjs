@@ -27,6 +27,30 @@ export { decideDelivery } from "./install-delivery-consent.mjs";
 // Each client keeps its own directory under the user's home, and an adapter
 // pointed at the home itself writes beside them rather than inside them. That
 // install reports success and the client never reads a byte of it.
+// Each client also honours its own relocation variable, and none reads
+// XDG_CONFIG_HOME (measured 2026-11-01, #148): Claude Code 2.1.316
+// CLAUDE_CONFIG_DIR, Codex 0.166.0 CODEX_HOME, Gemini CLI 0.60.0 GEMINI_CLI_HOME
+// (the parent of .gemini), Kimi Code 2.4.1 KIMI_CODE_HOME and Grok 1.0.70
+// GROK_HOME. Antigravity CLI 1.4.12 has none. An integration written beside the
+// client's real directory is one the client never reads.
+const absoluteEnv = (env, name) => typeof env[name] === "string" && path.isAbsolute(env[name])
+  ? env[name] : null;
+// The directory each client reads its configuration from, as install resolved
+// it, and the variable that moved it there (null at the default). Doctor reports
+// both, so an integration written for another location is visible.
+const RELOCATION = { claude_code: ["configDir", "CLAUDE_CONFIG_DIR"], codex: ["codexHome", "CODEX_HOME"],
+  kimi: ["kimiHome", "KIMI_CODE_HOME"], grok: ["grokHome", "GROK_HOME"] };
+export function clientConfigHome(context, adapterId, env = {}) {
+  if (adapterId === "gemini_cli") {
+    return { path: path.join(context.geminiHome ?? context.home, ".gemini"),
+      variable: context.geminiHome && context.geminiHome !== context.home ? "GEMINI_CLI_HOME" : null };
+  }
+  if (adapterId === "antigravity") return { path: path.join(context.home, ".gemini"), variable: null };
+  const [key, variable] = RELOCATION[adapterId] ?? [];
+  if (key === undefined) return null;
+  return { path: context[key], variable: typeof env[variable] === "string" && env[variable] === context[key]
+    ? variable : null };
+}
 export const clientContext = (home, stateRoot,
   { env = {}, dataHome, cwd = process.cwd(), platform, livePolicies = {} } = {}) => withReceivers({
   home,
@@ -34,11 +58,16 @@ export const clientContext = (home, stateRoot,
   // declaration depends on it: a grant for a listener nobody enabled is a hole.
   livePolicies,
   ...(dataHome === undefined ? {} : { dataHome }),
-  configDir: path.join(home, ".claude"),
+  configDir: absoluteEnv(env, "CLAUDE_CONFIG_DIR") ?? path.join(home, ".claude"),
   agentsHome: home,
   codexHome: typeof env.CODEX_HOME === "string" && env.CODEX_HOME !== ""
     ? env.CODEX_HOME : path.join(home, ".codex"),
-  kimiHome: path.join(home, ".kimi-code"),
+  geminiHome: absoluteEnv(env, "GEMINI_CLI_HOME") ?? home,
+  kimiHome: absoluteEnv(env, "KIMI_CODE_HOME") ?? path.join(home, ".kimi-code"),
+  // Every directory a client reads, for directories ACC creates outside the
+  // home when a variable moved one there.
+  clientRoots: [absoluteEnv(env, "CLAUDE_CONFIG_DIR"), env.CODEX_HOME || null, absoluteEnv(env, "GEMINI_CLI_HOME"),
+    absoluteEnv(env, "KIMI_CODE_HOME"), env.GROK_HOME || null].filter(Boolean),
   grokHome: typeof env.GROK_HOME === "string" && env.GROK_HOME !== ""
     ? env.GROK_HOME : path.join(home, ".grok"),
   // The user's PATH, for finding the real client executable to probe.

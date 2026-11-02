@@ -83,9 +83,10 @@ The usual cause is a client sandbox around the command:
   transport access is denied, use approved escalation with the specific local operation
   and destination in `justification`. An installed rule does not prove runtime access. See
   [Codex command approval](CONFIGURATION.md#codex-command-approval).
-- Some desktop hosts deny access outside the session's folders. ChatGPT Work Mode did this
-  with 0.11.1 (#316). Run ACC from a session or terminal that can read and write the data
-  home.
+- Some desktop hosts deny writes to ACC's data home and allow no escalation. In ChatGPT Work
+  Mode, approval mode "Approve for me", the write was refused and a request to run outside
+  the sandbox was rejected without a prompt (ChatGPT.app 26.1027.51404, #316). Run ACC from a
+  session that can read and write the data home, such as Codex or Claude Code in a terminal.
 
 If the data home's files belong to another user, for example after a run with `sudo`, give
 them back to your user. To keep ACC's state elsewhere, set `ACC_DATA_HOME` for every

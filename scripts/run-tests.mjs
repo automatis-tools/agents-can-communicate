@@ -6,7 +6,7 @@
 // strip those quotes and expand the glob; PowerShell does not, and Node exits 0
 // when a pattern matches nothing. The Windows CI job therefore ran zero tests
 // and reported success - green, and testing nothing.
-import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
@@ -78,6 +78,18 @@ const context = { ...identity, platform: process.platform, node: process.version
   fileCount: files.length, concurrency: TEST_FILE_CONCURRENCY, fsyncMode: skipsFsync() ? "skipped" : "real" };
 const events = [];
 const records = [];
+const runningTimings = process.env.ACC_TEST_TIMINGS
+  ? `${path.resolve(process.env.ACC_TEST_TIMINGS)}.running.jsonl` : undefined;
+// Optional file timings must survive validation failures and cannot fail a
+// successful gate themselves. Their existing file-only JSONL stays intact.
+async function writeTimings() {
+  if (!process.env.ACC_TEST_TIMINGS) return;
+  try {
+    const output = path.resolve(process.env.ACC_TEST_TIMINGS);
+    await mkdir(path.dirname(output), { recursive: true });
+    await writeFile(output, records.map(record => JSON.stringify(record)).join("\n") + "\n");
+  } catch { /* Best effort reporting. */ }
+}
 let timingsComplete = true;
 let decision;
 let inputDigest;
@@ -106,7 +118,7 @@ async function execute() {
   await invalidateGateProofs(snapshot);
   const reportDir = await mkdtemp(path.join(tmpdir(), "acc-test-report-"));
   const batches = testBatches(files.map(file => path.relative(repo, file)), {
-    testOptions: { timings: path.join(reportDir, "batch-00000.jsonl") },
+    testOptions: { timings: runningTimings ?? path.join(reportDir, "batch-00000.jsonl") },
   });
   const failed = [];
   let template;
@@ -115,7 +127,14 @@ async function execute() {
     template = await phase("packed-template", () => createPackedTemplate());
     console.log(`packed template ready in ${(events.at(-1).durationMs / 1000).toFixed(2)} s`);
     for (const [index, batch] of batches.entries()) {
-      const report = path.join(reportDir, `batch-${index + 1}.jsonl`);
+      // With timings requested, the reporter streams this batch's records next
+      // to them, and the timings are rewritten after every batch: a run killed
+      // at a job deadline still leaves every finished file's record (#408).
+      // An unwritable destination keeps the batch's report private, as before.
+      const streamed = runningTimings !== undefined
+        && await mkdir(path.dirname(runningTimings), { recursive: true })
+          .then(() => writeFile(runningTimings, "")).then(() => true, () => false);
+      const report = streamed ? runningTimings : path.join(reportDir, `batch-${index + 1}.jsonl`);
       const result = await phase("batch-execution", () => runTestBatch(batch, { cwd: repo, report,
         env: { ...testEnvironment(), ACC_TEST_PACKED_TEMPLATE: template } }));
       Object.assign(events.at(-1), { fileCount: batch.length, result: result.code === 0 ? "passed" : "failed" });
@@ -128,6 +147,7 @@ async function execute() {
         if (existing < 0) records.push(result.timeoutRecord);
         else records[existing] = result.timeoutRecord;
       }
+      await writeTimings();
     }
     if (failed.length === 0 && selection.scope === "docs") {
       await phase("package-smoke", () => verifyScopedPackage({ repo, template }));
@@ -182,15 +202,8 @@ try {
   console.error(error);
   process.exitCode = 1;
 } finally {
-  // Optional file timings must survive validation failures and cannot fail a
-  // successful gate themselves. Their existing file-only JSONL stays intact.
-  if (process.env.ACC_TEST_TIMINGS) {
-    try {
-      const output = path.resolve(process.env.ACC_TEST_TIMINGS);
-      await mkdir(path.dirname(output), { recursive: true });
-      await writeFile(output, records.map(record => JSON.stringify(record)).join("\n") + "\n");
-    } catch { /* Best effort reporting. */ }
-  }
+  await writeTimings();
+  if (runningTimings) await rm(runningTimings, { force: true }).catch(() => {});
   events.push({ schema: 1, ...context, event: "total", durationMs: performance.now() - invocationStarted, result: outcome });
   try {
     await writeGateDiagnostic(destination, { schema: 1, events, inputDigest, receiptDecision: decision,

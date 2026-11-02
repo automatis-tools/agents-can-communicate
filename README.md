@@ -138,7 +138,7 @@ Automatic updates are enabled on first install. Use `acc update --auto off` to d
 `acc update` to update manually, and `acc uninstall` to remove integrations. See
 [update controls](docs/UPGRADING.md) for details.
 
-MIT-licensed and permanently noncommercial. Try it on one real task and
+MIT-licensed. Try it on one real task and
 [open an issue](https://github.com/automatis-tools/agents-can-communicate/issues/new/choose)
 with what happened: whether it worked, where it broke, or where you still had to carry
 messages between sessions yourself. If it worked, watch the repository’s releases to hear
@@ -146,7 +146,7 @@ about the next one. Longer write-ups and setups are welcome in
 [Discussions](https://github.com/automatis-tools/agents-can-communicate/discussions).
 
 [Documentation](docs/index.md) ·
-[Contributing](https://github.com/automatis-tools/agents-can-communicate/blob/main/AGENTS.md)
+[Contributing](https://github.com/automatis-tools/agents-can-communicate/blob/main/CONTRIBUTING.md)
 
 ## Related projects
 

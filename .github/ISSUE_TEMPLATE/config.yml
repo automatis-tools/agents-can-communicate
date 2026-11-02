@@ -1,5 +1,8 @@
 blank_issues_enabled: true
 contact_links:
+  - name: Report a vulnerability
+    url: https://github.com/automatis-tools/agents-can-communicate/security/advisories/new
+    about: Report it privately. Please do not open a public issue for a vulnerability.
   - name: Questions and longer write-ups
     url: https://github.com/automatis-tools/agents-can-communicate/discussions
     about: Ask how something works, or share a full setup.

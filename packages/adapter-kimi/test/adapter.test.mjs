@@ -157,6 +157,33 @@ test("the plugin bundle carries a Kimi manifest and the coordination skill", asy
   assert.equal(registry.plugins.some(entry => entry.id === "agents-can-communicate"), true);
 });
 
+test("the plugin registry records a source value Kimi Code accepts", async t => {
+  const { context } = await fixture(t);
+  const registryFile = path.join(context.home, "plugins", "installed.json");
+  const readRegistry = async () => JSON.parse(await readFile(registryFile, "utf8"));
+  // Kimi Code 2.4.1 validates every listed plugin against this enum; one
+  // record outside it breaks `/plugins install` for every plugin.
+  const accepted = ["local-path", "zip-url", "github"];
+  const other = { id: "someone-elses-plugin", root: "/elsewhere", source: "github", enabled: false };
+
+  await createKimiAdapter().install(context);
+  const fresh = (await readRegistry()).plugins.find(entry => entry.id === "agents-can-communicate");
+  assert.equal(fresh.source, "local-path");
+  assert.equal(accepted.includes(fresh.source), true);
+
+  // An earlier ACC release wrote "local"; reinstalling must replace that record
+  // and leave every other plugin's record as it was.
+  const legacy = await readRegistry();
+  legacy.plugins = [other, ...legacy.plugins.map(entry =>
+    entry.id === "agents-can-communicate" ? { ...entry, source: "local" } : entry)];
+  await writeFile(registryFile, JSON.stringify(legacy));
+  await createKimiAdapter().install(context);
+  const upgraded = await readRegistry();
+  assert.deepEqual(upgraded.plugins.filter(entry => entry.id === "agents-can-communicate")
+    .map(entry => entry.source), ["local-path"]);
+  assert.deepEqual(upgraded.plugins.find(entry => entry.id === other.id), other);
+});
+
 test("only capabilities observed firing are declared true", () => {
   const { capabilities } = createKimiAdapter();
 

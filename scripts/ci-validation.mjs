@@ -6,6 +6,7 @@ import path from 'node:path';
 import { createCiRoute, verifyCiRoute, verifyCiInputs, ciWorker } from './ci-plan.mjs';
 import { verifyCiAggregate, verifyCiTestManifest } from './ci-results.mjs';
 import { runPushCommand } from './push-targets.mjs';
+import { progressTracker } from './test-progress-reporter.mjs';
 
 const fail = () => { throw Error('ci-validation-failed'); };
 const inside = (root, file) => { const r = path.relative(root, file); return r === '' || (!r.startsWith(`..${path.sep}`) && r !== '..' && !path.isAbsolute(r)); };
@@ -23,7 +24,7 @@ async function context() {
     || !outputStat.isFile() || outputStat.nlink !== 1 || !(await lstat(env.GITHUB_EVENT_PATH)).isFile()) fail();
   const event = JSON.parse(await readFile(env.GITHUB_EVENT_PATH, 'utf8'));
   const paths = Object.fromEntries(['acc-test-timings.jsonl','acc-test-timings.jsonl.manifest.json',
-    'acc-ci-plan.json','acc-ci-proof.json','acc-ci-selection.json'].map(name => [name, path.join(temporary,name)]));
+    'acc-test-timings.jsonl.running.jsonl','acc-ci-plan.json','acc-ci-proof.json','acc-ci-selection.json'].map(name => [name, path.join(temporary,name)]));
   for (const file of Object.values(paths)) {
     const stat = await lstat(file).catch(error => { if (error.code !== 'ENOENT') throw error; });
     if (stat && (!stat.isFile() || stat.nlink !== 1)) fail();
@@ -65,13 +66,34 @@ async function main() {
     await writeFile(paths['acc-ci-selection.json'], JSON.stringify(plan), { mode: 0o600 });
     args.push('--selection-plan', paths['acc-ci-selection.json']);
   }
+  // A job that reaches its own time limit skips every later step, the
+  // diagnostics upload included (#408). The test command stops first, and its
+  // output streams live, so the log names the files that were still running.
+  const deadlineMs = env.ACC_CI_TEST_DEADLINE_MS === undefined ? null : Number(env.ACC_CI_TEST_DEADLINE_MS);
+  // setTimeout fires at once for a delay above 2^31-1 ms.
+  if (deadlineMs !== null && (!Number.isSafeInteger(deadlineMs) || deadlineMs < 1 || deadlineMs > 2 ** 31 - 1)) fail();
+  const progress = progressTracker();
+  const decoder = new TextDecoder();
   const controller = new AbortController();
   const interrupt = () => controller.abort();
   let published = false;
+  let deadline;
   process.on('SIGINT', interrupt); process.on('SIGTERM', interrupt);
   try {
-    await runPushCommand(process.execPath, args, { cwd: repo, signal: controller.signal,
+    if (deadlineMs !== null) deadline = setTimeout(() => {
+      const running = progress.running();
+      process.stderr.write(`test command exceeded ${deadlineMs} ms; stopping it so the diagnostics can be uploaded\n`
+        + (running.length ? `still running:\n${running.map(file => `  ${file}\n`).join('')}`
+          : 'no test file was running\n'));
+      controller.abort();
+    }, deadlineMs);
+    await runPushCommand(process.execPath, args, { cwd: repo, signal: controller.signal, quiet: true,
+      onOutput: (bytes, stream) => {
+        if (stream === 'stdout') progress.feed(decoder.decode(bytes, { stream: true }));
+        (stream === 'stdout' ? process.stdout : process.stderr).write(bytes);
+      },
       env: { ACC_TEST_TIMINGS: paths['acc-test-timings.jsonl'], ACC_GATE_DIAGNOSTIC: paths['acc-test-timings.jsonl.manifest.json'] } });
+    clearTimeout(deadline);
     if (controller.signal.aborted) fail();
     const manifest = JSON.parse(await readFile(paths['acc-test-timings.jsonl.manifest.json'],'utf8'));
     if (controller.signal.aborted) fail();
@@ -87,6 +109,7 @@ async function main() {
     appendFileSync(output, `proof=${JSON.stringify(proof)}\n`);
     published = true;
   } finally {
+    clearTimeout(deadline);
     process.off('SIGINT', interrupt); process.off('SIGTERM', interrupt);
     if (!published && !controller.signal.aborted) await rm(paths['acc-ci-selection.json'], { force: true });
   }

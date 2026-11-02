@@ -81,7 +81,7 @@ export function createKimiAdapter() {
     uninstall: context => uninstallKimiPlugin(forClient(context)),
 
     doctor: async context => {
-      const detected = await detectKimi(context);
+      const detected = await detectKimi(forClient(context));
       return { ok: true, changes: [], diagnostics: [
         ...detected.diagnostics,
         `lifecycle, guard and heartbeat payloads captured from Kimi Code ${KIMI_CODE_VERSION}`,

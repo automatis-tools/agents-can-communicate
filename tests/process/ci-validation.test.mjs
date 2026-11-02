@@ -226,11 +226,9 @@ test('interrupted real test execution never emits proof',{skip:process.platform=
     const plan=JSON.parse(await readFile(path.join(f.temporary,'acc-ci-plan.json'),'utf8'));
     let completed=0;
     while(!exited) {
-      const reports=(await readdir(f.temporary)).filter(name=>name.startsWith('acc-test-report-'));
-      for(const report of reports) {
-        const bytes=await readFile(path.join(f.temporary,report,'batch-1.jsonl'),'utf8').catch(()=>'');
-        completed=bytes.trim().split('\n').filter(Boolean).length;
-      }
+      // The batch streams its finished files beside the timings (#408).
+      const bytes=await readFile(path.join(f.temporary,'acc-test-timings.jsonl.running.jsonl'),'utf8').catch(()=>'');
+      completed=bytes.trim().split('\n').filter(Boolean).length;
       if(completed===plan.selectedFiles.length-1) break;
       await new Promise(resolve=>setTimeout(resolve,20));
     }
@@ -240,6 +238,8 @@ test('interrupted real test execution never emits proof',{skip:process.platform=
     assert.notEqual(result.code,0);
     assert.equal(await readFile(f.outputPath,'utf8'),'');
     assert.equal((await readdir(f.temporary)).includes('acc-ci-proof.json'),false);
+    const kept=await readFile(path.join(f.temporary,'acc-test-timings.jsonl.running.jsonl'),'utf8');
+    assert.equal(kept.trim().split('\n').length,plan.selectedFiles.length-1,'an interrupted run keeps its finished files');
   } finally {
     child.kill('SIGTERM');
     await closed;
@@ -340,4 +340,47 @@ test('production aggregate CLI accepts mixed Windows success attempts under one 
     noProof(await invoke(broken));
   }
   assert.equal((await f.records('packs')).length, 0);
+});
+
+// #408: a job that reaches its own time limit skips the diagnostics upload, and
+// the buffered output used to vanish with it. The test command now stops at its
+// own deadline, its output streams live, and the finished files' timings stay.
+test('a hung test command stops at its deadline and leaves its evidence', async t => {
+  const hung = `import { spawn } from 'node:child_process';
+import { writeFile } from 'node:fs/promises';
+const holder = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { stdio: 'ignore' });
+await writeFile(process.env.ACC_TEST_TIMINGS + '.holder-pid', String(holder.pid));
+await writeFile(process.env.ACC_TEST_TIMINGS + '.running.jsonl',
+  JSON.stringify({ file: 'tests/finished.test.mjs', durationMs: 12, success: true }) + '\\n');
+process.stdout.write('acc-test-file start tests/finished.test.mjs\\nacc-test-file start tests/hung.test');
+process.stdout.write('.mjs\\nacc-test-file done tests/finished.test.mjs 0.0 s passed\\n');
+setInterval(() => {}, 1000);
+`;
+  const f = await ciRunnerFixture(t, { runnerOnly: hung });
+  const p = await f.invoke('plan'); assert.equal(p.code, 0, p.stderr);
+  const started = Date.now();
+  const r = await f.invoke('test', { CI_ROUTE: p.outputs.route, CI_WORKER: f.worker, ACC_CI_TEST_DEADLINE_MS: '3000' });
+  noProof(r);
+  assert.ok(Date.now() - started < 25_000, 'the deadline, not the fixture timeout, ended the command');
+  assert.match(r.stdout, /acc-test-file done tests\/finished\.test\.mjs/);
+  assert.match(r.stderr, /test command exceeded 3000 ms; stopping it so the diagnostics can be uploaded\nstill running:\n {2}tests\/hung\.test\.mjs\n/);
+  assert.doesNotMatch(r.stderr, /finished\.test\.mjs/);
+  const running = await readFile(path.join(f.temporary, 'acc-test-timings.jsonl.running.jsonl'), 'utf8');
+  assert.equal(JSON.parse(running).file, 'tests/finished.test.mjs');
+  const pid = Number(await readFile(path.join(f.temporary, 'acc-test-timings.jsonl.holder-pid'), 'utf8'));
+  let alive = true;
+  for (const until = Date.now() + 10_000; alive && Date.now() < until;) {
+    try { process.kill(pid, 0); await new Promise(resolve => setTimeout(resolve, 100)); }
+    catch { alive = false; }
+  }
+  assert.equal(alive, false, 'the test command\'s process tree was stopped');
+});
+
+test('a malformed test deadline refuses before any execution', async t => {
+  const f = await ciRunnerFixture(t);
+  const p = await f.invoke('plan'); assert.equal(p.code, 0, p.stderr);
+  for (const value of ['0', '-1', '1.5', 'soon', '', '2147483648']) {
+    noProof(await f.invoke('test', { CI_ROUTE: p.outputs.route, CI_WORKER: f.worker, ACC_CI_TEST_DEADLINE_MS: value }));
+  }
+  assert.equal((await f.records('docs')).length, 0);
 });

@@ -39,6 +39,134 @@ Web 2.4.0 scenarios are in
 [Kimi delivery evidence](packages/adapter-kimi/fixtures/delivery/kimi-web-2.4.0.json).
 This is not a published release; the package version remains `0.12.2`.
 
+## 0.13.0 — release candidate
+
+This release carries the work merged to main after 0.12.2. Each item has its own
+`Unreleased` section below.
+
+- **Store contract 8.** An inbox read no longer reads the workspace's backlog (#306). The
+  update waits until no client session runs older ACC, then moves every workspace's store to
+  contract 8 by itself. ACC 0.12.x and older refuse a contract-8
+  store. See [Upgrading](docs/UPGRADING.md#from-012x-to-0130).
+- **Faster reads.** A read-only transaction no longer lists the event log (#307), and
+  attention reads each receipt once (#305).
+- **Updates.** ACC commands keep working while an update deletes an old runtime generation
+  (#406). Process start times stay unambiguous during the repeated daylight-saving hour (#402).
+- **Clients.**
+  - Install, doctor and uninstall follow `CLAUDE_CONFIG_DIR`, `GEMINI_CLI_HOME` and
+    `KIMI_CODE_HOME` (#148).
+  - Kimi Code accepts ACC's plugin record (#409).
+  - Codex guidance starts ACC commands with default permissions.
+  - Troubleshooting names the supported path when ChatGPT Work Mode denies ACC's state (#316).
+- **Project.** `CONTRIBUTING.md` and a pull request template (#175), and author attribution in
+  the README.
+
+| Candidate artifact | Value |
+|---|---|
+| Built from | `57197f1c513b392034ae67c4a787f3f238f6f975` |
+| Tarball | `agents-can-communicate-0.13.0.tgz`, 633,651 bytes, 381 files |
+| sha256 | `195d41811ea5a868a8e1aae6ae533e6f9310da045bdfd7a5e272708c912f02d6` |
+
+The exact archive passed package verification. It also passed an upgrade from published
+0.12.2, in which a contract-7 question crossed the update and its store moved to contract 8.
+On a copy of the maintainer's data home, all 73 workspace stores migrated with unchanged
+message bytes. Source packed from commit A passed 25 managed-update checks and two real-client
+model-stub checks with Claude Code 2.1.316 and Codex 0.166.0. See
+[release evidence](docs/release-evidence/v0.13.0.md). This candidate is not published.
+
+## Unreleased — clients with a relocated configuration
+
+- `acc install`, `acc doctor` and `acc uninstall` use `CLAUDE_CONFIG_DIR`,
+  `GEMINI_CLI_HOME` and `KIMI_CODE_HOME` when they hold an absolute path, as the
+  clients themselves do. Before, ACC wrote these integrations under the default
+  directory, where a relocated client never reads them. `CODEX_HOME` and `GROK_HOME`
+  were already honoured. None of the supported clients reads `XDG_CONFIG_HOME` for its
+  configuration. Doctor reports each client's `configHome` and names a relocated
+  client's directory and variable. Uninstall removes the directories ACC created in a
+  relocated client directory, and doctor says when the variable changed after an
+  install (#148).
+
+| Development artifact | Value |
+|---|---|
+| Built from | `b554a77499ee65eca6250be68981444c2848800d` |
+| Tarball | `agents-can-communicate-0.12.2.tgz`, 633,399 bytes, 381 files |
+| sha256 | `6ff0adcc7d282305e5472bef4bbad7c24e91592d5f9b57912a6fbec82c54ff01` |
+
+The exact archive passed package verification. See
+[development evidence](docs/release-evidence/client-config-relocation-2026-11-01.md).
+This is not a published release. The version remains `0.12.2`.
+Earlier candidate and release records retain their original provenance.
+
+## Unreleased — ChatGPT Work Mode guidance
+
+- Troubleshooting names a terminal session as the supported path for ChatGPT Work
+  Mode. A Work Mode chat gets ACC's `state_access_denied` answer, and its approval
+  policy rejected the request to run outside the sandbox (#316).
+
+| Development artifact | Value |
+|---|---|
+| Built from | `c8da801915fc80154854ccc239f7677cedd77206` |
+| Tarball | `agents-can-communicate-0.12.2.tgz`, 631,478 bytes, 381 files |
+| sha256 | `593b7dc0f160d7dc4011d244f2c6e706e41153a2dce6238786cd2097656877c7` |
+
+The exact archive passed package verification. See
+[development evidence](docs/release-evidence/work-mode-guidance-2026-11-01.md).
+This is not a published release. The version remains `0.12.2`.
+Earlier candidate and release records retain their original provenance.
+
+## Unreleased — contributing guidance
+
+- `CONTRIBUTING.md` says how to propose a fix or an adapter, what an adapter pull
+  request carries, and what is merged. Contributions are accepted under MIT with no
+  separate sign-off. The README and docs index link it, and the README no longer
+  calls the project noncommercial (#175).
+
+| Development artifact | Value |
+|---|---|
+| Built from | `c4ee4c159c25db8a8aaf927aa8ea9352f7f7a07a` |
+| Tarball | `agents-can-communicate-0.12.2.tgz`, 631,384 bytes, 381 files |
+| sha256 | `b26b3f0de88c7b1ba98536ba39746619cb040d137d65a832d161c85443f48399` |
+
+The exact archive passed package verification. See
+[development evidence](docs/release-evidence/contributing-2026-11-01.md).
+This is not a published release. The version remains `0.12.2`.
+Earlier candidate and release records retain their original provenance.
+
+## Unreleased — Kimi Code plugin installs
+
+- ACC registers its Kimi Code plugin with the source value `local-path`. Before, it wrote
+  `local`, which Kimi Code 2.4.1 rejects. Then `/plugins install` failed for every plugin
+  with "output validation failed for pluginService.listPlugins". Reinstalling ACC repairs
+  an existing record (#409).
+
+| Development artifact | Value |
+|---|---|
+| Built from | `56e3592c91984b776fae335882f64c88712765f2` |
+| Tarball | `agents-can-communicate-0.12.2.tgz`, 631,369 bytes, 381 files |
+| sha256 | `d0d256cd6e5ac41ec8f7f8be8c00b54dfdb1fbcabc5f884c5c4cb89e7e97b95a` |
+
+The exact archive passed package verification. See
+[development evidence](docs/release-evidence/kimi-plugin-source-2026-11-01.md).
+This is not a published release. The version remains `0.12.2`.
+Earlier candidate and release records retain their original provenance.
+
+## Unreleased — commands right after an update
+
+- Reclaiming old generations after an update no longer blocks ACC commands. The tree
+  is deleted after the manager lock is released. Before, a command in that window could
+  fail with "runtime unavailable; retry after the update" (#406).
+
+| Development artifact | Value |
+|---|---|
+| Built from | `3f921d2f11ae8f04da152136d4df9e90f132f56f` |
+| Tarball | `agents-can-communicate-0.12.2.tgz`, 631,235 bytes, 381 files |
+| sha256 | `df561d10785a1b8d403baa237d61f2d92215a782986d93d1611fcbf7adfe41a9` |
+
+The exact archive passed package verification. See
+[development evidence](docs/release-evidence/reclaim-outside-lock-2026-11-01.md).
+This is not a published release. The version remains `0.12.2`.
+Earlier candidate and release records retain their original provenance.
+
 ## Unreleased — process start times across the repeated DST hour
 
 - The managed runtime reads a process start time as UTC. When daylight saving time ended,
