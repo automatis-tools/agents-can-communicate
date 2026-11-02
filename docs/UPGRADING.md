@@ -1,5 +1,19 @@
 # Upgrading
 
+## From 0.13.x to 0.14.0
+
+Update as usual with `acc update`, or let the automatic update run. Version 0.14.0 keeps store
+contract 8 and adds no data migration. The update refreshes installed integrations and keeps
+each client's recorded delivery policy, so Kimi Code gets live delivery only if you choose it.
+
+To let a busy Kimi Code turn continue once for a new peer message, and to wake a Kimi Web
+session that already runs in `yolo` mode, run `acc install --adapter kimi --delivery actionable`
+(or `all`). ACC does not start a Kimi Web server and does not change the session's permission
+mode. While Kimi's live delivery is on, a sandboxed Codex sender gets the exact `127.0.0.1`
+network rule. That rule opens every local service to Codex's sandbox, not only Kimi; see
+[Durable and delivery integrity](SECURITY_MODEL.md#durable-and-delivery-integrity).
+`acc install --adapter kimi --delivery off` removes the rule again.
+
 ## From 0.12.x to 0.13.0
 
 Update as usual with `acc update`, or let the automatic update run. Version 0.13.0 moves every
