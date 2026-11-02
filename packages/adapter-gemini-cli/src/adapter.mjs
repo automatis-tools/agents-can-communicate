@@ -36,6 +36,9 @@ export const GEMINI_CLI_VERSION = "0.57.0";
  * the request the client sent to the model, as its own `<hook_context>` part.
  * Printing an envelope is not evidence that anything consumed it.
  */
+// Gemini CLI keeps .gemini under GEMINI_CLI_HOME when it is set (#148).
+const forClient = context => ({ ...context, home: context.geminiHome ?? context.home });
+
 export function createGeminiCliAdapter() {
   return defineAdapter({
     id: "gemini_cli",
@@ -61,13 +64,13 @@ export function createGeminiCliAdapter() {
     guardWrite: async () => ({ ok: true, changes: [], diagnostics: [] }),
     guardShell: async () => ({ ok: true, changes: [], diagnostics: [] }),
 
-    planInstall: context => planGeminiInstall(context),
-    detect: context => detectGemini(context),
-    install: context => installGeminiExtension(context),
-    uninstall: context => uninstallGeminiExtension(context),
+    planInstall: context => planGeminiInstall(forClient(context)),
+    detect: context => detectGemini(forClient(context)),
+    install: context => installGeminiExtension(forClient(context)),
+    uninstall: context => uninstallGeminiExtension(forClient(context)),
 
     doctor: async context => {
-      const detected = await detectGemini(context);
+      const detected = await detectGemini(forClient(context));
       return { ok: true, changes: [], diagnostics: [
         ...detected.diagnostics,
         `lifecycle, guard and injection payloads captured from Gemini CLI ${GEMINI_CLI_VERSIONS.join(" and ")}`,

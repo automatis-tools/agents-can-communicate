@@ -13,7 +13,7 @@ import { describeDeliveryDecision, describeNative, nativeRemediation, nativeStat
   updateNativeRuntime } from "./native-delivery-status.mjs";
 export { describeNative } from "./native-delivery-status.mjs";
 import { nativeSessionLines, updateNativeSessions } from "./native-session-diagnostics.mjs";
-import { ALL_ADAPTERS, clientContext, probeTimeout } from "./install-command.mjs";
+import { ALL_ADAPTERS, clientConfigHome, clientContext, probeTimeout } from "./install-command.mjs";
 import { decisionOf } from "./install-delivery-consent.mjs";
 import { describePresence, presenceBreakdown, registerNativeSessions } from "./main.mjs";
 import { platformPaths } from "./platform-paths.mjs";
@@ -167,6 +167,16 @@ async function findShims(root, depth) {
   return found;
 }
 
+// The paths an install in this environment would write, or none when the
+// adapter cannot say.
+function plannedPaths(adapter, context) {
+  try {
+    const artifacts = typeof adapter?.planInstall === "function" ? adapter.planInstall(context) : [];
+    return new Set((Array.isArray(artifacts) ? artifacts : []).map(artifact => artifact?.path)
+      .filter(file => typeof file === "string").map(file => path.resolve(file)));
+  } catch { return new Set(); }
+}
+
 export async function diagnoseAdapters({ options, runtime, detect = detectInstallation }) {
   // The same home `acc install --home` writes to, or the real one. Reading a
   // different home than install wrote to reports every adapter as missing.
@@ -202,6 +212,19 @@ export async function diagnoseAdapters({ options, runtime, detect = detectInstal
     // trust prompt, most of all. It goes where a person reads, not into --json.
     remediation.push(...(entry.needsAction ?? []));
     const installed = record.installs.find(one => one.adapterId === entry.adapterId);
+    // Recorded where this environment would not install: the relocation
+    // variable changed since install (#148). Compared with the paths an install
+    // here would write, so an old directory nested inside the new one still
+    // counts as moved.
+    const configHome = clientConfigHome(clients, entry.adapterId, runtime?.env ?? {});
+    const recordedFiles = (installed?.artifacts ?? []).map(artifact => artifact.path)
+      .filter(file => typeof file === "string").map(file => path.resolve(file));
+    const planned = plannedPaths(adapters.find(adapter => adapter.id === entry.adapterId), clients);
+    if (configHome && recordedFiles.length > 0 && planned.size > 0
+      && !recordedFiles.some(file => planned.has(file))) {
+      remediation.push(`acc uninstall --adapter ${entry.adapterId}  # ACC's integration was installed outside `
+        + `${configHome.path}; run this with the environment used at install, then install again here`);
+    }
     const bundleVersion = installed?.accVersion ?? null;
     const stale = staleInstall({ recorded: bundleVersion, running });
     if (stale !== null) {
@@ -230,6 +253,7 @@ export async function diagnoseAdapters({ options, runtime, detect = detectInstal
     // an npm upgrade with no `acc install`, and reporting both is what makes the
     // divergence legible rather than hidden behind a single reassuring number.
     return { ...entry, stale, wired, bundleVersion,
+      configHome,
       deliveryDecision: installed === undefined ? null : decisionOf(installed),
       owned: { modified: owned.modified,
       missing: owned.missing, intact: owned.intact.length },
@@ -358,6 +382,11 @@ export async function runDoctor({ options, context, runtime }) {
     && adapter.nativeDelivery.reasonCode === "native_delivery_unsupported"
     && typeof adapter.deliveryDiagnostic === "string")
     .map(adapter => `  ${adapter.deliveryDiagnostic}`),
+  // Only a relocated client gets a line: the default needs no mention, and a
+  // moved one explains why the integration lives where it does (#148).
+  ...adapters.filter(adapter => (adapter.present || adapter.installed) && adapter.configHome?.variable)
+    .map(adapter => `  ${adapter.displayName} configuration: ${adapter.configHome.path}`
+      + ` (${adapter.configHome.variable})`),
   // One concise native-delivery line per detected client, distinguishing
   // eligibility, the recorded policy, and the live runtime state. It never
   // claims that "active" means a model read anything.

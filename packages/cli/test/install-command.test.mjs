@@ -12,7 +12,7 @@ import { PassThrough } from "node:stream";
 import { channelSocketDirectory, tomlString } from "@agents-can-communicate/adapter-sdk";
 
 import { askConfirmation } from "../src/confirm.mjs";
-import { clientContext, decideDelivery, runInstallCommand } from "../src/install-command.mjs";
+import { clientConfigHome, clientContext, decideDelivery, runInstallCommand } from "../src/install-command.mjs";
 import { writeFakeClient } from "../../../tests/helpers/fake-client.mjs";
 
 // Kept cohesive above 300 lines because each case drives the same installer
@@ -31,6 +31,31 @@ test("the Codex home respects an explicit CODEX_HOME and otherwise follows the s
     env: { HOME: "/ambient/home" } }).codexHome, underHome(".codex"));
   assert.equal(clientContext("/supplied/home", "/state", {
     env: { CODEX_HOME: "" } }).codexHome, underHome(".codex"));
+});
+
+// #148: each client moves its configuration with its own variable, and none
+// reads XDG_CONFIG_HOME. A relative value is not a directory ACC can name.
+test("Claude Code, Gemini CLI and Kimi Code homes follow their own absolute variables only", () => {
+  const explicit = clientContext("/supplied/home", "/state", { env: { CLAUDE_CONFIG_DIR: "/c/claude",
+    GEMINI_CLI_HOME: "/g", KIMI_CODE_HOME: "/k/kimi", XDG_CONFIG_HOME: "/xdg" } });
+  assert.deepEqual([explicit.configDir, explicit.geminiHome, explicit.kimiHome], ["/c/claude", "/g", "/k/kimi"]);
+  for (const env of [{}, { CLAUDE_CONFIG_DIR: "", GEMINI_CLI_HOME: "", KIMI_CODE_HOME: "" },
+    { CLAUDE_CONFIG_DIR: "rel", GEMINI_CLI_HOME: "rel", KIMI_CODE_HOME: "rel", XDG_CONFIG_HOME: "/xdg" }]) {
+    const context = clientContext("/supplied/home", "/state", { env });
+    assert.deepEqual([context.configDir, context.geminiHome, context.kimiHome],
+      [underHome(".claude"), "/supplied/home", underHome(".kimi-code")], JSON.stringify(env));
+  }
+});
+
+test("doctor names a relocated client's directory and the variable that moved it", () => {
+  const env = { CLAUDE_CONFIG_DIR: "/c/claude", GEMINI_CLI_HOME: "/g", GROK_HOME: "/r/grok" };
+  const context = clientContext("/supplied/home", "/state", { env });
+  assert.deepEqual(clientConfigHome(context, "claude_code", env), { path: "/c/claude", variable: "CLAUDE_CONFIG_DIR" });
+  assert.deepEqual(clientConfigHome(context, "gemini_cli", env), { path: path.join("/g", ".gemini"), variable: "GEMINI_CLI_HOME" });
+  assert.deepEqual(clientConfigHome(context, "grok", env), { path: "/r/grok", variable: "GROK_HOME" });
+  assert.deepEqual(clientConfigHome(context, "kimi", env), { path: underHome(".kimi-code"), variable: null });
+  assert.deepEqual(clientConfigHome(context, "antigravity", env), { path: underHome(".gemini"), variable: null });
+  assert.equal(clientConfigHome(context, "unknown", env), null);
 });
 
 // Issue #213: the Codex permission profile allowed ACC's channel directory and
