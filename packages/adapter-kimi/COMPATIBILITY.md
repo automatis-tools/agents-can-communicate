@@ -15,7 +15,10 @@ ACC's machine-readable `delivery.nextTurn` capability was captured on `0.36.1` /
 `darwin-arm64`, recorded in `certification.json`. Since 0.6.2 that capture applies forward:
 0.36.1 and everything after it reads it, on every platform, until a capture of its own says
 otherwise. A client older than 0.36.1 is reported as a downgrade, while durable `acc inbox`
-polling remains available. Kimi Code has no certified live-push binding.
+polling remains available. The terminal client has no live-push binding: an idle TUI session
+stays next-turn only, and a busy 2.4.0 turn can continue once through `Stop`. `kimi web` 2.4.0
+has a certified wake-only `livePush` binding; see
+[Stop continuation and native delivery](#stop-continuation-and-native-delivery--240-2026-10-31).
 
 ## The integration surface is not the plugin
 

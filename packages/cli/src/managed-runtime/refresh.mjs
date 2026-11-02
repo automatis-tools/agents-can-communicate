@@ -1,7 +1,7 @@
 import path from "node:path";
 import { applyPlan, detectInstallation, livePolicyOf, loadOwnership, planInstallation }
   from "@agents-can-communicate/installer";
-import { ALL_ADAPTERS, clientContext, probeTimeout, recordedLivePolicies }
+import { ALL_ADAPTERS, clientContext, plannedLivePolicy, probeTimeout, recordedLivePolicies }
   from "../install-command.mjs";
 import { processIsZombie } from "@agents-can-communicate/adapter-sdk";
 import { sweepStaleBindings } from "./activation.mjs";
@@ -27,9 +27,10 @@ export async function prepareRefresh({ control, root, env = process.env, callerP
   // session open across the update keeps running from the outgoing copy until it
   // restarts. Naming it here keeps that copy; everything older than it goes.
   const recorded = (await loadOwnership({ dataHome })).installs;
-  const context = { ...clientContext(control.home, path.join(dataHome, "acc"),
-    { env, dataHome, livePolicies: recordedLivePolicies(recorded) }), ...stablePaths(root),
-  keepPreviousVersion: control.active.version };
+  const build = livePolicies => ({ ...clientContext(control.home, path.join(dataHome, "acc"),
+    { env, dataHome, livePolicies }), ...stablePaths(root), keepPreviousVersion: control.active.version });
+  const before = recordedLivePolicies(recorded);
+  let context = build(before);
   const detected = await detectInstallation({ adapters, context, probeTimeoutMs: probeTimeout(env) });
   const deliveryByAdapter = Object.fromEntries(adapters.map(adapter => [adapter.id,
     livePolicyOf(recorded.find(record => record.adapterId === adapter.id))]));
@@ -40,9 +41,21 @@ export async function prepareRefresh({ control, root, env = process.env, callerP
   // Refresh configuration even when the client's service is temporarily absent.
   // The installer preserves consent and existing activation; readiness stays a
   // separate, current probe result rather than an update prerequisite.
-  const plan = planInstallation({ adapters, detected, context, recorded,
+  const planWith = planned => planInstallation({ adapters, detected, context: planned, recorded,
     accVersion: control.pending.version, requested: control.targets, deliveryByAdapter,
     deliveryDecisionByAdapter });
+  let plan = planWith(context);
+  // A receiver can activate for the first time in this plan: a recorded opt-in
+  // for a client the outgoing version could not deliver to live (Kimi Web before
+  // 0.14.0). Its loopback listener exists only in this plan, so the senders are
+  // planned again for the policies the refresh leaves behind.
+  const after = { ...before, ...Object.fromEntries(plan.operations
+    .map(operation => [operation.adapterId, plannedLivePolicy(operation)])) };
+  const following = build(after);
+  if (following.receiverLoopback !== context.receiverLoopback) {
+    context = following;
+    plan = planWith(context);
+  }
   if (plan.skipped.length || plan.operations.length !== wanted.size) {
     throw new Error("candidate did not plan every installed integration");
   }

@@ -6,7 +6,7 @@ import test from "node:test";
 
 import { prepareLivePermissions } from "../../adapter-codex/src/live-permissions.mjs";
 import { PROTOCOL_CONTRACT } from "../../adapter-kimi/src/web-contract.mjs";
-import { recordInstall } from "@agents-can-communicate/installer";
+import { loadOwnership, recordInstall } from "@agents-can-communicate/installer";
 
 import { clientContext, runInstallCommand } from "../src/install-command.mjs";
 import { prepareRefresh } from "../src/managed-runtime/refresh.mjs";
@@ -76,7 +76,7 @@ test("a managed refresh grants 127.0.0.1 only while Kimi's live delivery is on",
     };
 
     assert.doesNotMatch(await refreshWith("off"), /127\.0\.0\.1/);
-    // Requested but never activated - a Kimi below the Web floor - opens nothing.
+    // Requested but never activated, with Kimi outside this refresh, opens nothing.
     assert.doesNotMatch(await refreshWith("actionable", { activated: false }), /127\.0\.0\.1/);
     const enabled = await refreshWith("actionable");
     assert.match(enabled, GRANT);
@@ -85,6 +85,49 @@ test("a managed refresh grants 127.0.0.1 only while Kimi's live delivery is on",
     const disabled = await refreshWith("off");
     assert.doesNotMatch(disabled, /127\.0\.0\.1|network\.domains/);
     assert.match(disabled, /^model = "mine"$/m);
+  });
+
+// ACC 0.13.0 recorded an explicit `acc install --delivery actionable` for a Kimi
+// it could not deliver to live, with no activation. The update to a version that
+// can activates Kimi Web in its own plan, so the Codex profile it writes in the
+// same refresh must already carry the grant that activation needs.
+const refreshBoth = async ({ home, dataHome, env }) => {
+  const control = { home, targets: ["codex", "kimi"], active: { version: "0.13.0", root: process.cwd() },
+    pending: { version: "0.14.0", root: process.cwd() } };
+  const refresh = await prepareRefresh({ control, root: path.join(dataHome, "acc", "runtime"),
+    callerProtocol: 2, env });
+  return refresh();
+};
+
+test("a managed refresh that first activates Kimi grants Codex 127.0.0.1 in the same refresh",
+  { skip: POSIX_LIVE_TRANSPORT }, async t => {
+    const { home, dataHome, config, env } = await machine(t);
+    await recordInstall({ dataHome, adapterId: "kimi", version: "0.13.0", artifacts: [],
+      deliveryPolicy: "actionable",
+      deliveryDecision: { source: "explicit-option", completeSetup: true } });
+    const result = await refreshBoth({ home, dataHome, env });
+    assert.deepEqual(result.failed, []);
+    const kimi = (await loadOwnership({ dataHome })).installs.find(entry => entry.adapterId === "kimi");
+    assert.equal(kimi.nativeActivation?.livePolicy, "actionable");
+    const source = await readFile(config, "utf8");
+    assert.match(source, GRANT);
+    assert.match(source, /^model = "mine"$/m);
+  });
+
+// The same record on a Kimi below the Web floor: the refresh plans no
+// activation for it, so Codex gets no grant either.
+test("a managed refresh that cannot activate Kimi grants Codex nothing",
+  { skip: POSIX_LIVE_TRANSPORT }, async t => {
+    const { home, dataHome, bin, config, env } = await machine(t);
+    await writeFakeClient(bin, "kimi", { output: "kimi, version 2.3.0" });
+    await recordInstall({ dataHome, adapterId: "kimi", version: "0.13.0", artifacts: [],
+      deliveryPolicy: "actionable",
+      deliveryDecision: { source: "explicit-option", completeSetup: true } });
+    const result = await refreshBoth({ home, dataHome, env });
+    assert.deepEqual(result.failed, []);
+    const kimi = (await loadOwnership({ dataHome })).installs.find(entry => entry.adapterId === "kimi");
+    assert.equal(kimi.nativeActivation ?? null, null);
+    assert.doesNotMatch(await readFile(config, "utf8"), /127\.0\.0\.1|network\.domains/);
   });
 
 test("turning Kimi's live delivery on or off rewrites an installed Codex profile in the same run",
