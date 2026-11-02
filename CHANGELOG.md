@@ -5,11 +5,12 @@
 This release carries the work merged to main after 0.12.2. Each item has its own
 `Unreleased` section below.
 
-- **Store contract 8.** An inbox read no longer reads the workspace's backlog (#306), a
-  read-only transaction no longer lists the event log (#307), and attention reads each
-  receipt once (#305). The update waits until no client session runs older ACC, then moves
-  every workspace's store to contract 8 by itself. ACC 0.12.x and older refuse a contract-8
+- **Store contract 8.** An inbox read no longer reads the workspace's backlog (#306). The
+  update waits until no client session runs older ACC, then moves every workspace's store to
+  contract 8 by itself. ACC 0.12.x and older refuse a contract-8
   store. See [Upgrading](docs/UPGRADING.md#from-012x-to-0130).
+- **Faster reads.** A read-only transaction no longer lists the event log (#307), and
+  attention reads each receipt once (#305).
 - **Updates.** ACC commands keep working while an update deletes an old runtime generation
   (#406). Process start times stay unambiguous during the repeated daylight-saving hour (#402).
 - **Clients.**
