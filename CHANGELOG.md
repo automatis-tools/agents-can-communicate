@@ -11,9 +11,9 @@
 
 | Development artifact | Value |
 |---|---|
-| Built from | `fa0d4f344d17d062cbf502d02996ddd76c5a380a` |
-| Tarball | `agents-can-communicate-0.14.0.tgz`, 655,359 bytes, 390 files |
-| sha256 | `dec89aee264d2bc2097bd544859afb2be9df035ad1c309d5060d894e7e322d57` |
+| Built from | `2c18c44a9edac39b2faed376e4423e62221c1bb2` |
+| Tarball | `agents-can-communicate-0.14.0.tgz`, 655,344 bytes, 390 files |
+| sha256 | `f27028308743ee0f25e1e06c69c2fa4754ec5c00e7beedd438fd052ba14c5637` |
 
 The exact archive passed package verification. See
 [development evidence](docs/release-evidence/live-offer-diagnostics-2026-11-09.md).
