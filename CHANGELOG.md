@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.14.1 — release candidate
+
+This release carries the work merged to main after 0.14.0, from #419. It keeps store contract 8
+and adds no data migration. See [Upgrading](docs/UPGRADING.md#from-0140-to-0141).
+
+- **A held note explains itself.** A `note` held by the `actionable` policy tells the sender that
+  it arrives on the recipient's next turn and that a question or request wakes an idle session.
+  Its JSON outcome keeps `errorCode: "delivery_disabled"` and adds `"waitsForNextTurn": true`.
+- **A slow Codex refresh keeps its offer.** Refreshing the expired lease of an idle Codex session
+  has the same five-second bound as an offer. A refresh that still times out records a failed
+  offer as `transport_error`.
+
+| Candidate artifact | Value |
+|---|---|
+| Built from | `acb77793f7a0164e0da3097d6acfd8bcbdb7ef1a` |
+| Tarball | `agents-can-communicate-0.14.1.tgz`, 655,500 bytes, 390 files |
+| sha256 | `d1c569b79df46e12ff86e586f275d11908b6d64c8335c5872358a3e70138d7c9` |
+
+The exact archive passed package verification, 25 managed-update checks and an upgrade from
+published 0.14.0 in which a question crossed the update and the store stayed on contract 8. See
+[release evidence](docs/release-evidence/v0.14.1.md). This candidate is not published.
+
 ## Unreleased — a held note explains itself, and a slow Codex refresh no longer drops an offer
 
 - A `note` held by the `actionable` policy now tells the sender that it arrives on the recipient's
