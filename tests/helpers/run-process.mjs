@@ -13,7 +13,8 @@ export function runProcess(args, { timeoutMs = 4_000, env = {} } = {}) {
     child.stdout.on("data", chunk => { stdout += chunk; });
     child.stderr.on("data", chunk => { stderr += chunk; });
     const timer = setTimeout(() => child.kill("SIGKILL"), timeoutMs);
-    child.once("exit", code => {
+    // "close", because "exit" can fire while stdout still has data to deliver.
+    child.once("close", code => {
       clearTimeout(timer);
       let result = null;
       try { result = JSON.parse(stdout); } catch { /* not JSON: caller inspects stdout */ }
