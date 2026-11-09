@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { pathWithoutClients } from "../helpers/path-without-clients.mjs";
 import { execFile } from "node:child_process";
 import { mkdtemp, readFile, readdir, realpath } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -82,7 +83,7 @@ test("every documented command is one the CLI still accepts", async t => {
     const { stdout } = await run(process.execPath,
       [path.join(repo, "bin", "acc.mjs"), ...argv, "--cwd", place.cwd, "--json"],
       { env: { ...process.env, HOME: place.home, ACC_DATA_HOME: place.dataHome,
-        GIT_DIR: "", GIT_WORK_TREE: "" } })
+        PATH: pathWithoutClients(), GIT_DIR: "", GIT_WORK_TREE: "" } })
       .catch(error => { throw new Error(`${command}\n${error.stdout || error.message}`); });
     assert.equal(JSON.parse(stdout).ok, true, command);
   }

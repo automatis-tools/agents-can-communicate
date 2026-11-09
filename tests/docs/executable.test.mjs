@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { pathWithoutClients } from "../helpers/path-without-clients.mjs";
 import { mkdtemp, readFile, readdir, realpath } from "node:fs/promises";
 import { homedir, tmpdir } from "node:os";
 import path from "node:path";
@@ -97,7 +98,7 @@ async function sandbox(t, executor) {
     await runtimeWorkersQuiet(dataHome);
     await Promise.all([home, cwd, dataHome].map(removeFixture));
   });
-  const env = { ...process.env, HOME: home, USERPROFILE: home,
+  const env = { ...process.env, PATH: pathWithoutClients(), HOME: home, USERPROFILE: home,
     ACC_DATA_HOME: dataHome, ACC_NO_UPDATE_CHECK: "1",
     GIT_DIR: "", GIT_WORK_TREE: "" };
 
