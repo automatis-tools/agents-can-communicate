@@ -141,7 +141,8 @@ handoff. ACC does not restart an exited client.
 
 `--delivery actionable|all` records recipient intent; delivery also needs a
 supported platform, current probe and exact session binding. Under `actionable`,
-a `note` stays queued with `delivery_disabled`.
+a `note` stays queued with `delivery_disabled` and `"waitsForNextTurn": true`: delivery is on,
+and the note arrives with the recipient's next turn. Send a question or request to wake an idle session.
 
 For Codex, use your ordinary launch command with 0.152.1 or newer. Its LocalDaemon infrastructure and trusted hooks must establish
 the receiver's exact thread and workspace. Embedded sessions, an absent socket,

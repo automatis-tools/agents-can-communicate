@@ -124,6 +124,26 @@ test("a refresh handshake reporting a different but eligible version still succe
     runtimeDir: f.store.root, clock: f.clock })).refreshed, true);
 });
 
+const timedOut = () => handshake({ supported: false, modes: [], opaqueEndpointRef: null,
+  leaseUntil: null, reasonCode: "handshake_timeout" });
+
+test("a daemon slowed by host load gets the same bound as the offer that follows", async () => {
+  const f = await fixture();
+  const answersWithinOfferBound = async ({ timeoutMs }) => timeoutMs < 5_000 ? timedOut() : handshake();
+
+  assert.deepEqual(await refreshExpiredBinding({ service: f.service,
+    adapter: adapterWith(answersWithinOfferBound), binding: f.binding,
+    runtimeDir: f.store.root, clock: f.clock }), { refreshed: true, errorCode: null });
+});
+
+test("a refresh that times out is reported as a transport error", async () => {
+  const f = await fixture();
+
+  assert.deepEqual(await refreshExpiredBinding({ service: f.service,
+    adapter: adapterWith(async () => timedOut()), binding: f.binding,
+    runtimeDir: f.store.root, clock: f.clock }), { refreshed: false, errorCode: "transport_error" });
+});
+
 test("missing refresh support leaves the expired binding untouched", async () => {
   const f = await fixture();
   assert.equal((await refreshExpiredBinding({ service: f.service, adapter: adapterWith(undefined),

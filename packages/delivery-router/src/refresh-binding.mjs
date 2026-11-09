@@ -1,6 +1,11 @@
 import { validateNativeHandshake } from "@agents-can-communicate/adapter-sdk";
 
 const MAX_REFRESH_LEASE_MS = 120_000;
+// The same bound an offer gets. A 750 ms bound timed out in bursts on a loaded
+// host, and an idle Codex session depends on this refresh after 120 seconds.
+const REFRESH_TIMEOUT_MS = 5_000;
+const REFUSALS = new Map([["transport_permission_denied", "transport_permission_denied"],
+  ["handshake_timeout", "transport_error"]]);
 const refused = (errorCode = "recipient_unavailable") => ({ refreshed: false, errorCode });
 
 function sameBinding(current, expected, leaseUntil) {
@@ -15,7 +20,7 @@ function sameBinding(current, expected, leaseUntil) {
 }
 
 export async function refreshExpiredBinding({ service, adapter, binding, runtimeDir,
-  clock, timeoutMs = 750 }) {
+  clock, timeoutMs = REFRESH_TIMEOUT_MS }) {
   if (typeof adapter?.refreshNativeSession !== "function") return refused();
   const now = Date.parse(clock.now());
   if (!Number.isFinite(now)) return refused();
@@ -24,8 +29,7 @@ export async function refreshExpiredBinding({ service, adapter, binding, runtime
     const validated = validateNativeHandshake(adapter, {
       clientVersion: binding.clientVersion, handshake,
     });
-    if (!validated.ok) return refused(validated.reasonCode === "transport_permission_denied"
-      ? "transport_permission_denied" : "recipient_unavailable");
+    if (!validated.ok) return refused(REFUSALS.get(validated.reasonCode));
     if (validated.opaqueEndpointRef !== binding.opaqueEndpointRef) return refused();
     const requestedLease = Date.parse(validated.leaseUntil);
     if (!Number.isFinite(requestedLease) || requestedLease <= now) return refused();

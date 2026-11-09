@@ -108,6 +108,25 @@ test("an expired binding is refreshed once before one offered receipt", async ()
   assert.equal(binding.leaseUntil, "2026-09-01T21:03:00.001Z");
 });
 
+test("a refresh that times out leaves a failed-offer event naming the cause", async () => {
+  let offers = 0;
+  const f = await fixture(async () => { offers += 1; }, { refreshNativeSession: async () =>
+    refreshedHandshake({ supported: false, modes: [], opaqueEndpointRef: null, leaseUntil: null,
+      reasonCode: "handshake_timeout" }) });
+  await publish(f.service, f.recipient);
+  f.clock.advance(60_001);
+  const message = await send(f, "expired_refresh_timeout");
+
+  assert.deepEqual(await f.router.offer(message), [{ recipientParticipantId: "models",
+    outcome: "queued", transport: "durable", errorCode: "transport_error" }]);
+  assert.equal(offers, 0);
+  const failed = (await events(f)).filter(event => event.type === "message.offer_failed");
+  assert.equal(failed.length, 1);
+  assert.equal(failed[0].payload.safeErrorCode, "transport_error");
+  assert.equal((await f.service.readReceipt({ messageId: message.messageId,
+    recipientParticipantId: "models" })).state, "queued");
+});
+
 test("an adapter without refresh support leaves an expired receipt queued", async () => {
   let offers = 0;
   const f = await fixture(async () => { offers += 1; });
