@@ -11,12 +11,15 @@
 - The default also completes setup as an explicit `--delivery actionable` does: local grants, a
   missing Codex service, and the official Codex download where required. A service the default
   cannot start is reported and leaves the install successful, with the fallback in place.
+- A sender whose sandbox refuses Antigravity's relay socket now gets
+  `transport_permission_denied` and the instruction to retry through approved execution, as for
+  Claude Code, Codex and Kimi. It used to get `transport_error`, with no way to deliver the wake.
 
 | Development artifact | Value |
 |---|---|
-| Built from | `f826841a51b69ccb5ff112f1d198ee53747a3bb8` |
-| Tarball | `agents-can-communicate-0.14.1.tgz`, 655,842 bytes, 390 files |
-| sha256 | `d358d13b849378391645ecde4df9c14cc534b1bf3e07905d8dd8ffbb23c949c3` |
+| Built from | `7d749c7a3f06f52573cec668b35490a15ec9a02d` |
+| Tarball | `agents-can-communicate-0.14.1.tgz`, 655,976 bytes, 390 files |
+| sha256 | `a4ac19d672e5b200d9c63bcefe6711be67919918bee82dc4dbffde1b9b30f9fe` |
 
 The exact archive passed package verification. See
 [development evidence](docs/release-evidence/delivery-on-by-default-2026-11-09.md).
