@@ -5,9 +5,9 @@ published release.
 
 ## Exact artifact
 
-- Source: clean commit `7d749c7a3f06f52573cec668b35490a15ec9a02d`.
-- Archive: `agents-can-communicate-0.14.1.tgz`, 655,976 bytes, 390 files.
-- SHA-256: `a4ac19d672e5b200d9c63bcefe6711be67919918bee82dc4dbffde1b9b30f9fe`.
+- Source: clean commit `66ec99a79920b277c14943d380306ca72812770c`.
+- Archive: `agents-can-communicate-0.14.1.tgz`, 656,097 bytes, 390 files.
+- SHA-256: `bc40bb7be6f560fe8f19cadd3588aca8377dc585fd244ef52405d38d75ba023f`.
 - Node 24.4.0, npm 11.4.2, macOS arm64.
 
 The exact archive passed `scripts/verify-package.mjs`.
@@ -25,6 +25,7 @@ The exact archive passed `scripts/verify-package.mjs`.
 - A sender refused by Antigravity's relay socket with `EPERM` or `EACCES` gets
   `transport_permission_denied`, on an offer and on a lease refresh. Any other connection error
   stays `transport_error`.
+- The install's delivery note names a client only after that client's install succeeded.
 
 ## Real clients
 
@@ -32,7 +33,7 @@ Claude Code 2.1.321, Codex CLI 0.167.0 and Antigravity CLI 1.5.3 ran on macOS ar
 home and data home. Plain `acc install`, with no `--delivery`, recorded `default-enabled` and
 `actionable` for all three and asked nothing.
 
-### Three-window deploy lane, earlier artifact
+### Three-window deploy lane, first candidate
 
 Five runs from clean clones of the public demo, on commit
 `f826841a51b69ccb5ff112f1d198ee53747a3bb8`. Each session held one finished feature, and one
@@ -55,14 +56,14 @@ sandbox:
 - Four were `transport_error` on Antigravity's relay, and Codex received no retry instruction.
   Two messages reached Antigravity on its next turn, and two were still queued when the run ended.
 
-### Antigravity relay refusal, exact artifact
+### Antigravity relay refusal, commit `7d749c7a`
 
 Inside Codex's sandbox with `default_permissions = ":workspace"`, connecting to a listening socket
 in `/private/tmp/acc-ch-501` returned `EPERM`. The same connection succeeded with the
 `acc-workspace` profile and outside the sandbox.
 
-On the exact artifact, an idle Antigravity session and a Codex session ran in the same clone, and
-Codex was asked to send an ACC request:
+On commit `7d749c7a3f06f52573cec668b35490a15ec9a02d`, an idle Antigravity session and a Codex
+session ran in the same clone, and Codex was asked to send an ACC request:
 
 1. The first attempt recorded the message and printed that the live offer was blocked by sender
    permissions. The store shows `offer_failed` with `transport_permission_denied`.
@@ -70,8 +71,9 @@ Codex was asked to send an ACC request:
    `offer_succeeded` on the relay.
 3. The idle Antigravity session woke with no user input and answered 12 seconds later.
 
-The three-window scene then ran once more on the exact artifact: 3 deploys live, 0 collisions,
-202 seconds, load 100 at the start.
+The three-window scene then ran once more on that commit: 3 deploys live, 0 collisions,
+202 seconds, load 100 at the start. The exact artifact adds one commit after it, which limits the
+install's delivery note to clients that installed.
 
 ## Limits
 
