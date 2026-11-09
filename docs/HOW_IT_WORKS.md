@@ -108,12 +108,12 @@ All recipients have the same durable record, but adapters expose different accel
   sender name. An idle session starts a turn. A busy session takes the wake between two tool
   calls and keeps its turn. Each delivered wake fires `UserPromptSubmit`, ACC's next-turn
   hook, which shows the message in its untrusted block. The model answers with
-  `acc reply`. This is experimental, off by default and can spend tokens. Claude Code's
+  `acc reply`. This is experimental, on by default at install and can spend tokens. Claude Code's
   own inbound controls apply to each wake.
 
 - **Optional Codex LocalDaemon delivery:** a captured
   minimum of 0.152.1 plus a current probe and exact session checks allow delivery
-  to an independently opened thread. It is experimental, off by default, and can
+  to an independently opened thread. It is experimental, on by default at install, and can
   spend tokens. Messages wait for a running turn to finish; a daemon-retained
   thread can receive them for about a minute after its terminal exits, until the
   daemon unloads it and ACC closes its session. ACC adds no launch arguments
@@ -124,14 +124,14 @@ All recipients have the same durable record, but adapters expose different accel
   in the agent's own shell, so ACC's context asks the agent once per conversation to start a
   relay, a command install allows. The relay keeps the endpoint
   in memory, wakes an idle session with a fenced peer message, holds one for a busy session,
-  and ends with the client. It is experimental, off by default, and can spend tokens. The
+  and ends with the client. It is experimental, on by default at install, and can spend tokens. The
   woken agent's ACC commands run without the client's approval prompt because install adds
   an allow rule for ACC's wrapper. On Windows install adds no rule, so the client asks first.
 
 - **Optional Antigravity desktop delivery:** with Antigravity 2.19.1 or later, ACC pushes a
   message into a desktop conversation through the app's own language server, reading its
   endpoint when it binds and when it delivers, and storing no token. The agent starts
-  nothing. It is experimental, off by default, and can spend tokens.
+  nothing. It is experimental, on by default at install, and can spend tokens.
 
 Grok, generic MCP, unsupported versions and uncaptured platforms use inbox polling.
 [Capabilities](CAPABILITIES.md) lists evidence and fallback.

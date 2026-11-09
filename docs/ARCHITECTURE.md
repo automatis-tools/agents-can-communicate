@@ -113,8 +113,8 @@ is judged by its release triple. Claude Code and Codex preserve the ordinary
 client launch. Claude Code verifies its session registry, Codex verifies its registered
 thread and workspace, and Kimi verifies its Web server, live session and workspace. Native
 delivery owns no vendor daemon lifecycle. Gemini CLI has exact-version next-turn evidence
-only. Kimi Code additionally continues a busy turn once on 2.4.0 with explicit recipient
-opt-in; ordinary idle TUI stays next-turn only. Grok and generic MCP use inbox polling.
+only. Kimi Code additionally continues a busy turn once on 2.4.0 with an explicit recipient
+policy; ordinary idle TUI stays next-turn only. Grok and generic MCP use inbox polling.
 Antigravity CLI additionally attaches a session only where the client reports an open
 workspace.
 

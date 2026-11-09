@@ -36,16 +36,13 @@ test("an accepted live delivery is asked nothing more", async () => {
   assert.equal(Object.hasOwn(result, "commandApprovalAsked"), false);
 });
 
-test("a fresh install asks one question, about delivery", async () => {
-  const questions = [];
+test("a fresh install turns delivery on and asks about nothing", async () => {
   const result = await decideDelivery({ options: {}, detected: [antigravity], recorded: [],
-    dryRun: false, runtime: { isInteractive: () => true,
-      confirm: async question => { questions.push(question); return true; } } });
+    dryRun: false, runtime: { isInteractive: () => true, confirm: neverConfirm } });
 
-  assert.equal(questions.length, 1);
-  assert.match(questions[0], /peer-request setup/);
+  assert.equal(result.deliveryByAdapter.antigravity, "actionable");
   assert.deepEqual(result.deliveryDecisionByAdapter.antigravity,
-    { source: "interactive-accepted", completeSetup: true });
+    { source: "default-enabled", completeSetup: true });
 });
 
 test("an explicit delivery records its own decision and nothing about the rule", async () => {

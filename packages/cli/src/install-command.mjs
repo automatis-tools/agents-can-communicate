@@ -362,11 +362,11 @@ export async function runInstallCommand({ options, runtime, action = "install" }
   const requested = options.adapter === undefined
     ? []
     : (Array.isArray(options.adapter) ? options.adapter : [options.adapter]);
-  // Decided only after detection, from the operator's explicit answer, the
-  // recorded consent, or a default of off; never from inference.
+  // Decided only after detection: the operator's explicit option, otherwise the
+  // default, which turns delivery on and leaves a person's own off alone.
   const decided = action === "install"
-    ? await decideDelivery({ options, detected, recorded, runtime, dryRun })
-    : { deliveryByAdapter: {}, asked: [], notes: [] };
+    ? decideDelivery({ options, detected, recorded, dryRun })
+    : { deliveryByAdapter: {}, notes: [] };
   const planWith = input => planInstallation({ ...input, action, recorded,
     indicator: options.indicator,
     accVersion, allowDowngrade: options.downgrade === true, requested,
@@ -408,10 +408,10 @@ export async function runInstallCommand({ options, runtime, action = "install" }
   }
 
   return { data: { ...result, plan, dataHome, deliveryByAdapter: decided.deliveryByAdapter,
-    deliveryDecisionByAdapter: decided.deliveryDecisionByAdapter, asked: decided.asked, senders },
+    deliveryDecisionByAdapter: decided.deliveryDecisionByAdapter, senders },
   text: [describeOutcome({ action, acted, failed: result.failed,
     skipped: plan.skipped, operations: result.operations, home }),
-  ...describeSenders(senders, false)].filter(line => line !== "").join("\n"),
+  ...describeSenders(senders, false), ...decided.notes].filter(line => line !== "").join("\n"),
   error: failureOf({ action, acted, failed: result.failed, operations: result.operations,
     skipped: plan.skipped, home }) };
 }

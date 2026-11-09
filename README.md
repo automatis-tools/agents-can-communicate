@@ -114,7 +114,8 @@ provide messages at the next normal turn; other sessions read their ACC inbox ex
 
 Experimental live delivery can wake eligible Claude Code, Codex and Antigravity CLI
 sessions, conversations in the Antigravity desktop app, and local Code sessions in Claude.app.
-It requires opt-in and an active verified connection, is off by default, and can spend model
+`acc install` turns it on with the `actionable` policy for every client that can receive it;
+`--delivery off` turns it off. It needs an active verified connection and can spend model
 tokens. Claude Code sessions wake through the inbox that Claude Code itself opens, so you start
 Claude Code with your ordinary command. A busy Claude Code session gets the message between two
 tool calls. A busy Codex session gets it when the current turn ends. Chats in the Codex app run

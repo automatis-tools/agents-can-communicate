@@ -36,75 +36,67 @@ const unsupported = {
 const CLAUDE = eligible("claude_code", "Claude Code", "claude");
 const CODEX = eligible("codex", "Codex", "codex");
 const DETECTED = [CLAUDE, CODEX, unsupported];
-const neverConfirm = async () => { throw new Error("must not prompt"); };
 const decide = overrides => decideDelivery({ options: {}, detected: DETECTED, recorded: [],
-  dryRun: false, runtime: { isInteractive: () => true, confirm: neverConfirm }, ...overrides });
+  dryRun: false, ...overrides });
+const ON = { source: "default-enabled", completeSetup: true };
+const CANNOT = { source: "unsupported-default", completeSetup: false };
+const LEGACY = { source: "legacy-unknown", completeSetup: false };
 
-test("two undecided clients share one complete-setup answer", async () => {
-  const questions = [];
-  const result = await decide({ runtime: { isInteractive: () => true,
-    confirm: async question => { questions.push(question); return true; } } });
+test("a fresh install turns delivery on for every client that can receive it", async () => {
+  const result = await decide();
 
-  assert.equal(questions.length, 1);
-  assert.deepEqual(result.asked, ["claude_code", "codex"]);
   assert.deepEqual(result.deliveryByAdapter,
     { claude_code: "actionable", codex: "actionable", grok: "off" });
-  assert.deepEqual(result.deliveryDecisionByAdapter, {
-    claude_code: { source: "interactive-accepted", completeSetup: true },
-    codex: { source: "interactive-accepted", completeSetup: true },
-    grok: { source: "unsupported-default", completeSetup: false },
-  });
-  assert.match(questions[0], /Claude Code/);
-  assert.match(questions[0], /Codex/);
-  assert.match(questions[0], /tokens/);
-  assert.match(questions[0], /local permission grants/i);
-  assert.doesNotMatch(questions[0], /Channels/);
-  // A Claude session that bypasses permission prompts holds each wake.
-  assert.match(questions[0], /Claude Code sessions that bypass permission prompts ask before each ACC wake/);
-  assert.match(questions[0], /crossSessionInbound to accept/);
-  assert.match(questions[0], /start/i);
+  assert.deepEqual(result.deliveryDecisionByAdapter,
+    { claude_code: ON, codex: ON, grok: CANNOT });
 });
 
-test("one No keeps every undecided client off with declined provenance", async () => {
-  let confirms = 0;
-  const result = await decide({ runtime: { isInteractive: () => true,
-    confirm: async () => { confirms += 1; return false; } } });
+test("the install asks nothing, whatever kind of run it is", async () => {
+  const runtime = { isInteractive: () => true,
+    confirm: async () => { throw new Error("must not prompt"); } };
 
-  assert.equal(confirms, 1);
-  assert.deepEqual(result.deliveryByAdapter,
-    { claude_code: "off", codex: "off", grok: "off" });
-  assert.deepEqual(result.deliveryDecisionByAdapter, {
-    claude_code: { source: "interactive-declined", completeSetup: false },
-    codex: { source: "interactive-declined", completeSetup: false },
-    grok: { source: "unsupported-default", completeSetup: false },
-  });
+  for (const dryRun of [false, true]) {
+    const result = await decide({ runtime, dryRun });
+    assert.equal(result.deliveryByAdapter.codex, "actionable");
+  }
 });
 
-test("noninteractive and dry-run defaults do not confirm", async () => {
-  const noninteractive = await decide({ runtime: { isInteractive: () => false,
-    confirm: neverConfirm } });
-  assert.deepEqual(noninteractive.deliveryByAdapter,
-    { claude_code: "off", codex: "off", grok: "off" });
-  assert.deepEqual(noninteractive.deliveryDecisionByAdapter, {
-    claude_code: { source: "noninteractive-default", completeSetup: false },
-    codex: { source: "noninteractive-default", completeSetup: false },
-    grok: { source: "unsupported-default", completeSetup: false },
-  });
-  assert.deepEqual(noninteractive.asked, []);
+test("a fresh install says delivery is on, what it can cost, and how to turn it off", async () => {
+  const { notes } = await decide();
+  const text = notes.join("\n");
 
+  assert.match(text, /live delivery on for Claude Code, Codex/);
+  assert.doesNotMatch(text, /Grok/);
+  assert.match(text, /tokens/);
+  assert.match(text, /acc install --delivery off/);
+  assert.match(text, /Claude Code sessions that bypass permission prompts ask before each ACC wake/);
+  assert.match(text, /crossSessionInbound to accept/);
+});
+
+test("a preview shows the same policy and says it would apply it", async () => {
   const preview = await decide({ dryRun: true });
+
   assert.deepEqual(preview.deliveryByAdapter,
-    { claude_code: "off", codex: "off", grok: "off" });
-  assert.deepEqual(preview.deliveryDecisionByAdapter, {
-    claude_code: { source: "noninteractive-default", completeSetup: false },
-    codex: { source: "noninteractive-default", completeSetup: false },
-    grok: { source: "unsupported-default", completeSetup: false },
-  });
-  assert.deepEqual(preview.asked, []);
-  assert.match(preview.notes.join("\n"), /interactive choices were not made/);
+    { claude_code: "actionable", codex: "actionable", grok: "off" });
+  assert.match(preview.notes.join("\n"), /would turn live delivery on for Claude Code, Codex/);
 });
 
-test("explicit delivery policies record complete-setup intent and never confirm", async () => {
+test("the Claude Code wake note appears only when Claude Code was turned on", async () => {
+  const { notes } = await decide({ detected: [CODEX] });
+
+  assert.doesNotMatch(notes.join("\n"), /crossSessionInbound/);
+});
+
+test("a run that turns nothing on says nothing", async () => {
+  const result = await decide({ recorded: [
+    { adapterId: "claude_code", deliveryPolicy: "actionable", deliveryDecision: ON },
+    { adapterId: "codex", deliveryPolicy: "actionable", deliveryDecision: ON },
+  ] });
+
+  assert.deepEqual(result.notes, []);
+});
+
+test("explicit delivery policies record complete-setup intent", async () => {
   for (const [delivery, completeSetup] of [
     ["actionable", true], ["all", true], ["off", false],
   ]) {
@@ -116,67 +108,62 @@ test("explicit delivery policies record complete-setup intent and never confirm"
       codex: { source: "explicit-option", completeSetup },
       grok: { source: "explicit-option", completeSetup },
     });
-    assert.deepEqual(result.asked, []);
+    assert.deepEqual(result.notes, []);
   }
 });
 
-test("known decisions and a recorded non-off policy survive reinstall", async () => {
-  const accepted = { source: "interactive-accepted", completeSetup: true };
+test("a person's own off stays off", async () => {
   const declined = { source: "interactive-declined", completeSetup: false };
+  const explicit = { source: "explicit-option", completeSetup: false };
   const result = await decide({ recorded: [
-    { adapterId: "claude_code", deliveryPolicy: "all", deliveryDecision: accepted },
-    { adapterId: "codex", deliveryPolicy: "off", deliveryDecision: declined },
+    { adapterId: "claude_code", deliveryPolicy: "off", deliveryDecision: declined },
+    { adapterId: "codex", deliveryPolicy: "off", deliveryDecision: explicit },
   ] });
 
   assert.deepEqual(result.deliveryByAdapter,
-    { claude_code: "all", codex: "off", grok: "off" });
-  assert.deepEqual(result.deliveryDecisionByAdapter, {
-    claude_code: accepted,
-    codex: declined,
-    grok: { source: "unsupported-default", completeSetup: false },
-  });
-  assert.deepEqual(result.asked, []);
-});
-
-test("recorded defaults still receive one later interactive choice", async () => {
-  let confirms = 0;
-  const result = await decide({ recorded: [
-    { adapterId: "claude_code", deliveryPolicy: "off",
-      deliveryDecision: { source: "noninteractive-default", completeSetup: false } },
-    { adapterId: "codex", deliveryPolicy: "off",
-      deliveryDecision: { source: "unsupported-default", completeSetup: false } },
-  ], runtime: { isInteractive: () => true,
-    confirm: async () => { confirms += 1; return true; } } });
-
-  assert.equal(confirms, 1);
-  assert.deepEqual(result.asked, ["claude_code", "codex"]);
-  assert.deepEqual(result.deliveryByAdapter,
-    { claude_code: "actionable", codex: "actionable", grok: "off" });
-  assert.deepEqual(result.deliveryDecisionByAdapter, {
-    claude_code: { source: "interactive-accepted", completeSetup: true },
-    codex: { source: "interactive-accepted", completeSetup: true },
-    grok: { source: "unsupported-default", completeSetup: false },
-  });
-});
-
-test("a noninteractive reinstall retains existing default and legacy provenance", async () => {
-  const result = await decide({ recorded: [
-    { adapterId: "claude_code", deliveryPolicy: "off" },
-    { adapterId: "codex", deliveryPolicy: "off",
-      deliveryDecision: { source: "unsupported-default", completeSetup: false } },
-  ], runtime: { isInteractive: () => false, confirm: neverConfirm } });
-
-  assert.deepEqual(result.deliveryByAdapter,
     { claude_code: "off", codex: "off", grok: "off" });
-  assert.deepEqual(result.deliveryDecisionByAdapter, {
-    claude_code: { source: "legacy-unknown", completeSetup: false },
-    codex: { source: "unsupported-default", completeSetup: false },
-    grok: { source: "unsupported-default", completeSetup: false },
-  });
-  assert.deepEqual(result.asked, []);
+  assert.deepEqual(result.deliveryDecisionByAdapter,
+    { claude_code: declined, codex: explicit, grok: CANNOT });
+  assert.deepEqual(result.notes, []);
 });
 
-test("invalid and missing legacy provenance is normalized without changing policy", async () => {
+test("an off that ACC set itself turns on once the client can receive delivery", async () => {
+  for (const decision of [
+    { source: "noninteractive-default", completeSetup: false },
+    CANNOT,
+    undefined,
+  ]) {
+    const result = await decide({ detected: [CODEX], recorded: [{ adapterId: "codex",
+      deliveryPolicy: "off", ...(decision ? { deliveryDecision: decision } : {}) }] });
+
+    assert.equal(result.deliveryByAdapter.codex, "actionable", decision?.source);
+    assert.deepEqual(result.deliveryDecisionByAdapter.codex, ON, decision?.source);
+  }
+});
+
+test("an off that ACC set stays off while the client cannot receive delivery", async () => {
+  const result = await decide({ detected: [unsupported], recorded: [
+    { adapterId: "grok", deliveryPolicy: "off", deliveryDecision: CANNOT },
+  ] });
+
+  assert.deepEqual(result.deliveryByAdapter, { grok: "off" });
+  assert.deepEqual(result.deliveryDecisionByAdapter, { grok: CANNOT });
+});
+
+test("a recorded policy that is on survives reinstall", async () => {
+  const accepted = { source: "interactive-accepted", completeSetup: true };
+  const result = await decide({ recorded: [
+    { adapterId: "claude_code", deliveryPolicy: "all", deliveryDecision: accepted },
+    { adapterId: "codex", deliveryPolicy: "actionable", deliveryDecision: ON },
+  ] });
+
+  assert.deepEqual(result.deliveryByAdapter,
+    { claude_code: "all", codex: "actionable", grok: "off" });
+  assert.deepEqual(result.deliveryDecisionByAdapter,
+    { claude_code: accepted, codex: ON, grok: CANNOT });
+});
+
+test("invalid and missing legacy provenance is normalized without changing an enabled policy", async () => {
   const result = await decide({ recorded: [
     { adapterId: "claude_code", deliveryPolicy: "all" },
     { adapterId: "codex", deliveryPolicy: "actionable",
@@ -185,12 +172,8 @@ test("invalid and missing legacy provenance is normalized without changing polic
 
   assert.deepEqual(result.deliveryByAdapter,
     { claude_code: "all", codex: "actionable", grok: "off" });
-  assert.deepEqual(result.deliveryDecisionByAdapter, {
-    claude_code: { source: "legacy-unknown", completeSetup: false },
-    codex: { source: "legacy-unknown", completeSetup: false },
-    grok: { source: "unsupported-default", completeSetup: false },
-  });
-  assert.deepEqual(result.asked, []);
+  assert.deepEqual(result.deliveryDecisionByAdapter,
+    { claude_code: LEGACY, codex: LEGACY, grok: CANNOT });
 });
 
 test("source, setup value, and recorded policy must describe one coherent decision", async () => {
@@ -205,6 +188,8 @@ test("source, setup value, and recorded policy must describe one coherent decisi
     { source: "noninteractive-default", completeSetup: false, policy: "all" },
     { source: "unsupported-default", completeSetup: true, policy: "off" },
     { source: "unsupported-default", completeSetup: false, policy: "actionable" },
+    { source: "default-enabled", completeSetup: false, policy: "actionable" },
+    { source: "default-enabled", completeSetup: true, policy: "off" },
     { source: "legacy-unknown", completeSetup: true, policy: "all" },
   ];
 
@@ -213,85 +198,37 @@ test("source, setup value, and recorded policy must describe one coherent decisi
       detected: [CODEX],
       recorded: [{ adapterId: "codex", deliveryPolicy: entry.policy,
         deliveryDecision: { source: entry.source, completeSetup: entry.completeSetup } }],
-      runtime: { isInteractive: () => false, confirm: neverConfirm },
     });
-    assert.equal(result.deliveryByAdapter.codex, entry.policy, entry.source);
-    assert.deepEqual(result.deliveryDecisionByAdapter.codex,
-      { source: "legacy-unknown", completeSetup: false }, entry.source);
-    assert.deepEqual(result.asked, [], entry.source);
+    // An off with no coherent record of a person's choice is ACC's own off.
+    const off = entry.policy === "off";
+    assert.equal(result.deliveryByAdapter.codex, off ? "actionable" : entry.policy, entry.source);
+    assert.deepEqual(result.deliveryDecisionByAdapter.codex, off ? ON : LEGACY, entry.source);
   }
 });
 
-test("incoherent non-off decisions still receive one expanded interactive choice", async () => {
+test("a client already on completes the setup it still needs", async () => {
   const entries = [
     { ...CLAUDE, nativeServiceSetup: { state: "needed" } },
     { ...CODEX, nativeServiceSetup: { state: "blocked" } },
-    { ...eligible("fixture", "Fixture", "fixture"),
-      nativeServiceSetup: { state: "needed" } },
   ];
-  const recorded = [
-    { adapterId: "claude_code", deliveryPolicy: "all",
-      deliveryDecision: { source: "noninteractive-default", completeSetup: true } },
-    { adapterId: "codex", deliveryPolicy: "actionable",
-      deliveryDecision: { source: "interactive-declined", completeSetup: true } },
-    { adapterId: "fixture", deliveryPolicy: "actionable",
-      deliveryDecision: { source: "explicit-option", completeSetup: false } },
-  ];
-  let confirms = 0;
-  const result = await decide({ detected: entries, recorded,
-    runtime: { isInteractive: () => true,
-      confirm: async () => { confirms += 1; return true; } } });
-
-  assert.equal(confirms, 1);
-  assert.deepEqual(result.asked, ["claude_code", "codex", "fixture"]);
-  assert.deepEqual(result.deliveryByAdapter,
-    { claude_code: "all", codex: "actionable", fixture: "actionable" });
-  assert.deepEqual(result.deliveryDecisionByAdapter, {
-    claude_code: { source: "interactive-accepted", completeSetup: true },
-    codex: { source: "interactive-accepted", completeSetup: true },
-    fixture: { source: "interactive-accepted", completeSetup: true },
-  });
-});
-
-test("one answer expands setup for legacy opted-in clients that need service work", async () => {
-  const detected = [
-    { ...CLAUDE, nativeServiceSetup: { state: "needed" } },
-    { ...CODEX, nativeServiceSetup: { state: "blocked" } },
-  ];
-  const recorded = [
+  const result = await decide({ detected: entries, recorded: [
     { adapterId: "claude_code", deliveryPolicy: "all" },
-    { adapterId: "codex", deliveryPolicy: "actionable" },
-  ];
-  let confirms = 0;
-  const accepted = await decide({ detected, recorded,
-    runtime: { isInteractive: () => true, confirm: async () => { confirms += 1; return true; } } });
-  assert.equal(confirms, 1);
-  assert.deepEqual(accepted.deliveryByAdapter,
-    { claude_code: "all", codex: "actionable" });
-  assert.deepEqual(accepted.deliveryDecisionByAdapter, {
-    claude_code: { source: "interactive-accepted", completeSetup: true },
-    codex: { source: "interactive-accepted", completeSetup: true },
-  });
+    { adapterId: "codex", deliveryPolicy: "actionable",
+      deliveryDecision: { source: "explicit-option", completeSetup: false } },
+  ] });
 
-  const declined = await decide({ detected, recorded,
-    runtime: { isInteractive: () => true, confirm: async () => false } });
-  assert.deepEqual(declined.deliveryByAdapter,
-    { claude_code: "all", codex: "actionable" });
-  assert.deepEqual(declined.deliveryDecisionByAdapter, {
-    claude_code: { source: "legacy-unknown", completeSetup: false },
-    codex: { source: "legacy-unknown", completeSetup: false },
-  });
+  assert.deepEqual(result.deliveryByAdapter, { claude_code: "all", codex: "actionable" });
+  assert.deepEqual(result.deliveryDecisionByAdapter, { claude_code: ON, codex: ON });
+  assert.deepEqual(result.notes, []);
 });
 
-test("complete consent suppresses expanded setup confirmation on reinstall", async () => {
+test("complete setup is left as recorded on reinstall", async () => {
+  const explicit = { source: "explicit-option", completeSetup: true };
   const result = await decide({
     detected: [{ ...CODEX, nativeServiceSetup: { state: "needed" } }],
-    recorded: [{ adapterId: "codex", deliveryPolicy: "actionable",
-      deliveryDecision: { source: "explicit-option", completeSetup: true } }],
+    recorded: [{ adapterId: "codex", deliveryPolicy: "actionable", deliveryDecision: explicit }],
   });
 
   assert.deepEqual(result.deliveryByAdapter, { codex: "actionable" });
-  assert.deepEqual(result.deliveryDecisionByAdapter,
-    { codex: { source: "explicit-option", completeSetup: true } });
-  assert.deepEqual(result.asked, []);
+  assert.deepEqual(result.deliveryDecisionByAdapter, { codex: explicit });
 });

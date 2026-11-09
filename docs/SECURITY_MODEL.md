@@ -27,7 +27,7 @@ graph LR
 ACC does not read raw transcripts or relay permission approvals. A native delivery path
 may only offer an attributed peer envelope to an already-running, user-owned session.
 Confirmed update maintenance is a separate service restart operation; a peer message or
-live-delivery opt-in does not authorize it.
+turning live delivery on does not authorize it.
 
 ## Peer-content boundary
 
@@ -72,9 +72,9 @@ the message queued and records only a closed safe error code. Diagnostics and of
 never copy the peer body.
 
 A live adapter must match its declared evidence contract, one current
-generation-bound binding and recipient opt-in. Opaque endpoints remain private
+generation-bound binding and a recipient policy that allows the offer. Opaque endpoints remain private
 and outside repositories. Claude Code inbox wakes and Codex LocalDaemon delivery are
-experimental and off by default. Codex verifies the exact receiver thread,
+experimental and on by default at install, as `actionable`. Codex verifies the exact receiver thread,
 canonical cwd, live process, stable version and protocol, and rereads recorded
 consent before offers. A loaded daemon thread can receive messages after its TUI
 exits. Delivery off and uninstall prevent new Codex submissions; a submission
@@ -93,7 +93,7 @@ ACC also never attests a permission mode. Claude Code's inbound controls therefo
 user's: a session in `bypassPermissions` mode holds each wake for approval unless
 `crossSessionInbound` is `accept`, and `refuse` drops wakes.
 
-On captured Codex/macOS configurations, live opt-in also grants outgoing access to ACC's
+On captured Codex/macOS configurations, live delivery also grants outgoing access to ACC's
 state and local Unix sockets through a deny-by-default network proxy. The sockets are the
 ones ACC delivers to, which include the directories where Claude Code binds each session's
 inbox: a command in the Codex sandbox can connect to those sockets, and Claude Code's own
@@ -106,8 +106,10 @@ readiness does not prove that an active session's overrides permit a live offer.
 Kimi Web receives on a loopback HTTP server. A Codex network rule names a host, never a port,
 so allowing `127.0.0.1` lets a sandboxed command reach every local service on the machine, not
 only Kimi. ACC therefore writes that exact literal - never a wildcard, range or private
-netblock - only while Kimi's live delivery is activated as `actionable` or `all`. With Kimi off
-or absent the profile carries no domain rule. Turning Kimi's live delivery off or uninstalling
+netblock - only while Kimi's live delivery is activated as `actionable` or `all`. Install does this
+by default for anyone with Kimi and Codex, so a sandboxed Codex command can reach every
+local service on the machine unless you run `acc install --adapter kimi --delivery off`.
+With Kimi off or absent the profile carries no domain rule. Turning Kimi's live delivery off or uninstalling
 Kimi removes the grant from an installed Codex profile in the same command; one left over any
 other way is reported by `acc doctor` and removed by the next install or update.
 

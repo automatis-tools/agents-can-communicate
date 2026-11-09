@@ -122,7 +122,7 @@ for (const policy of ["actionable", "all"]) {
 
 test("doctor names unavailable fallback without withdrawing captured live delivery", async t => {
   const place = await machine(t);
-  await place.command("install", "--adapter", "codex", "--home", place.home);
+  await place.command("install", "--adapter", "codex", "--delivery", "off", "--home", place.home);
 
   const human = (await place.command("doctor", "--home", place.home)).stdout;
   assert.match(human, /Codex CLI live delivery:.*off/);

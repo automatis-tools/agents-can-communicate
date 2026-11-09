@@ -212,7 +212,7 @@ access. Custom policies and active-session overrides remain unverified; inspect 
 path doctor names and follow [outgoing permissions](CONFIGURATION.md#codex-outgoing-permissions).
 
 Check `acc doctor --json` and `acc status --json` while both clients are open. If policy is
-`off`, opt in with `acc install --adapter codex --delivery actionable` (or select another
+`off`, turn it on with `acc install --adapter codex --delivery actionable` (or select another
 adapter). This can spend model tokens. If policy is enabled but runtime is `waiting` and
 `deliveryBindings` is empty, no live channel is bound in this workspace. Start a new client
 session, check its integration prompts and re-run doctor. A healthy store, online peers,

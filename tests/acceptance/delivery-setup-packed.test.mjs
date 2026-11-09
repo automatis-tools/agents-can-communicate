@@ -59,7 +59,7 @@ esac
   return commandLog;
 };
 
-test("packed CLI asks once for two clients and preserves complete setup decisions", async t => {
+test("packed CLI turns delivery on for two clients without asking and keeps their setup", async t => {
   const p = await createPackedAcc(t);
   p.env.CODEX_HOME = path.join(p.clientHome, ".codex");
   p.env.SHELL = "/bin/zsh";
@@ -79,10 +79,10 @@ test("packed CLI asks once for two clients and preserves complete setup decision
 
   await human(p, [...selected, "--dry-run"]);
   await assert.rejects(readFile(downloads), { code: "ENOENT" });
-  const accepted = await terminal(p, selected, "y", { expectedCode: 4 });
-  assert.equal((accepted.stdout.match(/\[y\/N\]/g) ?? []).length, 1);
-  assert.match(accepted.stdout, /Claude Code, Codex CLI/);
-  assert.match(accepted.stdout, /Download the official Codex 0\.154\.0/);
+  // The download cannot finish here, and that is reported without failing the install.
+  const accepted = await terminal(p, selected, "y");
+  assert.equal((accepted.stdout.match(/\[y\/N\]/g) ?? []).length, 0);
+  assert.match(accepted.stdout, /turned live delivery on for Claude Code, Codex CLI/);
   assert.match(accepted.stdout + accepted.stderr, /Could not download the official Codex installer/);
   const doctor = await p.acc(["doctor"]);
   assert.ok(Array.isArray(doctor.adapters), JSON.stringify(doctor));
@@ -95,22 +95,22 @@ test("packed CLI asks once for two clients and preserves complete setup decision
   const ownership = JSON.parse(await readFile(path.join(p.dataHome, "acc", "installs.json")));
   assert.deepEqual(Object.fromEntries(ownership.installs.map(entry => [entry.adapterId,
     [entry.deliveryPolicy, entry.deliveryDecision]])), {
-    claude_code: ["actionable", { source: "interactive-accepted", completeSetup: true }],
-    codex: ["actionable", { source: "interactive-accepted", completeSetup: true, installPrerequisites: true }],
+    claude_code: ["actionable", { source: "default-enabled", completeSetup: true }],
+    codex: ["actionable", { source: "default-enabled", completeSetup: true, installPrerequisites: true }],
   });
   assert.deepEqual((await readFile(downloads, "utf8")).trim().split("\n"),
     ["https://raw.githubusercontent.com/openai/codex/rust-v0.154.0/scripts/install/install.sh"]);
   assert.doesNotMatch(await readFile(commandLog, "utf8"), /app-server daemon start/);
   assert.match(await readFile(path.join(p.env.CODEX_HOME, "config.toml"), "utf8"), /acc-workspace/);
 
-  const repeat = await terminal(p, selected, "n", { expectedCode: 4 });
+  const repeat = await terminal(p, selected, "n");
   assert.equal((repeat.stdout.match(/\[y\/N\]/g) ?? []).length, 0);
   const repeated = JSON.parse(await readFile(path.join(p.dataHome, "acc", "installs.json")));
   assert.ok(repeated.installs.every(entry => entry.deliveryDecision.completeSetup === true));
   assert.equal((await readFile(downloads, "utf8")).trim().split("\n").length, 2);
 });
 
-test("packed CLI refusal, explicit automation, and dry run keep their distinct effects", async t => {
+test("packed CLI explicit off, the default, explicit automation, and dry run keep their distinct effects", async t => {
   const refused = await createPackedAcc(t);
   refused.env.CODEX_HOME = path.join(refused.clientHome, ".codex");
   refused.env.SHELL = "/bin/zsh";
@@ -119,10 +119,10 @@ test("packed CLI refusal, explicit automation, and dry run keep their distinct e
   const refusedCommands = await enableManagedCodex(refused);
   const selected = ["install", "--adapter", "claude_code", "--adapter", "codex",
     "--home", refused.clientHome];
-  await terminal(refused, selected, "n");
+  await human(refused, [...selected, "--delivery", "off"]);
   const declined = JSON.parse(await readFile(path.join(refused.dataHome, "acc", "installs.json")));
   assert.ok(declined.installs.every(entry => entry.deliveryPolicy === "off"
-    && entry.deliveryDecision.source === "interactive-declined"
+    && entry.deliveryDecision.source === "explicit-option"
     && entry.deliveryDecision.completeSetup === false));
   assert.doesNotMatch(await readFile(path.join(refused.env.CODEX_HOME, "config.toml"), "utf8"),
     /acc-workspace|unix_sockets/);
@@ -130,6 +130,24 @@ test("packed CLI refusal, explicit automation, and dry run keep their distinct e
   const refusedDoctor = await human(refused, ["doctor", "--home", refused.clientHome]);
   assert.match(refusedDoctor.stdout, /ACC outgoing grants are absent/);
   assert.equal(refusedDoctor.stdout.split("sender permissions unverified").length - 1, 1);
+  // A later install with no option respects that off.
+  await human(refused, selected);
+  const kept = JSON.parse(await readFile(path.join(refused.dataHome, "acc", "installs.json")));
+  assert.ok(kept.installs.every(entry => entry.deliveryPolicy === "off"));
+
+  // The default tries the same service and survives its failure.
+  const defaulted = await createPackedAcc(t);
+  defaulted.env.CODEX_HOME = path.join(defaulted.clientHome, ".codex");
+  defaulted.env.SHELL = "/bin/zsh";
+  await defaulted.setClientVersions({ codex: "0.154.0" });
+  const defaultedCommands = await enableManagedCodex(defaulted);
+  const unattended = await human(defaulted, ["install", "--adapter", "codex", "--home", defaulted.clientHome]);
+  assert.match(unattended.stdout, /Codex service preparation could not verify/);
+  assert.match(unattended.stdout, /turned live delivery on for Codex CLI/);
+  assert.match(await readFile(defaultedCommands, "utf8"), /app-server daemon start/);
+  const defaultRecord = JSON.parse(await readFile(path.join(defaulted.dataHome, "acc", "installs.json")));
+  assert.equal(defaultRecord.installs[0].deliveryPolicy, "actionable");
+  assert.equal(defaultRecord.installs[0].deliveryDecision.source, "default-enabled");
 
   const automated = await createPackedAcc(t);
   automated.env.CODEX_HOME = path.join(automated.clientHome, ".codex");
@@ -151,13 +169,13 @@ test("packed CLI refusal, explicit automation, and dry run keep their distinct e
     { source: "explicit-option", completeSetup: true });
 });
 
-test("installed delivery setup preserves opt-in before a Codex service exists and explains fallback", async t => {
+test("installed delivery setup saves the default before a Codex service exists and explains fallback", async t => {
   const p = await createPackedAcc(t);
   p.env.CODEX_HOME = path.join(p.clientHome, ".codex");
   p.env.SHELL = "/bin/zsh";
   await p.setClientVersions({ codex: "0.153.4" });
   const preview = await human(p, ["install", "--adapter", "codex", "--dry-run"]);
-  assert.match(preview.stdout, /live delivery: off/);
+  assert.match(preview.stdout, /would turn live delivery on for Codex CLI/);
   await assert.rejects(readFile(path.join(p.clientHome, ".codex", "config.toml")), { code: "ENOENT" });
   // Use the shipped command and actual detection/planning/application. Only the
   // terminal answer is supplied by a port; no detection result is invented.
@@ -178,13 +196,9 @@ test("installed delivery setup preserves opt-in before a Codex service exists an
   `);
   const result = JSON.parse((await run(process.execPath, [driver],
     { cwd: p.project, env: p.env })).stdout);
-  assert.equal(result.questions.length, 1,
-    "a supported client with no running service must still offer to save consent");
-  assert.match(preview.stdout, /interactive choices were not made/);
-  assert.match(result.questions[0], /Codex CLI/);
-  assert.match(result.questions[0], /tokens/);
-  assert.match(result.questions[0], /acc inbox/);
-  assert.doesNotMatch(result.questions[0], /messages still arrive|use next-turn hooks/);
+  assert.equal(result.questions.length, 0, "the install must not ask");
+  assert.match(result.text, /turned live delivery on for Codex CLI/);
+  assert.match(result.text, /tokens/);
   const expectedPolicy = "actionable";
   const operation = result.data.operations[0];
   assert.equal(operation.livePolicy, expectedPolicy);
