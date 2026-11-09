@@ -43,8 +43,6 @@ const notOffered = (recipientParticipantId, policies) => ({
   ...(policies.includes("actionable") ? { waitsForNextTurn: true } : {}),
 });
 
-const RECORDED_REFRESH_FAILURES = new Set(["transport_permission_denied", "transport_error"]);
-
 const settled = receipt => ({ recipientParticipantId: receipt.recipientParticipantId,
   outcome: receipt.state, transport: "durable" });
 
@@ -153,7 +151,8 @@ export function createDeliveryRouter({ service, adapters, loadAdapter, clock, re
       const refreshed = await refreshExpiredBinding({ service, adapter, binding,
         runtimeDir: service.store?.root, clock });
       if (!refreshed.refreshed) {
-        if (RECORDED_REFRESH_FAILURES.has(refreshed.errorCode)) {
+        if (refreshed.errorCode === "transport_permission_denied"
+          || refreshed.errorCode === "transport_error") {
           await recordFailure(binding, message, participantId, "live-adapter", refreshed.errorCode);
         } else observeOffer(binding, refreshed.errorCode);
         return durable(participantId, refreshed.errorCode);
