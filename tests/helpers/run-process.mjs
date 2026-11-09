@@ -12,7 +12,9 @@ export function runProcess(args, { timeoutMs = 4_000, env = {} } = {}) {
     child.stderr.setEncoding("utf8");
     child.stdout.on("data", chunk => { stdout += chunk; });
     child.stderr.on("data", chunk => { stderr += chunk; });
-    const timer = setTimeout(() => child.kill("SIGKILL"), timeoutMs);
+    // Destroying the streams ends a run whose descendant still holds them open.
+    const timer = setTimeout(() => { child.kill("SIGKILL"); child.stdout.destroy(); child.stderr.destroy(); },
+      timeoutMs);
     // "close", because "exit" can fire while stdout still has data to deliver.
     child.once("close", code => {
       clearTimeout(timer);
