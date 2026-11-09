@@ -1,5 +1,18 @@
 # Upgrading
 
+## From 0.14.0 to 0.14.1
+
+Update as usual with `acc update`, or let the automatic update run. Version 0.14.1 keeps store
+contract 8 and adds no data migration.
+
+When the `actionable` policy holds a `note`, the sender now reads that the note arrives on the
+recipient's next turn and that a question or request wakes an idle session. The JSON outcome keeps
+`errorCode: "delivery_disabled"` and adds `"waitsForNextTurn": true`.
+
+An idle Codex session now has five seconds to refresh its expired lease. A refresh that still
+times out records a failed offer as `transport_error`, where it used to report
+`recipient_unavailable` and leave no event.
+
 ## From 0.13.x to 0.14.0
 
 Update as usual with `acc update`, or let the automatic update run. Version 0.14.0 keeps store
