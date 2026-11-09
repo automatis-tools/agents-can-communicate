@@ -106,7 +106,8 @@ export function defaultDelivery({ detected, recorded }) {
   return { deliveryByAdapter, deliveryDecisionByAdapter, turnedOn };
 }
 
-function notesFor(entries, dryRun) {
+/** What this run tells the operator about the clients the default turned on. */
+export function deliveryNotes(entries, dryRun) {
   if (entries.length === 0) return [];
   const names = entries.map(entry => entry.displayName ?? entry.adapterId).join(", ");
   return [
@@ -126,8 +127,8 @@ export function decideDelivery({ options, detected, recorded, dryRun }) {
   }
 
   if (explicit === undefined) {
-    const { turnedOn, ...decided } = defaultDelivery({ detected, recorded });
-    return { ...decided, notes: notesFor(turnedOn, dryRun) };
+    const decided = defaultDelivery({ detected, recorded });
+    return { ...decided, notes: deliveryNotes(decided.turnedOn, dryRun) };
   }
 
   const deliveryByAdapter = {};
@@ -139,5 +140,5 @@ export function decideDelivery({ options, detected, recorded, dryRun }) {
       ...(needsPrerequisite(entry) ? { installPrerequisites: explicit !== "off" } : {}),
     };
   }
-  return { deliveryByAdapter, deliveryDecisionByAdapter, notes: [] };
+  return { deliveryByAdapter, deliveryDecisionByAdapter, turnedOn: [], notes: [] };
 }
