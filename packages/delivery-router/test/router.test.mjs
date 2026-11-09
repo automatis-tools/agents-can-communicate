@@ -622,6 +622,21 @@ test("actionable offers every conversation-advancing kind and holds notes for th
   }
 });
 
+test("only a note held by the actionable policy is marked as waiting for the next turn",
+  async () => {
+    const actionable = await fixture();
+    await publish(actionable.service, actionable.sessions[0]);
+    const [held] = await actionable.router.offer(await sendKind(actionable, "note", "held_note"));
+    assert.equal(held.errorCode, "delivery_disabled");
+    assert.equal(held.waitsForNextTurn, true);
+
+    const off = await fixture();
+    await publish(off.service, off.sessions[0], { livePolicy: "off" });
+    const [disabled] = await off.router.offer(await sendKind(off, "note", "off_note"));
+    assert.equal(disabled.errorCode, "delivery_disabled");
+    assert.equal(Object.hasOwn(disabled, "waitsForNextTurn"), false);
+  });
+
 test("current recorded policy narrows and expands an existing binding", async () => {
   // The final row broadens an actionable binding to all. Its note must reach
   // offer now, without waiting for another recipient hook to rewrite the

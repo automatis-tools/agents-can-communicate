@@ -35,6 +35,14 @@ const liveCapable = (adapter, binding) => adapter !== undefined
 const durable = (recipientParticipantId, errorCode) => ({ recipientParticipantId,
   outcome: "queued", transport: "durable", errorCode });
 
+// Under `actionable` live delivery is on: only this kind waits for the next
+// turn. The sender needs to know that, because an idle recipient has no next
+// turn until something wakes it.
+const notOffered = (recipientParticipantId, policies) => ({
+  ...durable(recipientParticipantId, "delivery_disabled"),
+  ...(policies.includes("actionable") ? { waitsForNextTurn: true } : {}),
+});
+
 const settled = receipt => ({ recipientParticipantId: receipt.recipientParticipantId,
   outcome: receipt.state, transport: "durable" });
 
@@ -126,7 +134,7 @@ export function createDeliveryRouter({ service, adapters, loadAdapter, clock, re
       return { binding, adapter, policy: await policyFor(adapter, binding) };
     }));
     const permitted = evaluated.filter(({ policy }) => permits(policy, message.kind));
-    if (permitted.length === 0) return durable(participantId, "delivery_disabled");
+    if (permitted.length === 0) return notOffered(participantId, evaluated.map(({ policy }) => policy));
     const reachable = permitted.filter(({ binding }) => binding.availableModes.includes("livePush"));
     if (reachable.length === 0) return durable(participantId, "no_live_transport");
     const capable = reachable.filter(({ binding, adapter }) => liveCapable(adapter, binding));
@@ -143,7 +151,8 @@ export function createDeliveryRouter({ service, adapters, loadAdapter, clock, re
       const refreshed = await refreshExpiredBinding({ service, adapter, binding,
         runtimeDir: service.store?.root, clock });
       if (!refreshed.refreshed) {
-        if (refreshed.errorCode === "transport_permission_denied") {
+        if (refreshed.errorCode === "transport_permission_denied"
+          || refreshed.errorCode === "transport_error") {
           await recordFailure(binding, message, participantId, "live-adapter", refreshed.errorCode);
         } else observeOffer(binding, refreshed.errorCode);
         return durable(participantId, refreshed.errorCode);
@@ -158,9 +167,7 @@ export function createDeliveryRouter({ service, adapters, loadAdapter, clock, re
       [binding] = current;
     }
     const currentPolicy = await policyFor(adapter, binding);
-    if (!permits(currentPolicy, message.kind)) {
-      return durable(participantId, "delivery_disabled");
-    }
+    if (!permits(currentPolicy, message.kind)) return notOffered(participantId, [currentPolicy]);
     // A refresh RPC or policy read can overlap another session opening. The
     // receiver must still be the sole live session when we hand off to transport.
     const currentSessions = await service.listLiveSessions({ participantId, now: clock.now() });

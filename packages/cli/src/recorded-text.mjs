@@ -18,6 +18,9 @@ export function recordedText(message, delivery) {
           + "through approved execution"
           + (typeof message.clientMessageId === "string"
             ? ` with --client-message-id ${shellQuote(message.clientMessageId)}` : " with its original retry key")
+        : item.waitsForNextTurn === true
+          ? `${item.recipientParticipantId} gets this note on its next turn; a note does not wake an `
+            + "idle session, so send a request or question if it must act now"
         : item.errorCode === "no_live_transport"
           ? `${item.recipientParticipantId} has no live transport`
             + `${item.nativeReasonCode ? ` (${describeNativeReason(item.nativeReasonCode,

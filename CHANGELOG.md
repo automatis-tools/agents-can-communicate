@@ -1,5 +1,25 @@
 # Changelog
 
+## Unreleased — a held note explains itself, and a slow Codex refresh no longer drops an offer
+
+- A `note` held by the `actionable` policy now tells the sender that it arrives on the recipient's
+  next turn and that a question or request wakes an idle session. Its JSON outcome keeps
+  `errorCode: "delivery_disabled"` and adds `"waitsForNextTurn": true`. The ACC skill says the same.
+- Refreshing the expired lease of an idle Codex session has the same five-second bound as an
+  offer, up from 750 ms. A refresh that still times out records a failed offer as
+  `transport_error`, where it used to report `recipient_unavailable` and leave no event.
+
+| Development artifact | Value |
+|---|---|
+| Built from | `2c18c44a9edac39b2faed376e4423e62221c1bb2` |
+| Tarball | `agents-can-communicate-0.14.0.tgz`, 655,344 bytes, 390 files |
+| sha256 | `f27028308743ee0f25e1e06c69c2fa4754ec5c00e7beedd438fd052ba14c5637` |
+
+The exact archive passed package verification. See
+[development evidence](docs/release-evidence/live-offer-diagnostics-2026-11-09.md).
+This is not a published release. The version remains `0.14.0`.
+Earlier candidate and release records retain their original provenance.
+
 ## Unreleased — website changelog step in the release procedure
 
 - The release procedure ends with a step that adds the release to the changelog at getacc.dev,

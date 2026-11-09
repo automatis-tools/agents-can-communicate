@@ -114,6 +114,9 @@ For information that needs no response:
   --body "Record v2 accepts nullable pid; no migration is planned."
 ```
 
+A note does not wake an idle session; it waits for that session's next turn. When the peer
+has to act, send a question or a request.
+
 For a question, use the kind whose default obligation is a reply:
 
 ```bash
