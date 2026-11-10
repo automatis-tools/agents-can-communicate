@@ -37,7 +37,7 @@ test("recorded installed uninstall refuses ambiguous TOML before deleting any ar
   const packed = await createPackedAcc(t);
   await packed.setClientVersions({ codex: "0.153.4" });
   const args = ["--adapter", "codex", "--home", packed.clientHome];
-  await packed.acc(["install", ...args]);
+  await packed.acc(["install", ...args, "--delivery", "off"]);
   const config = path.join(packed.clientHome, ".codex", "config.toml");
   const installed = await readFile(config, "utf8");
   const ambiguous = installed.replace("enabled = true", 'enabled = true\nunknown_option = "preserve"');

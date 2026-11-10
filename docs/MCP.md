@@ -185,7 +185,7 @@ See [decision lifecycle](PROTOCOL.md#decision-lifecycle).
 
 `acc_message`, `acc_request`, `acc_reply`, and `acc_finish` record their outgoing message
 before attempting delivery. The installed server uses the delivery router and recipient
-policy to offer addressed messages through eligible, opted-in native adapters. If no
+policy to offer addressed messages through eligible native adapters whose policy allows it. If no
 eligible route accepts a pending message, it remains queued for durable retrieval.
 Inspect the returned `delivery` outcomes; sending through MCP does not guarantee a native
 offer, model attention, or a reply. These outgoing routes add no receiving capability to MCP.

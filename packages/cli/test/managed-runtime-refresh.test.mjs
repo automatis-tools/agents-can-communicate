@@ -117,3 +117,40 @@ test("a background refresh brings an older ACC's Codex grants up to date", { ski
   assert.equal(outgoingStatus(refreshed, { ...permissions, receiverSockets: ["/tmp/cc-socks"] }).state,
     "configured");
 });
+
+async function refreshOffCodex(t, deliveryDecision) {
+  const base = await realpath(await mkdtemp(path.join(tmpdir(), "acc-refresh-default-")));
+  t.after(() => rm(base, { recursive: true, force: true }));
+  const dataHome = path.join(base, "data");
+  const home = path.join(base, "home");
+  const bin = path.join(base, "bin");
+  await mkdir(bin, { recursive: true });
+  await writeFakeClient(bin, "codex", { output: "codex-cli 0.157.1" });
+  await recordInstall({ dataHome, adapterId: "codex", version: "0.157.1", artifacts: [],
+    deliveryPolicy: "off", ...(deliveryDecision ? { deliveryDecision } : {}) });
+  const control = { home, targets: ["codex"],
+    active: { version: "0.14.1", root: process.cwd() }, pending: { version: "0.15.0", root: process.cwd() } };
+  const refresh = await prepareRefresh({ control, root: path.join(dataHome, "acc", "runtime"),
+    callerProtocol: 2, env: { HOME: home, ACC_DATA_HOME: dataHome, PATH: `${bin}:/usr/bin:/bin` } });
+  const result = await refresh();
+  assert.deepEqual(result.failed, []);
+  return (await loadOwnership({ dataHome })).installs.find(entry => entry.adapterId === "codex");
+}
+
+test("an automatic update turns on delivery that ACC itself left off", { skip: POSIX_LIVE_TRANSPORT }, async t => {
+  for (const decision of [{ source: "noninteractive-default", completeSetup: false },
+    { source: "unsupported-default", completeSetup: false }, undefined]) {
+    const install = await refreshOffCodex(t, decision);
+    assert.equal(install.deliveryPolicy, "actionable", decision?.source);
+    assert.equal(install.deliveryDecision.source, "default-enabled", decision?.source);
+  }
+});
+
+test("an automatic update keeps a person's own off", { skip: POSIX_LIVE_TRANSPORT }, async t => {
+  for (const decision of [{ source: "interactive-declined", completeSetup: false },
+    { source: "explicit-option", completeSetup: false }]) {
+    const install = await refreshOffCodex(t, decision);
+    assert.equal(install.deliveryPolicy, "off", decision.source);
+    assert.deepEqual(install.deliveryDecision, decision);
+  }
+});

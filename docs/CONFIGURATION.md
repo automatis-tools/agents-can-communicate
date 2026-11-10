@@ -127,9 +127,10 @@ through the recipient's user-owned client installation:
 acc install --adapter codex --delivery off
 ```
 
-The allowed values are `off`, `actionable`, and `all`; the default is `off`. This setting
-does not belong in `acc.workspace.json`, where a pull request could opt someone else into
-spending a turn. It also cannot create a capability. Every adapter reads live-delivery
+The allowed values are `off`, `actionable`, and `all`; the default at install is `actionable`.
+`--delivery off` is recorded and respected from then on. This setting
+does not belong in `acc.workspace.json`, where a pull request could turn on spending a
+turn for someone else. It also cannot create a capability. Every adapter reads live-delivery
 consent from this installation record, and only from it. Exact-version evidence governs
 ordinary hook features. Claude Code live delivery separately requires version 2.1.282 or
 newer on macOS or Linux (on native Windows its inbox is a named pipe, so delivery stays
@@ -162,9 +163,9 @@ Unavailable or ineligible sessions retain durable inbox fallback. Use
 ### Codex outgoing permissions
 
 Receiving a native message and sending from the agent's sandbox are separate operations.
-On Codex 0.153.4 or newer, live opt-in also configures outgoing access
+On Codex 0.153.4 or newer, live delivery also configures outgoing access
 for default workspace permissions. This happens even when the daemon is not yet available.
-Installation, its preview, and the interactive consent question disclose this change.
+Installation and its preview disclose this change.
 
 On macOS and Linux with Codex 0.164.0 or newer, ACC installs a
 [command rule](#codex-command-approval) and defines an optional `acc-workspace` permission profile.

@@ -363,8 +363,8 @@ test("an idle session is described by what happens to a message sent to it", asy
     "2 live");
 });
 
-// The per-client consent decision, fed a finished detection report and fake
-// ports, so what is asked and what is stored can be checked without a client.
+// The per-client delivery decision, fed a finished detection report and fake
+// ports, so what is stored can be checked without a client.
 const eligible = (adapterId, displayName, command) => ({ adapterId, displayName, present: true,
   version: "2.1.258", nativeDelivery: { state: "eligible", reasonCode: null,
     realExecutable: `/vendor/${command}`, probe: null,
@@ -383,78 +383,53 @@ const neverAsk = { isInteractive: () => true,
 const decide = overrides => decideDelivery({ options: {}, detected: DETECTED, recorded: [],
   runtime: neverAsk, dryRun: false, context: CONTEXT, ...overrides });
 
-test("an explicit delivery applies uniformly to the selected clients and never prompts", async () => {
+test("an explicit delivery applies uniformly to the selected clients", async () => {
   for (const delivery of ["actionable", "all", "off"]) {
-    const decided = await decide({ options: { delivery } });
+    const decided = decide({ options: { delivery } });
     assert.deepEqual(decided.deliveryByAdapter,
       { claude_code: delivery, codex: delivery, grok: delivery });
-    assert.deepEqual(decided.asked, []);
   }
-  await assert.rejects(decide({ options: { delivery: "sometimes" } }), /unknown delivery policy/);
+  assert.throws(() => decide({ options: { delivery: "sometimes" } }), /unknown delivery policy/);
 });
 
-test("delivery omitted without an interactive terminal installs off and asks nothing", async () => {
-  const decided = await decide({ runtime: { isInteractive: () => false,
+test("delivery omitted turns delivery on for the clients that can receive it", () => {
+  const decided = decide({ runtime: { isInteractive: () => false,
     confirm: async () => { throw new Error("must not prompt"); } } });
-  assert.deepEqual(decided.deliveryByAdapter, { claude_code: "off", codex: "off", grok: "off" });
-  assert.deepEqual(decided.asked, []);
-  assert.deepEqual(decided.notes, []);
-});
-
-test("a dry run with delivery omitted previews off and says no choice was made", async () => {
-  const recorded = [{ adapterId: "codex", nativeActivation: { livePolicy: "all",
-    protocolContract: "codex-native-v1", mechanisms: [] } }];
-  const decided = await decide({ dryRun: true, recorded });
-  assert.deepEqual(decided.deliveryByAdapter, { claude_code: "off", codex: "all", grok: "off" });
-  assert.match(decided.notes.join("\n"), /interactive choices were not made/);
-  assert.deepEqual(decided.asked, []);
-});
-
-test("an interactive install asks one default-No question for all eligible clients", async () => {
-  const questions = [];
-  const runtime = { isInteractive: () => true, input: "in", output: "out",
-    confirm: async (question, io) => { questions.push([question, io]); return true; } };
-  const decided = await decide({ runtime });
   assert.deepEqual(decided.deliveryByAdapter,
     { claude_code: "actionable", codex: "actionable", grok: "off" });
-  assert.deepEqual(decided.asked, ["claude_code", "codex"]);
-  assert.equal(questions.length, 1, "the eligible clients did not share one decision");
-  const [first, io] = questions[0];
-
-  assert.match(first, /^Complete automatic peer-request setup for Claude Code, Codex/);
-  assert.match(first, /experimental/);
-  assert.match(first, /automatic turns can spend tokens/);
-  assert.match(first, /local permission grants/);
-  assert.match(first, /bypass permission prompts ask before each ACC wake/);
-  assert.match(first, /No:.*acc inbox/);
-  assert.doesNotMatch(first, /messages still arrive, at the session.s next turn/);
-  assert.doesNotMatch(first, /--captured|PATH|shim|launcher|plugin entry|\.zshrc/);
-  assert.deepEqual(io, { input: "in", output: "out" });
 });
 
-test("the question names its recipient even when only one client is supported", async () => {
-  const questions = [];
+test("a dry run with delivery omitted previews the same policies", () => {
+  const recorded = [{ adapterId: "codex", nativeActivation: { livePolicy: "all",
+    protocolContract: "codex-native-v1", mechanisms: [] } }];
+  const decided = decide({ dryRun: true, recorded });
+  assert.deepEqual(decided.deliveryByAdapter,
+    { claude_code: "actionable", codex: "all", grok: "off" });
+  assert.match(decided.notes.join("\n"), /would turn live delivery on for Claude Code\b/);
+});
+
+test("the delivery note speaks in the user's terms", () => {
+  const text = decide().notes.join("\n");
+
+  assert.match(text, /^turned live delivery on for Claude Code, Codex \(experimental\)/);
+  assert.match(text, /spend tokens/);
+  assert.match(text, /bypass permission prompts ask before each ACC wake/);
+  assert.doesNotMatch(text, /--captured|PATH|shim|launcher|plugin entry|\.zshrc/);
+});
+
+test("the delivery note names its client even when only one is supported", () => {
   const detected = DETECTED.filter(entry => entry.adapterId !== "codex");
-  await decideDelivery({ options: {}, detected, recorded: [], dryRun: false, context: CONTEXT,
-    runtime: { isInteractive: () => true, input: "in", output: "out",
-      confirm: async question => { questions.push(question); return false; } } });
+  const { notes } = decideDelivery({ options: {}, detected, recorded: [], dryRun: false });
 
-  assert.equal(questions.length, 1);
-  assert.match(questions[0], /^Complete automatic peer-request setup for Claude Code/);
+  assert.match(notes.join("\n"), /^turned live delivery on for Claude Code \(experimental\)/);
 });
 
-test("a recorded opt-in is kept on upgrade without a new question", async () => {
+test("a recorded policy that is on is kept while the rest take the default", () => {
   const recorded = [{ adapterId: "claude_code", nativeActivation: { livePolicy: "all",
     protocolContract: "claude-native-v1", mechanisms: [] } }];
-  const asked = [];
-  const runtime = { isInteractive: () => true, confirm: async question => {
-    asked.push(question); return false;
-  } };
-  const decided = await decide({ recorded, runtime });
+  const decided = decide({ recorded });
   assert.equal(decided.deliveryByAdapter.claude_code, "all");
-  assert.equal(decided.deliveryByAdapter.codex, "off");
-  assert.deepEqual(decided.asked, ["codex"]);
-  assert.equal(asked.length, 1);
+  assert.equal(decided.deliveryByAdapter.codex, "actionable");
 });
 
 test("EOF and blank input mean No, and only an explicit yes means Yes", async () => {

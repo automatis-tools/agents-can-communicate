@@ -75,6 +75,10 @@ export function askRelay(socketPath, message, timeoutMs) {
   });
 }
 
+// A client sandbox around the sending command refuses connect(2). The relay is fine,
+// and the sender can retry through its client's approved execution.
+const deniedToSender = error => ["EPERM", "EACCES"].includes(error?.code);
+
 const closedHandshake = (clientVersion, reasonCode) => ({ supported: false,
   clientVersion: clientVersion ?? null, protocolContract: PROTOCOL_CONTRACT, modes: [],
   opaqueEndpointRef: null, leaseUntil: null, reasonCode });
@@ -89,6 +93,7 @@ async function serving(record, { timeoutMs, isAlive, clientPid, platform = proce
     const pong = await askRelay(record.socketPath, { nonce: record.nonce, ping: true }, timeoutMs);
     return pong?.accepted === true && pong.ping === true ? null : "handshake_failed";
   } catch (error) {
+    if (deniedToSender(error)) return "transport_permission_denied";
     return error?.code === "ETIMEDOUT" ? "handshake_timeout" : "handshake_failed";
   }
 }
@@ -164,8 +169,8 @@ export async function offerMessage({ binding, message, runtimeDir, timeoutMs = 8
       return { accepted: true, transport: TRANSPORT, clientVersion: record.clientVersion };
     }
     return rejected(SAFE_CODES.get(answer?.reasonCode) ?? "transport_error");
-  } catch {
-    return rejected("transport_error");
+  } catch (error) {
+    return rejected(deniedToSender(error) ? "transport_permission_denied" : "transport_error");
   }
 }
 

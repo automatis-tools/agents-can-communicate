@@ -78,10 +78,10 @@ const CHOICES = Object.freeze({
 const NOTES = Object.freeze({
   doctor: ["--repair completes recoverable writes without changing the store contract.",
     "--migrate-store moves a contract 6 or 7 store to contract 8 after old clients and unmanaged store users stop, as ACC does itself after an update; it cannot be combined with --repair."],
-  install: ["Without --delivery, one default-No question covers all selected clients that need a decision.",
+  install: ["Without --delivery, every client that can receive live delivery gets the actionable policy; an off you chose stays.",
     "--indicator on|off controls the compact indicator in supported clients; omission preserves the saved choice (initially off).",
-    "--delivery actionable|all gives explicit complete-setup consent; --delivery off disables incoming automatic requests.",
-    "A dry run does not prompt, write configuration, or start a service. Service readiness does not establish a session binding."],
+    "--delivery actionable|all sets the policy and completes its setup; --delivery off disables incoming automatic requests.",
+    "A dry run does not write configuration or start a service. Service readiness does not establish a session binding."],
   attach: ["Native hooks already manage their own session. Attach only for a manual CLI session.",
     "Keep the returned session and generation together for subsequent calls.",
     "--cadence is a positive interval in milliseconds."],

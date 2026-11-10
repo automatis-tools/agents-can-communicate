@@ -114,6 +114,36 @@ test("a managed refresh that first activates Kimi grants Codex 127.0.0.1 in the 
     assert.match(source, /^model = "mine"$/m);
   });
 
+// Delivery is on by default now, so a Kimi that ACC itself left off turns on in the
+// update, and the Codex profile written in that refresh must carry the grant.
+test("a managed refresh that turns Kimi on by default grants Codex 127.0.0.1 in the same refresh",
+  { skip: POSIX_LIVE_TRANSPORT }, async t => {
+    const { home, dataHome, config, env } = await machine(t);
+    await recordInstall({ dataHome, adapterId: "kimi", version: "0.13.0", artifacts: [],
+      deliveryPolicy: "off",
+      deliveryDecision: { source: "unsupported-default", completeSetup: false } });
+    const result = await refreshBoth({ home, dataHome, env });
+    assert.deepEqual(result.failed, []);
+    const kimi = (await loadOwnership({ dataHome })).installs.find(entry => entry.adapterId === "kimi");
+    assert.equal(kimi.deliveryPolicy, "actionable");
+    assert.equal(kimi.nativeActivation?.livePolicy, "actionable");
+    assert.match(await readFile(config, "utf8"), GRANT);
+  });
+
+// A person who turned Kimi off keeps it off, and Codex gets no grant.
+test("a managed refresh leaves a Kimi someone turned off alone",
+  { skip: POSIX_LIVE_TRANSPORT }, async t => {
+    const { home, dataHome, config, env } = await machine(t);
+    await recordInstall({ dataHome, adapterId: "kimi", version: "0.13.0", artifacts: [],
+      deliveryPolicy: "off",
+      deliveryDecision: { source: "explicit-option", completeSetup: false } });
+    const result = await refreshBoth({ home, dataHome, env });
+    assert.deepEqual(result.failed, []);
+    const kimi = (await loadOwnership({ dataHome })).installs.find(entry => entry.adapterId === "kimi");
+    assert.equal(kimi.deliveryPolicy, "off");
+    assert.doesNotMatch(await readFile(config, "utf8"), /127\.0\.0\.1/);
+  });
+
 // The same record on a Kimi below the Web floor: the refresh plans no
 // activation for it, so Codex gets no grant either.
 test("a managed refresh that cannot activate Kimi grants Codex nothing",

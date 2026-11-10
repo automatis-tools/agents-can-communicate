@@ -1,5 +1,31 @@
 # Changelog
 
+## Unreleased — live delivery is on by default
+
+- `acc install` with no `--delivery` gives every client that can receive live delivery the
+  `actionable` policy and asks nothing. Kimi is included, so a sandboxed Codex sender gets the
+  exact `127.0.0.1` network rule when Kimi's live delivery is on. The install says which clients
+  it turned on, that a request or question can spend tokens, and how to turn it off.
+- `acc update` and the automatic update do the same where ACC itself left delivery off. An off
+  that a person chose, with `--delivery off` or by answering the old question, stays.
+- The default also completes setup as an explicit `--delivery actionable` does: local grants, a
+  missing Codex service, and the official Codex download where required. A service the default
+  cannot start is reported and leaves the install successful, with the fallback in place.
+- A sender whose sandbox refuses Antigravity's relay socket now gets
+  `transport_permission_denied` and the instruction to retry through approved execution, as for
+  Claude Code, Codex and Kimi. It used to get `transport_error`, with no way to deliver the wake.
+
+| Development artifact | Value |
+|---|---|
+| Built from | `66ec99a79920b277c14943d380306ca72812770c` |
+| Tarball | `agents-can-communicate-0.14.1.tgz`, 656,097 bytes, 390 files |
+| sha256 | `bc40bb7be6f560fe8f19cadd3588aca8377dc585fd244ef52405d38d75ba023f` |
+
+The exact archive passed package verification. See
+[development evidence](docs/release-evidence/delivery-on-by-default-2026-11-09.md).
+This is not a published release. The version remains `0.14.1`.
+Earlier candidate and release records retain their original provenance.
+
 ## 0.14.1 — release candidate
 
 This release carries the work merged to main after 0.14.0, from #419. It keeps store contract 8

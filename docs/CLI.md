@@ -405,11 +405,18 @@ beside an isolated `ACC_DATA_HOME` - is skipped with the reason; name it with `-
 remove its ACC wiring anyway.
 
 `--delivery off|actionable|all` is a per-client recipient policy request, not a capability
-switch, and the default is `off`. `--adapter` is repeatable to name several clients. An
-explicit `--delivery` applies uniformly and never prompts; omitting it on an interactive
-terminal asks one default-No question for all selected clients that need a decision. Codex can save consent while
-its local service is unavailable or has no loaded session; this does not activate delivery.
-A non-interactive run or a `--dry-run` keeps fresh clients off. A recorded opt-in is kept on upgrade. If the detected
+switch. Without it, `acc install` turns live delivery on with the `actionable` policy for
+every client that can receive it, Kimi included, and never asks a question. `actionable`
+lets a `request` or `question` wake an idle session and spend tokens; a `note` waits for the
+next turn. `all` also wakes on notes. `--adapter` is repeatable to name several clients. The
+default behaves as an explicit `--delivery actionable`: it configures the local permission
+grants, starts a missing supported Codex service, and downloads the official Codex standalone
+package where that is required. `--dry-run` previews the result and changes nothing. Codex
+can save consent while its local service is unavailable or has no loaded session; this does
+not activate delivery. `--delivery off` records your choice, and later installs and updates
+respect it, as they do an earlier "No" at the old interactive question. `acc update` and
+the automatic update turn delivery on where ACC itself set `off` and no choice is recorded;
+automatic updates never download Codex or start its service. If the detected
 client cannot receive native delivery - unsupported, below the captured minimum, a
 prerelease, known-bad, or a wrong platform - installation keeps the
 effective policy off and prints the reason. Every adapter reads live-delivery consent from
@@ -417,20 +424,21 @@ the installation record. Claude Code live delivery uses the inbox that each Clau
 session opens itself. ACC adds no launch argument, shell file or wrapper for it. Codex
 LocalDaemon delivery also keeps ordinary launch arguments unchanged.
 `acc install --adapter <adapter> --delivery off` disables new native offers for that client. On a
-supported explicit install, complete consent can prepare a missing Codex service. On macOS
+supported install, turning delivery on can prepare a missing Codex service. On macOS
 arm64 with Codex 0.154.0 or newer, the same choice includes downloading a missing standalone
 package from OpenAI. ACC selects the installed CLI version and verifies the official
 installer's pinned checksum. The installer uses the selected `HOME` and `CODEX_HOME`.
 Your existing npm or Homebrew command and shell profiles remain unchanged.
-An older consent that covered service start receives one expanded choice for the download.
-An accepted or declined answer persists. To change a declined answer, use
+An older answer that covered service start now covers the download too. A download someone
+declined stays declined. To change that, use
 `acc install --adapter codex --delivery actionable` (or `all` for that policy).
 Installing the Antigravity adapter always adds one prefix rule for ACC's wrapper to
 `~/.gemini/antigravity-cli/settings.json`, so ACC's commands run there without an approval
 prompt; nothing asks about it and the delivery policy does not change it. Uninstall removes
 exactly that rule. See
 [Antigravity CLI command approval](CONFIGURATION.md#antigravity-cli-command-approval).
-Explicit `--delivery actionable|all` also approves a required download on supported clients.
+Turning delivery on, by default or with `--delivery actionable|all`, also approves a required
+download on supported clients.
 Dry runs, delivery off, doctor, automatic refresh, and message delivery do not download
 Codex or start its service. Uninstall does not remove Codex or stop the shared vendor daemon.
 The install summary names each client's requested policy,

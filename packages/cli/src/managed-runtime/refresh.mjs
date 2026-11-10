@@ -4,6 +4,7 @@ import { applyPlan, detectInstallation, livePolicyOf, loadOwnership, planInstall
 import { ALL_ADAPTERS, clientContext, plannedLivePolicy, probeTimeout, recordedLivePolicies }
   from "../install-command.mjs";
 import { processIsZombie } from "@agents-can-communicate/adapter-sdk";
+import { defaultDelivery } from "../install-delivery-consent.mjs";
 import { sweepStaleBindings } from "./activation.mjs";
 import { listRuntimeHolds } from "./leases.mjs";
 import { stablePaths, writeLaunchers } from "./launchers.mjs";
@@ -32,10 +33,15 @@ export async function prepareRefresh({ control, root, env = process.env, callerP
   const before = recordedLivePolicies(recorded);
   let context = build(before);
   const detected = await detectInstallation({ adapters, context, probeTimeoutMs: probeTimeout(env) });
+  // An update gives a client the same default an install does, so delivery that
+  // ACC itself left off comes on here. A person's own off stays.
+  const defaults = defaultDelivery({ detected, recorded });
   const deliveryByAdapter = Object.fromEntries(adapters.map(adapter => [adapter.id,
-    livePolicyOf(recorded.find(record => record.adapterId === adapter.id))]));
+    defaults.deliveryByAdapter[adapter.id]
+      ?? livePolicyOf(recorded.find(record => record.adapterId === adapter.id))]));
   const deliveryDecisionByAdapter = Object.fromEntries(adapters.flatMap(adapter => {
-    const decision = recorded.find(record => record.adapterId === adapter.id)?.deliveryDecision;
+    const decision = defaults.deliveryDecisionByAdapter[adapter.id]
+      ?? recorded.find(record => record.adapterId === adapter.id)?.deliveryDecision;
     return decision === undefined ? [] : [[adapter.id, decision]];
   }));
   // Refresh configuration even when the client's service is temporarily absent.

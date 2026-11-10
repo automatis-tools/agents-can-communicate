@@ -28,8 +28,12 @@ export async function applyServiceSetup({ adapter, context, operation, results }
     operation.deliveryDiagnostic = setup.diagnostic;
   } else {
     operation.needsAction.push(setup.diagnostic);
-    if (setup.state === "failed") results.failed.push({ adapterId: operation.adapterId,
-      error: setup.diagnostic, reasonCode: setup.reasonCode, stage: "service-setup" });
+    // Nobody asked for this service by name, so one that cannot start yet leaves
+    // the install successful, the fallback in place, and the reason on screen.
+    if (setup.state === "failed" && operation.deliveryDecision.source !== "default-enabled") {
+      results.failed.push({ adapterId: operation.adapterId,
+        error: setup.diagnostic, reasonCode: setup.reasonCode, stage: "service-setup" });
+    }
   }
   operation.diagnostics.push(setup.diagnostic);
 }

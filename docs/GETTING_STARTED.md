@@ -52,14 +52,16 @@ With legacy sandbox settings, the named ACC state directory must also be in
 ACC keeps those user settings unchanged. Installed files alone do not establish that hooks
 are active; `acc doctor` leaves current readiness unverified and directs you to Codex.
 
-Read the delivery summary for each client. Live delivery needs an explicit opt-in and a
-verified channel in the current session. Codex can save your choice even when its local
-service is not running yet. Declining uses the reported fallback: `acc inbox`, or next-turn
-hooks wherever the client is at or after a captured version.
+Read the delivery summary for each client. `acc install` turns live delivery on with the
+`actionable` policy for every client that can receive it, and asks no question. A request or
+question can then wake an idle session and spend tokens; a note waits for the next turn.
+Live delivery also needs a verified channel in the current session. Codex can save your
+choice even when its local service is not running yet. A client that cannot receive it stays
+off with the reported fallback: `acc inbox`, or next-turn hooks wherever the client is at or
+after a captured version.
 
-An interactive install asks one default-No question for all selected clients that need a
-choice. Use `--delivery actionable|all` for explicit noninteractive consent. Use
-`--delivery off` to disable incoming automatic requests. A dry run does not ask, write
+Use `--delivery all` to wake on notes too. Use `--delivery off` to disable incoming automatic
+requests; ACC keeps that choice on later installs and updates. A dry run does not write
 configuration, download Codex, or start a service. On macOS or Linux with Codex 0.154.0 through
 0.157.0, the choice includes downloading a missing standalone package from OpenAI; Codex
 0.157.1 and newer install the service's own package when it first starts. ACC selects the
@@ -70,11 +72,11 @@ trust review to establish a session-bound channel. An incomplete existing standa
 installation or unsupported CLI version still needs the vendor action named by install.
 
 Claude Code's experimental live delivery wakes the session through the inbox that Claude
-Code opens for every session. After you opt in, start Claude Code with your ordinary command.
+Code opens for every session. With live delivery on, start Claude Code with your ordinary command.
 ACC adds no launch flag, shell change or wrapper. A session in `bypassPermissions` mode asks
 you to approve each ACC wake. See
 [held or dropped wakes](TROUBLESHOOTING.md#a-claude-code-session-holds-or-drops-acc-wakes).
-The feature is off by default, can spend model tokens, and requires Claude Code 2.1.282 or
+The feature is on by default at install, can spend model tokens, and requires Claude Code 2.1.282 or
 newer. Local sessions in Claude.app's Code tab wake the same way; its Cloud, SSH and Cowork
 sessions run on another machine. You do not need it for durable messages or supported
 next-turn delivery.
@@ -148,10 +150,10 @@ the client shows no hook output to say so - `acc doctor` names it.
 Codex LocalDaemon and the Claude Code inbox wake offer optional native delivery. They are
 experimental and can spend tokens. Codex queues a message
 until a running turn finishes. A busy Claude Code session takes the wake between two tool
-calls. Claude Code requires 2.1.282 or newer and recorded opt-in, and it wakes through the
+calls. Claude Code requires 2.1.282 or newer and delivery on, and it wakes through the
 inbox that each session opens itself. Codex requires 0.152.1 or newer, LocalDaemon
-infrastructure, recorded opt-in, and a verified session. A new Codex chat becomes
-addressable before its first message: `acc status` registers it. Supported explicit setup can
+infrastructure, delivery on, and a verified session. A new Codex chat becomes
+addressable before its first message: `acc status` registers it. Supported setup can
 prepare a missing service. Start the client with your normal command. A loaded daemon
 thread can receive messages for about a minute after its terminal exits, until the daemon
 unloads it and ACC closes its session. Antigravity CLI 1.2.7 and later has one too: with

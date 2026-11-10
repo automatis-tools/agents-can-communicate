@@ -1,14 +1,19 @@
 import { LIVE_POLICIES, livePolicyOf } from "@agents-can-communicate/installer";
 import { AccError, EXIT } from "@agents-can-communicate/protocol";
 
+/** What a client that can receive live delivery gets when nobody chose otherwise. */
+export const DEFAULT_LIVE_POLICY = "actionable";
+
 const DECISION_SOURCES = new Set([
   "interactive-accepted",
   "interactive-declined",
   "explicit-option",
   "noninteractive-default",
   "unsupported-default",
+  "default-enabled",
   "legacy-unknown",
 ]);
+// A person made these. `off` from any other source is ACC's own and yields to the default.
 const DELIBERATE_SOURCES = new Set([
   "interactive-accepted", "interactive-declined", "explicit-option",
 ]);
@@ -25,7 +30,9 @@ function validDecision(record) {
       || (decision.installPrerequisites && !decision.completeSetup))) return false;
 
   const enabled = livePolicyOf(record) !== "off";
-  if (decision.source === "interactive-accepted") return decision.completeSetup && enabled;
+  if (["interactive-accepted", "default-enabled"].includes(decision.source)) {
+    return decision.completeSetup && enabled;
+  }
   if (decision.source === "interactive-declined") return !decision.completeSetup && !enabled;
   if (decision.source === "explicit-option") return decision.completeSetup === enabled;
   if (["noninteractive-default", "unsupported-default"].includes(decision.source)) {
@@ -50,117 +57,88 @@ const needsExpandedSetup = entry => ["needed", "blocked"]
   .includes(entry.nativeServiceSetup?.state);
 const needsPrerequisite = entry => entry.nativeServiceSetup?.requiresInstall === true;
 
-const isInteractive = runtime => typeof runtime.isInteractive === "function"
-  && runtime.isInteractive() === true;
-
-function questionFor(entries) {
-  const names = entries.map(entry => entry.displayName ?? entry.adapterId).join(", ");
-  const setup = [...new Set(entries.map(entry => entry.outgoingDelivery?.setup)
-    .filter(value => typeof value === "string"))];
-  return [
-    `Complete automatic peer-request setup for ${names}? (experimental)`,
-    "  Yes: automatic turns can spend tokens without waiting for you.",
-    "       Configure the required local permission grants.",
-    ...(entries.some(entry => entry.adapterId === "codex")
-      ? ["       Start a missing supported Codex service."] : []),
-    ...entries.filter(needsPrerequisite).map(entry =>
-      `       Download the official Codex ${entry.nativeServiceSetup.cliVersion} standalone package for its service; retain your existing codex command.`),
-    ...setup.map(note => `       ${note}`),
-    ...(entries.some(entry => entry.adapterId === "claude_code")
-      ? ["       Claude Code sessions that bypass permission prompts ask before each ACC wake;",
-        "       set Claude Code's crossSessionInbound to accept to take wakes without asking."] : []),
-    "  No: keep current delivery policies and use available next-turn hooks or acc inbox.",
-  ].join("\n");
+/** True when a client that is already on still lacks setup it has not been refused. */
+function setupStillOwed(entry, record) {
+  const decision = decisionOf(record);
+  const expandsSetup = needsExpandedSetup(entry) && !decision.completeSetup
+    && !(needsPrerequisite(entry) && decision.installPrerequisites === false);
+  const expandsPrerequisite = needsPrerequisite(entry)
+    && !Object.hasOwn(decision, "installPrerequisites");
+  return expandsSetup || expandsPrerequisite;
 }
 
-/** Decide delivery once for all clients whose complete setup has no recorded answer. */
-export async function decideDelivery({ options, detected, recorded, runtime, dryRun }) {
-  const explicit = options.delivery;
-  if (explicit !== undefined && !LIVE_POLICIES.includes(explicit)) {
-    throw new AccError(EXIT.USAGE, `unknown delivery policy: ${explicit}`, { delivery: explicit });
-  }
-
+/**
+ * The delivery every client gets when this run names no policy, for an install and
+ * for an update alike: on for each client that can receive it. An off stays only
+ * when a person chose it, so a client ACC left off comes on once it is able to.
+ */
+export function defaultDelivery({ detected, recorded }) {
   const recordedById = new Map(recorded.map(install => [install.adapterId, install]));
   const deliveryByAdapter = {};
   const deliveryDecisionByAdapter = {};
-  const candidates = [];
-  let withheld = 0;
+  const turnedOn = [];
 
   for (const entry of detected) {
     const record = recordedById.get(entry.adapterId);
     const previous = livePolicyOf(record);
-    const eligible = isEligible(entry);
-
-    if (explicit !== undefined) {
-      deliveryByAdapter[entry.adapterId] = explicit;
-      deliveryDecisionByAdapter[entry.adapterId] = {
-        source: "explicit-option", completeSetup: explicit !== "off",
-        ...(needsPrerequisite(entry) ? { installPrerequisites: explicit !== "off" } : {}),
-      };
-      continue;
-    }
+    const enabled = { source: "default-enabled", completeSetup: true,
+      ...(needsPrerequisite(entry) ? { installPrerequisites: true } : {}) };
 
     deliveryByAdapter[entry.adapterId] = previous;
-    if (record !== undefined) {
-      deliveryDecisionByAdapter[entry.adapterId] = decisionOf(record);
-    }
+    if (record !== undefined) deliveryDecisionByAdapter[entry.adapterId] = decisionOf(record);
 
-    if (!eligible) {
+    if (!isEligible(entry)) {
       deliveryDecisionByAdapter[entry.adapterId] ??= {
         source: "unsupported-default", completeSetup: false,
       };
       continue;
     }
 
-    const alreadyDecided = validDecision(record)
-      && DELIBERATE_SOURCES.has(record.deliveryDecision.source);
-    const expandsLegacyOptIn = previous !== "off" && needsExpandedSetup(entry)
-      && !decisionOf(record).completeSetup
-      && !(needsPrerequisite(entry) && decisionOf(record).installPrerequisites === false);
-    const freshDecision = previous === "off" && !alreadyDecided;
-    const expandsPrerequisite = previous !== "off" && needsPrerequisite(entry)
-      && !Object.hasOwn(decisionOf(record), "installPrerequisites");
-    if (!freshDecision && !expandsLegacyOptIn && !expandsPrerequisite) {
-      deliveryDecisionByAdapter[entry.adapterId] ??= legacyDecision();
-      continue;
-    }
-
-    if (dryRun || !isInteractive(runtime)) {
-      if (record === undefined) {
-        deliveryDecisionByAdapter[entry.adapterId] = {
-          source: "noninteractive-default", completeSetup: false,
-        };
-      }
-      if (dryRun && freshDecision) withheld += 1;
-      continue;
-    }
-    candidates.push(entry);
-  }
-
-  const asked = candidates.map(entry => entry.adapterId);
-  if (candidates.length > 0) {
-    const yes = await runtime.confirm(questionFor(candidates),
-      { input: runtime.input, output: runtime.output }) === true;
-    for (const entry of candidates) {
-      const record = recordedById.get(entry.adapterId);
-      const previous = livePolicyOf(record);
-      deliveryByAdapter[entry.adapterId] = yes
-        ? (previous === "off" ? "actionable" : previous)
-        : previous;
-      deliveryDecisionByAdapter[entry.adapterId] = yes
-        ? { source: "interactive-accepted", completeSetup: true }
-        : previous === "off"
-          ? { source: "interactive-declined", completeSetup: false }
-          : decisionOf(record);
-      if (needsPrerequisite(entry)) {
-        deliveryDecisionByAdapter[entry.adapterId].installPrerequisites = yes;
-      }
+    if (previous === "off") {
+      if (validDecision(record) && DELIBERATE_SOURCES.has(record.deliveryDecision.source)) continue;
+      deliveryByAdapter[entry.adapterId] = DEFAULT_LIVE_POLICY;
+      deliveryDecisionByAdapter[entry.adapterId] = enabled;
+      turnedOn.push(entry);
+    } else if (setupStillOwed(entry, record)) {
+      deliveryDecisionByAdapter[entry.adapterId] = enabled;
     }
   }
+  return { deliveryByAdapter, deliveryDecisionByAdapter, turnedOn };
+}
 
-  const notes = explicit === undefined && dryRun && withheld > 0
-    ? ["interactive choices were not made: this preview keeps native delivery off for "
-      + `${withheld} eligible client(s) without a recorded opt-in`]
-    : [];
-  return { deliveryByAdapter, deliveryDecisionByAdapter, asked, notes };
+/** What this run tells the operator about the clients the default turned on. */
+export function deliveryNotes(entries, dryRun) {
+  if (entries.length === 0) return [];
+  const names = entries.map(entry => entry.displayName ?? entry.adapterId).join(", ");
+  return [
+    `${dryRun ? "would turn" : "turned"} live delivery on for ${names} (experimental): a request or `
+      + "question can wake an idle session and spend tokens; acc install --delivery off turns it off",
+    ...(entries.some(entry => entry.adapterId === "claude_code")
+      ? ["Claude Code sessions that bypass permission prompts ask before each ACC wake; "
+        + "set Claude Code's crossSessionInbound to accept to take wakes without asking"] : []),
+  ];
+}
+
+/** Decide delivery for an install: the operator's explicit option, or the default. */
+export function decideDelivery({ options, detected, recorded, dryRun }) {
+  const explicit = options.delivery;
+  if (explicit !== undefined && !LIVE_POLICIES.includes(explicit)) {
+    throw new AccError(EXIT.USAGE, `unknown delivery policy: ${explicit}`, { delivery: explicit });
+  }
+
+  if (explicit === undefined) {
+    const decided = defaultDelivery({ detected, recorded });
+    return { ...decided, notes: deliveryNotes(decided.turnedOn, dryRun) };
+  }
+
+  const deliveryByAdapter = {};
+  const deliveryDecisionByAdapter = {};
+  for (const entry of detected) {
+    deliveryByAdapter[entry.adapterId] = explicit;
+    deliveryDecisionByAdapter[entry.adapterId] = {
+      source: "explicit-option", completeSetup: explicit !== "off",
+      ...(needsPrerequisite(entry) ? { installPrerequisites: explicit !== "off" } : {}),
+    };
+  }
+  return { deliveryByAdapter, deliveryDecisionByAdapter, turnedOn: [], notes: [] };
 }

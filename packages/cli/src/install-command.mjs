@@ -13,7 +13,7 @@ import { AccError, EXIT } from "@agents-can-communicate/protocol";
 
 import { platformPaths } from "./platform-paths.mjs";
 import { installManaged, uninstallManaged } from "./managed-runtime/install.mjs";
-import { decideDelivery } from "./install-delivery-consent.mjs";
+import { decideDelivery, deliveryNotes } from "./install-delivery-consent.mjs";
 
 export { decideDelivery } from "./install-delivery-consent.mjs";
 
@@ -362,11 +362,11 @@ export async function runInstallCommand({ options, runtime, action = "install" }
   const requested = options.adapter === undefined
     ? []
     : (Array.isArray(options.adapter) ? options.adapter : [options.adapter]);
-  // Decided only after detection, from the operator's explicit answer, the
-  // recorded consent, or a default of off; never from inference.
+  // Decided only after detection: the operator's explicit option, otherwise the
+  // default, which turns delivery on and leaves a person's own off alone.
   const decided = action === "install"
-    ? await decideDelivery({ options, detected, recorded, runtime, dryRun })
-    : { deliveryByAdapter: {}, asked: [], notes: [] };
+    ? decideDelivery({ options, detected, recorded, dryRun })
+    : { deliveryByAdapter: {}, turnedOn: [], notes: [] };
   const planWith = input => planInstallation({ ...input, action, recorded,
     indicator: options.indicator,
     accVersion, allowDowngrade: options.downgrade === true, requested,
@@ -407,11 +407,15 @@ export async function runInstallCommand({ options, runtime, action = "install" }
         ...describeSenders(senders, true), ...decided.notes].join("\n") };
   }
 
+  // Announced from what this run applied: a client that failed keeps its old policy.
+  const failedIds = new Set((result.failed ?? []).map(failure => failure.adapterId));
+  const turnedOn = decided.turnedOn.filter(entry => !failedIds.has(entry.adapterId));
   return { data: { ...result, plan, dataHome, deliveryByAdapter: decided.deliveryByAdapter,
-    deliveryDecisionByAdapter: decided.deliveryDecisionByAdapter, asked: decided.asked, senders },
+    deliveryDecisionByAdapter: decided.deliveryDecisionByAdapter, senders },
   text: [describeOutcome({ action, acted, failed: result.failed,
     skipped: plan.skipped, operations: result.operations, home }),
-  ...describeSenders(senders, false)].filter(line => line !== "").join("\n"),
+  ...describeSenders(senders, false), ...deliveryNotes(turnedOn, false)]
+    .filter(line => line !== "").join("\n"),
   error: failureOf({ action, acted, failed: result.failed, operations: result.operations,
     skipped: plan.skipped, home }) };
 }
