@@ -1,5 +1,31 @@
 # Upgrading
 
+## From 0.14.x to 0.15.0
+
+Update as usual with `acc update`, or let the automatic update run. Version 0.15.0 keeps store
+contract 8 and adds no data migration.
+
+The update turns live delivery on. Each client that can receive it and that ACC itself left off
+gets the `actionable` policy, Kimi included, and nothing asks first. From then on, a request or
+question can wake an idle session and spend tokens. A `note` still waits for the next turn.
+
+- An off that you chose stays. That means `--delivery off`, or answering no to the question that
+  earlier versions asked.
+- `acc doctor` shows each client's policy. `acc install --delivery off` turns delivery off for
+  every client, and `acc install --adapter <adapter> --delivery off` for one.
+- While Kimi's live delivery is on, a sandboxed Codex sender gets the exact `127.0.0.1` network
+  rule, written in the same update. That rule opens every local service to Codex's sandbox; see
+  [Durable and delivery integrity](SECURITY_MODEL.md#durable-and-delivery-integrity).
+- A Claude Code session that bypasses permission prompts asks before each ACC wake. See
+  [delivery troubleshooting](TROUBLESHOOTING.md#a-claude-code-session-holds-or-drops-acc-wakes).
+
+An update does not download Codex or start its service. If `acc doctor` reports the Codex service
+as missing, run `acc install`, which prepares it. A service that `acc install` cannot start is
+reported and leaves the install successful, with next-turn delivery in place.
+
+A sender whose sandbox refuses Antigravity's relay socket now gets `transport_permission_denied`
+and the instruction to retry through approved execution. It used to get `transport_error`.
+
 ## From 0.14.0 to 0.14.1
 
 Update as usual with `acc update`, or let the automatic update run. Version 0.14.1 keeps store
