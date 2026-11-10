@@ -1,5 +1,30 @@
 # Changelog
 
+## 0.15.0 — release candidate
+
+This release carries the work merged to main after 0.14.1, from #421. It keeps store contract 8
+and adds no data migration. See [Upgrading](docs/UPGRADING.md#from-014x-to-0150).
+
+- **Live delivery is on by default.** `acc install` with no `--delivery` gives every client that
+  can receive live delivery the `actionable` policy and asks nothing, Kimi included. `acc update`
+  and the automatic update do the same where ACC itself left delivery off. An off that a person
+  chose stays. A request or question can now wake an idle session and spend tokens, and the
+  install says so. `acc install --delivery off` turns it off.
+- **Antigravity's relay tells a sandboxed sender what to do.** A sender whose sandbox refuses the
+  relay socket gets `transport_permission_denied` and the instruction to retry through approved
+  execution, as for Claude Code, Codex and Kimi.
+
+| Candidate artifact | Value |
+|---|---|
+| Built from | `a8c492509457741787d5afe0b8bd42dd3154d99b` |
+| Tarball | `agents-can-communicate-0.15.0.tgz`, 656,464 bytes, 390 files |
+| sha256 | `0364857eab90a1edd8aa2b63b1f384f01265e12864d3a7db3f786d254524d903` |
+
+The exact archive passed package verification, 25 managed-update checks and upgrades from
+published 0.14.1 with real client executables, in which delivery came on where ACC had left it off
+and a person's off stayed. See [release evidence](docs/release-evidence/v0.15.0.md). This candidate
+is not published.
+
 ## Unreleased — live delivery is on by default
 
 - `acc install` with no `--delivery` gives every client that can receive live delivery the
