@@ -1,5 +1,27 @@
 # Changelog
 
+## Unreleased — Codex keeps trusting ACC's hooks across updates
+
+- **An ACC update no longer switches off ACC's hooks in Codex.** Codex trusts a plugin's hooks
+  against a hash of the whole plugin, and every ACC release changed that hash: it stamped its
+  version into the plugin, and the skill's text lived there too. After each update Codex ran
+  none of ACC's hooks until a person trusted them again. The hooks now live in a plugin of their
+  own, `agents-can-communicate-hooks`, whose version moves only when its files do. An update
+  that leaves the hooks alone leaves the copy Codex trusted byte for byte, and a Codex session
+  open during the update keeps running ACC's hooks. The skill stays in
+  `agents-can-communicate`, under the same name.
+- Updating from 0.15.x or earlier asks once more, because the hooks appear under the new
+  plugin. A Codex session open during that update runs no ACC hooks until it restarts.
+
+| Development artifact | Value |
+|---|---|
+| Built from | `9aa2ceb5fc1afd0b25d5527c81f06204ff8a701c` |
+| Tarball | `agents-can-communicate-0.15.0.tgz`, 658,915 bytes, 392 files |
+| sha256 | `eedd261280ce718ae28cd6e7feec6eb574e4c05f02e267161fcc2dd0824a058b` |
+
+The exact archive passed package verification and a real Codex CLI 0.167.1 run. See
+[development evidence](docs/release-evidence/codex-hooks-own-plugin-2026-11-11.md).
+
 ## 0.15.0 — release candidate
 
 This release carries the work merged to main after 0.14.1, from #421. It keeps store contract 8
