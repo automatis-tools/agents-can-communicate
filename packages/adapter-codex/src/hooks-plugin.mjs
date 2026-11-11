@@ -81,9 +81,11 @@ const stamp = (source, version) =>
  * both always carry the same one. Returns the version settled on and whether the
  * cached copy changed.
  *
- * Nothing is removed when nothing changed. When the copy changes, the one it
- * replaces stays beside it: a session open across the update was trusted
- * against that copy's hash and keeps running its hooks until it ends.
+ * Nothing is touched when nothing changed, so a Codex session open across the
+ * update keeps running ACC's hooks: Codex resolves the plugin again while the
+ * session runs, finds the same copy, and its hash still matches. When the copy
+ * changes, the one it replaces goes. Codex runs the highest version present,
+ * open sessions included (measured on 0.167.1), so nothing would read it.
  */
 export async function settleHooksPlugin({ source, cacheDir, version }) {
   const present = (await readdir(cacheDir, { withFileTypes: true }).catch(() => []))
@@ -97,6 +99,6 @@ export async function settleHooksPlugin({ source, cacheDir, version }) {
   const cached = path.join(cacheDir, version);
   await rm(cached, { recursive: true, force: true });
   await cp(source, cached, { recursive: true });
-  await keepVersions({ root: cacheDir, keep: [version, active], io });
+  await keepVersions({ root: cacheDir, keep: [version], io });
   return { version, changed: true };
 }

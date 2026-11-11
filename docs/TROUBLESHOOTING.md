@@ -322,8 +322,10 @@ enable/trust its current definition if needed; then restart the session. New or 
 definitions need review, and a trusted hook can still be disabled.
 
 Codex asks again only when the hooks plugin itself changes: a new hook, or a shim that now
-pins a different node. An ACC update that leaves both alone keeps the copy Codex trusted.
-Updating from 0.15.x or earlier asks once, because the hooks moved to their own plugin.
+pins a different node. An ACC update that leaves both alone keeps the copy Codex trusted,
+and an open session keeps running ACC's hooks. Updating from 0.15.x or earlier asks once,
+because the hooks moved to their own plugin; a Codex session open during that update runs
+no ACC hooks until you restart it.
 
 `acc doctor` reports installed files separately from hook readiness, which it leaves
 unverified. A saved trust record cannot prove current activation. If installation preserved

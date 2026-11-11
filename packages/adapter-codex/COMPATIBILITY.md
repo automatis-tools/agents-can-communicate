@@ -433,13 +433,28 @@ files an install would write are byte for byte the same, and the marketplace cop
 that same version, since Codex re-copies a plugin whose marketplace version differs from
 its cached one. A changed hook list or shim (the shim pins the node it runs) is a changed
 plugin: it gets the running ACC's version and Codex asks for trust again, as it should.
-The copy it replaces stays for sessions trusted against it. The skill's plugin holds no
-hooks, so Codex hashes nothing there and its version follows ACC's.
+The copy it replaces goes. The skill's plugin holds no hooks, so Codex hashes nothing
+there and its version follows ACC's.
 
-Moving from the single plugin costs one more review: the five hooks appear under the new
-plugin id. A Codex session opened before that update still runs the old cached copy's
-hooks, which call the shim at the skill plugin's path, so ACC keeps a shim there while
-that old copy is kept and drops it with the next update.
+Codex resolves each enabled plugin to its highest cached version again while a session
+runs. A plugin enabled after the session started is not loaded until the next session.
+So a session open across an ACC update that leaves the hooks plugin alone keeps running
+ACC's hooks, and a session open across the move from the single plugin has none until it
+restarts. That move costs one more review, because the five hooks appear under the new
+plugin id; until 0.15.x every update cost one.
+
+Observed on 2026-11-11 with Codex CLI 0.167.1 on macOS arm64, in isolated homes (own
+`HOME`, `CODEX_HOME` and ACC data home) driven through a PTY, with candidate archives
+re-versioned 0.15.90, 0.15.91 and 0.15.92 and updates served from a local registry:
+
+| Step | Codex |
+|---|---|
+| Fresh install of 0.15.90, first session | "Hooks need review: 5 hooks are new or changed", all under `agents-can-communicate-hooks@acc-local`; trusted with `trusted_content_hash` equal to ACC's port of Codex's hash over the cached copy |
+| `acc update` to 0.15.91, new session | no review; `/hooks` lists all five installed and active; a prompt ran them and the session joined ACC |
+| `/skills` | `acc (agents-can-communicate)` |
+| Published 0.15.0 trusted, session left open, `acc update` to 0.15.90 | the open session's `/hooks` lists no hooks and a prompt registers nothing |
+| New session after that update | one review of the five hooks under the new plugin id |
+| `acc update` to 0.15.91, then to 0.15.92 with a session open | no review in the new session; the open session kept all five hooks active, ran them on its next prompt, and joined ACC |
 
 Because the client runs the *cached copy*, a hook command relative to the bundle would not
 survive installation. ACC's shim is written with absolute paths, so it does.

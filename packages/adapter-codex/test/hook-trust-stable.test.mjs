@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { cp, lstat, mkdir, mkdtemp, readdir, readFile, realpath, rm, writeFile } from "node:fs/promises";
+import { cp, lstat, mkdtemp, readdir, readFile, realpath, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -74,7 +74,7 @@ test("an ACC update that leaves the hooks alone leaves the copy Codex trusts byt
   assert.equal(await manifestVersion(SKILL), "0.16.1");
 });
 
-test("a changed hook shim is a changed plugin, and the copy it replaces stays", async t => {
+test("a changed hook shim is a changed plugin, and the copy it replaces goes", async t => {
   const { cache, versions, manifestVersion, install } = await fixture(t);
   await install("0.16.0");
   const before = await codexContentHash(path.join(cache(HOOKS), "0.16.0"));
@@ -82,14 +82,11 @@ test("a changed hook shim is a changed plugin, and the copy it replaces stays", 
   // The shim pins the node it runs; a different one is a different hook.
   await install("0.17.0", { node: "/opt/node-b/bin/node" });
 
-  assert.deepEqual(await versions(HOOKS), ["0.16.0", "0.17.0"]);
+  // Codex runs the highest version present, open sessions included (0.167.1),
+  // so nothing would read the copy this one replaces.
+  assert.deepEqual(await versions(HOOKS), ["0.17.0"]);
   assert.equal(await manifestVersion(HOOKS), "0.17.0");
   assert.notEqual(await codexContentHash(path.join(cache(HOOKS), "0.17.0")), before);
-  // A session trusted against the old copy keeps running its hooks until it ends.
-  assert.equal(await codexContentHash(path.join(cache(HOOKS), "0.16.0")), before);
-
-  await install("0.18.0", { node: "/opt/node-c/bin/node" });
-  assert.deepEqual(await versions(HOOKS), ["0.17.0", "0.18.0"], "an older copy holds no session");
 });
 
 test("the hooks copy keeps its version across reinstalls of the same ACC", async t => {
@@ -100,27 +97,24 @@ test("the hooks copy keeps its version across reinstalls of the same ACC", async
   assert.equal(await manifestVersion(HOOKS), "0.16.0");
 });
 
-test("an update from the single plugin keeps the hook shim where open sessions call it", async t => {
-  const { context, cache, source, versions, install } = await fixture(t);
-  // What 0.15.0 left: one plugin whose cached copy holds the hooks, calling the
-  // shim in its marketplace copy.
+test("an update from the single plugin moves the hooks out of the skill's plugin", async t => {
+  const { cache, source, versions, install } = await fixture(t);
+  // What 0.15.0 left: one plugin, its cached copy and its marketplace copy
+  // holding the hooks and their shim.
   await install("0.15.0");
-  const old = path.join(cache(SKILL), "0.15.0");
-  await cp(path.join(cache(HOOKS), "0.15.0"), old, { recursive: true, force: false });
+  for (const root of [path.join(cache(SKILL), "0.15.0"), source(SKILL)]) {
+    await cp(path.join(cache(HOOKS), "0.15.0"), root, { recursive: true, force: false });
+  }
   await rm(cache(HOOKS), { recursive: true, force: true });
-  await mkdir(source(SKILL), { recursive: true });
 
   await install("0.16.0", { keepPreviousVersion: "0.15.0" });
 
-  const shim = path.join(source(SKILL), "acc-hook.sh");
-  assert.equal((await readFile(shim, "utf8")).includes(context.node), true,
-    "a session open across the update lost the shim its hooks call");
+  assert.deepEqual((await readdir(source(SKILL))).sort(),
+    [".codex-plugin", "acc-cli.sh", "assets", "skills"].sort(), "the skill's plugin still holds hooks");
   assert.deepEqual((await readdir(path.join(cache(SKILL), "0.16.0"))).sort(),
-    [".codex-plugin", "acc-cli.sh", "assets", "skills"].sort(), "the new skill copy holds hooks");
+    [".codex-plugin", "acc-cli.sh", "assets", "skills"].sort(), "the copy Codex runs holds hooks");
+  const manifest = JSON.parse(await readFile(
+    path.join(cache(SKILL), "0.16.0", ".codex-plugin", "plugin.json"), "utf8"));
+  assert.equal(manifest.hooks, undefined);
   assert.deepEqual(await versions(HOOKS), ["0.16.0"]);
-
-  // The next update removes the old copy, and with it the reason for the shim.
-  await install("0.17.0", { keepPreviousVersion: "0.16.0" });
-  assert.deepEqual(await versions(SKILL), ["0.16.0", "0.17.0"]);
-  await assert.rejects(readFile(shim), error => error.code === "ENOENT");
 });

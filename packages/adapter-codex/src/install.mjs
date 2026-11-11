@@ -77,14 +77,6 @@ const cacheRoot = codexHome => path.join(codexHome, "plugins", "cache", MARKETPL
 const cachePath = (codexHome, name = PLUGIN_NAME) => path.join(cacheRoot(codexHome), name);
 const cachedVersionPath = (codexHome, version) =>
   path.join(cachePath(codexHome), version);
-// Whether a cached copy from before the split - ACC's hooks still in this
-// plugin - is kept for a session that opened before the update.
-async function holdsHooks(directory) {
-  const versions = await readdir(directory).catch(() => []);
-  const found = await Promise.all(versions.map(name =>
-    stat(path.join(directory, name, "hooks.json")).then(() => true, () => false)));
-  return found.some(Boolean);
-}
 
 /**
  * Read a client's own JSON, and say which file when it will not parse.
@@ -236,12 +228,11 @@ export async function installCodexPlugin({ home, agentsHome = home,
   const cliShim = await writeCliShim({ dir: target, cli, node, dataHome, platform: hostPlatform });
   await bakeSkillCommand({ root: target, cliShim, platform: hostPlatform });
   const allowRule = await writeAllowRule({ codexHome, cliShim, hostPlatform });
-  const hookShim = dir => writeHookShim({ dir, adapterId: "codex",
-    dataHome, runner, node, platform: hostPlatform });
   const hooksTarget = pluginPath(agentsHome, HOOKS_PLUGIN_NAME);
   await rm(hooksTarget, { recursive: true, force: true });
   await cp(hooksBundle, hooksTarget, { recursive: true });
-  const shim = await hookShim(hooksTarget);
+  const shim = await writeHookShim({ dir: hooksTarget, adapterId: "codex",
+    dataHome, runner, node, platform: hostPlatform });
   await writeJson(path.join(hooksTarget, "hooks.json"),
     withShim(await readJson(path.join(hooksBundle, "hooks.json"), { hooks: {} }), shim,
       hostPlatform === "win32" ? { node: node ?? process.execPath } : null));
@@ -283,19 +274,13 @@ export async function installCodexPlugin({ home, agentsHome = home,
   await cp(target, cached, { recursive: true });
   // The copy just written, plus the one an upgrade moved off - and only inside
   // this plugin's own directory. The marketplace cache root above it holds other
-  // people's plugins. A session open across the upgrade still fires its hooks
-  // from the path it started with, so removing that one now would silence it
-  // until restart; anything older than it holds no session and is litter.
+  // people's plugins. Anything older than the copy an upgrade moved off is litter.
+  // Codex 0.167.1 itself runs the highest version present, measured even in a
+  // session opened before the upgrade, so no open session depends on that copy.
   await keepVersions({ root: path.dirname(cached), keep: [version, keepPreviousVersion],
     io: { readdir, rm } });
   await settleHooksPlugin({ source: hooksTarget,
     cacheDir: cachePath(codexHome, HOOKS_PLUGIN_NAME), version });
-  // A session opened before the split runs the hooks of the copy it started
-  // with, and that copy calls the shim at this plugin's path. While such a copy
-  // is kept, the shim stays where it looks; the copy the client now runs, made
-  // above, holds no hooks and no shim. The next update removes the old copy,
-  // and with it the reason for this one.
-  if (await holdsHooks(cachePath(codexHome))) await hookShim(target);
 
   // The plugin's own directory in the cache. Not the versioned one inside it,
   // which goes stale the moment the version changes - and not the marketplace
