@@ -148,17 +148,17 @@ test("literal null control is malformed rather than an absent installation", asy
 // NTFS file ids are 64-bit and carry a sequence number in their top bits, so
 // real ids often pass 2^53. Without { bigint: true } Node hands them over as
 // doubles, and two directories created next to each other can round to the same
-// ino (seen on a windows-latest runner). This stand-in keeps every real id
-// distinct as a bigint and rounds it the way a double would otherwise.
+// ino (seen on a windows-latest runner). This stand-in leaves every bigint read
+// as it is - Windows' no-follow open compares those with the handle's own stat -
+// and gives a plain read the double an id above 2^60 would round to.
 function modelNtfsFileIds() {
   const originalLstat = fs.lstat;
   const high = 2n ** 60n;
   fs.lstat = async (target, options) => {
-    const real = await originalLstat(target, { bigint: true });
-    const ino = high + real.ino;
-    if (options?.bigint) return Object.assign(real, { ino });
-    const rounded = await originalLstat(target, options);
-    return Object.assign(rounded, { ino: Number(ino) });
+    if (options?.bigint) return originalLstat(target, options);
+    const [plain, exact] = await Promise.all([originalLstat(target, options),
+      originalLstat(target, { bigint: true })]);
+    return Object.assign(plain, { ino: Number(high + exact.ino) });
   };
   syncBuiltinESMExports();
   return () => {
