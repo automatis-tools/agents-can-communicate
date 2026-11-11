@@ -74,12 +74,18 @@ test("a nonregular FIFO registration is refused without waiting for a writer", {
   const h = await registered(t);
   await rename(h.file, `${h.file}.original`);
   execFileSync("mkfifo", ["-m", "600", h.file]);
+  // The read itself is timed inside the child. A FIFO opened for reading waits
+  // for a writer forever, so the outer deadline only has to outlast Node's own
+  // start-up - which, with the module import, took up to 1.1 s on a loaded
+  // machine and failed the 1 s deadline this used to put on both together.
   const script = `import { readNativeEndpoint } from ${JSON.stringify(new URL("../src/native-endpoint.mjs", import.meta.url).href)};
+    const started = performance.now();
     const result = await readNativeEndpoint(JSON.parse(process.argv[1]));
-    if (result !== null) process.exit(2);`;
+    if (result !== null) process.exit(2);
+    if (performance.now() - started > 1_000) process.exit(3);`;
   const child = spawnSync(process.execPath, ["--input-type=module", "-e", script,
-    JSON.stringify({ runtimeDir: h.runtimeDir, endpointId: h.endpointId })], { timeout: 1_000 });
-  assert.equal(child.status, 0, "endpoint read must refuse FIFO within the subprocess deadline");
+    JSON.stringify({ runtimeDir: h.runtimeDir, endpointId: h.endpointId })], { timeout: 30_000 });
+  assert.equal(child.status, 0, "endpoint read must refuse FIFO without waiting for a writer");
 });
 
 test("publication exposes complete records while concurrent readers inspect the address", async t => {
