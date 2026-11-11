@@ -20,7 +20,8 @@ const identity = owner => createHash("sha256")
 
 async function lockDirectoryIdentity(directory) {
   try {
-    const info = await lstat(directory);
+    // NTFS file ids pass 2^53; as doubles two lock directories can share an ino.
+    const info = await lstat(directory, { bigint: true });
     if (!info.isDirectory() || info.isSymbolicLink()) throw new Error("manager lock is not a regular directory");
     return info;
   } catch (error) {

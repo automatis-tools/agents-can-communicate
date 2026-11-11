@@ -145,7 +145,29 @@ test("literal null control is malformed rather than an absent installation", asy
   await assert.rejects(readControl(f.root), /control/i);
 });
 
-test("lock inspection retries when a successor appears after owner open saw ENOENT", async t => {
+// NTFS file ids are 64-bit and carry a sequence number in their top bits, so
+// real ids often pass 2^53. Without { bigint: true } Node hands them over as
+// doubles, and two directories created next to each other can round to the same
+// ino (seen on a windows-latest runner). This stand-in keeps every real id
+// distinct as a bigint and rounds it the way a double would otherwise.
+function modelNtfsFileIds() {
+  const originalLstat = fs.lstat;
+  const high = 2n ** 60n;
+  fs.lstat = async (target, options) => {
+    const real = await originalLstat(target, { bigint: true });
+    const ino = high + real.ino;
+    if (options?.bigint) return Object.assign(real, { ino });
+    const rounded = await originalLstat(target, options);
+    return Object.assign(rounded, { ino: Number(ino) });
+  };
+  syncBuiltinESMExports();
+  return () => {
+    fs.lstat = originalLstat;
+    syncBuiltinESMExports();
+  };
+}
+
+async function successorAfterOwnerOpenSawEnoent(t, { ntfsFileIds = false } = {}) {
   const f = await fixture(t);
   const directory = path.join(f.root, "manager.lock");
   const replacement = path.join(f.root, "prepared-successor.lock");
@@ -172,6 +194,7 @@ test("lock inspection retries when a successor appears after owner open saw ENOE
     throw missing;
   };
   syncBuiltinESMExports();
+  const restoreLstat = ntfsFileIds ? modelNtfsFileIds() : () => {};
   let observedSuccessor = false;
   try {
     const result = await withManagerLock(f.root, () => "admitted", {
@@ -186,9 +209,18 @@ test("lock inspection retries when a successor appears after owner open saw ENOE
     assert.equal(result, "admitted");
     assert.equal(observedSuccessor, true);
   } finally {
+    restoreLstat();
     fs.open = originalOpen;
     syncBuiltinESMExports();
   }
+}
+
+test("lock inspection retries when a successor appears after owner open saw ENOENT", async t => {
+  await successorAfterOwnerOpenSawEnoent(t);
+});
+
+test("lock inspection tells the successor apart when file ids pass 2^53", async t => {
+  await successorAfterOwnerOpenSawEnoent(t, { ntfsFileIds: true });
 });
 
 
