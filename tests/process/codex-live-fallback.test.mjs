@@ -50,13 +50,14 @@ printf '%s\\n' ${shellLiteral(version)}
       return { home: observedHome, argc: Number(argc), args };
     });
   const pluginTrees = async () => {
+    // The plugin that holds ACC's hooks, as published and as the client runs it.
     const source = path.join(home, ".agents", "acc-local", "plugins",
-      "agents-can-communicate");
+      "agents-can-communicate-hooks");
     const versions = await readdir(path.join(home, ".codex", "plugins", "cache",
-      "acc-local", "agents-can-communicate"));
+      "acc-local", "agents-can-communicate-hooks"));
     assert.equal(versions.length, 1);
     return [source, path.join(home, ".codex", "plugins", "cache", "acc-local",
-      "agents-can-communicate", versions[0])];
+      "agents-can-communicate-hooks", versions[0])];
   };
   return { argv, codexHome, command, dataHome, home, pluginTrees };
 }

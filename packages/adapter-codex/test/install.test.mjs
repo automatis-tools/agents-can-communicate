@@ -53,22 +53,30 @@ async function fixture(t) {
   const ours = path.join(root, ".agents", "plugins", "marketplace.json");
   const read = async () => JSON.parse(await readFile(ours, "utf8"));
   const plugin = path.join(root, "plugins", "agents-can-communicate");
+  const hooks = path.join(root, "plugins", "agents-can-communicate-hooks");
   return { context: { home, codexHome: path.join(home, ".codex"), hostPlatform: POSIX_FORM },
-    marketplace: ours, read, theirs, root, plugin };
+    marketplace: ours, read, theirs, root, plugin, hooks };
 }
 
-test("install places the plugin and registers it in the marketplace", async t => {
-  const { context, read, theirs, plugin } = await fixture(t);
+test("install places both plugins and registers them in the marketplace", async t => {
+  const { context, read, plugin, hooks } = await fixture(t);
 
   const result = await createCodexAdapter().install(context);
 
   assert.equal(result.ok, true);
+  // The skill's plugin holds no hooks: Codex hashes the whole plugin that holds
+  // them, and the skill's text changes far more often than the hooks do.
   assert.deepEqual((await readdir(plugin)).sort(),
-    [".codex-plugin", "acc-cli.sh", "acc-hook.sh", "assets", "hooks.json", "skills"].sort());
-  const manifest = JSON.parse(await readFile(
-    path.join(plugin, ".codex-plugin", "plugin.json"), "utf8"));
-  assert.equal(manifest.hooks, "./hooks.json");
+    [".codex-plugin", "acc-cli.sh", "assets", "skills"].sort());
+  assert.deepEqual((await readdir(hooks)).sort(), [".codex-plugin", "acc-hook.sh", "hooks.json"].sort());
+  const manifest = async root => JSON.parse(await readFile(
+    path.join(root, ".codex-plugin", "plugin.json"), "utf8"));
+  assert.equal((await manifest(plugin)).hooks, undefined);
+  assert.equal((await manifest(plugin)).skills, "./skills/");
+  assert.equal((await manifest(hooks)).hooks, "./hooks.json");
+  assert.equal((await manifest(hooks)).skills, undefined);
   assert.equal(named(await read(), "agents-can-communicate") !== undefined, true);
+  assert.equal(named(await read(), "agents-can-communicate-hooks") !== undefined, true);
 });
 
 // The two arcs of ACC's linked mark, as getacc.dev/assets/acc-mark.svg draws them.
@@ -123,7 +131,7 @@ test("the hooks file wires only events this client actually has", async t => {
   await createCodexAdapter().install(context);
 
   const wired = JSON.parse(await readFile(path.join(context.home, ".agents", "acc-local", "plugins",
-    "agents-can-communicate", "hooks.json"), "utf8"));
+    "agents-can-communicate-hooks", "hooks.json"), "utf8"));
 
   for (const event of Object.keys(wired.hooks)) {
     assert.equal(CODEX_HOOK_EVENTS.includes(event), true,
@@ -202,7 +210,7 @@ test("the guard matches the tools this client actually uses", async t => {
   const { context } = await fixture(t);
   await createCodexAdapter().install(context);
   const wired = JSON.parse(await readFile(path.join(context.home, ".agents", "acc-local", "plugins",
-    "agents-can-communicate", "hooks.json"), "utf8"));
+    "agents-can-communicate-hooks", "hooks.json"), "utf8"));
 
   // Codex names its edit tool apply_patch. A matcher copied from another
   // harness's vocabulary would never fire on a file edit, and the adapter would
@@ -451,10 +459,12 @@ test("install finishes the job the client's own command would have done", async 
   // components are ACC's own. Verified on 0.147.0 by diffing the home around
   // the command, and by running a real session against a cache ACC wrote:
   // all five hooks fired.
-  const cached = path.join(context.codexHome, "plugins", "cache", "acc-local",
-    "agents-can-communicate", await pluginVersion(CODEX_PLUGIN));
-  assert.deepEqual((await readdir(cached)).sort(),
-    [".codex-plugin", "acc-cli.sh", "acc-hook.sh", "assets", "hooks.json", "skills"].sort());
+  const cache = path.join(context.codexHome, "plugins", "cache", "acc-local");
+  const version = await pluginVersion(CODEX_PLUGIN);
+  assert.deepEqual((await readdir(path.join(cache, "agents-can-communicate", version))).sort(),
+    [".codex-plugin", "acc-cli.sh", "assets", "skills"].sort());
+  assert.deepEqual((await readdir(path.join(cache, "agents-can-communicate-hooks", version))).sort(),
+    [".codex-plugin", "acc-hook.sh", "hooks.json"].sort());
 });
 
 test("the cached copy carries the same absolute hook command", async t => {
@@ -466,7 +476,7 @@ test("the cached copy carries the same absolute hook command", async t => {
   // to the bundle would not survive the copy; an absolute one does, which is
   // the whole reason the shim is written with absolute paths.
   const cached = JSON.parse(await readFile(path.join(context.codexHome, "plugins",
-    "cache", "acc-local", "agents-can-communicate", await pluginVersion(CODEX_PLUGIN),
+    "cache", "acc-local", "agents-can-communicate-hooks", await pluginVersion(CODEX_PLUGIN),
   "hooks.json"), "utf8"));
   const command = Object.values(cached.hooks)[0][0].hooks[0].command;
   const executable = command.match(/^sh (['"])(.*?)\1 /)[2];
@@ -493,7 +503,7 @@ test("the installed hook command preserves literal metacharacters and exports it
       hostPlatform: POSIX_FORM };
     await createCodexAdapter().install(context);
     const cached = JSON.parse(await readFile(path.join(context.codexHome, "plugins", "cache",
-      "acc-local", "agents-can-communicate", await pluginVersion(CODEX_PLUGIN), "hooks.json"),
+      "acc-local", "agents-can-communicate-hooks", await pluginVersion(CODEX_PLUGIN), "hooks.json"),
     "utf8"));
     const command = Object.values(cached.hooks)[0][0].hooks[0].command;
 
@@ -629,8 +639,9 @@ test("a marketplace ACC creates itself is still its own", async t => {
   const config = await readFile(path.join(context.codexHome, "config.toml"), "utf8");
   assert.match(config, /\[marketplaces\.acc-local\]/);
   assert.match(config, /\[plugins\."agents-can-communicate@acc-local"\]/);
-  assert.deepEqual(await readdir(path.join(context.codexHome, "plugins", "cache",
-    "acc-local")), ["agents-can-communicate"]);
+  assert.match(config, /\[plugins\."agents-can-communicate-hooks@acc-local"\]/);
+  assert.deepEqual((await readdir(path.join(context.codexHome, "plugins", "cache",
+    "acc-local"))).sort(), ["agents-can-communicate", "agents-can-communicate-hooks"]);
 });
 
 /**
@@ -758,7 +769,7 @@ test("an install with no previous version to hold leaves one copy", async t => {
 // Codex runs a hook's `commandWindows` on Windows, through PowerShell, which
 // has no `sh`: the pinned node runs the Node shim there.
 test("windows: each hook carries a PowerShell commandWindows beside a portable command", async t => {
-  const { context, plugin } = await fixture(t);
+  const { context, hooks: plugin } = await fixture(t);
   const { installCodexPlugin } = await import("../src/install.mjs");
   const runner = path.join(context.home, "acc-hook.mjs");
   await writeFile(runner, "");

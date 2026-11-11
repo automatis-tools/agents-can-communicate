@@ -47,7 +47,8 @@ test("managed refresh keeps generated Codex hooks and skills in the enrolled dat
   assert.equal(result.activated, true, JSON.stringify(result));
   assert.equal(await policy(), consent);
   const plugin = path.join(f.clientHome, ".agents", "acc-local", "plugins", "agents-can-communicate");
-  const shim = path.join(plugin, windows ? "acc-hook.mjs" : "acc-hook.sh");
+  const hooksPlugin = path.join(f.clientHome, ".agents", "acc-local", "plugins", "agents-can-communicate-hooks");
+  const shim = path.join(hooksPlugin, windows ? "acc-hook.mjs" : "acc-hook.sh");
   const skill = await readFile(path.join(plugin, "skills", "acc", "SKILL.md"), "utf8");
   const statusCommand = skill.match(/`([^`\n]+ status --json)`/)[1];
   for (const inherited of [undefined, path.join(f.root, "wrong-data")]) {

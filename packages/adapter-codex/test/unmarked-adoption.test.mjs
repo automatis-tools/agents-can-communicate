@@ -54,6 +54,8 @@ test("an install whose markers a rewrite removed is adopted and marked again", a
   assert.match(after, /^# >>> agents-can-communicate/m);
   assert.match(after, /^# ACC native permissions begin profile$/m);
   assert.equal(count(after, /^\[marketplaces\.acc-local\]$/gm), 1);
+  assert.equal(count(after, /^\[plugins\."agents-can-communicate@acc-local"\]$/gm), 1);
+  assert.equal(count(after, /^\[plugins\."agents-can-communicate-hooks@acc-local"\]$/gm), 1);
   assert.equal(count(after, /^\[permissions\.acc-workspace\]$/gm), 1);
   assert.equal(count(after, /^default_permissions = /gm), 1);
   assert.match(after, DEFAULT);
@@ -80,6 +82,8 @@ test("unmarked entries that differ from what ACC writes are still refused", asyn
   for (const change of [
     text => text.replace(/^source = ".*acc-local"$/m, 'source = "/somewhere/else"'),
     text => text.replace(/(\[plugins\."agents-can-communicate@acc-local"\]\n)enabled = true/, "$1enabled = false"),
+    text => text.replace(/(\[plugins\."agents-can-communicate-hooks@acc-local"\]\n)enabled = true/,
+      "$1enabled = false"),
   ]) {
     const f = await fixture(t);
     const changed = change(await rewrittenInstall(f));
@@ -88,6 +92,23 @@ test("unmarked entries that differ from what ACC writes are still refused", asyn
     await assert.rejects(f.adapter.install(f.context), /already registered/);
     assert.equal(await f.read(), changed);
   }
+});
+
+// Before the split ACC registered one plugin, and an unmarked install of that
+// shape has no hooks table to adopt.
+test("an unmarked install from before the hooks plugin is adopted", async t => {
+  const f = await fixture(t);
+  const single = (await rewrittenInstall(f))
+    .replace(/\[plugins\."agents-can-communicate-hooks@acc-local"\]\nenabled = true\n\n?/, "");
+  assert.equal(single.includes("agents-can-communicate-hooks"), false);
+  await f.write(single);
+
+  await f.adapter.install(f.context);
+  const after = await f.read();
+
+  assert.match(after, /^# >>> agents-can-communicate/m);
+  assert.equal(count(after, /^\[plugins\."agents-can-communicate@acc-local"\]$/gm), 1);
+  assert.equal(count(after, /^\[plugins\."agents-can-communicate-hooks@acc-local"\]$/gm), 1);
 });
 
 test("an unmarked profile with a key ACC never writes stays the user's policy", async t => {

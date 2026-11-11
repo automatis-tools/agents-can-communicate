@@ -7,8 +7,8 @@ import { createCodexDiscovery } from "../src/native-discovery.mjs";
 import { maintenanceFixture } from "./maintenance-fixture.mjs";
 import { posixTransportTest as test } from "../../../tests/helpers/platform-scope.mjs";
 
-const PLUGIN = "agents-can-communicate@acc-local";
-// What `hooks/list` returns for ACC's plugin on 0.158.0, one entry per event.
+const PLUGIN = "agents-can-communicate-hooks@acc-local";
+// What `hooks/list` returns for ACC's hooks plugin, one entry per event (shape: 0.158.0).
 const accHooks = (overrides = {}) => ["preToolUse", "sessionStart", "sessionEnd", "userPromptSubmit",
   "stop"].map(eventName => ({ key: `${PLUGIN}:hooks.json:${eventName}:0:0`, eventName,
   handlerType: "command", source: "plugin", pluginId: PLUGIN, enabled: true, isManaged: false,

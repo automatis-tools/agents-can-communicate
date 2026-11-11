@@ -12,6 +12,7 @@ import { AccError, EXIT } from "@agents-can-communicate/protocol";
 import { inspectAllowRule, removeAllowRule, ruleAllowsCommands, ruleApplies, rulesPath, writeAllowRule }
   from "./allow-rule.mjs";
 import { inspectConfig, readConfig, sandboxOwnership, writeTomlBlock } from "./config-block.mjs";
+import { settleHooksPlugin } from "./hooks-plugin.mjs";
 import { controlSocket, grantPath, outgoingStatus, prepareLivePermissions, removeLivePermissions, sockets }
   from "./live-permissions.mjs";
 import { adoptUnmarked } from "./unmarked-adoption.mjs";
@@ -24,6 +25,12 @@ import { inspectPermissions } from "./permission-ownership.mjs";
 
 const bundle = fileURLToPath(new URL("../plugin", import.meta.url));
 const PLUGIN_NAME = "agents-can-communicate";
+// ACC's hooks live in a plugin of their own, apart from the skill. Codex hashes
+// a whole plugin to trust its hooks, and the skill's text changed in about half
+// of ACC's releases: in one plugin, each of those releases switched every ACC
+// hook off until a person trusted them again. See hooks-plugin.mjs.
+const hooksBundle = fileURLToPath(new URL("../hooks-plugin", import.meta.url));
+const HOOKS_PLUGIN_NAME = "agents-can-communicate-hooks";
 
 // The marketplace ACC owns, and its own root inside the agents home.
 //
@@ -37,8 +44,9 @@ const PLUGIN_NAME = "agents-can-communicate";
 // again to confirm a root of ACC's own is accepted and reported enabled.
 const MARKETPLACE = "acc-local";
 const QUALIFIED = `${PLUGIN_NAME}@${MARKETPLACE}`;
-// The id Codex reports for ACC's plugin, in `hooks/list` among other places.
-export const CODEX_PLUGIN_ID = QUALIFIED;
+const HOOKS_QUALIFIED = `${HOOKS_PLUGIN_NAME}@${MARKETPLACE}`;
+// The id Codex reports for the plugin that holds ACC's hooks, in `hooks/list`.
+export const CODEX_PLUGIN_ID = HOOKS_QUALIFIED;
 const HOOK_REVIEW = "hook readiness unverified: open codex; check ACC is enabled in /plugins; in /hooks, review "
   + "each ACC hook and enable/trust its current definition if needed, then restart the session";
 
@@ -66,9 +74,17 @@ const configPath = codexHome => path.join(codexHome, "config.toml");
 // diffing the home around `codex plugin add` shows that copy is the only thing
 // it does, and a real session against a cache ACC wrote fires every hook.
 const cacheRoot = codexHome => path.join(codexHome, "plugins", "cache", MARKETPLACE);
-const cachePath = codexHome => path.join(cacheRoot(codexHome), PLUGIN_NAME);
+const cachePath = (codexHome, name = PLUGIN_NAME) => path.join(cacheRoot(codexHome), name);
 const cachedVersionPath = (codexHome, version) =>
   path.join(cachePath(codexHome), version);
+// Whether a cached copy from before the split - ACC's hooks still in this
+// plugin - is kept for a session that opened before the update.
+async function holdsHooks(directory) {
+  const versions = await readdir(directory).catch(() => []);
+  const found = await Promise.all(versions.map(name =>
+    stat(path.join(directory, name, "hooks.json")).then(() => true, () => false)));
+  return found.some(Boolean);
+}
 
 /**
  * Read a client's own JSON, and say which file when it will not parse.
@@ -129,9 +145,9 @@ const writeMarketplace = (file, value) =>
  * file, so a marketplace ACC wrote incorrectly would take the user's own
  * plugins down with it. `authentication` accepts only ON_INSTALL or ON_USE.
  */
-const entryFor = () => ({
-  name: PLUGIN_NAME,
-  source: { source: "local", path: `./plugins/${PLUGIN_NAME}` },
+const entryFor = name => ({
+  name,
+  source: { source: "local", path: `./plugins/${name}` },
   policy: { installation: "INSTALLED_BY_DEFAULT", authentication: "ON_USE" },
   category: "Coding",
 });
@@ -180,7 +196,7 @@ const adoptionGrants = context => ({ sockets: sockets(context),
 export async function installCodexPlugin({ home, agentsHome = home,
   codexHome = path.join(home, ".codex"), dataHome, stateRoot, runner, node, cli, keepPreviousVersion = null,
   requestedLivePolicy, livePolicy, clientVersion, platform, receiverSockets, receiverLoopback,
-  hostPlatform = process.platform }) {
+  hostPlatform = process.platform, accVersion = null }) {
   // Read before writing, so a manifest that will not parse is found before a
   // plugin tree is laid down that nothing will then be able to remove.
   const existing = await readJson(marketplacePath(agentsHome), { name: MARKETPLACE,
@@ -220,18 +236,24 @@ export async function installCodexPlugin({ home, agentsHome = home,
   const cliShim = await writeCliShim({ dir: target, cli, node, dataHome, platform: hostPlatform });
   await bakeSkillCommand({ root: target, cliShim, platform: hostPlatform });
   const allowRule = await writeAllowRule({ codexHome, cliShim, hostPlatform });
-  const shim = await writeHookShim({ dir: target, adapterId: "codex",
+  const hookShim = dir => writeHookShim({ dir, adapterId: "codex",
     dataHome, runner, node, platform: hostPlatform });
-  await writeJson(path.join(target, "hooks.json"),
-    withShim(await readJson(path.join(bundle, "hooks.json"), { hooks: {} }), shim,
+  const hooksTarget = pluginPath(agentsHome, HOOKS_PLUGIN_NAME);
+  await rm(hooksTarget, { recursive: true, force: true });
+  await cp(hooksBundle, hooksTarget, { recursive: true });
+  const shim = await hookShim(hooksTarget);
+  await writeJson(path.join(hooksTarget, "hooks.json"),
+    withShim(await readJson(path.join(hooksBundle, "hooks.json"), { hooks: {} }), shim,
       hostPlatform === "win32" ? { node: node ?? process.execPath } : null));
 
   const file = marketplacePath(agentsHome);
   // Ownership is the entry's own name. Recording it as an extra key beside the
   // plugins - which is what this used to do - puts a nameless entry into a
   // sequence the client then tries to load.
-  const others = (existing.plugins ?? []).filter(entry => entry.name !== PLUGIN_NAME);
-  await writeMarketplace(file, { ...existing, plugins: [...others, entryFor()] });
+  const others = (existing.plugins ?? [])
+    .filter(entry => entry.name !== PLUGIN_NAME && entry.name !== HOOKS_PLUGIN_NAME);
+  await writeMarketplace(file, { ...existing,
+    plugins: [...others, entryFor(PLUGIN_NAME), entryFor(HOOKS_PLUGIN_NAME)] });
 
   await writeTomlBlock(config, [
     `[marketplaces.${MARKETPLACE}]`,
@@ -240,16 +262,20 @@ export async function installCodexPlugin({ home, agentsHome = home,
     "",
     `[plugins.${tomlString(QUALIFIED)}]`,
     "enabled = true",
+    "",
+    `[plugins.${tomlString(HOOKS_QUALIFIED)}]`,
+    "enabled = true",
     ...sandboxTable(stateRoot, theirSandbox),
   ], permissions.source);
 
-  // The client runs the cached copy, so this has to happen after the shim and
+  // The client runs the cached copies, so this has to happen after the shims and
   // the rewritten hooks.json are in place.
-  // One version on this machine: the package's own. The shipped manifest carries
+  // One version on this machine: the package's own. The shipped manifests carry
   // none, so nothing in the repository can fall out of step with it - which is
-  // how every client came to report 0.1.6 while running 0.1.9. The copy the
-  // client reads is stamped, so it says which ACC wrote it.
-  const version = await ownVersion(import.meta.url);
+  // how every client came to report 0.1.6 while running 0.1.9. The skill's copy
+  // is stamped with it, so it says which ACC wrote it; the hooks' copy keeps the
+  // version of the last ACC that changed it (hooks-plugin.mjs).
+  const version = accVersion ?? await ownVersion(import.meta.url);
   await stampPluginVersion({ file: path.join(target, ".codex-plugin", "plugin.json"),
     version, io: { readFile, writeFile } });
   const cached = cachedVersionPath(codexHome, version);
@@ -262,6 +288,14 @@ export async function installCodexPlugin({ home, agentsHome = home,
   // until restart; anything older than it holds no session and is litter.
   await keepVersions({ root: path.dirname(cached), keep: [version, keepPreviousVersion],
     io: { readdir, rm } });
+  await settleHooksPlugin({ source: hooksTarget,
+    cacheDir: cachePath(codexHome, HOOKS_PLUGIN_NAME), version });
+  // A session opened before the split runs the hooks of the copy it started
+  // with, and that copy calls the shim at this plugin's path. While such a copy
+  // is kept, the shim stays where it looks; the copy the client now runs, made
+  // above, holds no hooks and no shim. The next update removes the old copy,
+  // and with it the reason for this one.
+  if (await holdsHooks(cachePath(codexHome))) await hookShim(target);
 
   // The plugin's own directory in the cache. Not the versioned one inside it,
   // which goes stale the moment the version changes - and not the marketplace
@@ -272,8 +306,8 @@ export async function installCodexPlugin({ home, agentsHome = home,
   // The old comment here said the root was "what ACC owns", which was true only
   // while ACC invented its own marketplace name and so had a root to itself.
   // make the record stale the moment the plugin version changes.
-  return { ok: true, changes: [target, file, config, cachePath(codexHome),
-    ...(allowRule.file === null ? [] : [allowRule.file])],
+  return { ok: true, changes: [target, hooksTarget, file, config, cachePath(codexHome),
+    cachePath(codexHome, HOOKS_PLUGIN_NAME), ...(allowRule.file === null ? [] : [allowRule.file])],
     needsAction: [HOOK_REVIEW, ...permissionActions,
       ...(permissions.skipLegacy ? [] : sandboxReview(before, config, stateRoot))],
     diagnostics: ["hooks require explicit trust in Codex before they run",
@@ -338,8 +372,11 @@ export async function uninstallCodexPlugin({ home, agentsHome = home,
     codexHome, stateRoot, receiverSockets });
   const changes = [];
   if (existing !== null) {
-    const kept = (existing.plugins ?? []).filter(entry => entry.name !== PLUGIN_NAME);
-    if (kept.length !== (existing.plugins ?? []).length) changes.push(PLUGIN_NAME);
+    const listed = existing.plugins ?? [];
+    const kept = listed.filter(entry => entry.name !== PLUGIN_NAME && entry.name !== HOOKS_PLUGIN_NAME);
+    for (const name of [PLUGIN_NAME, HOOKS_PLUGIN_NAME]) {
+      if (listed.some(entry => entry.name === name)) changes.push(name);
+    }
     await writeMarketplace(file, { ...existing, plugins: kept });
   }
   if (before !== withoutOurs) {
@@ -376,8 +413,10 @@ export async function uninstallCodexPlugin({ home, agentsHome = home,
 
   const rule = await removeAllowRule({ codexHome, keep });
   if (rule !== null) changes.push(rule);
-  await removeInstalledTree(cachePath(codexHome), keep);
-  await removeInstalledTree(pluginPath(agentsHome), keep);
+  for (const name of [PLUGIN_NAME, HOOKS_PLUGIN_NAME]) {
+    await removeInstalledTree(cachePath(codexHome, name), keep);
+    await removeInstalledTree(pluginPath(agentsHome, name), keep);
+  }
   // The directories ACC made to hold those, once nothing is in them. They are
   // ACC's own - a marketplace root it created and the cache directory named
   // after it - and an empty one left behind is litter in a home that did not
@@ -402,12 +441,18 @@ export async function detectCodex({ home, agentsHome = home,
   codexHome = path.join(home, ".codex"), stateRoot, clientVersion, platform, nativeDelivery,
   receiverSockets, receiverLoopback, hostPlatform = process.platform }) {
   const marketplace = await readJson(marketplacePath(agentsHome), null);
-  const published = (marketplace?.plugins ?? []).some(entry => entry.name === PLUGIN_NAME);
+  const names = [PLUGIN_NAME, HOOKS_PLUGIN_NAME];
+  const published = names.every(name => (marketplace?.plugins ?? []).some(entry => entry.name === name));
   const config = await readFile(configPath(codexHome), "utf8").catch(() => "");
   const registered = config.includes(`[marketplaces.${MARKETPLACE}]`);
-  const pluginEntry = config.includes(`[plugins."${QUALIFIED}"]`);
-  const cached = await stat(cachePath(codexHome))
-    .then(() => true).catch(() => false);
+  const pluginEntry = [QUALIFIED, HOOKS_QUALIFIED].every(id => config.includes(`[plugins."${id}"]`));
+  const uncached = [];
+  for (const name of names) {
+    if (!await stat(cachePath(codexHome, name)).then(() => true, () => false)) {
+      uncached.push(`${name}@${MARKETPLACE}`);
+    }
+  }
+  const cached = uncached.length === 0;
   const allowRule = published
     ? await inspectAllowRule({ codexHome, cliShim: path.join(pluginPath(agentsHome), "acc-cli.sh"), hostPlatform })
     : { state: "none", diagnostic: null };
@@ -437,7 +482,7 @@ export async function detectCodex({ home, agentsHome = home,
     // own cache. Only the client does that, so ACC names the command.
     cached
       ? "plugin installed in the client's cache"
-      : `plugin not installed yet; run: codex plugin add ${QUALIFIED}`,
+      : `plugin not installed yet; run: ${uncached.map(id => `codex plugin add ${id}`).join("; ")}`,
     ...(cached
       ? ["hook readiness is unverified by ACC; Codex checks whether each current "
         + "definition is enabled and trusted"]
@@ -462,7 +507,9 @@ export function planCodexInstall({ home, agentsHome = home,
   codexHome = path.join(home, ".codex"), hostPlatform = process.platform }) {
   return [
     { path: pluginPath(agentsHome), kind: "tree" },
+    { path: pluginPath(agentsHome, HOOKS_PLUGIN_NAME), kind: "tree" },
     { path: cachePath(codexHome), kind: "tree" },
+    { path: cachePath(codexHome, HOOKS_PLUGIN_NAME), kind: "tree" },
     { path: marketplacePath(agentsHome), kind: "merge" },
     { path: configPath(codexHome), kind: "merge" },
     // ACC's own file, so a fingerprint decides whether uninstall takes it back.

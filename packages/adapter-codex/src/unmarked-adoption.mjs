@@ -71,15 +71,20 @@ function adopt(source, { marketplaceRoot, stateRoot, sockets = [], controlSocket
     || tables.some(found => found !== null && entry.start >= found.header.start && entry.end <= found.end));
 
   // Only a registration the managed block does not hold: a marked one is ACC's
-  // already. The marketplace and the plugin are adopted together or not at all.
+  // already. The marketplace and the plugins are adopted together or not at all.
+  // The hooks plugin is optional: an ACC from before the split registered only
+  // the one plugin, and when present it must be exactly what ACC writes.
   if (inspectConfig(source).registration) {
     const marketplace = table(["marketplaces", "acc-local"]);
     const plugin = table(["plugins", "agents-can-communicate@acc-local"]);
+    const hooks = table(["plugins", "agents-can-communicate-hooks@acc-local"]);
     if (exactly(marketplace, { source_type: "local", source: marketplaceRoot })
       && exactly(plugin, { enabled: true })
+      && (hooks === null || exactly(hooks, { enabled: true }))
       && within(["marketplaces", "acc-local"], [marketplace])
-      && within(["plugins", "agents-can-communicate@acc-local"], [plugin])) {
-      spans.push(...marketplace.spans, ...plugin.spans);
+      && within(["plugins", "agents-can-communicate@acc-local"], [plugin])
+      && within(["plugins", "agents-can-communicate-hooks@acc-local"], [hooks])) {
+      spans.push(...marketplace.spans, ...plugin.spans, ...(hooks === null ? [] : hooks.spans));
     }
   }
 

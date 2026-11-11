@@ -316,9 +316,14 @@ Windows gets no ACC command rule. ACC does not disable auto-review to repair coo
 
 ## Codex plugin is listed but inactive
 
-Open `/plugins` in Codex and check ACC is enabled. Open `/hooks`, review each ACC hook,
-and enable/trust its current definition if needed; then restart the session. New or changed
+Open `/plugins` in Codex and check both ACC plugins are enabled: Agents Can Communicate (the
+skill) and Agents Can Communicate hooks. Open `/hooks`, review each ACC hook, and
+enable/trust its current definition if needed; then restart the session. New or changed
 definitions need review, and a trusted hook can still be disabled.
+
+Codex asks again only when the hooks plugin itself changes: a new hook, or a shim that now
+pins a different node. An ACC update that leaves both alone keeps the copy Codex trusted.
+Updating from 0.15.x or earlier asks once, because the hooks moved to their own plugin.
 
 `acc doctor` reports installed files separately from hook readiness, which it leaves
 unverified. A saved trust record cannot prove current activation. If installation preserved
@@ -338,7 +343,8 @@ entries from yours. From 0.12.1, ACC recognises entries that hold exactly what i
 marks them again on the next install or update:
 - `[marketplaces.acc-local]` at ACC's own marketplace root, together with
   `[plugins."agents-can-communicate@acc-local"]` holding only `enabled = true`; neither is
-  taken without the other;
+  taken without the other. `[plugins."agents-can-communicate-hooks@acc-local"]`, when
+  present, must also hold only `enabled = true`;
 - the `acc-workspace` profile with all of ACC's grants and nothing else: the state directory,
   network access, and sockets ACC delivers to now, Codex's own control socket among them. Its selection, `default_permissions = "acc-workspace"`
   or `":workspace"`, goes with it.

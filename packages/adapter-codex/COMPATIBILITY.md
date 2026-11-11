@@ -380,13 +380,18 @@ ACC's ownership marker used to be written as an extra key beside the plugins, wh
 sequence becomes a nameless entry the client tries to load. Ownership is now the entry's
 own name.
 
+ACC ships two plugins in that marketplace: `agents-can-communicate` holds the skill,
+the CLI shim and the branding, and `agents-can-communicate-hooks` holds the hooks and
+their shim (see "Hook trust across ACC updates" below for why).
+
 Four things must all be true before a single hook runs:
 
 1. the plugin directory exists;
 2. it is published in a marketplace file the client can parse;
-3. `[marketplaces.acc-local]` and `[plugins."agents-can-communicate@acc-local"]` are
-   registered in the client's `config.toml`;
-4. the client has **installed** it - `codex plugin add agents-can-communicate@acc-local` -
+3. `[marketplaces.acc-local]` and `[plugins."agents-can-communicate-hooks@acc-local"]` are
+   registered in the client's `config.toml` (ACC registers the skill's
+   `[plugins."agents-can-communicate@acc-local"]` beside it);
+4. the client has **installed** it - `codex plugin add agents-can-communicate-hooks@acc-local` -
    which copies it into `$CODEX_HOME/plugins/cache/`.
 
 ACC does all four. Step 4 looked like the client's own business until it was measured:
@@ -402,6 +407,39 @@ missing - someone cleared it, or the client moved where it keeps one - because t
 supported command is the right answer.
 
 Hook trust remains a manual step. That one is the client's security model, not a gap.
+
+### Hook trust across ACC updates
+
+Codex 0.167.1 records two hashes per trusted plugin hook in
+`[hooks.state."<plugin>@<marketplace>:hooks.json:<event>:0:0"]`: `trusted_hash` over the
+hook's definition and `trusted_content_hash` over the whole cached plugin directory
+(`codex-rs/hooks/src/engine/plugin_fingerprint.rs`: every entry's relative path, kind,
+length and bytes, manifest included). It checks the content hash again before every hook
+runs; a mismatch skips the hook with "plugin contents changed; hook approval required" and
+lists it as modified since last trusted.
+
+Until this change ACC had one plugin, and each release stamped its own version into that
+plugin's manifest. Every release therefore changed the content hash, and after each update
+Codex ran none of ACC's five hooks until a person trusted them again. Measured on the
+maintainer's machine for 0.14.1 to 0.15.0: the stamped `version` was the only byte that
+differed between the two cached copies, each hook's `trusted_hash` stayed the same, and
+recomputing Codex's hash over the two copies gave exactly the two `trusted_content_hash`
+values Codex had recorded. The skill's text, which lived in the same plugin, changed in six
+of the thirteen releases from 0.10.0 to 0.15.0.
+
+So the hooks now live in `agents-can-communicate-hooks`: its manifest, `hooks.json` and the
+hook shim, nothing else. Its cached copy keeps the version it already has whenever the
+files an install would write are byte for byte the same, and the marketplace copy carries
+that same version, since Codex re-copies a plugin whose marketplace version differs from
+its cached one. A changed hook list or shim (the shim pins the node it runs) is a changed
+plugin: it gets the running ACC's version and Codex asks for trust again, as it should.
+The copy it replaces stays for sessions trusted against it. The skill's plugin holds no
+hooks, so Codex hashes nothing there and its version follows ACC's.
+
+Moving from the single plugin costs one more review: the five hooks appear under the new
+plugin id. A Codex session opened before that update still runs the old cached copy's
+hooks, which call the shim at the skill plugin's path, so ACC keeps a shim there while
+that old copy is kept and drops it with the next update.
 
 Because the client runs the *cached copy*, a hook command relative to the bundle would not
 survive installation. ACC's shim is written with absolute paths, so it does.

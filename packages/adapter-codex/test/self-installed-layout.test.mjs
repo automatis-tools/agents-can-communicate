@@ -43,7 +43,7 @@ test("discovery proves a self-installed daemon and finds its chats", async t => 
   f.state.threads = [{ id: "thread-empty", cwd: project, parentThreadId: null, ephemeral: false,
     status: { type: "idle" } }];
   f.state.hooks = { [project]: ["sessionStart", "sessionEnd", "userPromptSubmit"].map(eventName =>
-    ({ eventName, pluginId: "agents-can-communicate@acc-local", enabled: true, trustStatus: "trusted" })) };
+    ({ eventName, pluginId: "agents-can-communicate-hooks@acc-local", enabled: true, trustStatus: "trusted" })) };
   const found = await createCodexDiscovery({ run: f.run, open: f.open })
     .discoverNativeSessions({ env: f.context.env, home: f.context.home });
   assert.deepEqual(found.map(item => [item.sessionId, item.clientPid]), [["thread-empty", f.state.pid]]);
@@ -100,7 +100,7 @@ test("discovery lists the chats of a 0.164.0 daemon with its analytics option", 
   f.state.threads = [{ id: "thread-idle", cwd: project, parentThreadId: null, ephemeral: false,
     status: { type: "idle" } }];
   f.state.hooks = { [project]: ["sessionStart", "sessionEnd", "userPromptSubmit"].map(eventName =>
-    ({ eventName, pluginId: "agents-can-communicate@acc-local", enabled: true, trustStatus: "trusted" })) };
+    ({ eventName, pluginId: "agents-can-communicate-hooks@acc-local", enabled: true, trustStatus: "trusted" })) };
   const found = await createCodexDiscovery({ run: f.run, open: f.open })
     .discoverNativeSessions({ env: f.context.env, home: f.context.home });
   assert.deepEqual(found.map(item => item.sessionId), ["thread-idle"]);
