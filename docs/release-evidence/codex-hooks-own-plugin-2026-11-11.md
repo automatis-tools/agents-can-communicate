@@ -5,12 +5,26 @@ so an ACC update no longer makes Codex ask to trust them again. It is not a publ
 
 ## Exact artifact
 
-- Source: clean commit `9aa2ceb5fc1afd0b25d5527c81f06204ff8a701c`.
-- Archive: `agents-can-communicate-0.15.0.tgz`, 658,915 bytes, 392 files.
-- SHA-256: `eedd261280ce718ae28cd6e7feec6eb574e4c05f02e267161fcc2dd0824a058b`.
+- Source: clean commit `5249a5f98e4bd655a1a65375d23e23fdec49c600`.
+- Archive: `agents-can-communicate-0.15.0.tgz`, 658,977 bytes, 392 files.
+- SHA-256: `9b3cb22b0e2eeff4ed3b66d4d0b13893529bd29b55c7e5cb0ea27be1923876ed`.
 - Node 24.4.0, npm 11.4.2, macOS arm64.
 
 The exact archive passed `scripts/verify-package.mjs`.
+
+The real Codex run below used the archive built from `9aa2ceb5fc1afd0b25d5527c81f06204ff8a701c`
+(658,915 bytes, sha256 `eedd261280ce718ae28cd6e7feec6eb574e4c05f02e267161fcc2dd0824a058b`).
+The packed code differs from it only in `packages/cli/src/managed-runtime/mutex.mjs`, which
+reads the lock directory's file id as a bigint.
+
+## Lock identity on Windows
+
+The `windows-latest` CI shard failed "lock inspection retries when a successor appears after
+owner open saw ENOENT" with "invalid manager lock owner; refusing to reclaim". The lock compared
+two directories by `dev` and `ino` from a plain `lstat`, which returns NTFS's 64-bit file id as a
+double. Above 2^53 two directories created next to each other can round to the same value. A
+new test models that rounding on every platform: it fails without the bigint read and passes
+with it.
 
 ## Cause, measured before the change
 
@@ -33,7 +47,7 @@ hook's `trusted_hash` stayed the same. The two cached plugin copies differed onl
 ## Real client
 
 Codex CLI 0.167.1, macOS arm64, isolated `HOME`, `CODEX_HOME` and ACC data home, TUIs driven
-through a PTY. The exact archive above was re-versioned to 0.15.93 and 0.15.94, and the update
+through a PTY. The archive built from `9aa2ceb5` was re-versioned to 0.15.93 and 0.15.94, and the update
 was served from a local registry.
 
 - A fresh install asked once to review the five hooks of `agents-can-communicate-hooks@acc-local`.

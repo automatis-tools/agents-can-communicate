@@ -12,14 +12,19 @@
   `agents-can-communicate`, under the same name.
 - Updating from 0.15.x or earlier asks once more, because the hooks appear under the new
   plugin. A Codex session open during that update runs no ACC hooks until it restarts.
+- **The update manager's lock tells two lock directories apart on Windows.** It compared them
+  by file id read as a double, and NTFS ids often pass 2^53, so a successor's lock could look
+  like the one being read and the update refused with "invalid manager lock owner". It now
+  reads the full 64-bit id.
 
 | Development artifact | Value |
 |---|---|
-| Built from | `9aa2ceb5fc1afd0b25d5527c81f06204ff8a701c` |
-| Tarball | `agents-can-communicate-0.15.0.tgz`, 658,915 bytes, 392 files |
-| sha256 | `eedd261280ce718ae28cd6e7feec6eb574e4c05f02e267161fcc2dd0824a058b` |
+| Built from | `5249a5f98e4bd655a1a65375d23e23fdec49c600` |
+| Tarball | `agents-can-communicate-0.15.0.tgz`, 658,977 bytes, 392 files |
+| sha256 | `9b3cb22b0e2eeff4ed3b66d4d0b13893529bd29b55c7e5cb0ea27be1923876ed` |
 
-The exact archive passed package verification and a real Codex CLI 0.167.1 run. See
+The exact archive passed package verification. A real Codex CLI 0.167.1 run passed on the
+archive built from `9aa2ceb5`, which differs only in the lock change. See
 [development evidence](docs/release-evidence/codex-hooks-own-plugin-2026-11-11.md).
 
 ## 0.15.0 — release candidate
