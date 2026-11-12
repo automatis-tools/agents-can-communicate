@@ -1,5 +1,32 @@
 # Changelog
 
+## Unreleased — Codex keeps trusting ACC's hooks across updates
+
+- **An ACC update no longer switches off ACC's hooks in Codex.** Codex trusts a plugin's hooks
+  against a hash of the whole plugin, and every ACC release changed that hash: it stamped its
+  version into the plugin, and the skill's text lived there too. After each update Codex ran
+  none of ACC's hooks until a person trusted them again. The hooks now live in a plugin of their
+  own, `agents-can-communicate-hooks`, whose version moves only when its files do. An update
+  that leaves the hooks alone leaves the copy Codex trusted byte for byte, and a Codex session
+  open during the update keeps running ACC's hooks. The skill stays in
+  `agents-can-communicate`, under the same name.
+- Updating from 0.15.x or earlier asks once more, because the hooks appear under the new
+  plugin. A Codex session open during that update runs no ACC hooks until it restarts.
+- **The update manager's lock tells two lock directories apart on Windows.** It compared them
+  by file id read as a double, and NTFS ids often pass 2^53, so a successor's lock could look
+  like the one being read and the update refused with "invalid manager lock owner". It now
+  reads the full 64-bit id.
+
+| Development artifact | Value |
+|---|---|
+| Built from | `bd5f2872de030147c0af694439b371b4d4b8905e` |
+| Tarball | `agents-can-communicate-0.15.0.tgz`, 658,977 bytes, 392 files |
+| sha256 | `9b3cb22b0e2eeff4ed3b66d4d0b13893529bd29b55c7e5cb0ea27be1923876ed` |
+
+The exact archive passed package verification. A real Codex CLI 0.167.1 run passed on the
+archive built from `9aa2ceb5`, which differs only in the lock change. See
+[development evidence](docs/release-evidence/codex-hooks-own-plugin-2026-11-11.md).
+
 ## 0.15.0 — release candidate
 
 This release carries the work merged to main after 0.14.1, from #421. It keeps store contract 8

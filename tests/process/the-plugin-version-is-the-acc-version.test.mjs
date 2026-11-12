@@ -85,6 +85,7 @@ test("no shipped manifest carries a version of its own to drift", async () => {
   for (const manifest of [
     "packages/adapter-claude-code/plugin/.claude-plugin/plugin.json",
     "packages/adapter-codex/plugin/.codex-plugin/plugin.json",
+    "packages/adapter-codex/hooks-plugin/.codex-plugin/plugin.json",
     "packages/adapter-kimi/plugin/.kimi-plugin/plugin.json",
   ]) {
     const shipped = JSON.parse(await readFile(path.join(repo, manifest), "utf8"));

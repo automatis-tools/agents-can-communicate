@@ -40,9 +40,10 @@ const ADAPTERS = [
     commands: async home => {
       // ACC's own marketplace root, not the one this client discovers by
       // itself: joining the user's put ACC's tree where the client never
-      // looked, and enabled an id it never forms.
+      // looked, and enabled an id it never forms. The hooks have a plugin of
+      // their own there, apart from the skill.
       const wired = JSON.parse(await readFile(path.join(home, ".agents", "acc-local",
-        "plugins", "agents-can-communicate", "hooks.json"), "utf8"));
+        "plugins", "agents-can-communicate-hooks", "hooks.json"), "utf8"));
       // On Windows Codex runs `commandWindows` in place of `command`, in PowerShell.
       return hooksIn(wired).map(h => onHost("pwsh", windows ? h.commandWindows ?? h.command
         : h.command));

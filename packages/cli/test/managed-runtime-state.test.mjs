@@ -145,7 +145,29 @@ test("literal null control is malformed rather than an absent installation", asy
   await assert.rejects(readControl(f.root), /control/i);
 });
 
-test("lock inspection retries when a successor appears after owner open saw ENOENT", async t => {
+// NTFS file ids are 64-bit and carry a sequence number in their top bits, so
+// real ids often pass 2^53. Without { bigint: true } Node hands them over as
+// doubles, and two directories created next to each other can round to the same
+// ino (seen on a windows-latest runner). This stand-in leaves every bigint read
+// as it is - Windows' no-follow open compares those with the handle's own stat -
+// and gives a plain read the double an id above 2^60 would round to.
+function modelNtfsFileIds() {
+  const originalLstat = fs.lstat;
+  const high = 2n ** 60n;
+  fs.lstat = async (target, options) => {
+    if (options?.bigint) return originalLstat(target, options);
+    const [plain, exact] = await Promise.all([originalLstat(target, options),
+      originalLstat(target, { bigint: true })]);
+    return Object.assign(plain, { ino: Number(high + exact.ino) });
+  };
+  syncBuiltinESMExports();
+  return () => {
+    fs.lstat = originalLstat;
+    syncBuiltinESMExports();
+  };
+}
+
+async function successorAfterOwnerOpenSawEnoent(t, { ntfsFileIds = false } = {}) {
   const f = await fixture(t);
   const directory = path.join(f.root, "manager.lock");
   const replacement = path.join(f.root, "prepared-successor.lock");
@@ -172,6 +194,7 @@ test("lock inspection retries when a successor appears after owner open saw ENOE
     throw missing;
   };
   syncBuiltinESMExports();
+  const restoreLstat = ntfsFileIds ? modelNtfsFileIds() : () => {};
   let observedSuccessor = false;
   try {
     const result = await withManagerLock(f.root, () => "admitted", {
@@ -186,9 +209,18 @@ test("lock inspection retries when a successor appears after owner open saw ENOE
     assert.equal(result, "admitted");
     assert.equal(observedSuccessor, true);
   } finally {
+    restoreLstat();
     fs.open = originalOpen;
     syncBuiltinESMExports();
   }
+}
+
+test("lock inspection retries when a successor appears after owner open saw ENOENT", async t => {
+  await successorAfterOwnerOpenSawEnoent(t);
+});
+
+test("lock inspection tells the successor apart when file ids pass 2^53", async t => {
+  await successorAfterOwnerOpenSawEnoent(t, { ntfsFileIds: true });
 });
 
 

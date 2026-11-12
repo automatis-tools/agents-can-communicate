@@ -18,6 +18,7 @@
     "fixtures/delivery/codex-cli-0.152.1-remote-workspace.json",
     "src/",
     "plugin/",
+    "hooks-plugin/",
     "fixtures/delivery/codex-cli-0.152.1-local-daemon-product.json",
     "fixtures/delivery/codex-cli-0.152.1-local-daemon-product-evidence.json",
     "fixtures/delivery/codex-cli-0.152.1-local-daemon-transport.json",

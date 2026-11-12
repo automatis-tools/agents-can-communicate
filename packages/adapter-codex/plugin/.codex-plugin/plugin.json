@@ -9,7 +9,6 @@
     "handoff"
   ],
   "skills": "./skills/",
-  "hooks": "./hooks.json",
   "interface": {
     "displayName": "Agents Can Communicate",
     "shortDescription": "See who else is working here, claim resources, and hand off cleanly",

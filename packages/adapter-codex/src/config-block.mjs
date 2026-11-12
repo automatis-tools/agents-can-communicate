@@ -11,6 +11,7 @@ export const sandboxOwnership = root => `${ROOT}${JSON.stringify(root)}`;
 const OWNED = new Map([
   [JSON.stringify(["marketplaces", "acc-local"]), ["source_type", "source"]],
   [JSON.stringify(["plugins", "agents-can-communicate@acc-local"]), ["enabled"]],
+  [JSON.stringify(["plugins", "agents-can-communicate-hooks@acc-local"]), ["enabled"]],
   [JSON.stringify(["sandbox_workspace_write"]), ["writable_roots"]],
 ]);
 
@@ -110,7 +111,8 @@ function inspect(source) {
   return { source: kept.join(""),
     sandbox: has(["sandbox_workspace_write"]),
     registration: assignedParent || has(["marketplaces", "acc-local"])
-      || has(["plugins", "agents-can-communicate@acc-local"]) };
+      || has(["plugins", "agents-can-communicate@acc-local"])
+      || has(["plugins", "agents-can-communicate-hooks@acc-local"]) };
 }
 
 export function inspectConfig(source, file = "config.toml") {

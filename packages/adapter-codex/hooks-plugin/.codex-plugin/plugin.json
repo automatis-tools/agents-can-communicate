@@ -1,0 +1,13 @@
+{
+  "name": "agents-can-communicate-hooks",
+  "description": "The session hooks of Agents Can Communicate: presence, claims, the write guard and message delivery for this Codex session.",
+  "license": "MIT",
+  "hooks": "./hooks.json",
+  "interface": {
+    "displayName": "Agents Can Communicate hooks",
+    "shortDescription": "Session hooks for Agents Can Communicate",
+    "developerName": "automatis-tools",
+    "brandColor": "#3158C3",
+    "category": "Developer Tools"
+  }
+}

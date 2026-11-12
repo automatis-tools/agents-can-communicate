@@ -29,7 +29,8 @@ test("installed archive refresh and removal preserve client-written legacy TOML"
     assert.ok(after.includes(clientTables), "archive removal erased client values");
     assert.ok(after.includes(`writable_roots = [${JSON.stringify(stateRoot)}]`));
     assert.match(after, /network_access = true/);
-    assert.doesNotMatch(after, /\[marketplaces.acc-local\]|\[plugins\."agents-can-communicate@acc-local"\]/);
+    assert.doesNotMatch(after,
+      /\[marketplaces.acc-local\]|\[plugins\."agents-can-communicate(?:-hooks)?@acc-local"\]/);
   }
 });
 
