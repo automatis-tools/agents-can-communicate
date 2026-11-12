@@ -1,5 +1,31 @@
 # Changelog
 
+## 0.15.1 — release candidate
+
+This release carries the work merged to main after 0.15.0, from #423. It keeps store contract 8
+and adds no data migration. See [Upgrading](docs/UPGRADING.md#from-0150-to-0151).
+
+- **Codex keeps trusting ACC's hooks across updates.** The hooks move to a plugin of their own,
+  `agents-can-communicate-hooks`, whose version changes only when its files do. Until now every
+  ACC release changed the plugin Codex trusted, and Codex ran none of ACC's hooks after an
+  update until a person trusted them again. This update itself asks once more, because the
+  hooks appear under the new plugin, and a Codex session open during it runs no ACC hooks
+  until it restarts.
+- **The update manager's lock tells two lock directories apart on Windows.** NTFS file ids
+  often pass 2^53 and lost precision, so an update could refuse with "invalid manager lock
+  owner". The lock now reads the full id.
+
+| Candidate artifact | Value |
+|---|---|
+| Built from | `e10de78870089cd81450762e191c3f3b492c4718` |
+| Tarball | `agents-can-communicate-0.15.1.tgz`, 659,296 bytes, 392 files |
+| sha256 | `860c533671061909a8f48a094a055a5f0b297ffe16957531899252373d8104d2` |
+
+The exact archive passed package verification, 25 managed-update checks and an upgrade from
+published 0.15.0 with real Claude Code and Codex executables, in which the hooks moved to their
+own plugin and a later update left that plugin's files and hash unchanged. See
+[release evidence](docs/release-evidence/v0.15.1.md). This candidate is not published.
+
 ## Unreleased — Codex keeps trusting ACC's hooks across updates
 
 - **An ACC update no longer switches off ACC's hooks in Codex.** Codex trusts a plugin's hooks
