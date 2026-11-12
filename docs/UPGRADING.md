@@ -1,5 +1,26 @@
 # Upgrading
 
+## From 0.15.0 to 0.15.1
+
+Update as usual with `acc update`, or let the automatic update run. Version 0.15.1 keeps store
+contract 8 and adds no data migration.
+
+ACC's Codex hooks move to a plugin of their own, `agents-can-communicate-hooks`, so later ACC
+updates leave the hooks Codex trusted as they are. This update itself makes Codex ask once more:
+
+- The next Codex session shows "Hooks need review" for the five hooks of
+  `agents-can-communicate-hooks@acc-local`. Trust them as before.
+- A Codex session open during the update runs no ACC hooks until it restarts.
+- The skill stays in `agents-can-communicate` under the same name, and `config.toml` gains
+  `[plugins."agents-can-communicate-hooks@acc-local"]` inside ACC's block.
+
+From then on, an update that leaves the hooks unchanged asks nothing, and an open Codex session
+keeps running them. See [Codex plugin is listed but
+inactive](TROUBLESHOOTING.md#codex-plugin-is-listed-but-inactive).
+
+On Windows, an update that met another update's lock could refuse with "invalid manager lock
+owner". The lock now compares the full file id.
+
 ## From 0.14.x to 0.15.0
 
 Update as usual with `acc update`, or let the automatic update run. Version 0.15.0 keeps store
