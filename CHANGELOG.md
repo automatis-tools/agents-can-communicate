@@ -7,14 +7,15 @@
   details", and nothing kept the details. The notice now names the cause on one line, for
   example `fetch failed (ECONNREFUSED)`.
 - **The notice clears once a later check succeeds.** It used to stay after a check had found
-  the release current. The next due check now clears it before it runs, including the notice
-  that 0.15.1 and older wrote, and a check that fails again records its own cause.
+  the release current. It now clears once the registry answers a due check, including the notice
+  that 0.15.1 and older wrote. A check that fails keeps it, and a background pass that fails
+  again records its own cause.
 
 | Development artifact | Value |
 |---|---|
-| Built from | `d7697b8f0a05ab92f11e5aa3e0c81ef69d504d44` |
-| Tarball | `agents-can-communicate-0.15.1.tgz`, 659,696 bytes, 392 files |
-| sha256 | `67f7d76b02ad56ac598667b12d61fc9a611de814164863aabab3de2db3d3ae22` |
+| Built from | `659859e6321130a540a5acb8586b2fff528cca20` |
+| Tarball | `agents-can-communicate-0.15.1.tgz`, 659,737 bytes, 392 files |
+| sha256 | `4b5c2c278c5c754aeda07a470ab290ca02741bd32fb0393a29e91c6dd0622db0` |
 
 The exact archive passed package verification and an installed run of the update worker. See
 [development evidence](docs/release-evidence/worker-failure-notice-2026-11-22.md).

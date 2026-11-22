@@ -18,9 +18,9 @@ until its client exits, as designed. That generation goes when the session ends.
 
 ## Exact artifact
 
-- Source: clean commit `d7697b8f0a05ab92f11e5aa3e0c81ef69d504d44`.
-- Archive: `agents-can-communicate-0.15.1.tgz`, 659,696 bytes, 392 files.
-- SHA-256: `67f7d76b02ad56ac598667b12d61fc9a611de814164863aabab3de2db3d3ae22`.
+- Source: clean commit `659859e6321130a540a5acb8586b2fff528cca20`.
+- Archive: `agents-can-communicate-0.15.1.tgz`, 659,737 bytes, 392 files.
+- SHA-256: `4b5c2c278c5c754aeda07a470ab290ca02741bd32fb0393a29e91c6dd0622db0`.
 - Node 24.4.0, npm 11.4.2, macOS arm64.
 
 The exact archive passed `scripts/verify-package.mjs`.
@@ -33,18 +33,22 @@ The exact archive passed `scripts/verify-package.mjs`.
   notice stays within 400 characters; a lost lock race records nothing.
 - The cause-less notice that 0.15.1 and older wrote clears on the next check; any other notice
   stays.
-- The clearing test fails when the check keeps the old notice.
+- A foreground `acc update` whose registry request fails keeps the recorded notice.
+- The clearing test fails when the check keeps the old notice, and the keeping test fails when
+  the notice is cleared before the registry answers.
 
 ## Installed run
 
 The exact archive was installed with `npm install -g` into an isolated home, data home and
 prefix, with the real Codex executable for detection and `--delivery off`. The installed
-generation's own `bin/acc-update-worker.mjs` then ran twice:
+generation's own `bin/acc-update-worker.mjs` and `acc update` then ran:
 
 1. Against a registry on a closed local port, the notice became `Automatic update could not
    finish: fetch failed (ECONNREFUSED). The previous runtime was kept; the next check tries
    again, or run acc update.`, and `acc doctor` showed the same line.
-2. With the check made due and a local registry serving the installed version, the pass made one
+2. `acc update` in the foreground, against the same closed port, printed `fetch failed` and
+   left the notice unchanged.
+3. With the check made due and a local registry serving the installed version, the pass made one
    registry request and the notice was cleared.
 
 ## Limits
