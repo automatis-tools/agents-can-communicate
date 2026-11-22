@@ -336,8 +336,9 @@ possible without touching the operator's install.
    `--dangerously-bypass-hook-trust`, and the docs say "Review and trust plugin hooks
    before you enable them". Installation therefore cannot be silent: `acc install` can
    place the plugin, but the user must trust its hooks before any of them run, and
-   `acc doctor` must leave current readiness unverified rather than infer protection
-   from installed files or saved trust records. See the onboarding observation below.
+   `acc doctor` must not infer protection from installed files or saved trust records.
+   It takes the client's own answer from a verified daemon, or leaves readiness
+   unverified. See the onboarding observation and the 2026-11-22 entry below.
 2. **Distribution is marketplace-based.** `codex plugin add` installs from a configured
    marketplace snapshot; the personal marketplace lives at
    `~/.agents/plugins/marketplace.json`. A file drop into a plugins directory is not the
@@ -795,6 +796,23 @@ describes review of each exact definition. The correction preserves existing tru
 records; it does not guarantee that they still apply after a definition changes. This
 is configuration/metadata evidence, not new delivery, lifecycle or guard certification.
 The interactive trust UI and a new live model turn were not exercised in this audit.
+
+## Doctor takes hook readiness from the daemon — Codex 0.171.0, 2026-11-22
+
+Doctor asked for a hook review on every run while the hooks plugin was cached, also when
+Codex ran every ACC hook (#427). It now asks the running daemon, after the same pid and
+socket proof that chat discovery uses, for `hooks/list` in the home directory, and reads the
+entries of `agents-can-communicate-hooks@acc-local` for each event that ACC's installed
+`hooks.json` declares. A hook runs when Codex lists it `enabled` and `trusted` or `managed`.
+Doctor then reports the hooks enabled and trusted, or names each one that would not run as
+`not listed`, `disabled`, `untrusted` or `modified`, and keeps the review for those. No
+daemon, an unproven one, a client without `hooks/list`, an unreadable `hooks.json` or no
+answer within 1.5 s leaves readiness unverified, as before. Detection still reads no trust
+record, reproduces no hash and starts no service.
+
+On the maintainer's Mac with ACC 0.15.2, Codex 0.171.0 listed all five ACC hooks as
+`enabled` and `trusted` for the home directory and for a project directory. The new
+detection reported them enabled and trusted in 175 ms and asked for no hook review.
 
 ## Live review after native activation, 2026-09-07
 

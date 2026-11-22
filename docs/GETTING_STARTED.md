@@ -50,7 +50,9 @@ preserved; see [outgoing permissions](CONFIGURATION.md#codex-outgoing-permission
 With legacy sandbox settings, the named ACC state directory must also be in
 `sandbox_workspace_write.writable_roots` in the config the installer identifies.
 ACC keeps those user settings unchanged. Installed files alone do not establish that hooks
-are active; `acc doctor` leaves current readiness unverified and directs you to Codex.
+are active. While the Codex service runs, `acc doctor` asks it which of ACC's hooks it would
+run and names any that need review in Codex; otherwise it reports readiness as unverified
+and directs you to Codex.
 
 Read the delivery summary for each client. `acc install` turns live delivery on with the
 `actionable` policy for every client that can receive it, and asks no question. A request or

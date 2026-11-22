@@ -327,8 +327,11 @@ and an open session keeps running ACC's hooks. Updating from 0.15.x or earlier a
 because the hooks moved to their own plugin; a Codex session open during that update runs
 no ACC hooks until you restart it.
 
-`acc doctor` reports installed files separately from hook readiness, which it leaves
-unverified. A saved trust record cannot prove current activation. If installation preserved
+`acc doctor` reports installed files separately from hook readiness. A saved trust record
+cannot prove current activation, so doctor asks the running Codex service instead. It says
+"Codex reports ACC's hooks enabled and trusted" when Codex runs all of them, and names each
+hook Codex would not run, with the reason, otherwise. When the service is not running or
+cannot answer, doctor reports readiness as unverified and asks you to check `/hooks`. If installation preserved
 your own legacy sandbox configuration, doctor also names the ACC state directory whose
 access you should check in `sandbox_workspace_write.writable_roots`. Live delivery requires
 local socket permissions as well; a writable state directory alone is insufficient.
