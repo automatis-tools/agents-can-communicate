@@ -49,12 +49,16 @@ export async function performUpdate(root, { force = false, check = false, env = 
   if (!force && !check && !checkDue(initial)) return { ...data, checked: false, reason: "not_due" };
   if (!check) await withManagerLock(root, async () => {
     const current = await readControl(root);
-    // A new attempt supersedes the last background failure: it either
-    // succeeds, or fails and records its own cause.
-    await writeControl(root, { ...current, checkedAt: new Date().toISOString(),
-      notice: isWorkerFailure(current.notice) ? null : current.notice });
+    await writeControl(root, { ...current, checkedAt: new Date().toISOString() });
   });
   const release = await discover({ pin: initial.pin, env });
+  // The registry answered, so the last background failure no longer
+  // describes this machine. A check that failed keeps it: `acc update` runs
+  // this pass too and records nothing when it throws.
+  if (!check) await withManagerLock(root, async () => {
+    const current = await readControl(root);
+    if (isWorkerFailure(current.notice)) await writeControl(root, { ...current, notice: null });
+  });
   const newer = newerVersion(release.version, initial.active.version);
   const checked = { ...data, checked: true, latest: release.version, newer };
   // Nothing newer than a blocked pending release: report the activation that

@@ -126,6 +126,15 @@ test("the cause-less notice that 0.15.1 and older wrote clears on the next check
   assert.equal((await readControl(f.root)).notice, null);
 });
 
+test("a check that fails keeps the last recorded failure", async t => {
+  const notice = "Automatic update could not finish: fetch failed (ENOTFOUND). The previous runtime was kept; the next check tries again, or run acc update.";
+  const f = await fixture(t, { notice });
+  // `acc update` runs this pass in the foreground and records nothing when it throws.
+  await assert.rejects(performUpdate(f.root, { ...f.ports, force: true,
+    discover: async () => { throw new TypeError("fetch failed"); } }), /fetch failed/);
+  assert.equal((await readControl(f.root)).notice, notice);
+});
+
 test("a notice that is not a worker failure stays when a check succeeds", async t => {
   const f = await fixture(t, { notice: "ACC 0.4.0 is active." });
   await performUpdate(f.root, { ...f.ports, discover: async () => ({ version: "0.4.0" }) });
