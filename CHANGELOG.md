@@ -1,5 +1,32 @@
 # Changelog
 
+## 0.15.2 — release candidate
+
+This release carries the work merged to main after 0.15.1, from #425. It keeps store contract 8
+and adds no data migration, and Codex keeps trusting ACC's hooks across it. See
+[Upgrading](docs/UPGRADING.md#from-0151-to-0152).
+
+- **A failed background update names its cause.** The update worker runs without a terminal, and
+  when one of its passes failed, `acc doctor` showed only "Automatic update could not finish ...
+  Run acc update for details". Nothing kept the details. The notice now names the cause, for
+  example `fetch failed (ECONNREFUSED)`.
+- **The notice clears once a later check succeeds.** It used to stay after a check had found the
+  release current. It now clears once the registry answers a due check or `acc update`,
+  including the notice that 0.15.1 and older wrote. A check that fails keeps it. `acc update
+  --check` stays read-only.
+
+| Candidate artifact | Value |
+|---|---|
+| Built from | `ad4df1ae70216a8c2a417377c6945c118c204816` |
+| Tarball | `agents-can-communicate-0.15.2.tgz`, 659,952 bytes, 392 files |
+| sha256 | `9e3957955fe174cb8e4704b3450f79603c78332461654295fe56c88c0de4633f` |
+
+The exact archive passed package verification, 25 managed-update checks and an upgrade from
+published 0.15.1 with real Claude Code and Codex executables. In that upgrade the hooks plugin
+kept its files and content hash, and the new worker named a failure's cause and cleared it after
+an answered check. See [release evidence](docs/release-evidence/v0.15.2.md). This candidate is
+not published.
+
 ## Unreleased — a failed background update says why, and clears itself
 
 - **A failed background update names its cause.** The detached update worker has no terminal,
