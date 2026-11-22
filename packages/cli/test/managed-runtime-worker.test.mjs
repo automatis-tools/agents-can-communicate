@@ -120,6 +120,12 @@ test("a recorded failure keeps only one bounded line of its cause", async t => {
   assert.equal((await readControl(f.root)).notice, notice, "a lost lock race is not a failed update");
 });
 
+test("the cause-less notice that 0.15.1 and older wrote clears on the next check too", async t => {
+  const f = await fixture(t, { notice: "Automatic update could not finish; the previous runtime was kept. Run acc update for details." });
+  await performUpdate(f.root, { ...f.ports, discover: async () => ({ version: "0.4.0" }) });
+  assert.equal((await readControl(f.root)).notice, null);
+});
+
 test("a notice that is not a worker failure stays when a check succeeds", async t => {
   const f = await fixture(t, { notice: "ACC 0.4.0 is active." });
   await performUpdate(f.root, { ...f.ports, discover: async () => ({ version: "0.4.0" }) });
