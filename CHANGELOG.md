@@ -1,5 +1,25 @@
 # Changelog
 
+## Unreleased — a failed background update says why, and clears itself
+
+- **A failed background update names its cause.** The detached update worker has no terminal,
+  so a pass that failed left only "Automatic update could not finish ... Run acc update for
+  details", and nothing kept the details. The notice now names the cause on one line, for
+  example `fetch failed (ECONNREFUSED)`.
+- **The notice clears once a later check succeeds.** It used to stay after a check had found
+  the release current. It now clears once the registry answers a due check, including the notice
+  that 0.15.1 and older wrote. A check that fails keeps it, and a background pass that fails
+  again records its own cause.
+
+| Development artifact | Value |
+|---|---|
+| Built from | `659859e6321130a540a5acb8586b2fff528cca20` |
+| Tarball | `agents-can-communicate-0.15.1.tgz`, 659,737 bytes, 392 files |
+| sha256 | `4b5c2c278c5c754aeda07a470ab290ca02741bd32fb0393a29e91c6dd0622db0` |
+
+The exact archive passed package verification and an installed run of the update worker. See
+[development evidence](docs/release-evidence/worker-failure-notice-2026-11-22.md).
+
 ## 0.15.1 — release candidate
 
 This release carries the work merged to main after 0.15.0, from #423. It keeps store contract 8

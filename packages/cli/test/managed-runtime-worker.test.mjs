@@ -5,7 +5,7 @@ import { mkdir, mkdtemp, readFile, readdir, realpath, rm, writeFile } from "node
 import path from "node:path";
 import { tmpdir } from "node:os";
 import test from "node:test";
-import { performUpdate, runWorker } from "../src/managed-runtime/worker.mjs";
+import { performUpdate, recordWorkerFailure, runWorker } from "../src/managed-runtime/worker.mjs";
 import { readControl, writeControl } from "../src/managed-runtime/state.mjs";
 import { acquireRuntime } from "../src/managed-runtime/leases.mjs";
 import { withManagerLock } from "../src/managed-runtime/mutex.mjs";
@@ -87,6 +87,58 @@ test("failed downloads keep the working runtime and concurrent opt-out prevents 
   } });
   assert.equal(g.calls.some(([name]) => name === "activate"), false);
   assert.equal((await readControl(g.root)).pending, null);
+});
+
+// On 2026-11-22 a Mac on the current release still showed "Automatic update
+// could not finish" from a background pass days earlier: the notice named no
+// cause, and every later check that succeeded left it in place.
+test("a failed background pass says why, and the next check that succeeds clears it", async t => {
+  const f = await fixture(t);
+  const offline = Object.assign(new TypeError("fetch failed"), { cause: Object.assign(new Error("getaddrinfo ENOTFOUND registry.npmjs.org"), { code: "ENOTFOUND" }) });
+  await assert.rejects(performUpdate(f.root, { ...f.ports, discover: async () => { throw offline; } }), /fetch failed/);
+  await recordWorkerFailure(f.root, offline);
+  const failed = await readControl(f.root);
+  assert.match(failed.notice, /^Automatic update could not finish: fetch failed \(ENOTFOUND\)\./);
+  assert.match(failed.notice, /previous runtime was kept/);
+  // The next due check reaches the registry and finds nothing newer.
+  await writeControl(f.root, { ...failed, checkedAt: null });
+  const current = await performUpdate(f.root, { ...f.ports, discover: async () => ({ version: "0.4.0" }) });
+  assert.equal(current.newer, false);
+  assert.equal((await readControl(f.root)).notice, null);
+});
+
+test("a recorded failure keeps only one bounded line of its cause", async t => {
+  const f = await fixture(t);
+  // Node's fetch refuses some ports with a cause that has a message and no code.
+  await recordWorkerFailure(f.root, Object.assign(new TypeError("fetch failed"), { cause: new Error("bad port") }));
+  assert.match((await readControl(f.root)).notice, /^Automatic update could not finish: fetch failed \(bad port\)\./);
+  await recordWorkerFailure(f.root, new Error(`bad\u001b[31m archive\n${"x".repeat(500)}`));
+  const { notice } = await readControl(f.root);
+  assert.doesNotMatch(notice, /[\x00-\x1f\x7f]/);
+  assert.ok(notice.length <= 400, `notice is ${notice.length} characters`);
+  await recordWorkerFailure(f.root, new Error("manager lock held; acquisition timeout"));
+  assert.equal((await readControl(f.root)).notice, notice, "a lost lock race is not a failed update");
+});
+
+test("the cause-less notice that 0.15.1 and older wrote clears on the next check too", async t => {
+  const f = await fixture(t, { notice: "Automatic update could not finish; the previous runtime was kept. Run acc update for details." });
+  await performUpdate(f.root, { ...f.ports, discover: async () => ({ version: "0.4.0" }) });
+  assert.equal((await readControl(f.root)).notice, null);
+});
+
+test("a check that fails keeps the last recorded failure", async t => {
+  const notice = "Automatic update could not finish: fetch failed (ENOTFOUND). The previous runtime was kept; the next check tries again, or run acc update.";
+  const f = await fixture(t, { notice });
+  // `acc update` runs this pass in the foreground and records nothing when it throws.
+  await assert.rejects(performUpdate(f.root, { ...f.ports, force: true,
+    discover: async () => { throw new TypeError("fetch failed"); } }), /fetch failed/);
+  assert.equal((await readControl(f.root)).notice, notice);
+});
+
+test("a notice that is not a worker failure stays when a check succeeds", async t => {
+  const f = await fixture(t, { notice: "ACC 0.4.0 is active." });
+  await performUpdate(f.root, { ...f.ports, discover: async () => ({ version: "0.4.0" }) });
+  assert.equal((await readControl(f.root)).notice, "ACC 0.4.0 is active.");
 });
 
 test("a background poll releases the update lock while waiting for clients", { timeout: 15_000 }, async t => {
