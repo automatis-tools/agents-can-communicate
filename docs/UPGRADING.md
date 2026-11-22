@@ -1,5 +1,17 @@
 # Upgrading
 
+## From 0.15.1 to 0.15.2
+
+Update as usual with `acc update`, or let the automatic update run. Version 0.15.2 keeps store
+contract 8 and adds no data migration. Codex keeps trusting ACC's hooks: their plugin's files are
+unchanged, so this update asks nothing.
+
+When a background update failed, `acc doctor` showed "Automatic update could not finish ... Run
+acc update for details" without the cause, and kept showing it after later checks had succeeded.
+The notice now names the cause, for example `fetch failed (ECONNREFUSED)`, and clears once the
+registry answers the next due check or `acc update`. A notice left by 0.15.1 or older clears the
+same way. `acc update --check` stays read-only and leaves it in place.
+
 ## From 0.15.0 to 0.15.1
 
 Update as usual with `acc update`, or let the automatic update run. Version 0.15.1 keeps store
