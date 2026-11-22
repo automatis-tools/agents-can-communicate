@@ -1,5 +1,25 @@
 # Changelog
 
+## Unreleased — doctor asks Codex whether ACC's hooks run
+
+- **`acc doctor` stops asking to review Codex hooks that Codex already runs.** It asked for a
+  review on every run while ACC's hooks plugin was cached, also when Codex ran every ACC hook.
+  Doctor now asks the running Codex service, after the same process and socket checks that
+  chat discovery uses, which of ACC's hooks it would run. It reports them enabled and trusted,
+  or names each hook Codex would not run (`not listed`, `disabled`, `untrusted` or `modified`)
+  and keeps the review for those. Without the service's answer, readiness stays unverified as
+  before. Doctor still reads no trust record and starts no service.
+
+| Development artifact | Value |
+|---|---|
+| Built from | `7378ddb5830d8e7a55d9c7faeab1cf933cb1d862` |
+| Tarball | `agents-can-communicate-0.15.2.tgz`, 661,533 bytes, 392 files |
+| sha256 | `8ab958604689f17f9bcfed90e548537954416054cd1b7485fb9129f3189bcad6` |
+
+The exact archive passed package verification and an installed doctor run against a real
+Codex 0.171.0 service. See
+[development evidence](docs/release-evidence/doctor-codex-hook-trust-2026-11-22.md).
+
 ## 0.15.2 — release candidate
 
 This release carries the work merged to main after 0.15.1, from #425. It keeps store contract 8
