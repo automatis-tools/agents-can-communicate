@@ -154,8 +154,10 @@ const WORKER_FAILURE = "Automatic update could not finish";
 const isWorkerFailure = notice => typeof notice === "string" && notice.startsWith(WORKER_FAILURE);
 function failureCause(error) {
   const message = String(error?.message ?? error ?? "unknown error");
-  const code = typeof error?.cause?.code === "string" ? ` (${error.cause.code})` : "";
-  return (message + code).replace(/[\x00-\x1f\x7f-\x9f]+/g, " ").replace(/\s+/g, " ").trim().slice(0, 240);
+  // fetch says only "fetch failed"; the reason is on its cause.
+  const cause = error?.cause?.code ?? error?.cause?.message;
+  const detail = typeof cause === "string" && cause !== message ? ` (${cause})` : "";
+  return (message + detail).replace(/[\x00-\x1f\x7f-\x9f]+/g, " ").replace(/\s+/g, " ").trim().slice(0, 240);
 }
 
 export async function recordWorkerFailure(root, error) {

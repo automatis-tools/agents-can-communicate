@@ -109,6 +109,9 @@ test("a failed background pass says why, and the next check that succeeds clears
 
 test("a recorded failure keeps only one bounded line of its cause", async t => {
   const f = await fixture(t);
+  // Node's fetch refuses some ports with a cause that has a message and no code.
+  await recordWorkerFailure(f.root, Object.assign(new TypeError("fetch failed"), { cause: new Error("bad port") }));
+  assert.match((await readControl(f.root)).notice, /^Automatic update could not finish: fetch failed \(bad port\)\./);
   await recordWorkerFailure(f.root, new Error(`bad\u001b[31m archive\n${"x".repeat(500)}`));
   const { notice } = await readControl(f.root);
   assert.doesNotMatch(notice, /[\x00-\x1f\x7f]/);
