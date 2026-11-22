@@ -12,9 +12,9 @@ that notice beside a `checkedAt` from that morning: the morning check had succee
 the file around the notice. The pass that failed was older, and its error was not kept anywhere,
 so its cause cannot be recovered.
 
-The same machine kept a 0.14.0 generation. A pin held it: a Claude Code session that started
-on 0.14.0 was resumed after a reboot and kept its generation, as designed. That generation goes
-when the session ends.
+The same machine kept a 0.14.0 generation. A pin held it: a Claude Code session pinned to
+0.14.0 on 2026-11-11 has run without a break since then, and reclaim keeps a pinned generation
+until its client exits, as designed. That generation goes when the session ends.
 
 ## Exact artifact
 
