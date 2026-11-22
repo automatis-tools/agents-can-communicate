@@ -49,7 +49,10 @@ export async function performUpdate(root, { force = false, check = false, env = 
   if (!force && !check && !checkDue(initial)) return { ...data, checked: false, reason: "not_due" };
   if (!check) await withManagerLock(root, async () => {
     const current = await readControl(root);
-    await writeControl(root, { ...current, checkedAt: new Date().toISOString() });
+    // A new attempt supersedes the last background failure: it either
+    // succeeds, or fails and records its own cause.
+    await writeControl(root, { ...current, checkedAt: new Date().toISOString(),
+      notice: isWorkerFailure(current.notice) ? null : current.notice });
   });
   const release = await discover({ pin: initial.pin, env });
   const newer = newerVersion(release.version, initial.active.version);
@@ -143,12 +146,24 @@ async function pass(root, { force, env, wait, ignorePid }) {
   return wait ? withManagerLock(`${root}/worker/poller`, poll, { timeoutMs: 100 }) : poll();
 }
 
+// The notice a failed background pass leaves. It names its cause, because the
+// detached worker has no terminal and nothing else keeps the error: on
+// 2026-11-22 a Mac showed only "could not finish" for a pass days old, while a
+// later check had already found the release current.
+const WORKER_FAILURE = "Automatic update could not finish";
+const isWorkerFailure = notice => typeof notice === "string" && notice.startsWith(WORKER_FAILURE);
+function failureCause(error) {
+  const message = String(error?.message ?? error ?? "unknown error");
+  const code = typeof error?.cause?.code === "string" ? ` (${error.cause.code})` : "";
+  return (message + code).replace(/[\x00-\x1f\x7f-\x9f]+/g, " ").replace(/\s+/g, " ").trim().slice(0, 240);
+}
+
 export async function recordWorkerFailure(root, error) {
   // A second scheduled worker losing the lock is ordinary, not a failed update.
   if (/manager lock held/.test(error?.message ?? "")) return;
   await withManagerLock(root, async () => {
     const control = await readControl(root);
     if (control) await writeControl(root, { ...control,
-      notice: "Automatic update could not finish; the previous runtime was kept. Run acc update for details." });
+      notice: `${WORKER_FAILURE}: ${failureCause(error)}. The previous runtime was kept; the next check tries again, or run acc update.` });
   }).catch(() => {});
 }
