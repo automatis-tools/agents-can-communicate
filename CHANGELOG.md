@@ -1,5 +1,30 @@
 # Changelog
 
+## 0.15.3 — release candidate
+
+This release carries the work merged to main after 0.15.2, from #428. It keeps store contract 8
+and adds no data migration, and Codex keeps trusting ACC's hooks across it. See
+[Upgrading](docs/UPGRADING.md#from-0152-to-0153).
+
+- **`acc doctor` stops asking to review Codex hooks that Codex already runs.** Doctor asked for
+  the review on every run, also when Codex ran every ACC hook. It now asks the running Codex
+  service, after the same process and socket checks that chat discovery uses, which of ACC's
+  hooks it would run. It reports them enabled and trusted, or names each hook Codex would not
+  run and keeps the review for those. Without the service's answer, readiness stays unverified
+  as before. Doctor still reads no trust record and starts no service.
+
+| Candidate artifact | Value |
+|---|---|
+| Built from | `8ee41cd71615881b4ac72ed5ec0e342cb727c83b` |
+| Tarball | `agents-can-communicate-0.15.3.tgz`, 661,655 bytes, 392 files |
+| sha256 | `7e582bc6350e104a750cf58d783eaaa8142639fff0639947afd4e49ebb568fc6` |
+
+The exact archive passed package verification, 25 managed-update checks and an upgrade from
+published 0.15.2 with real Claude Code and Codex executables. In that upgrade the hooks plugin
+kept its files and content hash. Its Codex detection, run read-only against the maintainer's
+Codex 0.171.0 service, reported all five ACC hooks enabled and trusted. See
+[release evidence](docs/release-evidence/v0.15.3.md). This candidate is not published.
+
 ## Unreleased — doctor asks Codex whether ACC's hooks run
 
 - **`acc doctor` stops asking to review Codex hooks that Codex already runs.** It asked for a
