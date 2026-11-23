@@ -1,5 +1,16 @@
 # Upgrading
 
+## From 0.15.2 to 0.15.3
+
+Update as usual with `acc update`, or let the automatic update run. Version 0.15.3 keeps store
+contract 8 and adds no data migration. Codex keeps trusting ACC's hooks: their plugin's files are
+unchanged, so this update asks nothing.
+
+`acc doctor` asked to review Codex hooks on every run, also when Codex already ran all of ACC's
+hooks. Doctor now asks the running Codex service which of ACC's hooks it would run. It keeps the
+review only for the hooks Codex would not run, and names each of them. When the service does not
+answer, doctor reports hook readiness as unverified, as before.
+
 ## From 0.15.1 to 0.15.2
 
 Update as usual with `acc update`, or let the automatic update run. Version 0.15.2 keeps store
