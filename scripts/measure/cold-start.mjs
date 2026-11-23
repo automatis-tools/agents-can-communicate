@@ -105,11 +105,13 @@ async function fixture() {
 export async function measure({ packageRoot, rounds, warmup }) {
   const accBin = path.join(packageRoot, "bin", "acc.mjs");
   const hookBin = path.join(packageRoot, "bin", "acc-hook.mjs");
-  const f = await fixture();
   const samples = Object.fromEntries(PATHS.map(name => [name, []]));
   const loadBefore = os.loadavg();
-  try {
-    for (let round = 0; round < warmup + rounds; round += 1) {
+  for (let round = 0; round < warmup + rounds; round += 1) {
+    // A fixture of its own for every round, warm-up included: no round reads a
+    // store, project or home that an earlier session left behind.
+    const f = await fixture();
+    try {
       const sessionId = `cold-start-${round}`;
       const options = payload => ({ cwd: f.project, env: f.env,
         input: JSON.stringify({ session_id: sessionId, cwd: f.project, ...payload }) });
@@ -135,9 +137,9 @@ export async function measure({ packageRoot, rounds, warmup }) {
         const { wallMs, userMs, systemMs, cpuMs } = taken[name];
         samples[name].push({ wallMs, userMs, systemMs, cpuMs });
       }
+    } finally {
+      await rm(f.root, { recursive: true, force: true });
     }
-  } finally {
-    await rm(f.root, { recursive: true, force: true });
   }
   return {
     issue: 150, hookBudgetMs: HOOK_BUDGET_MS, rounds, warmup,
