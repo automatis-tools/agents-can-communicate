@@ -61,10 +61,30 @@ export function createClaimService(ports, sessions) {
       claimId: existing.claimId,
       resource: existing.resource,
       ownerSessionId: existing.ownerSessionId,
+      ownerParticipantId: ownerSession?.participantId ?? null,
       ownerPresence,
       expiresAt: existing.expiresAt,
       requestedBy: owner.sessionId,
     });
+  }
+
+  // One sentence a model can act on: who holds it, until when, and what to do
+  // next. The details stay for scripts (#146). The text serves the CLI and MCP
+  // alike, so it names a command only where the user runs it: a force release.
+  function holdText(requested, conflict) {
+    // The session as well: a client that shows only this text needs it (as the write guard says it).
+    const holder = conflict.ownerParticipantId === null ? `session ${conflict.ownerSessionId}`
+      : `${conflict.ownerParticipantId} (session ${conflict.ownerSessionId})`;
+    const as = conflict.resource === requested ? "" : ` as ${conflict.resource}`;
+    return `${requested} is claimed by ${holder}${as} until ${conflict.expiresAt}`;
+  }
+  function nextAction(conflict) {
+    return conflict.ownerPresence === "offline"
+      ? "its session is offline, so ask your user whether to release it with "
+        + `acc release --claim ${conflict.claimId} --authority human --reason "<their decision>", `
+        + "or retry after it expires"
+      : `ask ${conflict.ownerParticipantId ?? "its holder"} to release it, `
+        + "claim a narrower resource, or retry after it expires";
   }
 
   async function acquire(input, resources, batch) {
@@ -90,11 +110,11 @@ export function createClaimService(ports, sessions) {
       if (conflicts.length > 0) {
         if (!batch) {
           const { requestedResource, ...details } = conflicts[0];
-          throw new AccError(EXIT.CONFLICT, "the resource is already claimed", details);
+          throw new AccError(EXIT.CONFLICT,
+            `${holdText(requestedResource, details)}; ${nextAction(details)}.`, details);
         }
         const message = "batch claim conflicts:\n" + conflicts.map(conflict =>
-          `${conflict.requestedResource} overlaps ${conflict.resource}, held by ${conflict.ownerSessionId}`)
-          .join("\n");
+          `${holdText(conflict.requestedResource, conflict)}; ${nextAction(conflict)}.`).join("\n");
         throw new AccError(EXIT.CONFLICT, message, { conflicts });
       }
       // Validate every record before staging a write, including renewals.

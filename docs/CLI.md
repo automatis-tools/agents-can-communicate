@@ -183,6 +183,13 @@ acc release --resource 'file:packages/core/**' \
 acc release --all
 ```
 
+A resource is `<scheme>:<name>`: a lowercase scheme, a colon, and a name with no whitespace.
+ACC treats every scheme the same way. Two resources overlap when they are equal, or when both
+use the same scheme and one ends in `/**` and covers the other path segment by segment. So
+`port:7319` conflicts only with `port:7319`, and `tool:browser/**` covers
+`tool:browser/main-profile` but not `tool:browserstack`. Resources in different schemes never
+overlap.
+
 File resources use repository-relative paths. A directory claim ends in `/**`. The example
 creates an advisory claim: omitted `--enforcement` always means `advisory`, even with
 certified clients. Request `--enforcement guarded` explicitly when needed; an incapable
@@ -191,6 +198,12 @@ live participant still downgrades workspace protection. MCP claims are always ad
 Repeat `--resource` to acquire several claims atomically. The shared mode, enforcement,
 reason, and lease apply to every resource. ACC rejects duplicate resources after
 normalization. A conflict exits `5` without creating any claims or renewing existing ones.
+Its message is one sentence for the model. It names the holder and its session, the claim the
+holder has, when the lease ends, and one next action. When the holder is online, the action is
+to ask the holder, claim a narrower resource, or retry after the lease ends. When its session
+is offline, the action is to ask the user about a force release with `--authority human`. The
+error details keep the claim id, the holder's session and participant, its presence and the
+lease end.
 Batch error `details.conflicts` identifies each blocked requested resource and its holders.
 Repeating a successful claim command renews this session's existing claims on those resources.
 
