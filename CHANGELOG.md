@@ -7,13 +7,14 @@
   1 native binding; store contract 7; unknown client pid)". The report now names its session,
   participant, client and workspace, its last heartbeat, and when it stops blocking: 30 minutes
   after that heartbeat, or when the process its session records exits. It says how to release
-  the session sooner. Owner tokens stay out of the report.
+  the session sooner. Past ten blockers, it says that `acc update --json` lists every one. Owner
+  tokens stay out of the report.
 
 | Development artifact | Value |
 |---|---|
-| Built from | `500c3c8fc57c29ec382c14006a45169475f20282` |
-| Tarball | `agents-can-communicate-0.15.3.tgz`, 662,722 bytes, 392 files |
-| sha256 | `7a6da6c41c9dba303f42b6fadeb57427c5a4c30b83dccfe40de7daca8d17a994` |
+| Built from | `df5edbed7adc4a1f456c2fe751d97cc48544519c` |
+| Tarball | `agents-can-communicate-0.15.3.tgz`, 662,767 bytes, 392 files |
+| sha256 | `291ab63c54c1d4b4ab8bbbba73c8c41295fe5babe8c19264ec39c8bbb4648da0` |
 
 The exact archive passed package verification and an installed update that such a binding
 blocked. See [development evidence](docs/release-evidence/update-blocker-session-2026-11-23.md).

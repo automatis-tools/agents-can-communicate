@@ -14,9 +14,9 @@ The hold itself is expected since #273. The report did not say which session hel
 
 ## Exact artifact
 
-- Source: clean commit `500c3c8fc57c29ec382c14006a45169475f20282`.
-- Archive: `agents-can-communicate-0.15.3.tgz`, 662,722 bytes, 392 files.
-- SHA-256: `7a6da6c41c9dba303f42b6fadeb57427c5a4c30b83dccfe40de7daca8d17a994`.
+- Source: clean commit `df5edbed7adc4a1f456c2fe751d97cc48544519c`.
+- Archive: `agents-can-communicate-0.15.3.tgz`, 662,767 bytes, 392 files.
+- SHA-256: `291ab63c54c1d4b4ab8bbbba73c8c41295fe5babe8c19264ec39c8bbb4648da0`.
 - Node 24.4.0, npm 11.4.2, macOS arm64.
 
 The exact archive passed `scripts/verify-package.mjs`.
@@ -29,6 +29,8 @@ The exact archive passed `scripts/verify-package.mjs`.
   The result holds neither the binding's generation nor its harness key.
 - When the session records a live process, the report says the hold lasts until that process
   exits. A session without a checkout is named by its workspace id.
+- Past ten blockers, the notice says that `acc update --json` lists the rest; the result carries
+  every blocker with its session.
 - When the session record cannot be read, the report still names the workspace and says that
   the record is unreadable. It gives no release advice for a session it cannot name.
 
@@ -43,10 +45,12 @@ as 0.15.4.
 - `acc update --yes` stayed pending and printed: "ACC 0.15.4 is ready; waiting for 1 active or
   unidentified process(es): session session_… (participant manual, cli, workspace workspace_…;
   native; 1 native binding; store contract 7; unknown client pid; last heartbeat
-  2026-11-23T02:20:25.999Z; blocks until 2026-11-23T02:50:25.999Z unless it sends a heartbeat).
+  2026-11-23T02:41:07.698Z; blocks until 2026-11-23T03:11:07.698Z unless it sends a heartbeat).
   To release a session sooner, end it in its client, or have its owner run acc detach; once
   nothing blocks, run acc update or let the automatic update finish."
 - `acc doctor` showed the same notice.
+- `acc update --yes --json` listed the blocker with its session, participant, client and release
+  time.
 - Neither output contained the session's generation or the binding's harness key.
 - After the owner ran `acc detach`, `acc update --yes` activated 0.15.4.
 
