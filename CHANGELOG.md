@@ -1,5 +1,24 @@
 # Changelog
 
+## Unreleased — the MCP server lists its tools outside a workspace
+
+- **`acc-mcp` answers a client that starts it outside a workspace.** MCP directories and some
+  hosts start a server from the home directory and only list its tools. ACC keeps its state
+  there, so the home directory cannot be a workspace, and `acc-mcp` ended before `initialize`
+  with a stack trace. It now answers `initialize`, `tools/list` and `resources/list`. A tool
+  call or a resource read says `no workspace:` and the reason. Set `ACC_MCP_WORKSPACE` to the
+  project to use the tools.
+
+| Development artifact | Value |
+|---|---|
+| Built from | `5dcc4d70afbfa783a634faf90414721b316e35b9` |
+| Tarball | `agents-can-communicate-0.15.3.tgz`, 664,278 bytes, 393 files |
+| sha256 | `f9671e48cc5b015dad51c716fb4e4bff36f77afdfac9a14a7dd4a2839b86bbc0` |
+
+The exact archive passed package verification and an installed `acc-mcp` run from a home
+directory that holds ACC's state. See
+[development evidence](docs/release-evidence/mcp-outside-workspace-2026-11-23.md).
+
 ## Unreleased — line breaks in a peer subject stay escaped
 
 - **A peer cannot end a header line early with a Unicode line break.** The protocol refuses
