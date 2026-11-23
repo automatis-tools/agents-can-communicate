@@ -1,5 +1,22 @@
 # Changelog
 
+## Unreleased — what one ACC start costs
+
+- **The cost of one ACC start is measured and published.** Every hook and every `acc inbox`
+  poll starts a new Node process. `docs/ARCHITECTURE.md` now gives the wall time and CPU time of
+  each hook path and of `inbox`, next to the hook runner's 5-second budget. On an Apple silicon
+  Mac, the slowest path, session start, took 186 ms at p95, 4% of the budget. A checkout can
+  repeat the measurement with `node scripts/measure/cold-start.mjs`.
+
+| Development artifact | Value |
+|---|---|
+| Built from | `9665a1d5bdc4a036933903631655fbe8149bdc7a` |
+| Tarball | `agents-can-communicate-0.15.3.tgz`, 665,721 bytes, 393 files |
+| sha256 | `9bd117416c7b71fd9cbc12ce803150bc0187ddcb573f867216e924706221131e` |
+
+The exact archive passed package verification. Only `docs/ARCHITECTURE.md` differs from the
+archive that was measured. See [development evidence](docs/release-evidence/cold-start-2026-11-23.md).
+
 ## Unreleased — a claim conflict tells the model what to do next
 
 - **A claim refusal is one sentence a model can act on.** It used to say only "the resource is
