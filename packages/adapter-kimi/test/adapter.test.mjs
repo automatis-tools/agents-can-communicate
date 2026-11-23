@@ -150,7 +150,9 @@ test("the plugin bundle carries a Kimi manifest and the coordination skill", asy
   assert.deepEqual((await readdir(target)).sort(), [".kimi-plugin", "acc-cli.sh", "skills"]);
   const manifest = JSON.parse(await readFile(
     path.join(target, ".kimi-plugin", "plugin.json"), "utf8"));
-  assert.equal(manifest.sessionStart.skill, "acc");
+  // Listed, not preloaded: the full skill costs every session about 4,700 tokens (#135).
+  assert.equal(manifest.skills, "./skills/");
+  assert.equal(manifest.sessionStart, undefined);
 
   const registry = JSON.parse(await readFile(
     path.join(context.home, "plugins", "installed.json"), "utf8"));
