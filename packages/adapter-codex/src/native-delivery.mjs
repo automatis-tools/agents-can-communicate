@@ -6,8 +6,7 @@ import { PEER_BODY_FENCE, decisionBody, escapePeerText, isLaunchOption, oneLine 
   from "@agents-can-communicate/adapter-sdk";
 
 import { CODEX_QUEUE_MINIMUM, MINIMUM_VERSION, PROTOCOL_CONTRACT, QUEUE_MODES,
-  addCodexQueueMessage, canonicalCwd, compareVersions, controlSocketPath,
-  locateCodexThread, openCodexAppServer, probeCodexQueue, safeReason, serverVersionOf,
+  canonicalCwd, compareVersions, controlSocketPath, deliverCodexMessage, locateCodexThread, openCodexAppServer, probeCodexQueue, safeReason, serverVersionOf,
   versionOrder } from "./app-server-client.mjs";
 import { newEndpointId, readNativeEndpoint, readySocketPath, removeNativeEndpoint, socketIsReady,
   writeNativeEndpoint } from "./native-endpoint.mjs";
@@ -203,7 +202,7 @@ export async function offerMessage({ binding, message, runtimeDir, timeoutMs = 5
       const { reasonCode, servingVersion } = await verifyReceiver(peer, endpoint);
       if (reasonCode !== null) return rejected(reasonCode === "handshake_timeout" ? "transport_error"
         : reasonCode === "handshake_version_mismatch" ? "unsupported_client_version" : "recipient_unavailable");
-      await addCodexQueueMessage(peer, { threadId: endpoint.threadId,
+      await deliverCodexMessage(peer, { threadId: endpoint.threadId,
         messageId: message.messageId, text: renderText(message) });
       return { accepted: true, transport: "codex-app-server", clientVersion: servingVersion };
     });

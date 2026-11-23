@@ -5,8 +5,8 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import nodeTest from "node:test";
 
-import { addCodexQueueMessage, compareVersions, isMethodMissing, locateCodexThread,
-  openCodexAppServer, probeCodexQueue, safeReason, serverVersionOf }
+import { addCodexQueueMessage, compareVersions, deliverCodexMessage, isMethodMissing,
+  locateCodexThread, openCodexAppServer, probeCodexQueue, safeReason, serverVersionOf }
   from "../src/app-server-client.mjs";
 import { acceptKey, decodeFrames, encodeFrame } from "../src/ws-json-rpc.mjs";
 import { posixTransportTest as test } from "../../../tests/helpers/platform-scope.mjs";
@@ -19,8 +19,9 @@ const USER_AGENT = "agents-can-communicate/0.152.1 (Mac OS 26.6.2; arm64) Apple_
 // A fake daemon: HTTP upgrade on a Unix socket, then one JSON-RPC message per
 // text frame, exactly as codex-cli 0.152.1 answered.
 function startDaemon({ userAgent = USER_AGENT, loaded = [THREAD], threads, queue = [],
-  queueSupported = true, missingCode = -32601, unsolicited = false } = {}) {
-  const state = { queue: [...queue] };
+  queueSupported = true, missingCode = -32601, unsolicited = false, turns = [],
+  turnsSupported = true, endsBeforeSteer = false } = {}) {
+  const state = { queue: [...queue], turns: [...turns], steered: [], turnLists: [] };
   const dir = mkdtempSync(path.join(tmpdir(), "acc-codex-daemon-"));
   const socketPath = path.join(dir, "control.sock");
   const server = http.createServer((request, response) => response.writeHead(404).end());
@@ -68,6 +69,24 @@ function startDaemon({ userAgent = USER_AGENT, loaded = [THREAD], threads, queue
       state.queue.push(item);
       const { threadId, ...queuedSubmission } = item;
       return reply({ id, result: { queuedSubmission } });
+    }
+    // As codex-cli 0.171.0 answered: the newest turn first, and a steer that
+    // names any turn but the running one is refused as an invalid request.
+    if (method === "thread/turns/list") {
+      if (!turnsSupported) return reply({ id, error: missing(method) });
+      state.turnLists.push(params);
+      const listed = state.turns.slice(0, params.limit ?? state.turns.length)
+        .map(turn => ({ ...turn, items: [], itemsView: params.itemsView }));
+      if (endsBeforeSteer) state.turns = state.turns.map(turn => ({ ...turn, status: "completed" }));
+      return reply({ id, result: { data: listed, nextCursor: null } });
+    }
+    if (method === "turn/steer") {
+      const running = state.turns.find(turn => turn.status === "inProgress");
+      if (!running) return reply({ id, error: rpcError(-32600, "no active turn to steer") });
+      if (running.id !== params.expectedTurnId) return reply({ id, error: rpcError(-32600,
+        `expected active turn id \`${params.expectedTurnId}\` but found \`${running.id}\``) });
+      state.steered.push(params);
+      return reply({ id, result: { turnId: running.id } });
     }
     return reply({ id, error: missing(method) });
   };
@@ -154,6 +173,46 @@ test("a queue add carries the captured shape and a retry preserves the id",
     assert.equal(daemon.server.state.queue.length, 1);
     assert.equal(daemon.server.calls.some(m => /thread\/read|thread\/resume|turn\/start/.test(m)),
       false, "the client read transcript or steered a turn");
+  }));
+
+const TURN = "01a20acd-a86e-74c0-b07e-ef252712cb48";
+const BUSY = [{ id: TURN, status: "inProgress" }];
+
+test("a busy thread takes the message into its running turn, not the queue",
+  withDaemon({ turns: BUSY }, async (peer, daemon) => {
+    const result = await deliverCodexMessage(peer, { threadId: THREAD, messageId: "message_1",
+      text: "untrusted body" });
+    assert.deepEqual(result, { accepted: true, duplicate: false, steeredTurnId: TURN });
+    assert.deepEqual(daemon.server.state.steered, [{ threadId: THREAD, expectedTurnId: TURN,
+      input: [{ type: "text", text: "untrusted body" }], clientUserMessageId: "message_1" }]);
+    assert.deepEqual(daemon.server.state.turnLists,
+      [{ threadId: THREAD, limit: 1, itemsView: "notLoaded" }], "a turn's items were read");
+    assert.equal(daemon.server.state.queue.length, 0);
+    assert.equal(daemon.server.calls.some(m => /thread\/read|thread\/resume|turn\/start/.test(m)),
+      false, "the client read a transcript or started a turn");
+  }));
+
+// The queue is the path for every thread with no running turn to name.
+test("an idle thread, a finished turn, an older daemon or a turn that ends first gets the queue",
+  async () => {
+    for (const options of [{}, { turns: [{ id: TURN, status: "completed" }] },
+      { turns: BUSY, turnsSupported: false }, { turns: BUSY, endsBeforeSteer: true }]) {
+      await withDaemon(options, async (peer, daemon) => {
+        const result = await deliverCodexMessage(peer, { threadId: THREAD, messageId: "message_1",
+          text: "untrusted body" });
+        assert.deepEqual(result, { accepted: true, duplicate: false, queuedSubmissionId: "qs_1" },
+          JSON.stringify(options));
+        assert.deepEqual(daemon.server.state.steered, []);
+      })();
+    }
+  });
+
+test("a message still in the queue is the same offer, even once a turn runs",
+  withDaemon({ turns: BUSY, queue: [{ threadId: THREAD, id: "qs_7",
+    clientUserMessageId: "message_1" }] }, async (peer, daemon) => {
+    assert.deepEqual(await deliverCodexMessage(peer, { threadId: THREAD, messageId: "message_1",
+      text: "untrusted body" }), { accepted: true, duplicate: true, queuedSubmissionId: "qs_7" });
+    assert.deepEqual(daemon.server.state.steered, []);
   }));
 
 test("frames round-trip and a partial frame is buffered", () => {
