@@ -1,5 +1,24 @@
 # Changelog
 
+## Unreleased — a peer that a live push reached is not unavailable
+
+- **The sender no longer sees `recipient_unavailable` for a peer that a live push reached.** The
+  item counted every recipient without an online session, and online needs a recent heartbeat.
+  An idle session sends none until a live push wakes a turn, or until a person approves the wake,
+  so the sender was told to contact a peer that already had the message. A recipient whose
+  message a live transport offered to a session that has not ended now counts as reachable. A
+  queued message, an offer through the next turn, and an offer to an ended session still report
+  the recipient as unavailable.
+
+| Development artifact | Value |
+|---|---|
+| Built from | `fe41340e1640ecac9d728ca6573339fa00311237` |
+| Tarball | `agents-can-communicate-0.15.3.tgz`, 663,087 bytes, 392 files |
+| sha256 | `1910e4b50b6176ff543330e39e8f9818d4dc4ec6f5c7159e8f3cfa8cb6f41b29` |
+
+The exact archive passed package verification, and its packed core gave the attention above. See
+[development evidence](docs/release-evidence/attention-live-offer-2026-11-23.md).
+
 ## Unreleased — an update blocker without a client process names its session
 
 - **`acc update` and `acc doctor` name the session behind a pid-less update blocker.** A native
