@@ -1,0 +1,922 @@
+{
+  "issue": 135,
+  "candidate": [
+    {
+      "client": "claude_code",
+      "model": "haiku",
+      "task": "reply",
+      "passed": true,
+      "exit": 0,
+      "seconds": 8,
+      "events": [
+        "session.opened",
+        "session.opened",
+        "message.recorded",
+        "session.opened",
+        "message.offer_succeeded",
+        "message.recorded",
+        "message.acknowledged",
+        "session.closed"
+      ]
+    },
+    {
+      "client": "claude_code",
+      "model": "haiku",
+      "task": "read",
+      "passed": true,
+      "exit": 0,
+      "seconds": 4,
+      "events": [
+        "session.opened",
+        "session.opened",
+        "message.recorded",
+        "session.opened",
+        "message.offer_succeeded",
+        "session.closed"
+      ]
+    },
+    {
+      "client": "claude_code",
+      "model": "haiku",
+      "task": "claim",
+      "passed": true,
+      "exit": 0,
+      "seconds": 11,
+      "events": [
+        "session.opened",
+        "session.opened",
+        "session.opened",
+        "claim.acquired",
+        "claim.released",
+        "session.closed"
+      ]
+    },
+    {
+      "client": "claude_code",
+      "model": "haiku",
+      "task": "handoff",
+      "passed": true,
+      "exit": 0,
+      "seconds": 15,
+      "events": [
+        "session.opened",
+        "session.opened",
+        "session.opened",
+        "message.recorded",
+        "message.recorded",
+        "session.closed"
+      ]
+    },
+    {
+      "client": "claude_code",
+      "model": "opus",
+      "task": "reply",
+      "passed": true,
+      "exit": 0,
+      "seconds": 10,
+      "events": [
+        "session.opened",
+        "session.opened",
+        "message.recorded",
+        "session.opened",
+        "message.offer_succeeded",
+        "message.recorded",
+        "message.acknowledged",
+        "session.closed"
+      ]
+    },
+    {
+      "client": "claude_code",
+      "model": "opus",
+      "task": "read",
+      "passed": true,
+      "exit": 0,
+      "seconds": 7,
+      "events": [
+        "session.opened",
+        "session.opened",
+        "message.recorded",
+        "session.opened",
+        "message.offer_succeeded",
+        "session.closed"
+      ]
+    },
+    {
+      "client": "claude_code",
+      "model": "opus",
+      "task": "claim",
+      "passed": true,
+      "exit": 0,
+      "seconds": 19,
+      "events": [
+        "session.opened",
+        "session.opened",
+        "session.opened",
+        "claim.acquired",
+        "session.closed"
+      ]
+    },
+    {
+      "client": "claude_code",
+      "model": "opus",
+      "task": "handoff",
+      "passed": true,
+      "exit": 0,
+      "seconds": 18,
+      "events": [
+        "session.opened",
+        "session.opened",
+        "session.opened",
+        "message.recorded",
+        "session.closed"
+      ]
+    },
+    {
+      "client": "codex",
+      "model": "gpt-6-luna",
+      "task": "reply",
+      "passed": true,
+      "exit": 0,
+      "seconds": 23,
+      "events": [
+        "session.opened",
+        "session.opened",
+        "message.recorded",
+        "session.opened",
+        "message.offer_succeeded",
+        "message.recorded",
+        "message.acknowledged",
+        "session.closed"
+      ]
+    },
+    {
+      "client": "codex",
+      "model": "gpt-6-luna",
+      "task": "read",
+      "passed": true,
+      "exit": 0,
+      "seconds": 8,
+      "events": [
+        "session.opened",
+        "session.opened",
+        "message.recorded",
+        "session.opened",
+        "message.offer_succeeded",
+        "session.closed"
+      ]
+    },
+    {
+      "client": "codex",
+      "model": "gpt-6-luna",
+      "task": "claim",
+      "passed": true,
+      "exit": 0,
+      "seconds": 28,
+      "events": [
+        "session.opened",
+        "session.opened",
+        "session.opened",
+        "intent.published",
+        "claim.acquired",
+        "session.closed"
+      ]
+    },
+    {
+      "client": "codex",
+      "model": "gpt-6-luna",
+      "task": "handoff",
+      "passed": true,
+      "exit": 0,
+      "seconds": 36,
+      "events": [
+        "session.opened",
+        "session.opened",
+        "session.opened",
+        "message.recorded",
+        "session.closed"
+      ]
+    },
+    {
+      "client": "codex",
+      "model": "gpt-6.2-astra",
+      "task": "reply",
+      "passed": true,
+      "exit": 0,
+      "seconds": 20,
+      "events": [
+        "session.opened",
+        "session.opened",
+        "message.recorded",
+        "session.opened",
+        "message.offer_succeeded",
+        "message.recorded",
+        "message.acknowledged",
+        "session.closed"
+      ]
+    },
+    {
+      "client": "codex",
+      "model": "gpt-6.2-astra",
+      "task": "read",
+      "passed": true,
+      "exit": 0,
+      "seconds": 13,
+      "events": [
+        "session.opened",
+        "session.opened",
+        "message.recorded",
+        "session.opened",
+        "message.offer_succeeded",
+        "session.closed"
+      ]
+    },
+    {
+      "client": "codex",
+      "model": "gpt-6.2-astra",
+      "task": "claim",
+      "passed": true,
+      "exit": 0,
+      "seconds": 30,
+      "events": [
+        "session.opened",
+        "session.opened",
+        "session.opened",
+        "intent.published",
+        "claim.acquired",
+        "session.closed"
+      ]
+    },
+    {
+      "client": "codex",
+      "model": "gpt-6.2-astra",
+      "task": "handoff",
+      "passed": true,
+      "exit": 0,
+      "seconds": 16,
+      "events": [
+        "session.opened",
+        "session.opened",
+        "session.opened",
+        "message.recorded",
+        "session.closed"
+      ]
+    },
+    {
+      "client": "kimi",
+      "model": "kimi-code/kimi-for-coding",
+      "task": "reply",
+      "passed": true,
+      "exit": 0,
+      "seconds": 14,
+      "events": [
+        "session.opened",
+        "session.opened",
+        "message.recorded",
+        "session.opened",
+        "message.offer_succeeded",
+        "message.recorded",
+        "message.acknowledged"
+      ]
+    },
+    {
+      "client": "kimi",
+      "model": "kimi-code/kimi-for-coding",
+      "task": "read",
+      "passed": true,
+      "exit": 0,
+      "seconds": 19,
+      "events": [
+        "session.opened",
+        "session.opened",
+        "message.recorded",
+        "session.opened",
+        "message.offer_succeeded"
+      ]
+    },
+    {
+      "client": "kimi",
+      "model": "kimi-code/kimi-for-coding",
+      "task": "claim",
+      "passed": true,
+      "exit": 0,
+      "seconds": 19,
+      "events": [
+        "session.opened",
+        "session.opened",
+        "session.opened",
+        "intent.published",
+        "claim.acquired"
+      ]
+    },
+    {
+      "client": "kimi",
+      "model": "kimi-code/kimi-for-coding",
+      "task": "handoff",
+      "passed": true,
+      "exit": 0,
+      "seconds": 25,
+      "events": [
+        "session.opened",
+        "session.opened",
+        "session.opened",
+        "message.recorded",
+        "message.recorded",
+        "session.closed"
+      ]
+    },
+    {
+      "client": "kimi",
+      "model": "kimi-code/k3.1-pro",
+      "task": "reply",
+      "passed": true,
+      "exit": 0,
+      "seconds": 16,
+      "events": [
+        "session.opened",
+        "session.opened",
+        "message.recorded",
+        "session.opened",
+        "message.offer_succeeded",
+        "message.recorded",
+        "message.acknowledged"
+      ]
+    },
+    {
+      "client": "kimi",
+      "model": "kimi-code/k3.1-pro",
+      "task": "read",
+      "passed": true,
+      "exit": 0,
+      "seconds": 12,
+      "events": [
+        "session.opened",
+        "session.opened",
+        "message.recorded",
+        "session.opened",
+        "message.offer_succeeded"
+      ]
+    },
+    {
+      "client": "kimi",
+      "model": "kimi-code/k3.1-pro",
+      "task": "claim",
+      "passed": true,
+      "exit": 0,
+      "seconds": 27,
+      "events": [
+        "session.opened",
+        "session.opened",
+        "session.opened",
+        "intent.published",
+        "claim.acquired",
+        "claim.released",
+        "intent.cleared"
+      ]
+    },
+    {
+      "client": "kimi",
+      "model": "kimi-code/k3.1-pro",
+      "task": "handoff",
+      "passed": true,
+      "exit": 0,
+      "seconds": 36,
+      "events": [
+        "session.opened",
+        "session.opened",
+        "session.opened",
+        "message.recorded",
+        "session.closed"
+      ]
+    },
+    {
+      "client": "gemini_cli",
+      "model": "gemini-3.1-flash-lite",
+      "task": "reply",
+      "passed": true,
+      "exit": 0,
+      "seconds": 94,
+      "events": [
+        "session.opened",
+        "session.opened",
+        "message.recorded",
+        "session.opened",
+        "message.offer_succeeded",
+        "message.recorded",
+        "message.acknowledged",
+        "session.closed"
+      ]
+    },
+    {
+      "client": "gemini_cli",
+      "model": "gemini-3.1-flash-lite",
+      "task": "read",
+      "passed": true,
+      "exit": 0,
+      "seconds": 9,
+      "events": [
+        "session.opened",
+        "session.opened",
+        "message.recorded",
+        "session.opened",
+        "message.offer_succeeded",
+        "session.closed"
+      ]
+    },
+    {
+      "client": "gemini_cli",
+      "model": "gemini-3.1-flash-lite",
+      "task": "claim",
+      "passed": true,
+      "exit": 0,
+      "seconds": 22,
+      "events": [
+        "session.opened",
+        "session.opened",
+        "session.opened",
+        "intent.published",
+        "claim.acquired",
+        "claim.released",
+        "message.recorded",
+        "session.closed"
+      ]
+    },
+    {
+      "client": "gemini_cli",
+      "model": "gemini-3.1-flash-lite",
+      "task": "handoff",
+      "passed": true,
+      "exit": 0,
+      "seconds": 14,
+      "events": [
+        "session.opened",
+        "session.opened",
+        "session.opened",
+        "intent.published",
+        "message.recorded",
+        "message.recorded",
+        "session.closed"
+      ]
+    }
+  ],
+  "before": [
+    {
+      "client": "claude_code",
+      "model": "haiku",
+      "task": "reply",
+      "passed": true,
+      "exit": 0,
+      "seconds": 8,
+      "events": [
+        "session.opened",
+        "session.opened",
+        "message.recorded",
+        "session.opened",
+        "message.offer_succeeded",
+        "message.recorded",
+        "message.acknowledged",
+        "session.closed"
+      ]
+    },
+    {
+      "client": "claude_code",
+      "model": "haiku",
+      "task": "read",
+      "passed": true,
+      "exit": 0,
+      "seconds": 4,
+      "events": [
+        "session.opened",
+        "session.opened",
+        "message.recorded",
+        "session.opened",
+        "message.offer_succeeded",
+        "session.closed"
+      ]
+    },
+    {
+      "client": "claude_code",
+      "model": "haiku",
+      "task": "claim",
+      "passed": true,
+      "exit": 0,
+      "seconds": 11,
+      "events": [
+        "session.opened",
+        "session.opened",
+        "session.opened",
+        "claim.acquired",
+        "claim.released",
+        "session.closed"
+      ],
+      "rescored": "claimed, edited and released; the first check wanted a held claim"
+    },
+    {
+      "client": "claude_code",
+      "model": "haiku",
+      "task": "handoff",
+      "passed": true,
+      "exit": 0,
+      "seconds": 10,
+      "events": [
+        "session.opened",
+        "session.opened",
+        "session.opened",
+        "message.recorded",
+        "session.closed"
+      ]
+    },
+    {
+      "client": "claude_code",
+      "model": "opus",
+      "task": "reply",
+      "passed": true,
+      "exit": 0,
+      "seconds": 10,
+      "events": [
+        "session.opened",
+        "session.opened",
+        "message.recorded",
+        "session.opened",
+        "message.offer_succeeded",
+        "message.recorded",
+        "message.acknowledged",
+        "session.closed"
+      ]
+    },
+    {
+      "client": "claude_code",
+      "model": "opus",
+      "task": "read",
+      "passed": true,
+      "exit": 0,
+      "seconds": 11,
+      "events": [
+        "session.opened",
+        "session.opened",
+        "message.recorded",
+        "session.opened",
+        "message.offer_succeeded",
+        "message.acknowledged",
+        "session.closed"
+      ]
+    },
+    {
+      "client": "claude_code",
+      "model": "opus",
+      "task": "claim",
+      "passed": true,
+      "exit": 0,
+      "seconds": 19,
+      "events": [
+        "session.opened",
+        "session.opened",
+        "session.opened",
+        "claim.acquired",
+        "session.closed"
+      ]
+    },
+    {
+      "client": "claude_code",
+      "model": "opus",
+      "task": "handoff",
+      "passed": true,
+      "exit": 0,
+      "seconds": 18,
+      "events": [
+        "session.opened",
+        "session.opened",
+        "session.opened",
+        "message.recorded",
+        "session.closed"
+      ]
+    },
+    {
+      "client": "codex",
+      "model": "gpt-6-luna",
+      "task": "reply",
+      "passed": true,
+      "exit": 0,
+      "seconds": 30,
+      "events": [
+        "session.opened",
+        "session.opened",
+        "message.recorded",
+        "session.opened",
+        "message.offer_succeeded",
+        "message.recorded",
+        "message.acknowledged",
+        "session.closed"
+      ]
+    },
+    {
+      "client": "codex",
+      "model": "gpt-6-luna",
+      "task": "read",
+      "passed": true,
+      "exit": 0,
+      "seconds": 21,
+      "events": [
+        "session.opened",
+        "session.opened",
+        "message.recorded",
+        "session.opened",
+        "message.offer_succeeded",
+        "session.closed"
+      ]
+    },
+    {
+      "client": "codex",
+      "model": "gpt-6-luna",
+      "task": "claim",
+      "passed": true,
+      "exit": 0,
+      "seconds": 38,
+      "events": [
+        "session.opened",
+        "session.opened",
+        "session.opened",
+        "claim.acquired",
+        "session.closed"
+      ]
+    },
+    {
+      "client": "codex",
+      "model": "gpt-6-luna",
+      "task": "handoff",
+      "passed": true,
+      "exit": 0,
+      "seconds": 21,
+      "events": [
+        "session.opened",
+        "session.opened",
+        "session.opened",
+        "message.recorded",
+        "session.closed"
+      ]
+    },
+    {
+      "client": "codex",
+      "model": "gpt-6.2-astra",
+      "task": "reply",
+      "passed": true,
+      "exit": 0,
+      "seconds": 17,
+      "events": [
+        "session.opened",
+        "session.opened",
+        "message.recorded",
+        "session.opened",
+        "message.offer_succeeded",
+        "message.recorded",
+        "message.acknowledged",
+        "session.closed"
+      ]
+    },
+    {
+      "client": "codex",
+      "model": "gpt-6.2-astra",
+      "task": "read",
+      "passed": true,
+      "exit": 0,
+      "seconds": 13,
+      "events": [
+        "session.opened",
+        "session.opened",
+        "message.recorded",
+        "session.opened",
+        "message.offer_succeeded",
+        "session.closed"
+      ]
+    },
+    {
+      "client": "codex",
+      "model": "gpt-6.2-astra",
+      "task": "claim",
+      "passed": true,
+      "exit": 0,
+      "seconds": 24,
+      "events": [
+        "session.opened",
+        "session.opened",
+        "session.opened",
+        "intent.published",
+        "claim.acquired",
+        "claim.released",
+        "intent.cleared",
+        "session.closed"
+      ],
+      "rescored": "claimed, edited and released; the first check wanted a held claim"
+    },
+    {
+      "client": "codex",
+      "model": "gpt-6.2-astra",
+      "task": "handoff",
+      "passed": true,
+      "exit": 0,
+      "seconds": 26,
+      "events": [
+        "session.opened",
+        "session.opened",
+        "session.opened",
+        "message.recorded",
+        "session.closed"
+      ]
+    },
+    {
+      "client": "kimi",
+      "model": "kimi-code/kimi-for-coding",
+      "task": "reply",
+      "passed": true,
+      "exit": 0,
+      "seconds": 18,
+      "events": [
+        "session.opened",
+        "session.opened",
+        "message.recorded",
+        "session.opened",
+        "message.offer_succeeded",
+        "message.recorded",
+        "message.acknowledged"
+      ]
+    },
+    {
+      "client": "kimi",
+      "model": "kimi-code/kimi-for-coding",
+      "task": "claim",
+      "passed": true,
+      "exit": 0,
+      "seconds": 53,
+      "events": [
+        "session.opened",
+        "session.opened",
+        "session.opened",
+        "intent.published",
+        "claim.acquired"
+      ]
+    },
+    {
+      "client": "kimi",
+      "model": "kimi-code/kimi-for-coding",
+      "task": "handoff",
+      "passed": true,
+      "exit": 0,
+      "seconds": 20,
+      "events": [
+        "session.opened",
+        "session.opened",
+        "session.opened",
+        "message.recorded",
+        "session.closed"
+      ]
+    },
+    {
+      "client": "kimi",
+      "model": "kimi-code/k3.1-pro",
+      "task": "reply",
+      "passed": true,
+      "exit": 0,
+      "seconds": 25,
+      "events": [
+        "session.opened",
+        "session.opened",
+        "message.recorded",
+        "session.opened",
+        "message.offer_succeeded",
+        "message.recorded",
+        "message.acknowledged"
+      ]
+    },
+    {
+      "client": "kimi",
+      "model": "kimi-code/k3.1-pro",
+      "task": "claim",
+      "passed": true,
+      "exit": 0,
+      "seconds": 43,
+      "events": [
+        "session.opened",
+        "session.opened",
+        "session.opened",
+        "intent.published",
+        "claim.acquired",
+        "claim.released",
+        "intent.cleared"
+      ]
+    },
+    {
+      "client": "kimi",
+      "model": "kimi-code/k3.1-pro",
+      "task": "handoff",
+      "passed": true,
+      "exit": 0,
+      "seconds": 47,
+      "events": [
+        "session.opened",
+        "session.opened",
+        "session.opened",
+        "message.recorded",
+        "message.recorded",
+        "session.closed"
+      ]
+    },
+    {
+      "client": "kimi",
+      "model": "kimi-code/kimi-for-coding",
+      "task": "read",
+      "passed": true,
+      "exit": 0,
+      "seconds": 6,
+      "events": [
+        "session.opened",
+        "session.opened",
+        "message.recorded",
+        "session.opened",
+        "message.offer_succeeded"
+      ]
+    },
+    {
+      "client": "kimi",
+      "model": "kimi-code/k3.1-pro",
+      "task": "read",
+      "passed": true,
+      "exit": 0,
+      "seconds": 12,
+      "events": [
+        "session.opened",
+        "session.opened",
+        "message.recorded",
+        "session.opened",
+        "message.offer_succeeded"
+      ]
+    },
+    {
+      "client": "gemini_cli",
+      "model": "gemini-3.1-flash-lite",
+      "task": "reply",
+      "passed": true,
+      "exit": 0,
+      "seconds": 12,
+      "events": [
+        "session.opened",
+        "session.opened",
+        "message.recorded",
+        "session.opened",
+        "message.offer_succeeded",
+        "message.recorded",
+        "message.acknowledged",
+        "session.closed"
+      ]
+    },
+    {
+      "client": "gemini_cli",
+      "model": "gemini-3.1-flash-lite",
+      "task": "read",
+      "passed": true,
+      "exit": 0,
+      "seconds": 10,
+      "events": [
+        "session.opened",
+        "session.opened",
+        "message.recorded",
+        "session.opened",
+        "message.offer_succeeded",
+        "message.acknowledged",
+        "session.closed"
+      ]
+    },
+    {
+      "client": "gemini_cli",
+      "model": "gemini-3.1-flash-lite",
+      "task": "claim",
+      "passed": true,
+      "exit": 0,
+      "seconds": 21,
+      "events": [
+        "session.opened",
+        "session.opened",
+        "session.opened",
+        "intent.published",
+        "claim.acquired",
+        "claim.released",
+        "message.recorded",
+        "session.closed"
+      ]
+    },
+    {
+      "client": "gemini_cli",
+      "model": "gemini-3.1-flash-lite",
+      "task": "handoff",
+      "passed": true,
+      "exit": 0,
+      "seconds": 18,
+      "events": [
+        "session.opened",
+        "session.opened",
+        "session.opened",
+        "message.recorded",
+        "session.closed"
+      ]
+    }
+  ],
+  "notes": "The task script reads the last assistant message of a Kimi stream, which also repeats hook text. The before rows for Kimi read were rerun with that reading; every candidate row comes from one run of the script at 24f870f0. Gemini CLI ran one model, the only one the free API tier allowed that day."
+}
