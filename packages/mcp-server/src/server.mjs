@@ -198,6 +198,7 @@ async function handle(message, context) {
     case "resources/list":
       return { resources: [...RESOURCES] };
     case "resources/read": {
+      if (context.unavailable) throw new Error(context.unavailable);
       // Inbox discovery uses this configured participant's current owner but
       // returns summaries only. Reading this resource never retrieves bodies.
       const resourceContext = params.uri === "acc://inbox"
@@ -215,6 +216,7 @@ async function handle(message, context) {
           throw new AccError(EXIT.USAGE, `unknown tool: ${params.name}`, { name: params.name });
         }
         validateToolInput(tool.inputSchema, args);
+        if (context.unavailable) throw new Error(context.unavailable);
         const value = await callTool(params.name, validateClaimSelectors(params.name, args), context);
         return { content: [{ type: "text", text: JSON.stringify(value, null, 2) }],
           structuredContent: value };

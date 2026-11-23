@@ -31,6 +31,12 @@ identity for this server. It comes from user-owned launch configuration, never f
 server uses its launch directory, which may be a different workspace from the other
 sessions.
 
+A directory that cannot be a workspace still gets a server that answers `initialize`,
+`tools/list` and `resources/list`. The home directory that holds ACC's own state is one such
+directory, and so is a directory whose state ACC may not read. A client or an MCP directory can
+catalogue the tools there. Each tool call and each `resources/read` then fails with
+`no workspace:` and the reason. Set `ACC_MCP_WORKSPACE` to the project to use them.
+
 The server supports initialized MCP clients using `2025-06-18` or `2025-11-25`, and
 the per-request metadata interface in `2026-07-28`, over newline-delimited JSON-RPC stdio.
 Initialized clients send `initialize`, accept the negotiated revision, then send
