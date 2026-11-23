@@ -59,7 +59,8 @@ test("a first offer records how and when the transport accepted it", async () =>
   await offer(f, message);
 
   assert.deepEqual((await receipt(f, message)).extensions,
-    { offer: { transport: "codex-app-server", at: NOW, repeatedAt: null } });
+    { offer: { transport: "codex-app-server", at: NOW, repeatedAt: null,
+      targetSessionId: f.recipient.sessionId } });
 });
 
 test("a first offer keeps extension keys it does not own", async () => {
@@ -87,7 +88,7 @@ test("a live offer nobody followed up is repeated once, as another offer event",
   assert.equal(result.state, "offered");
   assert.equal(result.updatedAt, NOW);
   assert.deepEqual(result.extensions.offer,
-    { transport: "codex-app-server", at: NOW, repeatedAt });
+    { transport: "codex-app-server", at: NOW, repeatedAt, targetSessionId: f.recipient.sessionId });
   assert.deepEqual(await receipt(f, message), result);
   const [first, repeat] = await offerEvents(f);
   assert.equal(first.payload.transport, "codex-app-server");

@@ -42,18 +42,20 @@ function presenceByParticipant(snapshot, now, pidIsAlive) {
   for (const session of snapshot.sessions ?? []) {
     const presence = classifySessionPresence(session, now, pidIsAlive);
     if (presence === "online") online.add(session.participantId);
-    if (presence !== "offline") present.add(session.participantId);
+    if (presence !== "offline") present.add(session.sessionId);
   }
   return { online, present };
 }
 
-// A live transport put the message into a session the recipient still has.
+// A live transport put the message into a session that is still present.
 // Online needs a recent heartbeat, and an idle session sends none until the
 // push wakes a turn - or until a person approves the wake. Calling it
 // unavailable then told the sender to contact a peer that already had the
-// message (#211).
-const reachedLive = receipt => receipt.state === "offered"
-  && (offerFacts(receipt)?.transport ?? "next-turn") !== "next-turn";
+// message (#211). Only the session the push reached counts: an offer that
+// names none, as an older ACC recorded it, proves nothing about the rest.
+const reachedLive = (receipt, present) => receipt.state === "offered"
+  && (offerFacts(receipt)?.transport ?? "next-turn") !== "next-turn"
+  && present.has(receipt.extensions.offer.targetSessionId);
 
 function unavailableRecipients(snapshot, participantId, now, pidIsAlive) {
   const { online, present } = presenceByParticipant(snapshot, now, pidIsAlive);
@@ -65,7 +67,7 @@ function unavailableRecipients(snapshot, participantId, now, pidIsAlive) {
   const waiting = new Map(asking.map(message => [message.messageId, []]));
   for (const receipt of snapshot.receipts ?? []) {
     if (receipt.state === "acknowledged" || online.has(receipt.recipientParticipantId)
-      || reachedLive(receipt) && present.has(receipt.recipientParticipantId)) continue;
+      || reachedLive(receipt, present)) continue;
     waiting.get(receipt.messageId)?.push(receipt.recipientParticipantId);
   }
   return asking.flatMap(message => waiting.get(message.messageId).map(recipient => ({

@@ -109,7 +109,8 @@ test("a recipient whose idle session a live transport reached is not unavailable
     heartbeatAt: new Date(Date.parse(NOW) - 10 * 60_000).toISOString() };
   const receipt = (extensions, state = "offered") => ({ messageId: "message_a",
     recipientParticipantId: "participant_b", state, ...(extensions ? { extensions } : {}) });
-  const offer = transport => ({ offer: { transport, at: NOW, repeatedAt: null } });
+  const offer = (transport, targetSessionId = "session_b") => ({ offer: { transport, at: NOW,
+    repeatedAt: null, targetSessionId } });
   const kinds = (receipts, sessions = [idle]) => computeAttention({
     messages: [{ messageId: "message_a", fromParticipantId: "participant_a",
       toParticipantIds: ["participant_b"], subject: "Respond", obligation: "reply" }],
@@ -124,6 +125,11 @@ test("a recipient whose idle session a live transport reached is not unavailable
     "an earlier turn showed it, and the session has been idle since");
   assert.deepEqual(kinds([receipt(null)]), ["recipient_unavailable"],
     "an offer an older ACC recorded names no transport");
+  const other = { ...idle, sessionId: "session_b2" };
+  assert.deepEqual(kinds([receipt(offer("local-daemon"))], [{ ...idle, state: "closed" }, other]),
+    ["recipient_unavailable"], "the pushed session ended; another idle one never got the message");
+  assert.deepEqual(kinds([receipt(offer("local-daemon", null))]), ["recipient_unavailable"],
+    "an older ACC recorded no session for the push");
 });
 
 test("claim-derived attention remains reachable and the vocabulary is closed", () => {
