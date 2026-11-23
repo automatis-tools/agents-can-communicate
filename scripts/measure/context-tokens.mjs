@@ -68,6 +68,9 @@ async function measureClient({ id, tarball, templateHome, keep, model }) {
       for (let turn = 1; turn <= turns; turn += 1) asked.push(await ask(PROMPT, `${label} ${turn}`, turn > 1));
       return asked;
     };
+    // A client's first run in a new home differs from later ones (Codex adds about
+    // 3,000 tokens of its own from the second run on); this one is not counted.
+    await ask(PROMPT, "warm-up");
     const sessions = { baseline: await conversation("baseline") };
     await fixture.install();
     sessions.installed = await conversation("installed");
