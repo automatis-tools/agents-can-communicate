@@ -76,7 +76,8 @@ async function findBinding(dataHome, harnessSessionId) {
     if (!entry.isFile() || !entry.name.endsWith(".json")) continue;
     const file = path.join(entry.parentPath ?? entry.path, entry.name);
     const value = await readFile(file, "utf8").then(JSON.parse).catch(() => null);
-    if (value?.harnessSessionId === harnessSessionId) return value;
+    // A runtime pin carries the same harness id; only a binding names its ACC session.
+    if (value?.harnessSessionId === harnessSessionId && typeof value.accSessionId === "string") return value;
   }
   return null;
 }

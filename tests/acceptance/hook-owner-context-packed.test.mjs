@@ -53,6 +53,21 @@ for (const adapterId of ["claude_code", "codex"]) {
   });
 }
 
+// The session start asks the client shim for its version with a one-second
+// timeout. Under load the shim can answer late; the binding then records no
+// version, a version that cannot be read is judged by the newest evidence, and
+// the first turn delivers the body these cases expect withheld (#325). A
+// repeated start reads the version again, before anything is queued.
+async function startWithVersion(packed, adapterId, version) {
+  for (let attempt = 1; ; attempt += 1) {
+    const reader = await packed.start({ adapterId, participantId: "reader",
+      harnessSessionId: "native-reader" });
+    const recorded = (await packed.findBinding("native-reader"))?.clientVersion;
+    if (recorded === version) return reader;
+    assert.ok(attempt < 5, `${adapterId} --version never answered in time; the binding records ${recorded}`);
+  }
+}
+
 async function stage(t, budgetBytes = 6_000, queued = true, adapterId = "claude_code") {
   const packed = await createPackedAcc(t);
   await writeFile(path.join(packed.project, "acc.workspace.json"), JSON.stringify({
@@ -64,9 +79,10 @@ async function stage(t, budgetBytes = 6_000, queued = true, adapterId = "claude_
   // These cases are about what a tight budget keeps when a body is withheld,
   // which is now the one client that withholds: older than every capture this
   // adapter carries. Everything newer reads the capture and is delivered.
-  await packed.setClientVersions({ claude: "2.1.0", codex: "0.100.0" });
-  const reader = await packed.start({ adapterId, participantId: "reader",
-    harnessSessionId: "native-reader" });
+  const versions = { claude_code: "2.1.0", codex: "0.100.0", kimi: "0.0.0" };
+  await packed.setClientVersions({ claude: versions.claude_code, codex: versions.codex,
+    kimi: versions.kimi });
+  const reader = await startWithVersion(packed, adapterId, versions[adapterId]);
   const question = queued ? await packed.acc(["request", ...senderFlags, "--to", "reader",
     "--title", "receipt review", "--detail", "A long question. ".repeat(60)]) : null;
   const turn = async () => {
