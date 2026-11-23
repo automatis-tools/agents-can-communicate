@@ -80,7 +80,8 @@ async function stage(t, budgetBytes = 6_000, queued = true, adapterId = "claude_
   // which is now the one client that withholds: older than every capture this
   // adapter carries. Everything newer reads the capture and is delivered.
   const versions = { claude_code: "2.1.0", codex: "0.100.0", kimi: "0.0.0" };
-  await packed.setClientVersions({ claude: versions.claude_code, codex: versions.codex });
+  await packed.setClientVersions({ claude: versions.claude_code, codex: versions.codex,
+    kimi: versions.kimi });
   const reader = await startWithVersion(packed, adapterId, versions[adapterId]);
   const question = queued ? await packed.acc(["request", ...senderFlags, "--to", "reader",
     "--title", "receipt review", "--detail", "A long question. ".repeat(60)]) : null;
