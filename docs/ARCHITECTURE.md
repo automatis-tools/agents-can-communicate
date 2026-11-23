@@ -217,6 +217,31 @@ Hook execution is bounded. If coordination state cannot be read or a decision ca
 made in time, the client action continues. ACC may warn or guard where a real hook allows
 it, but a coordination tool must not be the reason a session stops working.
 
+Each hook is one new Node process, and the hook runner gives it 5 seconds. One start costs far
+less. These numbers come from ACC 0.15.3 installed from its tarball, Node 24.4.0, on an Apple
+silicon Mac (macOS, arm64) under a load average of 7. Each of 30 rounds is one Claude Code
+session with its own new Git project, home and data home. CPU time includes every child process
+that ACC waited for, such as `git` and the client version probe.
+
+| Path | Wall median | Wall p95 | CPU median | CPU p95 | p95 share of 5 s |
+|---|---|---|---|---|---|
+| Node alone (`node -e 0`) | 24 ms | 29 ms | 18 ms | 21 ms | 1% |
+| Session start | 237 ms | 306 ms | 162 ms | 216 ms | 6% |
+| Prompt (`beforeTurn`) | 114 ms | 150 ms | 120 ms | 159 ms | 3% |
+| Write guard | 81 ms | 101 ms | 83 ms | 106 ms | 2% |
+| `acc inbox` | 79 ms | 105 ms | 83 ms | 103 ms | 2% |
+| Stop (`finish`) | 82 ms | 102 ms | 85 ms | 107 ms | 2% |
+| Session end | 118 ms | 154 ms | 119 ms | 159 ms | 3% |
+
+Session start is the only path whose wall time is well above its CPU time: in this run it was
+the first session in a new data home, and the difference is time spent waiting, not computing.
+
+An agent that polls `acc inbox` every 5 seconds spends about 1.5% of one CPU core on it. A
+slow disk changes these numbers more than the CPU does: see "Hooks run out of time on a cloud
+machine" in [Troubleshooting](TROUBLESHOOTING.md). To measure another machine or version, run
+`node scripts/measure/cold-start.mjs` from a checkout, with `--package` set to an installed
+package to measure that one. It needs a POSIX shell and touches only a temporary directory.
+
 Next: [Protocol](PROTOCOL.md) · [Capabilities](CAPABILITIES.md) ·
 [Security model](SECURITY_MODEL.md)
 
