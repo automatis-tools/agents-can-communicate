@@ -1,6 +1,7 @@
 import { AccError, EXIT } from "@agents-can-communicate/protocol";
 
 import { overlaps } from "./claims.mjs";
+import { offerFacts } from "./receipts.mjs";
 import { classifySessionPresence } from "./sessions.mjs";
 import { decisionView, isCurrentDecision } from "./decision-state.mjs";
 import { isCurrentIntent } from "./intents.mjs";
@@ -37,17 +38,27 @@ function obligationItems(snapshot, participantId) {
 }
 
 function presenceByParticipant(snapshot, now, pidIsAlive) {
-  const online = new Set();
+  const online = new Set(), present = new Set();
   for (const session of snapshot.sessions ?? []) {
-    if (classifySessionPresence(session, now, pidIsAlive) === "online") {
-      online.add(session.participantId);
-    }
+    const presence = classifySessionPresence(session, now, pidIsAlive);
+    if (presence === "online") online.add(session.participantId);
+    if (presence !== "offline") present.add(session.sessionId);
   }
-  return online;
+  return { online, present };
 }
 
+// A live transport put the message into a session that is still present.
+// Online needs a recent heartbeat, and an idle session sends none until the
+// push wakes a turn - or until a person approves the wake. Calling it
+// unavailable then told the sender to contact a peer that already had the
+// message (#211). Only the session the push reached counts: an offer that
+// names none, as an older ACC recorded it, proves nothing about the rest.
+const reachedLive = (receipt, present) => receipt.state === "offered"
+  && (offerFacts(receipt)?.transport ?? "next-turn") !== "next-turn"
+  && present.has(receipt.extensions.offer.targetSessionId);
+
 function unavailableRecipients(snapshot, participantId, now, pidIsAlive) {
-  const online = presenceByParticipant(snapshot, now, pidIsAlive);
+  const { online, present } = presenceByParticipant(snapshot, now, pidIsAlive);
   const asking = (snapshot.messages ?? []).filter(message => message.fromParticipantId === participantId
     && message.toParticipantIds?.length !== 0 && message.obligation !== "none");
   // One pass over the receipts, kept per message in their own order. Filtering
@@ -55,7 +66,8 @@ function unavailableRecipients(snapshot, participantId, now, pidIsAlive) {
   // the same when all of them were acknowledged (#305).
   const waiting = new Map(asking.map(message => [message.messageId, []]));
   for (const receipt of snapshot.receipts ?? []) {
-    if (receipt.state === "acknowledged" || online.has(receipt.recipientParticipantId)) continue;
+    if (receipt.state === "acknowledged" || online.has(receipt.recipientParticipantId)
+      || reachedLive(receipt, present)) continue;
     waiting.get(receipt.messageId)?.push(receipt.recipientParticipantId);
   }
   return asking.flatMap(message => waiting.get(message.messageId).map(recipient => ({

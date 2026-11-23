@@ -172,7 +172,10 @@ export function createReceiptService(ports) {
       if (receipt.state !== "queued") return receipt;
       const offered = { ...receipt, state: advanceReceipt(receipt.state, "offered"),
         updatedAt: now, extensions: { ...receipt.extensions,
-          offer: { transport: input.transport, at: now, repeatedAt: null } } };
+          // The session the transport reached: attention asks whether that
+          // session, not just its participant, is still present (#211).
+          offer: { transport: input.transport, at: now, repeatedAt: null,
+            targetSessionId: input.targetSessionId } } };
       tx.put("receipt", id, offered, tx.generationOf("receipt", id));
       success({});
       return offered;

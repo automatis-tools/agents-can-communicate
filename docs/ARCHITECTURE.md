@@ -185,7 +185,7 @@ Attention is computed from seven explicit rules for current obligations:
 |---|---|---|
 | 1 | `reply_required` | this participant owns an unacknowledged receipt whose message requires a reply |
 | 2 | `acknowledgement_required` | this participant owns an unacknowledged receipt whose message requires acknowledgement |
-| 3 | `recipient_unavailable` | a required recipient of this participant's message has no online session |
+| 3 | `recipient_unavailable` | a required recipient of this participant's message has no online session, and no live transport has put the message into a session of it that is still present |
 | 4 | `claim_conflict` | this session's intent hint overlaps another live claim |
 | 5 | `claim_contended` | a peer intent hint overlaps a live claim this session owns |
 | 6 | `claim_expired` | a claim this session owned has reached its lease time |

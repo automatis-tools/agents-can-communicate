@@ -164,7 +164,8 @@ test("an installed future-version hook preserves a captured-version offer after 
   const prior = receipt(await snapshot(), old.message.messageId);
   assert.equal(prior.state, "offered");
   assert.deepEqual(prior.extensions.offer, { transport: "next-turn",
-    at: prior.updatedAt, repeatedAt: null }, "old receipt must carry an actual next-turn offer");
+    at: prior.updatedAt, repeatedAt: null, targetSessionId: flags(oldTurn)[1] },
+  "old receipt must carry an actual next-turn offer");
   assert.ok(Number.isFinite(Date.parse(prior.updatedAt)), "old offer must have a durable timestamp");
   const body = "FUTURE_CURRENT_REQUEST: use port 4317 for the new integration.";
   const fresh = await request("Current future-client review", body);
