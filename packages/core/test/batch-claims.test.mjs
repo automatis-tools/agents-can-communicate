@@ -50,6 +50,12 @@ test("a batch conflict changes no earlier claim or renewal and names all blocker
       ["file:b/x.mjs", "file:c.mjs"]);
     assert.deepEqual(error.details.conflicts.map(item => item.claimId), [b.claimId, c.claimId]);
     assert.equal(error.details.conflicts.every(item => item.ownerSessionId === f.bob.sessionId), true);
+    // One line per blocked resource, each naming the holder and the lease end.
+    const lines = error.message.split("\n");
+    assert.equal(lines[0], "batch claim conflicts:");
+    assert.match(lines[1],
+      /^file:b\/x\.mjs is claimed by bob \(session \S+\) as file:b\/\*\* until \S+Z; .+\.$/);
+    assert.match(lines[2], /^file:c\.mjs is claimed by bob \(session \S+\) until \S+Z; .+\.$/);
     return true;
   });
   assert.deepEqual(await f.inspect(), before);

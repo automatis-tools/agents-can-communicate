@@ -52,6 +52,54 @@ test("an exclusive claim blocks a second claimant on the same resource", async (
     error => error.code === EXIT.CONFLICT);
 });
 
+// The refusal is read by a model, which acted on a bare "the resource is
+// already claimed" by reading the details itself (#146).
+test("a refusal names the holder, the lease end and one next action in one sentence", async () => {
+  const { service } = makeService();
+  const { first, second } = await twoSessions(service);
+  const held = await service.acquireClaim(claiming(first, { resource: "file:packages/core/**" }));
+
+  const refused = await service.acquireClaim(claiming(second)).catch(error => error);
+
+  assert.equal(refused.code, EXIT.CONFLICT);
+  assert.equal(refused.message, `${RESOURCE} is claimed by participant_a (session ${first.sessionId}) as file:packages/core/** `
+    + `until ${held.expiresAt}; ask participant_a to release it, claim a `
+    + "narrower resource, or retry after it expires.");
+  assert.equal(refused.details.ownerParticipantId, "participant_a");
+  assert.equal(refused.details.claimId, held.claimId);
+});
+
+test("a refusal by an offline holder points to the user's release, not to the holder", async () => {
+  const { service, clock } = makeService();
+  const { first, second } = await twoSessions(service);
+  const held = await service.acquireClaim(claiming(first, { leaseSeconds: 7200 }));
+  clock.advance(31 * 60_000); // Past the floor for a session that records no process.
+
+  const refused = await service.acquireClaim(claiming(second)).catch(error => error);
+
+  assert.equal(refused.details.ownerPresence, "offline");
+  assert.equal(refused.message, `${RESOURCE} is claimed by participant_a (session ${first.sessionId}) until ${held.expiresAt}; `
+    + "its session is offline, so ask your user whether to release it with acc release --claim "
+    + `${held.claimId} --authority human --reason "<their decision>", or retry after it expires.`);
+});
+
+test("claims hold any scheme, and overlap is decided the same way for each", async () => {
+  // Exact names conflict, and a `/**` glob covers what lies under it segment by
+  // segment - for a port or a shared tool as for a file.
+  assert.equal(overlaps("port:7319", "port:7319"), true);
+  assert.equal(overlaps("port:7319", "port:7320"), false);
+  assert.equal(overlaps("tool:browser/**", "tool:browser/main-profile"), true);
+  assert.equal(overlaps("tool:browser/**", "tool:browserstack"), false);
+  const { service } = makeService();
+  const { first, second } = await twoSessions(service);
+  await service.acquireClaim(claiming(first, { resource: "port:7319" }));
+
+  await assert.rejects(service.acquireClaim(claiming(second, { resource: "port:7319" })),
+    /port:7319 is claimed by participant_a \(session session_\S+\) until /);
+  const other = await service.acquireClaim(claiming(second, { resource: "port:7320" }));
+  assert.equal(other.resource, "port:7320");
+});
+
 test("shared claims coexist while an exclusive claim excludes everything", async () => {
   const { service } = makeService();
   const { first, second } = await twoSessions(service);
