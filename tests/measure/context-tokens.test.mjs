@@ -22,18 +22,20 @@ test("Claude Code: the first request of the turn, with its cache reads and write
     model: "claude-opus-5-5", contextWindow: 1_000_000, reply: "OK" });
 });
 
-test("Codex: the turn's input, its model and window from the rollout, warnings are no tools", () => {
+test("Codex: the first request of the newest turn in the rollout, not the session total", () => {
   const stdout = [
     { type: "item.completed", item: { type: "error", message: "bypass-hook-trust is enabled" } },
     { type: "item.completed", item: { type: "agent_message", text: "OK" } },
-    { type: "turn.completed", usage: { input_tokens: 16218, cached_input_tokens: 13952 } },
+    { type: "turn.completed", usage: { input_tokens: 30420 } },
   ].map(line => JSON.stringify(line)).join("\n");
-  const rollout = [{ type: "turn_context", payload: { model: "gpt-6.2-sol" } },
-    { type: "event_msg", payload: { type: "token_count", info: { model_context_window: 475_000 } } }]
+  const usage = input => ({ type: "event_msg", payload: { type: "token_count",
+    info: { last_token_usage: { input_tokens: input }, model_context_window: 475_000 } } });
+  const rollout = [{ type: "turn_context", payload: { model: "gpt-6.2-sol" } }, usage(15202),
+    { type: "turn_context", payload: { model: "gpt-6.2-sol" } }, usage(15218), usage(16100)]
     .map(line => JSON.stringify(line)).join("\n");
-  assert.deepEqual(parseCodex(stdout, rollout), { inputTokens: 16218, requests: null, toolCalls: 0,
+  assert.deepEqual(parseCodex(stdout, rollout), { inputTokens: 15218, requests: 2, toolCalls: 0,
     model: "gpt-6.2-sol", contextWindow: 475_000, reply: "OK" });
-  assert.throws(() => parseCodex("{}"), /no usage/);
+  assert.throws(() => parseCodex(stdout, ""), /no request/);
 });
 
 test("Gemini CLI: the main model only, and no count when it took more than one request", () => {

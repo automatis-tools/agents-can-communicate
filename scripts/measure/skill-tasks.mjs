@@ -30,7 +30,7 @@ const WORKERS = {
   codex: {
     binary: "codex",
     args: ({ prompt, model }) => ["--dangerously-bypass-hook-trust", "-c", "features.remote_plugin=false",
-      "-m", model, "exec", "--skip-git-repo-check", "--json", prompt],
+      "-c", "features.apps=false", "-m", model, "exec", "--skip-git-repo-check", "--json", prompt],
     reply: stdout => stdout.split("\n").filter(line => line.startsWith("{")).map(line => JSON.parse(line))
       .filter(event => event.type === "item.completed" && event.item.type === "agent_message")
       .map(event => event.item.text).join("\n"),

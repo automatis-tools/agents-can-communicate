@@ -33,19 +33,21 @@ export function parseClaude(stdout) {
   contextWindow: usage.contextWindow ?? null, reply: result.result };
 }
 
-// Codex sums a turn's requests; the rollout names the model and its window.
+// Codex's `turn.completed` counts the whole session once it is resumed; the
+// rollout records each request of the newest turn, its model and its window.
 export function parseCodex(stdout, rollout = "") {
   const events = jsonLines(stdout);
-  const usage = events.find(event => event.type === "turn.completed")?.usage;
-  if (usage === undefined) throw new Error(`codex reported no usage: ${stdout.slice(-400)}`);
   const items = events.filter(event => event.type === "item.completed").map(event => event.item);
   const records = jsonLines(rollout);
+  const start = records.findLastIndex(record => record.type === "turn_context");
+  const requests = records.slice(Math.max(0, start)).map(record => record.payload?.info?.last_token_usage)
+    .filter(Boolean);
+  if (requests.length === 0) throw new Error(`codex recorded no request: ${stdout.slice(-400)}`);
   const window = records.map(record => record.payload?.info?.model_context_window).filter(Boolean).at(-1);
-  return { inputTokens: usage.input_tokens, requests: null,
+  return { inputTokens: requests[0].input_tokens, requests: requests.length,
     // An `error` item is Codex's own warning, such as the hook-trust bypass notice.
     toolCalls: items.filter(item => !["agent_message", "reasoning", "error"].includes(item.type)).length,
-    model: records.find(record => record.type === "turn_context")?.payload?.model ?? null,
-    contextWindow: window ?? null,
+    model: records[start]?.payload?.model ?? null, contextWindow: window ?? null,
     reply: items.filter(item => item.type === "agent_message").map(item => item.text).join("\n") };
 }
 
@@ -94,10 +96,10 @@ export const CLIENTS = Object.freeze({
     binary: "codex", env: home => ({ CODEX_HOME: path.join(home, ".codex") }),
     // Codex runs a plugin's hooks only once a user trusted them in its TUI. The
     // measurement installed these hooks itself, so it runs them without that record.
-    // An account's remote plugins arrive after the first run and list dozens of
-    // skills; they are left out so that only ACC differs between runs.
+    // An account's remote plugins and apps arrive in some runs and not others and
+    // add thousands of tokens; they are left out so that only ACC differs between runs.
     args: (prompt, resume, model) => ["--dangerously-bypass-hook-trust", "-c", "features.remote_plugin=false",
-      ...(model ? ["-m", model] : []), "exec", "--skip-git-repo-check",
+      "-c", "features.apps=false", ...(model ? ["-m", model] : []), "exec", "--skip-git-repo-check",
       "--json", "-s", "read-only",
       ...(resume ? ["resume", "--last"] : []), prompt],
     read: async ({ stdout, home }) => {
