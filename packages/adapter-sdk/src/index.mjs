@@ -18,6 +18,7 @@ export { BEGIN, END, removeTomlBlock, renderBlock, stripBlock, tomlString, write
 export { projectContext, projectContextResult } from "./context-projector.mjs";
 export { decisionBody, decisionLines } from "./decision-text.mjs";
 export { oneLine } from "./one-line.mjs";
+export { PEER_BODY_FENCE, escapePeerText } from "./peer-text.mjs";
 export { shellWriteTargets } from "./shell-writes.mjs";
 export { keepVersions, ownVersion, stampPluginVersion } from "./own-version.mjs";
 export { editJson, readJson } from "./json-text.mjs";
