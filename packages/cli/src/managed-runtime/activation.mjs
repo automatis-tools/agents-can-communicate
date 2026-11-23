@@ -303,9 +303,11 @@ export function activationBlockerNotice(version, blockers) {
     if (blocker.session) facts.push(`workspace ${safeText(blocker.session.workspaceId)}; session record unreadable`);
     return `${blocker.pid === null ? "unidentified process" : `PID ${blocker.pid}`} (${facts.join("; ")})`;
   });
-  const named = blockers.slice(0, 10).some(blocker => blocker.session?.sessionId);
+  // The notice stays bounded; the result lists every blocker with its session.
+  const named = blockers.some(blocker => blocker.session?.sessionId);
   return `ACC ${version} is ready; waiting for ${blockers.length} active or unidentified process(es): `
-    + details.join("; ") + (blockers.length > 10 ? `; and ${blockers.length - 10} more` : "") + "."
+    + details.join("; ") + (blockers.length > 10
+      ? `; and ${blockers.length - 10} more, which acc update --json lists` : "") + "."
     + (named ? " To release a session sooner, end it in its client, or have its owner run acc detach;"
       + " once nothing blocks, run acc update or let the automatic update finish." : "");
 }

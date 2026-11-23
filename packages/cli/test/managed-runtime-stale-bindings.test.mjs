@@ -150,6 +150,20 @@ test("a blocking binding without a client pid names its session and when it stop
   assert.doesNotMatch(JSON.stringify(result), /generation_session_manual|"manual"/, "owner tokens stay private");
 });
 
+test("past ten blockers the notice says where every session is listed", async t => {
+  const f = await fixture(t);
+  for (let index = 0; index < 11; index += 1) {
+    await f.session(`session_many${index}`, null);
+    await f.bind(`many${index}`, `session_many${index}`);
+  }
+
+  const { blockers, notice } = await f.activate();
+
+  assert.equal(blockers.length, 11);
+  assert.ok(blockers.every(blocker => blocker.session.sessionId?.startsWith("session_many")));
+  assert.match(notice, /; and 1 more, which acc update --json lists\. To release a session sooner/);
+});
+
 test("a blocking binding without a client pid whose session records a live process names that process", async t => {
   const f = await fixture(t);
   await f.session("session_live", process.pid);
