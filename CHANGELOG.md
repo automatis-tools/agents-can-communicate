@@ -1,5 +1,24 @@
 # Changelog
 
+## Unreleased — a claim conflict tells the model what to do next
+
+- **A claim refusal is one sentence a model can act on.** It used to say only "the resource is
+  already claimed" and leave the rest to the error details. It now names the holder and its
+  session, the claim it holds when that is wider than the request, when the lease ends, and one
+  next action. When the holder's session is offline, the action is to ask the user about a force
+  release. A batch conflict gives the same sentence for each blocked resource. The error details
+  add `ownerParticipantId`. The CLI documentation now states that claims accept any scheme, such
+  as `port:` or `tool:`, and how overlap is decided.
+
+| Development artifact | Value |
+|---|---|
+| Built from | `ed54577bd832ae828aa4e7a61f18b9d46e3ef349` |
+| Tarball | `agents-can-communicate-0.15.3.tgz`, 665,113 bytes, 393 files |
+| sha256 | `a69f45f5089fa7089491082d82bf7c1290ac450a5ebb9c28785dabf5f59e935b` |
+
+The exact archive passed package verification and an installed CLI run with a single and a
+batch conflict. See [development evidence](docs/release-evidence/claim-refusal-text-2026-11-23.md).
+
 ## Unreleased — the MCP server lists its tools outside a workspace
 
 - **`acc-mcp` answers a client that starts it outside a workspace.** MCP directories and some
