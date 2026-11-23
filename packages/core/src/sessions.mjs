@@ -57,6 +57,18 @@ export function classifySessionPresence(session, now, pidIsAlive) {
   return age > UNKNOWN_EXPIRY_MS ? "offline" : ageBand(session, age);
 }
 
+/** When the presence rule calls a session offline if no heartbeat renews it
+ * and any process it records stays alive; null for a closed session or an
+ * unreadable heartbeat. A session that records no process ends at the
+ * unknown floor, one that records a process at the hard floor. */
+export function presenceExpiresAt(session) {
+  if (session?.state === "closed") return null;
+  const heartbeat = Date.parse(session?.heartbeatAt);
+  if (!Number.isFinite(heartbeat)) return null;
+  const floor = (session.pid ?? null) === null ? UNKNOWN_EXPIRY_MS : HARD_EXPIRY_MS;
+  return new Date(heartbeat + floor).toISOString();
+}
+
 export function createSessionService(ports) {
   const { store, clock, ids, pidIsAlive } = ports;
 

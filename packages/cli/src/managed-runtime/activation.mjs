@@ -8,7 +8,7 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { promisify } from "node:util";
 import { processIsZombie, readWindowsProcess } from "@agents-can-communicate/adapter-sdk";
-import { classifySessionPresence } from "@agents-can-communicate/core";
+import { classifySessionPresence, presenceExpiresAt } from "@agents-can-communicate/core";
 import { assertPortableId } from "@agents-can-communicate/protocol";
 import { readSessionRecord, withWriterMutex } from "@agents-can-communicate/storage-filesystem";
 import { listRuntimeHolds } from "./leases.mjs";
@@ -107,20 +107,36 @@ const perPass = read => {
  * process, or a record or store that cannot be read, keeps the binding a hold.
  * On 2026-10-06 the maintainer's 0.10.0 waited behind 32 such bindings from
  * 0.5.10 to 0.9.0 that no client could clear (#273). */
-async function staleWithoutPid(workspaceRoot, workspaceId, record, pidIsAlive, file, startedAt, zombie) {
-  if (record?.schemaVersion !== 1) return false;
+async function judgeWithoutPid(workspaceRoot, workspaceId, record, pidIsAlive, file, startedAt, zombie) {
+  if (record?.schemaVersion !== 1) return { stale: false, session: null };
   let session;
   try {
     session = await readSessionRecord({ root: workspaceRoot, workspaceId,
       sessionId: record.accSessionId, allowLegacyIdentity: true });
-  } catch { return false; }
-  if (session === null) return true;
+  } catch { return { stale: false, session: null }; }
+  if (session === null) return { stale: true, session };
   if (Number.isSafeInteger(session.pid) && session.pid > 0) {
-    return await exitedProcess(session.pid, pidIsAlive, zombie) || pidReused(session.pid, file, startedAt);
+    return { stale: await exitedProcess(session.pid, pidIsAlive, zombie)
+      || await pidReused(session.pid, file, startedAt), session };
   }
   // No process to ask, so the probe is never called.
-  return classifySessionPresence(session, new Date().toISOString(), () => true) === "offline";
+  return { stale: classifySessionPresence(session, new Date().toISOString(), () => true) === "offline", session };
 }
+
+const staleWithoutPid = async (...args) => (await judgeWithoutPid(...args)).stale;
+
+/** What a person needs to find a binding that names no client process (#418):
+ * the session and where it runs, and when it stops holding by itself. Never
+ * the generation or the binding's harness key: those are owner tokens. A
+ * session that records a process holds until that process exits. */
+const pidlessSessionFacts = (session, workspaceId) => session ? {
+  sessionId: session.sessionId, participantId: session.participantId,
+  client: session.harness ?? null, workspaceId,
+  checkout: typeof session.checkoutRoot === "string" ? session.checkoutRoot : null,
+  heartbeatAt: session.heartbeatAt ?? null,
+  processPid: Number.isSafeInteger(session.pid) && session.pid > 0 ? session.pid : null,
+  releasesAt: Number.isSafeInteger(session.pid) && session.pid > 0 ? null : presenceExpiresAt(session),
+} : { sessionId: null, workspaceId };
 
 /** Native bindings outlive finish/TTL; MCP process lifetime is covered by its runtime lease. */
 export async function listNativeHolds(root, { pidIsAlive = defaultPidIsAlive, strict = false,
@@ -151,10 +167,12 @@ export async function listNativeHolds(root, { pidIsAlive = defaultPidIsAlive, st
       const pid = clientPidOf(record);
       if (pid !== null && (await exitedProcess(pid, pidIsAlive, zombieNow)
         || await pidReused(pid, file, started))) continue;
-      if (pid === null && await staleWithoutPid(path.dirname(bindings), entry.name, record, pidIsAlive,
-        file, started, zombieNow)) continue;
+      const judged = pid === null ? await judgeWithoutPid(path.dirname(bindings), entry.name, record,
+        pidIsAlive, file, started, zombieNow) : null;
+      if (judged?.stale) continue;
       holds.push({ kind: "native", pid, reason: pid === null ? "unknown_client_pid" : "client_running",
-        storeVersion: Number.isSafeInteger(record?.storeVersion) ? record.storeVersion : null });
+        storeVersion: Number.isSafeInteger(record?.storeVersion) ? record.storeVersion : null,
+        ...(judged ? { session: pidlessSessionFacts(judged.session, entry.name) } : {}) });
     }
   }
   return holds;
@@ -252,7 +270,7 @@ export async function listActivationBlockers(root, { pidIsAlive = defaultPidIsAl
     const nativeBindings = hold.nativeBindings;
     if (pid === null) {
       unidentified.push({ pid, kinds: [hold.kind], reason: hold.reason, nativeBindings,
-        storeVersion: hold.storeVersion });
+        storeVersion: hold.storeVersion, ...(hold.session ? { session: hold.session } : {}) });
       continue;
     }
     const blocker = byPid.get(pid) ?? { pid, kinds: [], reason: "process_running",
@@ -281,10 +299,26 @@ export function activationBlockerNotice(version, blockers) {
     facts.push(Number.isSafeInteger(blocker.storeVersion)
       ? `store contract ${blocker.storeVersion}` : "contract unknown");
     if (blocker.pid === null) facts.push(blocker.reason.replaceAll("_", " "));
+    if (blocker.session?.sessionId) return pidlessSessionDetail(blocker.session, facts);
+    if (blocker.session) facts.push(`workspace ${safeText(blocker.session.workspaceId)}; session record unreadable`);
     return `${blocker.pid === null ? "unidentified process" : `PID ${blocker.pid}`} (${facts.join("; ")})`;
   });
+  const named = blockers.slice(0, 10).some(blocker => blocker.session?.sessionId);
   return `ACC ${version} is ready; waiting for ${blockers.length} active or unidentified process(es): `
-    + details.join("; ") + (blockers.length > 10 ? `; and ${blockers.length - 10} more` : "") + ".";
+    + details.join("; ") + (blockers.length > 10 ? `; and ${blockers.length - 10} more` : "") + "."
+    + (named ? " To release a session sooner, end it in its client, or have its owner run acc detach;"
+      + " once nothing blocks, run acc update or let the automatic update finish." : "");
+}
+
+function pidlessSessionDetail(session, facts) {
+  const where = [`participant ${safeText(session.participantId)}`,
+    ...(session.client ? [safeText(session.client)] : []),
+    `workspace ${safeText(session.checkout ?? session.workspaceId)}`];
+  const until = session.processPid !== null ? `blocks until PID ${session.processPid} exits`
+    : session.releasesAt ? `blocks until ${session.releasesAt} unless it sends a heartbeat`
+      : "records no heartbeat time";
+  return `session ${safeText(session.sessionId)} (${where.join(", ")}; ${facts.join("; ")}; `
+    + `last heartbeat ${safeText(session.heartbeatAt ?? "unknown")}; ${until})`;
 }
 
 /** A candidate reference that is simply absent (no pending update, no
