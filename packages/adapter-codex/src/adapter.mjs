@@ -39,7 +39,9 @@ export const CODEX_DELIVERY_FALLBACK = Object.freeze({
  * Child sessions, native reply routing and new hook-version claims remain
  * unverified; a successful ACC CLI reply does not certify a native reply route.
  */
-export function createCodexAdapter() {
+export function createCodexAdapter({ discovery = createCodexDiscovery() } = {}) {
+  // Whether Codex runs ACC's hooks, from Codex itself (#427).
+  const detect = context => detectCodex({ ...context, readHookReadiness: discovery.readHookReadiness });
   return defineAdapter({
     id: "codex",
     displayName: "Codex CLI",
@@ -77,7 +79,7 @@ export function createCodexAdapter() {
     ...createCodexMaintenance(),
     ...createCodexServiceSetup(),
     // Chats the daemon holds before their first turn, for registration (#167).
-    ...createCodexDiscovery(),
+    discoverNativeSessions: discovery.discoverNativeSessions,
     startSession: async () => ({ ok: true, changes: [], diagnostics: [] }),
     endSession: async () => ({ ok: true, changes: [], diagnostics: [] }),
     guardWrite: async () => ({ ok: true, changes: [], diagnostics: [] }),
@@ -85,7 +87,7 @@ export function createCodexAdapter() {
 
 
     planInstall: context => planCodexInstall(context),
-    detect: context => detectCodex(context),
+    detect,
     install: context => installCodexPlugin({ ...context,
       livePolicy: context.livePolicy ?? "off" }),
     preflightUninstall: context => preflightCodexUninstall(context),
@@ -95,7 +97,7 @@ export function createCodexAdapter() {
     refreshSenderPermissions: context => refreshCodexSenderPermissions(context),
 
     doctor: async context => {
-      const detected = await detectCodex(context);
+      const detected = await detect(context);
       const captured = true;
       return {
         ok: captured,

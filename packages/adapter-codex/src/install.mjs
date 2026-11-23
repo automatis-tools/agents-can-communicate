@@ -422,9 +422,32 @@ export async function uninstallCodexPlugin({ home, agentsHome = home,
     ...permissionReview] };
 }
 
+// The events ACC's installed hooks plugin declares, as Codex names them in
+// `hooks/list` (`SessionStart` -> `sessionStart`). Empty when unreadable.
+async function installedHookEvents(agentsHome) {
+  const file = await readJson(path.join(pluginPath(agentsHome, HOOKS_PLUGIN_NAME), "hooks.json"), null)
+    .catch(() => null);
+  const hooks = file?.hooks;
+  if (hooks === null || typeof hooks !== "object" || Array.isArray(hooks)) return [];
+  return Object.keys(hooks).map(name => name.charAt(0).toLowerCase() + name.slice(1));
+}
+
+// Codex's own answer, when a verified daemon gives one; otherwise null, and the
+// review stays "unverified".
+async function hookReadinessOf({ readHookReadiness, env, home, codexHome, agentsHome }) {
+  if (typeof readHookReadiness !== "function") return null;
+  const events = await installedHookEvents(agentsHome);
+  if (events.length === 0) return null;
+  // The Codex home this detection reads, never one inherited from the caller.
+  const readiness = await readHookReadiness({ env: { ...env, CODEX_HOME: codexHome }, home,
+    cwd: home, events }).catch(() => null);
+  return Array.isArray(readiness) && readiness.length === events.length ? readiness : null;
+}
+
 export async function detectCodex({ home, agentsHome = home,
   codexHome = path.join(home, ".codex"), stateRoot, clientVersion, platform, nativeDelivery,
-  receiverSockets, receiverLoopback, hostPlatform = process.platform }) {
+  receiverSockets, receiverLoopback, hostPlatform = process.platform, env = process.env,
+  readHookReadiness = null }) {
   const marketplace = await readJson(marketplacePath(agentsHome), null);
   const names = [PLUGIN_NAME, HOOKS_PLUGIN_NAME];
   const published = names.every(name => (marketplace?.plugins ?? []).some(entry => entry.name === name));
@@ -451,8 +474,23 @@ export async function detectCodex({ home, agentsHome = home,
       cliShim: path.join(pluginPath(agentsHome), "acc-cli.sh"), hostPlatform }) }).setup };
   // Saved trust is not readiness. Codex compares every current definition's
   // hash and can disable a trusted hook. Even a commented or stale single record
-  // previously suppressed this check. Leave verification to Codex's /hooks;
-  // detection neither invents its hash algorithm nor starts a client service.
+  // previously suppressed this check. So detection neither reads trust records
+  // nor invents the hash algorithm, and it starts no client service: it asks a
+  // running, verified daemon which of ACC's hooks it would run (#427). Without
+  // that answer, readiness stays unverified and the review stays asked for.
+  const readiness = cached
+    ? await hookReadinessOf({ readHookReadiness, env, home, codexHome, agentsHome }) : null;
+  const notRunning = readiness?.filter(hook => hook.state !== "runs") ?? null;
+  const hookReview = notRunning === null ? HOOK_REVIEW
+    : notRunning.length === 0 ? null
+      : `Codex will not run these ACC hooks: ${notRunning.map(hook => `${hook.eventName} (${hook.state})`)
+        .join(", ")}; open codex; check ACC is enabled in /plugins; in /hooks, review them and `
+        + "enable/trust their current definitions, then restart the session";
+  const hookDiagnostic = notRunning === null
+    ? "hook readiness is unverified by ACC; Codex checks whether each current definition is enabled and trusted"
+    : notRunning.length === 0
+      ? `Codex reports ACC's hooks enabled and trusted: ${readiness.map(hook => hook.eventName).join(", ")}`
+      : `Codex reports ACC hooks it will not run: ${notRunning.map(hook => `${hook.eventName} (${hook.state})`).join(", ")}`;
   return { ok: true, changes: [], outgoingDelivery,
     nativeSetup: nativeDelivery?.reasonCode === "native_endpoint_unavailable"
       ? "Codex CLI: run codex app-server daemon start, then open a new Codex session; explicit ACC install with complete setup consent can prepare a missing supported service"
@@ -468,14 +506,11 @@ export async function detectCodex({ home, agentsHome = home,
     cached
       ? "plugin installed in the client's cache"
       : `plugin not installed yet; run: ${uncached.map(id => `codex plugin add ${id}`).join("; ")}`,
-    ...(cached
-      ? ["hook readiness is unverified by ACC; Codex checks whether each current "
-        + "definition is enabled and trusted"]
-      : []),
+    ...(cached ? [hookDiagnostic] : []),
     ...(allowRule.diagnostic === null ? [] : [allowRule.diagnostic]),
   ],
   needsAction: cached
-    ? [HOOK_REVIEW, ...sandboxReview(config, configPath(codexHome), stateRoot),
+    ? [...(hookReview === null ? [] : [hookReview]), ...sandboxReview(config, configPath(codexHome), stateRoot),
       ...(outgoingDelivery.state === "unverified" ? [outgoingDelivery.diagnostic] : []),
       ...(allowRule.state === "missing" ? [allowRule.diagnostic] : [])]
     : [] };

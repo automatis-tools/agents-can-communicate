@@ -60,8 +60,10 @@ from an ACC three releases older) revived the guard immediately.
 That is why removal is never ACC's to do: it preserves the client's trust decision.
 The historical observation above does not establish trust across arbitrary upgrades.
 Codex 0.153.4 compares each current definition's hash and reports changed definitions
-as modified; a trusted hook can also be disabled. ACC preserves the records but leaves
-current readiness unverified, directing the user to `/hooks` in Codex.
+as modified; a trusted hook can also be disabled. ACC preserves the records and never
+reads them as readiness. `acc doctor` asks a running, verified Codex daemon which of ACC's
+hooks it would run (`hooks/list`) and directs the user to `/hooks` for any that would not.
+Without that answer, readiness stays unverified.
 
 **The generalisation, since this cost a release:** to learn whether state is
 load-bearing, take it away. Changing it tests something else.

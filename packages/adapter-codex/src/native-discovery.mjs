@@ -1,4 +1,4 @@
-import { canonicalCwd, hooksForDirectories, loadedThreadMetadata, openCodexAppServer,
+import { canonicalCwd, hooksForDirectories, initializeCodex, loadedThreadMetadata, openCodexAppServer,
   probeCodexQueue } from "./app-server-client.mjs";
 import { CODEX_PLUGIN_ID } from "./install.mjs";
 import { maintenanceContext, readMaintenancePid, runMaintenanceCommand, verifyMaintenanceProcess }
@@ -45,16 +45,23 @@ export function createCodexDiscovery({ run = runMaintenanceCommand, open = openC
       timer = setTimeout(resolve, Math.max(1, timeoutMs), []);
     })]).finally(() => clearTimeout(timer));
   }
+  // The running daemon whose pid and socket are proven, or null. Never starts one.
+  async function verifiedDaemon({ env, home, timeoutMs }) {
+    const found = await contextPaths({ env, home });
+    // A process check that outlives the answer would still keep the
+    // caller's process alive until its own timeout, so it gets this one.
+    const paths = { ...found, options: { ...found.options, timeout: Math.max(1, timeoutMs) } };
+    const socketPath = await readySocketPath(paths.socketPath);
+    if (socketPath === null) return null;
+    const daemon = await readMaintenancePid(paths.pidPath);
+    await verifyMaintenanceProcess(daemon, paths, run);
+    return { socketPath, daemon };
+  }
   async function discover({ env, home, timeoutMs }) {
     try {
-      const found = await contextPaths({ env, home });
-      // A process check that outlives the answer would still keep the
-      // caller's process alive until its own timeout, so it gets this one.
-      const paths = { ...found, options: { ...found.options, timeout: Math.max(1, timeoutMs) } };
-      const socketPath = await readySocketPath(paths.socketPath);
-      if (socketPath === null) return [];
-      const daemon = await readMaintenancePid(paths.pidPath);
-      await verifyMaintenanceProcess(daemon, paths, run);
+      const verified = await verifiedDaemon({ env, home, timeoutMs });
+      if (verified === null) return [];
+      const { socketPath, daemon } = verified;
       return await withPeer(open, socketPath, timeoutMs, async peer => {
         const probe = await probeCodexQueue(peer);
         if (!probe.supported && probe.reasonCode !== "native_session_unavailable") return [];
@@ -78,5 +85,41 @@ export function createCodexDiscovery({ run = runMaintenanceCommand, open = openC
       return [];
     }
   }
-  return { discoverNativeSessions };
+  /**
+   * Whether Codex runs each of ACC's hooks, in Codex's own words (#427): the
+   * verified daemon's `hooks/list` for `cwd`, one entry per event ACC
+   * installed. ACC neither reads saved trust records nor reproduces the
+   * client's hash rules: a saved hash is not readiness, and a trusted hook can
+   * still be disabled. Null on any doubt - no daemon, an unproven one, a client
+   * without `hooks/list`, or no answer in time - and never starts a service.
+   */
+  async function readHookReadiness({ env = process.env, home, cwd, events, timeoutMs = 1_500 } = {}) {
+    if (!Array.isArray(events) || events.length === 0 || typeof cwd !== "string") return null;
+    let timer;
+    return Promise.race([hookReadiness({ env, home, cwd, events, timeoutMs }), new Promise(resolve => {
+      timer = setTimeout(resolve, Math.max(1, timeoutMs), null);
+    })]).finally(() => clearTimeout(timer));
+  }
+  async function hookReadiness({ env, home, cwd, events, timeoutMs }) {
+    try {
+      const verified = await verifiedDaemon({ env, home, timeoutMs });
+      if (verified === null) return null;
+      return await withPeer(open, verified.socketPath, timeoutMs, async peer => {
+        await initializeCodex(peer);
+        const [entry] = await hooksForDirectories(peer, [cwd]);
+        if (entry === undefined) return null;
+        const ours = entry.hooks.filter(hook => hook?.pluginId === CODEX_PLUGIN_ID);
+        return events.map(eventName => {
+          const listed = ours.filter(hook => hook.eventName === eventName);
+          const blocking = listed.find(hook => hook.enabled !== true || !RUNS.has(hook.trustStatus));
+          return { eventName, state: listed.length === 0 ? "not listed"
+            : blocking === undefined ? "runs"
+              : blocking.enabled !== true ? "disabled" : String(blocking.trustStatus ?? "unknown") };
+        });
+      });
+    } catch {
+      return null;
+    }
+  }
+  return { discoverNativeSessions, readHookReadiness };
 }
