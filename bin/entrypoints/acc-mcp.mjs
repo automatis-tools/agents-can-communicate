@@ -34,25 +34,40 @@ const participantId = process.env.ACC_MCP_PARTICIPANT ?? "mcp";
 const clock = { now: () => new Date().toISOString() };
 const ids = { next: kind => createId(kind, randomBytes) };
 
-const descriptor = await discoverWorkspace({
-  cwd: process.env.ACC_MCP_WORKSPACE ?? process.cwd(),
-  env: process.env,
-  gitProbe: createGitProbe(),
-});
+const log = message => process.stderr.write(`acc-mcp: ${message}\n`);
 const dataHome = platformDataHome({ platform: process.platform, env: process.env });
-const paths = runtimePaths({
-  dataHome,
-  workspaceId: descriptor.id,
-  workspaceRoots: descriptor.roots,
-});
-const store = await openFilesystemStore({ root: paths.root, clock, ids,
-  workspaceId: descriptor.id });
-const service = createCoordinationService({ store, clock, ids });
+// A client that only catalogues the server - an MCP directory, or a host that
+// starts it from the home directory - still gets its tools. Only a tool call
+// needs a workspace, and it says why there is none (#149). Without this, a
+// directory that holds ACC's own state ended the process before `initialize`.
+let workspace;
+try {
+  const descriptor = await discoverWorkspace({
+    cwd: process.env.ACC_MCP_WORKSPACE ?? process.cwd(),
+    env: process.env,
+    gitProbe: createGitProbe(),
+  });
+  const paths = runtimePaths({
+    dataHome,
+    workspaceId: descriptor.id,
+    workspaceRoots: descriptor.roots,
+  });
+  const store = await openFilesystemStore({ root: paths.root, clock, ids,
+    workspaceId: descriptor.id });
+  workspace = { descriptor, paths, service: createCoordinationService({ store, clock, ids }) };
+} catch (error) {
+  log(`no workspace: ${error.message}`);
+  await serve({ input: process.stdin, output: process.stdout, log,
+    context: { unavailable: `no workspace: ${error.message}` } });
+  process.exitCode = 0;
+  return;
+}
+const { descriptor, paths, service } = workspace;
 
 await serve({
   input: process.stdin,
   output: process.stdout,
-  log: message => process.stderr.write(`acc-mcp: ${message}\n`),
+  log,
   context: {
     service,
     // Each recipient's adapter loads with the first message routed to it (#270).
