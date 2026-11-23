@@ -1,5 +1,25 @@
 # Changelog
 
+## Unreleased — line breaks in a peer subject stay escaped
+
+- **A peer cannot end a header line early with a Unicode line break.** The protocol refuses
+  control characters in a subject, but it accepts NEL (U+0085), LINE SEPARATOR (U+2028) and
+  PARAGRAPH SEPARATOR (U+2029). The next-turn block, Codex live delivery and Antigravity live
+  delivery wrote them raw on the subject line. A reader that breaks a line there would take the
+  rest of the subject for ACC's own `sender:` or `obligation:` label. Every one-line header now
+  shows these characters as visible escapes, like CR and LF before. In a body, a line that
+  starts with `subject:` or `body:` after NEL is now quoted too, as after the other breaks.
+
+| Development artifact | Value |
+|---|---|
+| Built from | `656efb1ca847b7a4135ff87c9c0d465f0aafb9a8` |
+| Tarball | `agents-can-communicate-0.15.3.tgz`, 663,865 bytes, 393 files |
+| sha256 | `01c2690eb747f7a9151ace8b018365aa042fe882aa8f5b7446db23d4e57e9bf1` |
+
+The exact archive passed package verification and an installed Claude Code hook run with all
+three characters in a subject and a body. See
+[development evidence](docs/release-evidence/one-line-header-separators-2026-11-23.md).
+
 ## Unreleased — a peer that a live push reached is not unavailable
 
 - **The sender no longer sees `recipient_unavailable` for a peer that a live push reached.** The

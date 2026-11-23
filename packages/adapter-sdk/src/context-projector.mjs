@@ -11,13 +11,10 @@ function escapePeerText(value) {
   return String(value)
     .replaceAll(new RegExp(`${FENCE}${BLOCK}`, "g"), `'${FENCE}${BLOCK}`)
     .replaceAll(FENCE, `'${FENCE}`)
-    .replace(/^(subject:|body:)/gm, "'$1")
+    // A multiline `^` stops after LF, CR, U+2028 and U+2029, but not after NEL.
+    .replace(/(^|\u0085)(subject:|body:)/gm, "$1'$2")
     .replace(CONTROL_CHARACTERS,
       character => `\\u${character.codePointAt(0).toString(16).padStart(4, "0")}`);
-}
-
-function oneLine(value) {
-  return value.replaceAll("\r\n", "\\n").replaceAll("\n", "\\n").replaceAll("\r", "\\n");
 }
 
 function truncate(line, limit) {
@@ -225,3 +222,4 @@ export function projectContext(sync, options) {
   return projectContextResult(sync, options).text;
 }
 import { decisionLines } from "./decision-text.mjs";
+import { oneLine } from "./one-line.mjs";

@@ -33,7 +33,11 @@ turning live delivery on does not authorize it.
 
 Inbound messages are rendered as structured, attributed peer data. The frame includes the
 sender, message id, kind, obligation, and an explicit untrusted marker. The renderer
-escapes fences, nested strings, terminal control sequences, and human output. If a body
+escapes fences, nested strings, terminal control sequences, and human output. A one-line
+field such as the subject shows every line break as a visible escape: CR and LF, and also NEL
+(U+0085), LINE SEPARATOR (U+2028) and PARAGRAPH SEPARATOR (U+2029), which the protocol accepts
+in a subject. In a body, a line that starts with `subject:` or `body:` after any of these is
+quoted, so a peer cannot write a label that reads as the frame's. If a body
 cannot fit the context budget, the projection keeps the id and directs the participant to
 `acc inbox --message <id>` instead of cutting the frame in half.
 
