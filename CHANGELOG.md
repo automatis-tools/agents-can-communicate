@@ -1,5 +1,24 @@
 # Changelog
 
+## Unreleased — an update blocker without a client process names its session
+
+- **`acc update` and `acc doctor` name the session behind a pid-less update blocker.** A native
+  binding that records no client process was reported only as "unidentified process (native;
+  1 native binding; store contract 7; unknown client pid)". The report now names its session,
+  participant, client and workspace, its last heartbeat, and when it stops blocking: 30 minutes
+  after that heartbeat, or when the process its session records exits. It says how to release
+  the session sooner. Past ten blockers, it says that `acc update --json` lists every one. Owner
+  tokens stay out of the report.
+
+| Development artifact | Value |
+|---|---|
+| Built from | `df5edbed7adc4a1f456c2fe751d97cc48544519c` |
+| Tarball | `agents-can-communicate-0.15.3.tgz`, 662,767 bytes, 392 files |
+| sha256 | `291ab63c54c1d4b4ab8bbbba73c8c41295fe5babe8c19264ec39c8bbb4648da0` |
+
+The exact archive passed package verification and an installed update that such a binding
+blocked. See [development evidence](docs/release-evidence/update-blocker-session-2026-11-23.md).
+
 ## 0.15.3 — release candidate
 
 This release carries the work merged to main after 0.15.2, from #428. It keeps store contract 8

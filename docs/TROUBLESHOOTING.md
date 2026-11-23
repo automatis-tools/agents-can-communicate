@@ -587,6 +587,13 @@ unrelated holds still require lifecycle cleanup or confirmed process exit; safet
 do not expire merely by elapsed time. See
 [maintenance and recovery](UPGRADING.md#confirmed-client-service-maintenance).
 
+A native binding that names no client process is reported by its session: the session and
+participant ids, the client, the workspace, the last heartbeat, and when it stops blocking. If
+the session records no process, it stops blocking 30 minutes after its last heartbeat. If it
+records a process, it stops blocking when that process exits. To release it sooner, end that
+session in its client, or have its owner run `acc detach` with its own credentials. Then run
+`acc update`, or let the automatic update finish.
+
 If ACC 0.5.3 or 0.5.4 reports a Claude Code Channel process with `contract unknown` after
 an earlier 0.4.x upgrade, its active pointer may have lost the contract field. This can
 affect Channel processes opened after that upgrade too. A pending old updater retries its

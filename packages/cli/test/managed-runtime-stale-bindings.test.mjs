@@ -42,10 +42,10 @@ async function fixture(t) {
   const store = await openFilesystemStore({ root: workspace, workspaceId: WORKSPACE,
     clock: createFakeClock(NOW), ids: createFakeIds() });
   // Presence is judged against the real clock, so a heartbeat is set relative to it.
-  const session = (sessionId, pid, { state = "open", quietMs = 0 } = {}) => store.transaction(tx =>
+  const session = (sessionId, pid, { state = "open", quietMs = 0, checkoutRoot = null } = {}) => store.transaction(tx =>
     tx.put("session", sessionId, { schemaVersion: SCHEMA_VERSION, workspaceId: WORKSPACE, sessionId,
       participantId: `p_${sessionId}`, generation: `generation_${sessionId}`, harness: "claude_code",
-      state, parentSessionId: null, checkoutRoot: null, branch: null, pid, enforcement: "advisory",
+      state, parentSessionId: null, checkoutRoot, branch: null, pid, enforcement: "advisory",
       lifecycle: "managed", heartbeatCadenceMs: 30_000, startedAt: NOW,
       heartbeatAt: new Date(Date.now() - quietMs).toISOString() }), { kinds: ["session"] });
   // The identity a 0.9.x store carries, as on the machine the defect was found.
@@ -60,7 +60,7 @@ async function fixture(t) {
   const remaining = async () => (await readdir(bindings)).sort();
   const activate = () => activatePending(root, { pidIsAlive: alive,
     prepare: async () => async () => ({ failed: [] }) });
-  return { data, root, session, bind, remaining, activate };
+  return { data, root, session, bind, remaining, activate, workspace };
 }
 
 test("a binding without a client pid whose session record is gone does not block activation", async t => {
@@ -122,6 +122,73 @@ test("a binding without a client pid whose session names a live process still bl
 
   assert.equal(result.activated, false);
   assert.equal(result.blockers.length, 1);
+});
+
+// On 2026-11-03 the update to 0.14.0 reported only "unidentified process (native;
+// 1 native binding; store contract 7; unknown client pid)" for a manual Kimi
+// session that no running client owned (#418).
+test("a blocking binding without a client pid names its session and when it stops blocking", async t => {
+  const f = await fixture(t);
+  const checkout = path.join(f.data, "checkout");
+  await f.session("session_manual", null, { quietMs: 5 * 60_000, checkoutRoot: checkout });
+  await f.bind("manual", "session_manual");
+
+  const result = await f.activate();
+
+  assert.equal(result.activated, false);
+  const [blocker] = result.blockers;
+  const heartbeatAt = blocker.session.heartbeatAt;
+  assert.deepEqual(blocker.session, { sessionId: "session_manual", participantId: "p_session_manual",
+    client: "claude_code", workspaceId: WORKSPACE, checkout, heartbeatAt, processPid: null,
+    releasesAt: new Date(Date.parse(heartbeatAt) + 30 * 60_000).toISOString() });
+  for (const text of [result.notice, JSON.parse(await readFile(path.join(f.root, "control.json"), "utf8")).notice]) {
+    assert.match(text, /session session_manual \(participant p_session_manual, claude_code, workspace /);
+    assert.ok(text.includes(`workspace ${checkout}; native; 1 native binding; store contract 6; unknown client pid`), text);
+    assert.ok(text.includes(`last heartbeat ${heartbeatAt}; blocks until ${blocker.session.releasesAt} unless it sends a heartbeat`), text);
+    assert.match(text, /end it in its client, or have its owner run acc detach/);
+  }
+  assert.doesNotMatch(JSON.stringify(result), /generation_session_manual|"manual"/, "owner tokens stay private");
+});
+
+test("past ten blockers the notice says where every session is listed", async t => {
+  const f = await fixture(t);
+  for (let index = 0; index < 11; index += 1) {
+    await f.session(`session_many${index}`, null);
+    await f.bind(`many${index}`, `session_many${index}`);
+  }
+
+  const { blockers, notice } = await f.activate();
+
+  assert.equal(blockers.length, 11);
+  assert.ok(blockers.every(blocker => blocker.session.sessionId?.startsWith("session_many")));
+  assert.match(notice, /; and 1 more, which acc update --json lists\. To release a session sooner/);
+});
+
+test("a blocking binding without a client pid whose session records a live process names that process", async t => {
+  const f = await fixture(t);
+  await f.session("session_live", process.pid);
+  await f.bind("live", "session_live");
+
+  const { blockers, notice } = await f.activate();
+
+  assert.equal(blockers[0].session.processPid, process.pid);
+  assert.equal(blockers[0].session.releasesAt, null);
+  assert.ok(notice.includes(`blocks until PID ${process.pid} exits`), notice);
+  assert.ok(notice.includes(`workspace ${WORKSPACE};`), "a session with no checkout is named by its workspace");
+});
+
+test("a blocking binding whose session record cannot be read still names its workspace", async t => {
+  const f = await fixture(t);
+  await f.session("session_corrupt", null);
+  await f.bind("corrupt", "session_corrupt");
+  await writeFile(path.join(f.workspace, "state", "session", "session_corrupt.json"), "{not json");
+
+  const { activated, blockers, notice } = await f.activate();
+
+  assert.equal(activated, false);
+  assert.deepEqual(blockers[0].session, { sessionId: null, workspaceId: WORKSPACE });
+  assert.match(notice, /unidentified process \(native; .*unknown client pid; workspace workspace_a+; session record unreadable\)/);
+  assert.doesNotMatch(notice, /end it in its client/);
 });
 
 test("the sweep removes only the bindings that no longer name a possible client", async t => {
