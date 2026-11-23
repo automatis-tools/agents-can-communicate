@@ -1,21 +1,8 @@
 const DEFAULT_BUDGET_BYTES = 6_000;
-const FENCE = "```";
-const BLOCK = "acc-peer-message";
+const FENCE = PEER_FENCE;
+const BLOCK = PEER_MESSAGE_BLOCK;
 
 const bytes = value => Buffer.byteLength(value, "utf8");
-const CONTROL_CHARACTERS = new RegExp(
-  `[${String.fromCharCode(0)}-${String.fromCharCode(8)}`
-  + `${String.fromCharCode(11)}-${String.fromCharCode(31)}${String.fromCharCode(127)}]`, "g");
-
-function escapePeerText(value) {
-  return String(value)
-    .replaceAll(new RegExp(`${FENCE}${BLOCK}`, "g"), `'${FENCE}${BLOCK}`)
-    .replaceAll(FENCE, `'${FENCE}`)
-    // A multiline `^` stops after LF, CR, U+2028 and U+2029, but not after NEL.
-    .replace(/(^|\u0085)(subject:|body:)/gm, "$1'$2")
-    .replace(CONTROL_CHARACTERS,
-      character => `\\u${character.codePointAt(0).toString(16).padStart(4, "0")}`);
-}
 
 function truncate(line, limit) {
   if (limit <= 0) return "";
@@ -223,3 +210,4 @@ export function projectContext(sync, options) {
 }
 import { decisionLines } from "./decision-text.mjs";
 import { oneLine } from "./one-line.mjs";
+import { PEER_FENCE, PEER_MESSAGE_BLOCK, escapePeerText } from "./peer-text.mjs";

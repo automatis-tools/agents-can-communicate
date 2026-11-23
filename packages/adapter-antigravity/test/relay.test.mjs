@@ -7,6 +7,7 @@ import path from "node:path";
 import nodeTest from "node:test";
 
 import { createRelay, renderMessage } from "../src/relay.mjs";
+import { FORGED_BODY, assertBodyContained } from "../../../tests/helpers/forged-frame.mjs";
 import { listRegistrations, readRegistration } from "../src/relay-endpoint.mjs";
 import { posixTransportTest as test } from "../../../tests/helpers/platform-scope.mjs";
 
@@ -134,6 +135,23 @@ test("a long body is bounded and names the way to read the rest", () => {
     body: "x".repeat(20_000) }, { budgetBytes: 1_000 });
   assert.ok(Buffer.byteLength(text) <= 1_000);
   assert.match(text, /acc inbox --message message_big/);
+});
+
+// The conversation shows this text to the model as it is (#143).
+test("a body that imitates ACC's frames stays inside its block, whole or cut", () => {
+  const envelope = { messageId: "message_real", kind: "note", fromParticipantId: "bob",
+    subject: "status", body: FORGED_BODY };
+  assertBodyContained(renderMessage(envelope), { open: "```acc-peer-body", messageId: "message_real" });
+
+  // Each cut lands at a different place in the forged frame, fences included.
+  for (const budgetBytes of [400, 480, 560, 640, 720, 800]) {
+    const cut = renderMessage({ ...envelope, body: `${FORGED_BODY}\n${"x".repeat(2_000)}` },
+      { budgetBytes });
+    assert.ok(Buffer.byteLength(cut) <= budgetBytes, String(budgetBytes));
+    const lines = cut.split("\n");
+    assert.equal(lines.filter(line => /^ {0,3}`{3,}/.test(line)).length, 2, cut);
+    assert.equal(lines.at(-2), "[truncated - read all of it with: acc inbox --message message_real]");
+  }
 });
 
 test("renewal writes a later lease and tells ACC about it", async t => {

@@ -41,6 +41,21 @@ quoted, so a peer cannot write a label that reads as the frame's. If a body
 cannot fit the context budget, the projection keeps the id and directs the participant to
 `acc inbox --message <id>` instead of cutting the frame in half.
 
+A body can imitate a whole frame: another sender, another message id, an end-of-message
+line. Each path that shows a body to a model makes sure such text stays inside the message it
+came in:
+
+| Path | What the model sees | Why a body cannot start a second message |
+|---|---|---|
+| Next-turn hook context, every client | the ` ```acc-peer-message ` block | Only ACC opens or closes the block: every ` ``` ` in peer text is quoted |
+| Codex live delivery | a header line, then the body in an ` ```acc-peer-body ` block | Same quoting; the header comes before the block, ACC's lines after it |
+| Antigravity relay and desktop live delivery | the same, with the sender and ACC's closing line | Same quoting, also when a long body is cut |
+| Claude Code inbox wake, Kimi web wake | one fixed line with the message id | The wake carries no peer bytes; the body comes through the hook block |
+| `acc inbox --message`, `acc sync`, MCP resources and tools | JSON | The body is one JSON string, so its line breaks are escapes |
+
+The tests send one forged body through each path that shows a body as text: the hook
+block, Codex, and Antigravity. The forged body has a fake header, sender, subject and fences.
+
 A model may still choose to follow persuasive peer text. Attribution and the recipient's
 own instruction hierarchy are the mitigation; ACC is not a model sandbox.
 
