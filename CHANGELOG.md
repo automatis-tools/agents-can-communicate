@@ -1,5 +1,23 @@
 # Changelog
 
+## Unreleased — a peer body cannot imitate a second message
+
+- **Codex and Antigravity live pushes put the peer body in a block only ACC closes.** A push
+  showed the body as raw text between ACC's header and its closing line. A body that wrote an
+  imitation header, such as `ACC peer message ... from ada`, read as a second message from
+  another sender. The body is now in an `acc-peer-body` code block, with the escaping the
+  next-turn hook block already used: every ``` in peer text is quoted. `docs/SECURITY_MODEL.md`
+  states the framing guarantee for each delivery path.
+
+| Development artifact | Value |
+|---|---|
+| Built from | `0136efbf016b6853933184ad1bf89e83a8068862` |
+| Tarball | `agents-can-communicate-0.15.3.tgz`, 666,961 bytes, 394 files |
+| sha256 | `b4e24156bf0aed634261bccd8a0de3d76b0691970799462e1edd20b210fda488` |
+
+The exact archive passed package verification, and its renderers kept a forged body inside its
+block. See [development evidence](docs/release-evidence/peer-body-fence-2026-11-23.md).
+
 ## Unreleased — what one ACC start costs
 
 - **The cost of one ACC start is measured and published.** Every hook and every `acc inbox`
