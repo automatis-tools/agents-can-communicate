@@ -14,1389 +14,1389 @@
     "cpu": "Apple M5 Max",
     "cpus": 18,
     "loadBefore": [
-      7.14453125,
-      8.01904296875,
-      7.85400390625
+      6.93359375,
+      7.2265625,
+      7.88818359375
     ],
     "loadAfter": [
-      6.94677734375,
-      7.90625,
-      7.81640625
+      7.11376953125,
+      7.25341796875,
+      7.87890625
     ]
   },
   "summary": {
     "node": {
       "samples": 30,
       "wallMs": {
-        "median": 24.346042,
-        "p95": 27.510916,
-        "max": 28.963042
+        "median": 24.363625,
+        "p95": 28.555791,
+        "max": 29.107834
       },
       "cpuMs": {
         "median": 18,
-        "p95": 18,
-        "max": 20
+        "p95": 21,
+        "max": 21
       },
-      "p95ShareOfHookBudget": 0.0055021832
+      "p95ShareOfHookBudget": 0.0057111582
     },
     "sessionStart": {
       "samples": 30,
       "wallMs": {
-        "median": 172.902791,
-        "p95": 185.456334,
-        "max": 193.746
+        "median": 236.754542,
+        "p95": 306.363292,
+        "max": 324.393959
       },
       "cpuMs": {
-        "median": 165,
-        "p95": 174,
-        "max": 176
+        "median": 162,
+        "p95": 216,
+        "max": 217
       },
-      "p95ShareOfHookBudget": 0.0370912668
+      "p95ShareOfHookBudget": 0.0612726584
     },
     "beforeTurn": {
       "samples": 30,
       "wallMs": {
-        "median": 129.117834,
-        "p95": 135.930333,
-        "max": 138.237625
+        "median": 114.300291,
+        "p95": 150.168708,
+        "max": 151.571542
       },
       "cpuMs": {
-        "median": 135,
-        "p95": 142,
-        "max": 142
+        "median": 120,
+        "p95": 159,
+        "max": 160
       },
-      "p95ShareOfHookBudget": 0.0271860666
+      "p95ShareOfHookBudget": 0.0300337416
     },
     "guard": {
       "samples": 30,
       "wallMs": {
-        "median": 93.866083,
-        "p95": 102.319042,
-        "max": 103.551625
+        "median": 81.220791,
+        "p95": 101.048042,
+        "max": 112.615625
       },
       "cpuMs": {
-        "median": 97,
+        "median": 83,
         "p95": 106,
-        "max": 107
+        "max": 119
       },
-      "p95ShareOfHookBudget": 0.0204638084
+      "p95ShareOfHookBudget": 0.0202096084
     },
     "inbox": {
       "samples": 30,
       "wallMs": {
-        "median": 77.5795,
-        "p95": 87.008917,
-        "max": 87.3855
+        "median": 79.063208,
+        "p95": 105.282292,
+        "max": 109.755333
       },
       "cpuMs": {
-        "median": 78,
-        "p95": 89,
-        "max": 91
+        "median": 83,
+        "p95": 103,
+        "max": 115
       },
-      "p95ShareOfHookBudget": 0.0174017834
+      "p95ShareOfHookBudget": 0.0210564584
     },
     "finish": {
       "samples": 30,
       "wallMs": {
-        "median": 82.884,
-        "p95": 86.379,
-        "max": 88.051375
+        "median": 82.051625,
+        "p95": 101.618958,
+        "max": 120.178042
       },
       "cpuMs": {
-        "median": 84,
-        "p95": 89,
-        "max": 90
+        "median": 85,
+        "p95": 107,
+        "max": 123
       },
-      "p95ShareOfHookBudget": 0.0172758
+      "p95ShareOfHookBudget": 0.020323791600000002
     },
     "sessionEnd": {
       "samples": 30,
       "wallMs": {
-        "median": 117.711583,
-        "p95": 137.156292,
-        "max": 145.954875
+        "median": 117.956125,
+        "p95": 153.953292,
+        "max": 169.874541
       },
       "cpuMs": {
         "median": 119,
-        "p95": 137,
-        "max": 143
+        "p95": 159,
+        "max": 159
       },
-      "p95ShareOfHookBudget": 0.027431258400000002
+      "p95ShareOfHookBudget": 0.0307906584
     }
   },
   "samples": {
     "node": [
       {
-        "wallMs": 25.69175,
+        "wallMs": 24.751416,
         "userMs": 13,
         "systemMs": 5,
         "cpuMs": 18
       },
       {
-        "wallMs": 25.410875,
-        "userMs": 13,
-        "systemMs": 5,
-        "cpuMs": 18
-      },
-      {
-        "wallMs": 24.528875,
-        "userMs": 13,
-        "systemMs": 5,
-        "cpuMs": 18
-      },
-      {
-        "wallMs": 25.935666,
-        "userMs": 13,
-        "systemMs": 5,
-        "cpuMs": 18
-      },
-      {
-        "wallMs": 25.924167,
-        "userMs": 13,
-        "systemMs": 5,
-        "cpuMs": 18
-      },
-      {
-        "wallMs": 25.469708,
-        "userMs": 13,
-        "systemMs": 5,
-        "cpuMs": 18
-      },
-      {
-        "wallMs": 24.116792,
-        "userMs": 13,
-        "systemMs": 5,
-        "cpuMs": 18
-      },
-      {
-        "wallMs": 25.423042,
-        "userMs": 13,
-        "systemMs": 5,
-        "cpuMs": 18
-      },
-      {
-        "wallMs": 25.812042,
-        "userMs": 13,
-        "systemMs": 5,
-        "cpuMs": 18
-      },
-      {
-        "wallMs": 25.049041,
-        "userMs": 13,
-        "systemMs": 5,
-        "cpuMs": 18
-      },
-      {
-        "wallMs": 23.477833,
-        "userMs": 13,
-        "systemMs": 4,
-        "cpuMs": 17
-      },
-      {
-        "wallMs": 23.219375,
-        "userMs": 13,
-        "systemMs": 4,
-        "cpuMs": 17
-      },
-      {
-        "wallMs": 28.963042,
+        "wallMs": 26.603667,
         "userMs": 14,
         "systemMs": 6,
         "cpuMs": 20
       },
       {
-        "wallMs": 23.833167,
-        "userMs": 13,
-        "systemMs": 4,
-        "cpuMs": 17
+        "wallMs": 28.102709,
+        "userMs": 14,
+        "systemMs": 6,
+        "cpuMs": 20
       },
       {
-        "wallMs": 24.050667,
+        "wallMs": 25.686417,
+        "userMs": 14,
+        "systemMs": 5,
+        "cpuMs": 19
+      },
+      {
+        "wallMs": 29.107834,
+        "userMs": 14,
+        "systemMs": 6,
+        "cpuMs": 20
+      },
+      {
+        "wallMs": 25.153458,
+        "userMs": 14,
+        "systemMs": 5,
+        "cpuMs": 19
+      },
+      {
+        "wallMs": 25.910875,
+        "userMs": 14,
+        "systemMs": 6,
+        "cpuMs": 20
+      },
+      {
+        "wallMs": 26.702166,
+        "userMs": 14,
+        "systemMs": 5,
+        "cpuMs": 19
+      },
+      {
+        "wallMs": 26.467083,
+        "userMs": 14,
+        "systemMs": 5,
+        "cpuMs": 19
+      },
+      {
+        "wallMs": 25.93825,
+        "userMs": 14,
+        "systemMs": 5,
+        "cpuMs": 19
+      },
+      {
+        "wallMs": 28.555791,
+        "userMs": 14,
+        "systemMs": 7,
+        "cpuMs": 21
+      },
+      {
+        "wallMs": 27.635416,
+        "userMs": 14,
+        "systemMs": 6,
+        "cpuMs": 20
+      },
+      {
+        "wallMs": 27.348792,
+        "userMs": 15,
+        "systemMs": 6,
+        "cpuMs": 21
+      },
+      {
+        "wallMs": 24.21,
         "userMs": 13,
         "systemMs": 5,
         "cpuMs": 18
       },
       {
-        "wallMs": 23.820041,
+        "wallMs": 26.544125,
+        "userMs": 13,
+        "systemMs": 6,
+        "cpuMs": 19
+      },
+      {
+        "wallMs": 22.838,
         "userMs": 13,
         "systemMs": 4,
         "cpuMs": 17
       },
       {
-        "wallMs": 23.928833,
+        "wallMs": 23.48275,
+        "userMs": 13,
+        "systemMs": 5,
+        "cpuMs": 18
+      },
+      {
+        "wallMs": 22.637125,
         "userMs": 13,
         "systemMs": 4,
         "cpuMs": 17
       },
       {
-        "wallMs": 23.792791,
-        "userMs": 13,
-        "systemMs": 5,
-        "cpuMs": 18
-      },
-      {
-        "wallMs": 24.738084,
-        "userMs": 13,
-        "systemMs": 5,
-        "cpuMs": 18
-      },
-      {
-        "wallMs": 23.798208,
+        "wallMs": 22.973708,
         "userMs": 13,
         "systemMs": 4,
         "cpuMs": 17
       },
       {
-        "wallMs": 23.908459,
+        "wallMs": 24.363625,
+        "userMs": 13,
+        "systemMs": 5,
+        "cpuMs": 18
+      },
+      {
+        "wallMs": 22.194709,
         "userMs": 13,
         "systemMs": 4,
         "cpuMs": 17
       },
       {
-        "wallMs": 23.86675,
+        "wallMs": 22.689416,
         "userMs": 13,
-        "systemMs": 5,
-        "cpuMs": 18
+        "systemMs": 4,
+        "cpuMs": 17
       },
       {
-        "wallMs": 24.346042,
-        "userMs": 13,
-        "systemMs": 5,
-        "cpuMs": 18
-      },
-      {
-        "wallMs": 23.453792,
+        "wallMs": 21.987583,
         "userMs": 12,
         "systemMs": 4,
         "cpuMs": 16
       },
       {
-        "wallMs": 25.558791,
-        "userMs": 13,
-        "systemMs": 5,
-        "cpuMs": 18
-      },
-      {
-        "wallMs": 24.632917,
-        "userMs": 13,
-        "systemMs": 5,
-        "cpuMs": 18
-      },
-      {
-        "wallMs": 24.580916,
+        "wallMs": 23.394416,
         "userMs": 13,
         "systemMs": 4,
         "cpuMs": 17
       },
       {
-        "wallMs": 27.510916,
-        "userMs": 13,
-        "systemMs": 5,
-        "cpuMs": 18
-      },
-      {
-        "wallMs": 23.687625,
+        "wallMs": 23.272709,
         "userMs": 13,
         "systemMs": 4,
         "cpuMs": 17
       },
       {
-        "wallMs": 23.941333,
+        "wallMs": 24.947583,
         "userMs": 13,
         "systemMs": 5,
         "cpuMs": 18
+      },
+      {
+        "wallMs": 23.181041,
+        "userMs": 13,
+        "systemMs": 4,
+        "cpuMs": 17
+      },
+      {
+        "wallMs": 23.426666,
+        "userMs": 13,
+        "systemMs": 4,
+        "cpuMs": 17
+      },
+      {
+        "wallMs": 22.42125,
+        "userMs": 13,
+        "systemMs": 4,
+        "cpuMs": 17
+      },
+      {
+        "wallMs": 22.07975,
+        "userMs": 13,
+        "systemMs": 4,
+        "cpuMs": 17
       }
     ],
     "sessionStart": [
       {
-        "wallMs": 172.902791,
-        "userMs": 114,
-        "systemMs": 50,
-        "cpuMs": 164
+        "wallMs": 243.349,
+        "userMs": 122,
+        "systemMs": 60,
+        "cpuMs": 182
       },
       {
-        "wallMs": 169.080625,
-        "userMs": 111,
-        "systemMs": 49,
-        "cpuMs": 160
+        "wallMs": 324.393959,
+        "userMs": 123,
+        "systemMs": 62,
+        "cpuMs": 185
       },
       {
-        "wallMs": 161.421375,
-        "userMs": 106,
-        "systemMs": 46,
+        "wallMs": 257.237792,
+        "userMs": 132,
+        "systemMs": 70,
+        "cpuMs": 202
+      },
+      {
+        "wallMs": 240.584209,
+        "userMs": 122,
+        "systemMs": 63,
+        "cpuMs": 185
+      },
+      {
+        "wallMs": 306.30625,
+        "userMs": 127,
+        "systemMs": 66,
+        "cpuMs": 193
+      },
+      {
+        "wallMs": 236.754542,
+        "userMs": 121,
+        "systemMs": 60,
+        "cpuMs": 181
+      },
+      {
+        "wallMs": 253.874209,
+        "userMs": 131,
+        "systemMs": 71,
+        "cpuMs": 202
+      },
+      {
+        "wallMs": 306.363292,
+        "userMs": 121,
+        "systemMs": 64,
+        "cpuMs": 185
+      },
+      {
+        "wallMs": 246.579709,
+        "userMs": 128,
+        "systemMs": 67,
+        "cpuMs": 195
+      },
+      {
+        "wallMs": 259.524333,
+        "userMs": 134,
+        "systemMs": 72,
+        "cpuMs": 206
+      },
+      {
+        "wallMs": 261.549584,
+        "userMs": 143,
+        "systemMs": 74,
+        "cpuMs": 217
+      },
+      {
+        "wallMs": 261.007333,
+        "userMs": 143,
+        "systemMs": 73,
+        "cpuMs": 216
+      },
+      {
+        "wallMs": 251.495667,
+        "userMs": 133,
+        "systemMs": 70,
+        "cpuMs": 203
+      },
+      {
+        "wallMs": 236.699292,
+        "userMs": 127,
+        "systemMs": 65,
+        "cpuMs": 192
+      },
+      {
+        "wallMs": 243.762625,
+        "userMs": 110,
+        "systemMs": 55,
+        "cpuMs": 165
+      },
+      {
+        "wallMs": 218.221583,
+        "userMs": 104,
+        "systemMs": 48,
         "cpuMs": 152
       },
       {
-        "wallMs": 167.5,
-        "userMs": 109,
-        "systemMs": 50,
-        "cpuMs": 159
-      },
-      {
-        "wallMs": 170.01575,
-        "userMs": 111,
-        "systemMs": 49,
-        "cpuMs": 160
-      },
-      {
-        "wallMs": 175.548125,
-        "userMs": 115,
-        "systemMs": 52,
-        "cpuMs": 167
-      },
-      {
-        "wallMs": 165.565667,
-        "userMs": 107,
+        "wallMs": 214.187084,
+        "userMs": 101,
         "systemMs": 47,
-        "cpuMs": 154
+        "cpuMs": 148
       },
       {
-        "wallMs": 163.873167,
-        "userMs": 107,
+        "wallMs": 216.589875,
+        "userMs": 102,
         "systemMs": 48,
+        "cpuMs": 150
+      },
+      {
+        "wallMs": 222.256583,
+        "userMs": 110,
+        "systemMs": 52,
+        "cpuMs": 162
+      },
+      {
+        "wallMs": 218.415125,
+        "userMs": 106,
+        "systemMs": 49,
         "cpuMs": 155
       },
       {
-        "wallMs": 165.165584,
-        "userMs": 108,
-        "systemMs": 48,
+        "wallMs": 250.217292,
+        "userMs": 107,
+        "systemMs": 49,
         "cpuMs": 156
       },
       {
-        "wallMs": 172.524125,
-        "userMs": 114,
-        "systemMs": 51,
-        "cpuMs": 165
-      },
-      {
-        "wallMs": 173.135167,
-        "userMs": 112,
-        "systemMs": 53,
-        "cpuMs": 165
-      },
-      {
-        "wallMs": 163.55125,
-        "userMs": 107,
-        "systemMs": 48,
+        "wallMs": 218.280791,
+        "userMs": 105,
+        "systemMs": 50,
         "cpuMs": 155
       },
       {
-        "wallMs": 193.746,
-        "userMs": 119,
-        "systemMs": 57,
-        "cpuMs": 176
+        "wallMs": 215.929292,
+        "userMs": 104,
+        "systemMs": 48,
+        "cpuMs": 152
       },
       {
-        "wallMs": 171.663917,
-        "userMs": 112,
-        "systemMs": 51,
-        "cpuMs": 163
+        "wallMs": 219.295416,
+        "userMs": 108,
+        "systemMs": 50,
+        "cpuMs": 158
       },
       {
-        "wallMs": 166.238042,
-        "userMs": 109,
-        "systemMs": 51,
-        "cpuMs": 160
+        "wallMs": 223.650667,
+        "userMs": 105,
+        "systemMs": 50,
+        "cpuMs": 155
       },
       {
-        "wallMs": 176.548166,
-        "userMs": 113,
-        "systemMs": 53,
-        "cpuMs": 166
-      },
-      {
-        "wallMs": 170.6745,
-        "userMs": 111,
-        "systemMs": 52,
-        "cpuMs": 163
-      },
-      {
-        "wallMs": 177.076875,
-        "userMs": 118,
-        "systemMs": 54,
-        "cpuMs": 172
-      },
-      {
-        "wallMs": 167.10775,
+        "wallMs": 293.849209,
         "userMs": 109,
         "systemMs": 50,
         "cpuMs": 159
       },
       {
-        "wallMs": 179.27725,
-        "userMs": 117,
-        "systemMs": 56,
-        "cpuMs": 173
+        "wallMs": 227.349167,
+        "userMs": 105,
+        "systemMs": 48,
+        "cpuMs": 153
       },
       {
-        "wallMs": 177.121458,
-        "userMs": 115,
-        "systemMs": 53,
-        "cpuMs": 168
+        "wallMs": 215.971334,
+        "userMs": 104,
+        "systemMs": 48,
+        "cpuMs": 152
       },
       {
-        "wallMs": 179.796541,
-        "userMs": 113,
-        "systemMs": 55,
-        "cpuMs": 168
+        "wallMs": 215.042709,
+        "userMs": 103,
+        "systemMs": 48,
+        "cpuMs": 151
       },
       {
-        "wallMs": 173.467791,
-        "userMs": 113,
-        "systemMs": 53,
-        "cpuMs": 166
-      },
-      {
-        "wallMs": 172.0425,
-        "userMs": 112,
-        "systemMs": 52,
-        "cpuMs": 164
-      },
-      {
-        "wallMs": 185.456334,
-        "userMs": 116,
-        "systemMs": 58,
-        "cpuMs": 174
-      },
-      {
-        "wallMs": 178.552083,
-        "userMs": 112,
-        "systemMs": 53,
-        "cpuMs": 165
-      },
-      {
-        "wallMs": 179.708666,
-        "userMs": 117,
-        "systemMs": 56,
-        "cpuMs": 173
-      },
-      {
-        "wallMs": 177.522625,
-        "userMs": 114,
-        "systemMs": 56,
-        "cpuMs": 170
-      },
-      {
-        "wallMs": 176.087292,
-        "userMs": 114,
-        "systemMs": 55,
-        "cpuMs": 169
-      },
-      {
-        "wallMs": 178.21525,
-        "userMs": 115,
-        "systemMs": 56,
-        "cpuMs": 171
+        "wallMs": 225.592667,
+        "userMs": 109,
+        "systemMs": 51,
+        "cpuMs": 160
       }
     ],
     "beforeTurn": [
       {
-        "wallMs": 131.460667,
-        "userMs": 103,
-        "systemMs": 34,
-        "cpuMs": 137
-      },
-      {
-        "wallMs": 125.009125,
-        "userMs": 96,
-        "systemMs": 32,
-        "cpuMs": 128
-      },
-      {
-        "wallMs": 130.241875,
-        "userMs": 100,
-        "systemMs": 35,
-        "cpuMs": 135
-      },
-      {
-        "wallMs": 126.701167,
-        "userMs": 97,
-        "systemMs": 33,
-        "cpuMs": 130
-      },
-      {
-        "wallMs": 128.324042,
-        "userMs": 98,
-        "systemMs": 34,
-        "cpuMs": 132
-      },
-      {
-        "wallMs": 125.052791,
-        "userMs": 96,
-        "systemMs": 32,
-        "cpuMs": 128
-      },
-      {
-        "wallMs": 128.323,
-        "userMs": 99,
-        "systemMs": 34,
-        "cpuMs": 133
-      },
-      {
-        "wallMs": 126.115584,
-        "userMs": 99,
-        "systemMs": 34,
-        "cpuMs": 133
-      },
-      {
-        "wallMs": 127.21075,
-        "userMs": 98,
-        "systemMs": 35,
-        "cpuMs": 133
-      },
-      {
-        "wallMs": 133.100458,
-        "userMs": 104,
-        "systemMs": 38,
-        "cpuMs": 142
-      },
-      {
-        "wallMs": 126.100792,
-        "userMs": 97,
-        "systemMs": 34,
-        "cpuMs": 131
-      },
-      {
-        "wallMs": 125.157625,
-        "userMs": 97,
-        "systemMs": 34,
-        "cpuMs": 131
-      },
-      {
-        "wallMs": 127.540583,
-        "userMs": 100,
-        "systemMs": 34,
-        "cpuMs": 134
-      },
-      {
-        "wallMs": 122.571792,
+        "wallMs": 121.518084,
         "userMs": 96,
         "systemMs": 33,
         "cpuMs": 129
       },
       {
-        "wallMs": 129.117834,
-        "userMs": 100,
-        "systemMs": 35,
-        "cpuMs": 135
+        "wallMs": 145.787291,
+        "userMs": 112,
+        "systemMs": 43,
+        "cpuMs": 155
       },
       {
-        "wallMs": 131.303541,
-        "userMs": 103,
+        "wallMs": 131.774292,
+        "userMs": 107,
         "systemMs": 37,
-        "cpuMs": 140
+        "cpuMs": 144
       },
       {
-        "wallMs": 130.156125,
-        "userMs": 101,
-        "systemMs": 35,
-        "cpuMs": 136
-      },
-      {
-        "wallMs": 132.419042,
-        "userMs": 101,
-        "systemMs": 37,
-        "cpuMs": 138
-      },
-      {
-        "wallMs": 127.853416,
-        "userMs": 99,
-        "systemMs": 36,
-        "cpuMs": 135
-      },
-      {
-        "wallMs": 131.332625,
-        "userMs": 101,
-        "systemMs": 37,
-        "cpuMs": 138
-      },
-      {
-        "wallMs": 135.930333,
-        "userMs": 101,
-        "systemMs": 38,
-        "cpuMs": 139
-      },
-      {
-        "wallMs": 135.348833,
-        "userMs": 102,
-        "systemMs": 39,
-        "cpuMs": 141
-      },
-      {
-        "wallMs": 130.315084,
-        "userMs": 100,
-        "systemMs": 37,
-        "cpuMs": 137
-      },
-      {
-        "wallMs": 126.195,
+        "wallMs": 127.938041,
         "userMs": 99,
         "systemMs": 35,
         "cpuMs": 134
       },
       {
-        "wallMs": 134.645459,
-        "userMs": 103,
-        "systemMs": 39,
-        "cpuMs": 142
-      },
-      {
-        "wallMs": 135.484583,
-        "userMs": 102,
-        "systemMs": 39,
-        "cpuMs": 141
-      },
-      {
-        "wallMs": 127.68675,
-        "userMs": 99,
+        "wallMs": 132.959958,
+        "userMs": 106,
         "systemMs": 36,
-        "cpuMs": 135
-      },
-      {
-        "wallMs": 131.21475,
-        "userMs": 101,
-        "systemMs": 37,
-        "cpuMs": 138
-      },
-      {
-        "wallMs": 134.151625,
-        "userMs": 102,
-        "systemMs": 37,
-        "cpuMs": 139
-      },
-      {
-        "wallMs": 138.237625,
-        "userMs": 103,
-        "systemMs": 39,
         "cpuMs": 142
-      }
-    ],
-    "guard": [
-      {
-        "wallMs": 103.551625,
-        "userMs": 76,
-        "systemMs": 30,
-        "cpuMs": 106
-      },
-      {
-        "wallMs": 90.105791,
-        "userMs": 67,
-        "systemMs": 25,
-        "cpuMs": 92
-      },
-      {
-        "wallMs": 90.559416,
-        "userMs": 67,
-        "systemMs": 24,
-        "cpuMs": 91
-      },
-      {
-        "wallMs": 90.166625,
-        "userMs": 69,
-        "systemMs": 24,
-        "cpuMs": 93
-      },
-      {
-        "wallMs": 91.473916,
-        "userMs": 69,
-        "systemMs": 24,
-        "cpuMs": 93
-      },
-      {
-        "wallMs": 92.484583,
-        "userMs": 69,
-        "systemMs": 25,
-        "cpuMs": 94
-      },
-      {
-        "wallMs": 90.809625,
-        "userMs": 68,
-        "systemMs": 25,
-        "cpuMs": 93
-      },
-      {
-        "wallMs": 94.970875,
-        "userMs": 71,
-        "systemMs": 26,
-        "cpuMs": 97
-      },
-      {
-        "wallMs": 91.108208,
-        "userMs": 70,
-        "systemMs": 25,
-        "cpuMs": 95
-      },
-      {
-        "wallMs": 93.020917,
-        "userMs": 70,
-        "systemMs": 26,
-        "cpuMs": 96
-      },
-      {
-        "wallMs": 90.665834,
-        "userMs": 68,
-        "systemMs": 26,
-        "cpuMs": 94
-      },
-      {
-        "wallMs": 92.047458,
-        "userMs": 70,
-        "systemMs": 26,
-        "cpuMs": 96
-      },
-      {
-        "wallMs": 91.95325,
-        "userMs": 70,
-        "systemMs": 26,
-        "cpuMs": 96
-      },
-      {
-        "wallMs": 90.81675,
-        "userMs": 69,
-        "systemMs": 25,
-        "cpuMs": 94
-      },
-      {
-        "wallMs": 95.938292,
-        "userMs": 72,
-        "systemMs": 28,
-        "cpuMs": 100
-      },
-      {
-        "wallMs": 91.664958,
-        "userMs": 69,
-        "systemMs": 26,
-        "cpuMs": 95
-      },
-      {
-        "wallMs": 95.39625,
-        "userMs": 71,
-        "systemMs": 28,
-        "cpuMs": 99
-      },
-      {
-        "wallMs": 93.571625,
-        "userMs": 71,
-        "systemMs": 26,
-        "cpuMs": 97
-      },
-      {
-        "wallMs": 93.866083,
-        "userMs": 71,
-        "systemMs": 27,
-        "cpuMs": 98
-      },
-      {
-        "wallMs": 97.767584,
-        "userMs": 73,
-        "systemMs": 28,
-        "cpuMs": 101
-      },
-      {
-        "wallMs": 97.390375,
-        "userMs": 72,
-        "systemMs": 28,
-        "cpuMs": 100
-      },
-      {
-        "wallMs": 97.112334,
-        "userMs": 72,
-        "systemMs": 28,
-        "cpuMs": 100
-      },
-      {
-        "wallMs": 94.024958,
-        "userMs": 71,
-        "systemMs": 27,
-        "cpuMs": 98
-      },
-      {
-        "wallMs": 93.9735,
-        "userMs": 71,
-        "systemMs": 27,
-        "cpuMs": 98
-      },
-      {
-        "wallMs": 97.7495,
-        "userMs": 73,
-        "systemMs": 29,
-        "cpuMs": 102
-      },
-      {
-        "wallMs": 99.170917,
-        "userMs": 72,
-        "systemMs": 30,
-        "cpuMs": 102
-      },
-      {
-        "wallMs": 102.319042,
-        "userMs": 76,
-        "systemMs": 31,
-        "cpuMs": 107
-      },
-      {
-        "wallMs": 95.101625,
-        "userMs": 71,
-        "systemMs": 28,
-        "cpuMs": 99
-      },
-      {
-        "wallMs": 99.6385,
-        "userMs": 74,
-        "systemMs": 30,
-        "cpuMs": 104
-      },
-      {
-        "wallMs": 99.905459,
-        "userMs": 73,
-        "systemMs": 30,
-        "cpuMs": 103
-      }
-    ],
-    "inbox": [
-      {
-        "wallMs": 83.904792,
-        "userMs": 62,
-        "systemMs": 23,
-        "cpuMs": 85
-      },
-      {
-        "wallMs": 79.088792,
-        "userMs": 58,
-        "systemMs": 21,
-        "cpuMs": 79
-      },
-      {
-        "wallMs": 78.807625,
-        "userMs": 58,
-        "systemMs": 21,
-        "cpuMs": 79
-      },
-      {
-        "wallMs": 77.11975,
-        "userMs": 58,
-        "systemMs": 20,
-        "cpuMs": 78
-      },
-      {
-        "wallMs": 78.922,
-        "userMs": 57,
-        "systemMs": 21,
-        "cpuMs": 78
-      },
-      {
-        "wallMs": 77.5795,
-        "userMs": 57,
-        "systemMs": 20,
-        "cpuMs": 77
-      },
-      {
-        "wallMs": 80.579917,
-        "userMs": 60,
-        "systemMs": 22,
-        "cpuMs": 82
-      },
-      {
-        "wallMs": 78.032584,
-        "userMs": 57,
-        "systemMs": 21,
-        "cpuMs": 78
-      },
-      {
-        "wallMs": 80.954666,
-        "userMs": 61,
-        "systemMs": 22,
-        "cpuMs": 83
-      },
-      {
-        "wallMs": 76.864334,
-        "userMs": 58,
-        "systemMs": 21,
-        "cpuMs": 79
-      },
-      {
-        "wallMs": 76.979375,
-        "userMs": 57,
-        "systemMs": 20,
-        "cpuMs": 77
-      },
-      {
-        "wallMs": 76.467417,
-        "userMs": 56,
-        "systemMs": 20,
-        "cpuMs": 76
-      },
-      {
-        "wallMs": 75.556625,
-        "userMs": 57,
-        "systemMs": 21,
-        "cpuMs": 78
-      },
-      {
-        "wallMs": 76.062542,
-        "userMs": 57,
-        "systemMs": 20,
-        "cpuMs": 77
-      },
-      {
-        "wallMs": 80.125459,
-        "userMs": 59,
-        "systemMs": 22,
-        "cpuMs": 81
       },
-      {
-        "wallMs": 75.185042,
-        "userMs": 57,
-        "systemMs": 20,
-        "cpuMs": 77
-      },
-      {
-        "wallMs": 77.161084,
-        "userMs": 57,
-        "systemMs": 21,
-        "cpuMs": 78
-      },
-      {
-        "wallMs": 74.691833,
-        "userMs": 57,
-        "systemMs": 19,
-        "cpuMs": 76
-      },
-      {
-        "wallMs": 87.008917,
-        "userMs": 64,
-        "systemMs": 27,
-        "cpuMs": 91
-      },
-      {
-        "wallMs": 77.862292,
-        "userMs": 57,
-        "systemMs": 22,
-        "cpuMs": 79
-      },
-      {
-        "wallMs": 87.3855,
-        "userMs": 63,
-        "systemMs": 26,
-        "cpuMs": 89
-      },
-      {
-        "wallMs": 77.410916,
-        "userMs": 57,
-        "systemMs": 22,
-        "cpuMs": 79
-      },
-      {
-        "wallMs": 72.944417,
-        "userMs": 55,
-        "systemMs": 19,
-        "cpuMs": 74
-      },
-      {
-        "wallMs": 77.1185,
-        "userMs": 58,
-        "systemMs": 22,
-        "cpuMs": 80
-      },
-      {
-        "wallMs": 78.636084,
-        "userMs": 56,
-        "systemMs": 20,
-        "cpuMs": 76
-      },
-      {
-        "wallMs": 78.926583,
-        "userMs": 59,
-        "systemMs": 21,
-        "cpuMs": 80
-      },
-      {
-        "wallMs": 73.614708,
-        "userMs": 55,
-        "systemMs": 19,
-        "cpuMs": 74
-      },
-      {
-        "wallMs": 73.686208,
-        "userMs": 56,
-        "systemMs": 20,
-        "cpuMs": 76
-      },
-      {
-        "wallMs": 77.81525,
-        "userMs": 58,
-        "systemMs": 21,
-        "cpuMs": 79
-      },
-      {
-        "wallMs": 81.218417,
-        "userMs": 60,
-        "systemMs": 23,
-        "cpuMs": 83
-      }
-    ],
-    "finish": [
-      {
-        "wallMs": 86.379,
-        "userMs": 66,
-        "systemMs": 23,
-        "cpuMs": 89
-      },
-      {
-        "wallMs": 83.511125,
-        "userMs": 62,
-        "systemMs": 22,
-        "cpuMs": 84
-      },
-      {
-        "wallMs": 83.608083,
-        "userMs": 62,
-        "systemMs": 22,
-        "cpuMs": 84
-      },
-      {
-        "wallMs": 86.359167,
-        "userMs": 64,
-        "systemMs": 24,
-        "cpuMs": 88
-      },
-      {
-        "wallMs": 83.351333,
-        "userMs": 62,
-        "systemMs": 22,
-        "cpuMs": 84
-      },
-      {
-        "wallMs": 84.386042,
-        "userMs": 63,
-        "systemMs": 23,
-        "cpuMs": 86
-      },
-      {
-        "wallMs": 81.357,
-        "userMs": 61,
-        "systemMs": 21,
-        "cpuMs": 82
-      },
-      {
-        "wallMs": 82.979041,
-        "userMs": 61,
-        "systemMs": 22,
-        "cpuMs": 83
-      },
-      {
-        "wallMs": 83.371458,
-        "userMs": 63,
-        "systemMs": 22,
-        "cpuMs": 85
-      },
-      {
-        "wallMs": 85.554833,
-        "userMs": 62,
-        "systemMs": 22,
-        "cpuMs": 84
-      },
-      {
-        "wallMs": 84.051791,
-        "userMs": 63,
-        "systemMs": 23,
-        "cpuMs": 86
-      },
-      {
-        "wallMs": 78.755167,
-        "userMs": 60,
-        "systemMs": 21,
-        "cpuMs": 81
-      },
-      {
-        "wallMs": 79.7305,
-        "userMs": 61,
-        "systemMs": 21,
-        "cpuMs": 82
-      },
-      {
-        "wallMs": 88.051375,
-        "userMs": 65,
-        "systemMs": 25,
-        "cpuMs": 90
-      },
-      {
-        "wallMs": 82.884,
-        "userMs": 62,
-        "systemMs": 22,
-        "cpuMs": 84
-      },
-      {
-        "wallMs": 79.507833,
-        "userMs": 61,
-        "systemMs": 21,
-        "cpuMs": 82
-      },
-      {
-        "wallMs": 83.303625,
-        "userMs": 62,
-        "systemMs": 23,
-        "cpuMs": 85
-      },
-      {
-        "wallMs": 79.264042,
-        "userMs": 60,
-        "systemMs": 21,
-        "cpuMs": 81
-      },
-      {
-        "wallMs": 81.774041,
-        "userMs": 62,
-        "systemMs": 22,
-        "cpuMs": 84
-      },
-      {
-        "wallMs": 82.03625,
-        "userMs": 62,
-        "systemMs": 21,
-        "cpuMs": 83
-      },
-      {
-        "wallMs": 85.497042,
-        "userMs": 63,
-        "systemMs": 24,
-        "cpuMs": 87
-      },
-      {
-        "wallMs": 79.07175,
-        "userMs": 60,
-        "systemMs": 21,
-        "cpuMs": 81
-      },
-      {
-        "wallMs": 79.233125,
-        "userMs": 60,
-        "systemMs": 21,
-        "cpuMs": 81
-      },
-      {
-        "wallMs": 81.35,
-        "userMs": 62,
-        "systemMs": 22,
-        "cpuMs": 84
-      },
-      {
-        "wallMs": 78.047958,
-        "userMs": 60,
-        "systemMs": 21,
-        "cpuMs": 81
-      },
-      {
-        "wallMs": 83.552625,
-        "userMs": 63,
-        "systemMs": 22,
-        "cpuMs": 85
-      },
-      {
-        "wallMs": 79.206792,
-        "userMs": 60,
-        "systemMs": 21,
-        "cpuMs": 81
-      },
-      {
-        "wallMs": 76.33,
-        "userMs": 59,
-        "systemMs": 19,
-        "cpuMs": 78
-      },
-      {
-        "wallMs": 84.472125,
-        "userMs": 63,
-        "systemMs": 23,
-        "cpuMs": 86
-      },
-      {
-        "wallMs": 81.390917,
-        "userMs": 61,
-        "systemMs": 22,
-        "cpuMs": 83
-      }
-    ],
-    "sessionEnd": [
       {
-        "wallMs": 130.367458,
-        "userMs": 95,
+        "wallMs": 126.92575,
+        "userMs": 96,
         "systemMs": 35,
+        "cpuMs": 131
+      },
+      {
+        "wallMs": 136.070583,
+        "userMs": 106,
+        "systemMs": 38,
+        "cpuMs": 144
+      },
+      {
+        "wallMs": 151.571542,
+        "userMs": 117,
+        "systemMs": 42,
+        "cpuMs": 159
+      },
+      {
+        "wallMs": 147.518667,
+        "userMs": 116,
+        "systemMs": 42,
+        "cpuMs": 158
+      },
+      {
+        "wallMs": 145.893167,
+        "userMs": 114,
+        "systemMs": 42,
+        "cpuMs": 156
+      },
+      {
+        "wallMs": 137.290291,
+        "userMs": 111,
+        "systemMs": 39,
+        "cpuMs": 150
+      },
+      {
+        "wallMs": 137.572167,
+        "userMs": 110,
+        "systemMs": 40,
+        "cpuMs": 150
+      },
+      {
+        "wallMs": 150.168708,
+        "userMs": 116,
+        "systemMs": 44,
+        "cpuMs": 160
+      },
+      {
+        "wallMs": 122.952584,
+        "userMs": 98,
+        "systemMs": 32,
         "cpuMs": 130
       },
       {
-        "wallMs": 121.582625,
-        "userMs": 90,
-        "systemMs": 31,
-        "cpuMs": 121
-      },
-      {
-        "wallMs": 123.803125,
-        "userMs": 92,
-        "systemMs": 33,
-        "cpuMs": 125
-      },
-      {
-        "wallMs": 137.156292,
-        "userMs": 101,
-        "systemMs": 36,
-        "cpuMs": 137
-      },
-      {
-        "wallMs": 123.152584,
-        "userMs": 92,
-        "systemMs": 32,
-        "cpuMs": 124
-      },
-      {
-        "wallMs": 123.237042,
-        "userMs": 93,
-        "systemMs": 32,
-        "cpuMs": 125
-      },
-      {
-        "wallMs": 116.8475,
+        "wallMs": 111.288083,
         "userMs": 88,
+        "systemMs": 28,
+        "cpuMs": 116
+      },
+      {
+        "wallMs": 115.238292,
+        "userMs": 90,
         "systemMs": 30,
-        "cpuMs": 118
-      },
-      {
-        "wallMs": 119.326167,
-        "userMs": 89,
-        "systemMs": 31,
         "cpuMs": 120
       },
       {
-        "wallMs": 120.996042,
-        "userMs": 92,
-        "systemMs": 32,
-        "cpuMs": 124
+        "wallMs": 111.8955,
+        "userMs": 87,
+        "systemMs": 27,
+        "cpuMs": 114
       },
       {
-        "wallMs": 119.865,
-        "userMs": 89,
-        "systemMs": 31,
-        "cpuMs": 120
-      },
-      {
-        "wallMs": 116.634167,
+        "wallMs": 113.416,
         "userMs": 89,
         "systemMs": 30,
         "cpuMs": 119
       },
       {
-        "wallMs": 131.789,
-        "userMs": 95,
-        "systemMs": 34,
-        "cpuMs": 129
-      },
-      {
-        "wallMs": 111.746792,
-        "userMs": 85,
-        "systemMs": 28,
-        "cpuMs": 113
-      },
-      {
-        "wallMs": 145.954875,
-        "userMs": 104,
-        "systemMs": 39,
-        "cpuMs": 143
-      },
-      {
-        "wallMs": 114.395292,
-        "userMs": 88,
+        "wallMs": 111.669916,
+        "userMs": 87,
         "systemMs": 29,
+        "cpuMs": 116
+      },
+      {
+        "wallMs": 112.032208,
+        "userMs": 89,
+        "systemMs": 28,
         "cpuMs": 117
       },
       {
-        "wallMs": 116.395958,
-        "userMs": 88,
-        "systemMs": 30,
+        "wallMs": 113.315625,
+        "userMs": 89,
+        "systemMs": 29,
         "cpuMs": 118
       },
       {
-        "wallMs": 121.3205,
-        "userMs": 92,
-        "systemMs": 32,
-        "cpuMs": 124
-      },
-      {
-        "wallMs": 115.438208,
+        "wallMs": 110.821625,
         "userMs": 87,
-        "systemMs": 29,
-        "cpuMs": 116
+        "systemMs": 28,
+        "cpuMs": 115
       },
       {
-        "wallMs": 117.711583,
-        "userMs": 87,
-        "systemMs": 29,
-        "cpuMs": 116
-      },
-      {
-        "wallMs": 120.38725,
-        "userMs": 88,
-        "systemMs": 31,
-        "cpuMs": 119
-      },
-      {
-        "wallMs": 123.890291,
-        "userMs": 91,
-        "systemMs": 31,
-        "cpuMs": 122
-      },
-      {
-        "wallMs": 116.040083,
-        "userMs": 88,
+        "wallMs": 114.300291,
+        "userMs": 90,
         "systemMs": 30,
+        "cpuMs": 120
+      },
+      {
+        "wallMs": 110.838084,
+        "userMs": 89,
+        "systemMs": 28,
+        "cpuMs": 117
+      },
+      {
+        "wallMs": 112.957875,
+        "userMs": 88,
+        "systemMs": 28,
+        "cpuMs": 116
+      },
+      {
+        "wallMs": 113.244958,
+        "userMs": 89,
+        "systemMs": 29,
         "cpuMs": 118
       },
       {
-        "wallMs": 113.321,
+        "wallMs": 110.802125,
+        "userMs": 88,
+        "systemMs": 28,
+        "cpuMs": 116
+      },
+      {
+        "wallMs": 110.496042,
+        "userMs": 88,
+        "systemMs": 28,
+        "cpuMs": 116
+      },
+      {
+        "wallMs": 110.780375,
         "userMs": 86,
         "systemMs": 28,
         "cpuMs": 114
       },
       {
-        "wallMs": 120.613041,
-        "userMs": 90,
-        "systemMs": 30,
-        "cpuMs": 120
+        "wallMs": 110.849875,
+        "userMs": 88,
+        "systemMs": 28,
+        "cpuMs": 116
+      }
+    ],
+    "guard": [
+      {
+        "wallMs": 86.7435,
+        "userMs": 66,
+        "systemMs": 24,
+        "cpuMs": 90
       },
       {
-        "wallMs": 114.944833,
+        "wallMs": 100.797542,
+        "userMs": 77,
+        "systemMs": 29,
+        "cpuMs": 106
+      },
+      {
+        "wallMs": 92.919792,
+        "userMs": 71,
+        "systemMs": 28,
+        "cpuMs": 99
+      },
+      {
+        "wallMs": 86.752834,
+        "userMs": 67,
+        "systemMs": 24,
+        "cpuMs": 91
+      },
+      {
+        "wallMs": 94.156209,
+        "userMs": 70,
+        "systemMs": 27,
+        "cpuMs": 97
+      },
+      {
+        "wallMs": 94.814292,
+        "userMs": 71,
+        "systemMs": 28,
+        "cpuMs": 99
+      },
+      {
+        "wallMs": 95.130083,
+        "userMs": 72,
+        "systemMs": 27,
+        "cpuMs": 99
+      },
+      {
+        "wallMs": 112.615625,
+        "userMs": 85,
+        "systemMs": 34,
+        "cpuMs": 119
+      },
+      {
+        "wallMs": 94.413125,
+        "userMs": 70,
+        "systemMs": 27,
+        "cpuMs": 97
+      },
+      {
+        "wallMs": 101.048042,
+        "userMs": 76,
+        "systemMs": 29,
+        "cpuMs": 105
+      },
+      {
+        "wallMs": 99.655167,
+        "userMs": 77,
+        "systemMs": 29,
+        "cpuMs": 106
+      },
+      {
+        "wallMs": 97.265375,
+        "userMs": 75,
+        "systemMs": 28,
+        "cpuMs": 103
+      },
+      {
+        "wallMs": 100.966834,
+        "userMs": 76,
+        "systemMs": 30,
+        "cpuMs": 106
+      },
+      {
+        "wallMs": 87.268167,
+        "userMs": 66,
+        "systemMs": 24,
+        "cpuMs": 90
+      },
+      {
+        "wallMs": 81.020625,
+        "userMs": 62,
+        "systemMs": 21,
+        "cpuMs": 83
+      },
+      {
+        "wallMs": 79.170625,
+        "userMs": 61,
+        "systemMs": 20,
+        "cpuMs": 81
+      },
+      {
+        "wallMs": 78.897958,
+        "userMs": 60,
+        "systemMs": 21,
+        "cpuMs": 81
+      },
+      {
+        "wallMs": 79.203125,
+        "userMs": 60,
+        "systemMs": 21,
+        "cpuMs": 81
+      },
+      {
+        "wallMs": 79.863667,
+        "userMs": 61,
+        "systemMs": 21,
+        "cpuMs": 82
+      },
+      {
+        "wallMs": 78.114333,
+        "userMs": 60,
+        "systemMs": 20,
+        "cpuMs": 80
+      },
+      {
+        "wallMs": 77.396875,
+        "userMs": 59,
+        "systemMs": 20,
+        "cpuMs": 79
+      },
+      {
+        "wallMs": 80.37775,
+        "userMs": 61,
+        "systemMs": 21,
+        "cpuMs": 82
+      },
+      {
+        "wallMs": 79.409416,
+        "userMs": 61,
+        "systemMs": 21,
+        "cpuMs": 82
+      },
+      {
+        "wallMs": 79.7205,
+        "userMs": 60,
+        "systemMs": 21,
+        "cpuMs": 81
+      },
+      {
+        "wallMs": 77.610958,
+        "userMs": 60,
+        "systemMs": 20,
+        "cpuMs": 80
+      },
+      {
+        "wallMs": 81.220791,
+        "userMs": 62,
+        "systemMs": 21,
+        "cpuMs": 83
+      },
+      {
+        "wallMs": 81.738333,
+        "userMs": 61,
+        "systemMs": 22,
+        "cpuMs": 83
+      },
+      {
+        "wallMs": 77.675375,
+        "userMs": 60,
+        "systemMs": 20,
+        "cpuMs": 80
+      },
+      {
+        "wallMs": 78.7235,
+        "userMs": 60,
+        "systemMs": 21,
+        "cpuMs": 81
+      },
+      {
+        "wallMs": 78.472709,
+        "userMs": 60,
+        "systemMs": 20,
+        "cpuMs": 80
+      }
+    ],
+    "inbox": [
+      {
+        "wallMs": 82.324292,
+        "userMs": 63,
+        "systemMs": 24,
+        "cpuMs": 87
+      },
+      {
+        "wallMs": 105.282292,
+        "userMs": 72,
+        "systemMs": 29,
+        "cpuMs": 101
+      },
+      {
+        "wallMs": 95.732791,
+        "userMs": 71,
+        "systemMs": 28,
+        "cpuMs": 99
+      },
+      {
+        "wallMs": 85.872084,
+        "userMs": 64,
+        "systemMs": 25,
+        "cpuMs": 89
+      },
+      {
+        "wallMs": 86.578625,
+        "userMs": 65,
+        "systemMs": 25,
+        "cpuMs": 90
+      },
+      {
+        "wallMs": 93.451417,
+        "userMs": 70,
+        "systemMs": 28,
+        "cpuMs": 98
+      },
+      {
+        "wallMs": 89.048083,
+        "userMs": 66,
+        "systemMs": 26,
+        "cpuMs": 92
+      },
+      {
+        "wallMs": 109.755333,
+        "userMs": 81,
+        "systemMs": 34,
+        "cpuMs": 115
+      },
+      {
+        "wallMs": 86.451375,
+        "userMs": 64,
+        "systemMs": 25,
+        "cpuMs": 89
+      },
+      {
+        "wallMs": 94.312792,
+        "userMs": 69,
+        "systemMs": 28,
+        "cpuMs": 97
+      },
+      {
+        "wallMs": 96.787958,
+        "userMs": 72,
+        "systemMs": 29,
+        "cpuMs": 101
+      },
+      {
+        "wallMs": 98.34375,
+        "userMs": 74,
+        "systemMs": 29,
+        "cpuMs": 103
+      },
+      {
+        "wallMs": 98.169458,
+        "userMs": 74,
+        "systemMs": 29,
+        "cpuMs": 103
+      },
+      {
+        "wallMs": 78.96675,
+        "userMs": 62,
+        "systemMs": 21,
+        "cpuMs": 83
+      },
+      {
+        "wallMs": 74.045875,
+        "userMs": 57,
+        "systemMs": 19,
+        "cpuMs": 76
+      },
+      {
+        "wallMs": 73.217875,
+        "userMs": 56,
+        "systemMs": 19,
+        "cpuMs": 75
+      },
+      {
+        "wallMs": 76.497708,
+        "userMs": 57,
+        "systemMs": 21,
+        "cpuMs": 78
+      },
+      {
+        "wallMs": 74.601625,
+        "userMs": 56,
+        "systemMs": 20,
+        "cpuMs": 76
+      },
+      {
+        "wallMs": 79.705958,
+        "userMs": 60,
+        "systemMs": 23,
+        "cpuMs": 83
+      },
+      {
+        "wallMs": 82.364,
+        "userMs": 60,
+        "systemMs": 24,
+        "cpuMs": 84
+      },
+      {
+        "wallMs": 72.805417,
+        "userMs": 56,
+        "systemMs": 19,
+        "cpuMs": 75
+      },
+      {
+        "wallMs": 72.866458,
+        "userMs": 56,
+        "systemMs": 19,
+        "cpuMs": 75
+      },
+      {
+        "wallMs": 73.220917,
+        "userMs": 56,
+        "systemMs": 19,
+        "cpuMs": 75
+      },
+      {
+        "wallMs": 74.650333,
+        "userMs": 56,
+        "systemMs": 20,
+        "cpuMs": 76
+      },
+      {
+        "wallMs": 77.312416,
+        "userMs": 57,
+        "systemMs": 21,
+        "cpuMs": 78
+      },
+      {
+        "wallMs": 78.053625,
+        "userMs": 58,
+        "systemMs": 22,
+        "cpuMs": 80
+      },
+      {
+        "wallMs": 79.063208,
+        "userMs": 57,
+        "systemMs": 22,
+        "cpuMs": 79
+      },
+      {
+        "wallMs": 75.455458,
+        "userMs": 57,
+        "systemMs": 20,
+        "cpuMs": 77
+      },
+      {
+        "wallMs": 77.040833,
+        "userMs": 58,
+        "systemMs": 21,
+        "cpuMs": 79
+      },
+      {
+        "wallMs": 72.3565,
+        "userMs": 55,
+        "systemMs": 18,
+        "cpuMs": 73
+      }
+    ],
+    "finish": [
+      {
+        "wallMs": 89.829875,
+        "userMs": 68,
+        "systemMs": 25,
+        "cpuMs": 93
+      },
+      {
+        "wallMs": 95.890458,
+        "userMs": 74,
+        "systemMs": 27,
+        "cpuMs": 101
+      },
+      {
+        "wallMs": 101.618958,
+        "userMs": 76,
+        "systemMs": 31,
+        "cpuMs": 107
+      },
+      {
+        "wallMs": 88.238875,
+        "userMs": 66,
+        "systemMs": 25,
+        "cpuMs": 91
+      },
+      {
+        "wallMs": 89.101667,
+        "userMs": 68,
+        "systemMs": 24,
+        "cpuMs": 92
+      },
+      {
+        "wallMs": 97.134834,
+        "userMs": 73,
+        "systemMs": 29,
+        "cpuMs": 102
+      },
+      {
+        "wallMs": 94.327042,
+        "userMs": 71,
+        "systemMs": 27,
+        "cpuMs": 98
+      },
+      {
+        "wallMs": 120.178042,
+        "userMs": 87,
+        "systemMs": 36,
+        "cpuMs": 123
+      },
+      {
+        "wallMs": 89.785042,
+        "userMs": 67,
+        "systemMs": 25,
+        "cpuMs": 92
+      },
+      {
+        "wallMs": 96.719584,
+        "userMs": 72,
+        "systemMs": 28,
+        "cpuMs": 100
+      },
+      {
+        "wallMs": 93.817541,
+        "userMs": 73,
+        "systemMs": 27,
+        "cpuMs": 100
+      },
+      {
+        "wallMs": 98.494167,
+        "userMs": 76,
+        "systemMs": 29,
+        "cpuMs": 105
+      },
+      {
+        "wallMs": 99.193834,
+        "userMs": 77,
+        "systemMs": 29,
+        "cpuMs": 106
+      },
+      {
+        "wallMs": 81.623875,
+        "userMs": 65,
+        "systemMs": 21,
+        "cpuMs": 86
+      },
+      {
+        "wallMs": 76.8995,
+        "userMs": 59,
+        "systemMs": 20,
+        "cpuMs": 79
+      },
+      {
+        "wallMs": 77.148583,
+        "userMs": 59,
+        "systemMs": 20,
+        "cpuMs": 79
+      },
+      {
+        "wallMs": 79.323291,
+        "userMs": 60,
+        "systemMs": 21,
+        "cpuMs": 81
+      },
+      {
+        "wallMs": 79.890333,
+        "userMs": 60,
+        "systemMs": 21,
+        "cpuMs": 81
+      },
+      {
+        "wallMs": 82.051625,
+        "userMs": 62,
+        "systemMs": 22,
+        "cpuMs": 84
+      },
+      {
+        "wallMs": 86.94925,
+        "userMs": 66,
+        "systemMs": 24,
+        "cpuMs": 90
+      },
+      {
+        "wallMs": 79.253209,
+        "userMs": 60,
+        "systemMs": 21,
+        "cpuMs": 81
+      },
+      {
+        "wallMs": 79.642333,
+        "userMs": 60,
+        "systemMs": 21,
+        "cpuMs": 81
+      },
+      {
+        "wallMs": 75.652833,
+        "userMs": 58,
+        "systemMs": 19,
+        "cpuMs": 77
+      },
+      {
+        "wallMs": 76.72675,
+        "userMs": 59,
+        "systemMs": 20,
+        "cpuMs": 79
+      },
+      {
+        "wallMs": 78.817292,
+        "userMs": 59,
+        "systemMs": 21,
+        "cpuMs": 80
+      },
+      {
+        "wallMs": 78.03675,
+        "userMs": 59,
+        "systemMs": 21,
+        "cpuMs": 80
+      },
+      {
+        "wallMs": 83.22025,
+        "userMs": 62,
+        "systemMs": 22,
+        "cpuMs": 84
+      },
+      {
+        "wallMs": 76.068166,
+        "userMs": 58,
+        "systemMs": 19,
+        "cpuMs": 77
+      },
+      {
+        "wallMs": 76.009917,
+        "userMs": 59,
+        "systemMs": 19,
+        "cpuMs": 78
+      },
+      {
+        "wallMs": 81.221834,
+        "userMs": 63,
+        "systemMs": 22,
+        "cpuMs": 85
+      }
+    ],
+    "sessionEnd": [
+      {
+        "wallMs": 138.4785,
+        "userMs": 104,
+        "systemMs": 37,
+        "cpuMs": 141
+      },
+      {
+        "wallMs": 146.554292,
+        "userMs": 107,
+        "systemMs": 38,
+        "cpuMs": 145
+      },
+      {
+        "wallMs": 146.422334,
+        "userMs": 111,
+        "systemMs": 41,
+        "cpuMs": 152
+      },
+      {
+        "wallMs": 140.243542,
+        "userMs": 105,
+        "systemMs": 40,
+        "cpuMs": 145
+      },
+      {
+        "wallMs": 144.561834,
+        "userMs": 110,
+        "systemMs": 41,
+        "cpuMs": 151
+      },
+      {
+        "wallMs": 136.108833,
+        "userMs": 103,
+        "systemMs": 38,
+        "cpuMs": 141
+      },
+      {
+        "wallMs": 145.836417,
+        "userMs": 112,
+        "systemMs": 41,
+        "cpuMs": 153
+      },
+      {
+        "wallMs": 153.953292,
+        "userMs": 115,
+        "systemMs": 42,
+        "cpuMs": 157
+      },
+      {
+        "wallMs": 132.850625,
+        "userMs": 100,
+        "systemMs": 36,
+        "cpuMs": 136
+      },
+      {
+        "wallMs": 151.289333,
+        "userMs": 116,
+        "systemMs": 43,
+        "cpuMs": 159
+      },
+      {
+        "wallMs": 141.049292,
+        "userMs": 107,
+        "systemMs": 38,
+        "cpuMs": 145
+      },
+      {
+        "wallMs": 153.901208,
+        "userMs": 115,
+        "systemMs": 44,
+        "cpuMs": 159
+      },
+      {
+        "wallMs": 133.043292,
+        "userMs": 100,
+        "systemMs": 36,
+        "cpuMs": 136
+      },
+      {
+        "wallMs": 169.874541,
+        "userMs": 103,
+        "systemMs": 41,
+        "cpuMs": 144
+      },
+      {
+        "wallMs": 114.242292,
+        "userMs": 88,
+        "systemMs": 28,
+        "cpuMs": 116
+      },
+      {
+        "wallMs": 111.626375,
+        "userMs": 86,
+        "systemMs": 27,
+        "cpuMs": 113
+      },
+      {
+        "wallMs": 114.761792,
         "userMs": 87,
         "systemMs": 29,
         "cpuMs": 116
       },
       {
-        "wallMs": 117.131875,
+        "wallMs": 117.956125,
+        "userMs": 87,
+        "systemMs": 30,
+        "cpuMs": 117
+      },
+      {
+        "wallMs": 111.350458,
+        "userMs": 85,
+        "systemMs": 28,
+        "cpuMs": 113
+      },
+      {
+        "wallMs": 116.702958,
+        "userMs": 88,
+        "systemMs": 31,
+        "cpuMs": 119
+      },
+      {
+        "wallMs": 111.62875,
+        "userMs": 85,
+        "systemMs": 28,
+        "cpuMs": 113
+      },
+      {
+        "wallMs": 112.385417,
+        "userMs": 87,
+        "systemMs": 28,
+        "cpuMs": 115
+      },
+      {
+        "wallMs": 114.366708,
         "userMs": 88,
         "systemMs": 29,
         "cpuMs": 117
       },
       {
-        "wallMs": 114.130458,
-        "userMs": 87,
-        "systemMs": 28,
-        "cpuMs": 115
+        "wallMs": 110.666541,
+        "userMs": 85,
+        "systemMs": 27,
+        "cpuMs": 112
       },
       {
-        "wallMs": 117.471083,
-        "userMs": 90,
+        "wallMs": 117.306875,
+        "userMs": 88,
         "systemMs": 30,
-        "cpuMs": 120
+        "cpuMs": 118
       },
       {
-        "wallMs": 114.244,
-        "userMs": 87,
+        "wallMs": 117.970958,
+        "userMs": 89,
+        "systemMs": 30,
+        "cpuMs": 119
+      },
+      {
+        "wallMs": 114.258833,
+        "userMs": 88,
+        "systemMs": 29,
+        "cpuMs": 117
+      },
+      {
+        "wallMs": 112.392042,
+        "userMs": 86,
         "systemMs": 28,
+        "cpuMs": 114
+      },
+      {
+        "wallMs": 113.598916,
+        "userMs": 86,
+        "systemMs": 29,
         "cpuMs": 115
       },
       {
-        "wallMs": 117.308,
-        "userMs": 89,
+        "wallMs": 113.965084,
+        "userMs": 87,
         "systemMs": 29,
-        "cpuMs": 118
+        "cpuMs": 116
       }
     ]
   }
