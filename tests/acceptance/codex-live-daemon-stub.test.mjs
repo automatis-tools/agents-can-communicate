@@ -119,7 +119,22 @@ test("a peer message reaches an idle Codex thread through the app-server daemon"
       reported = await install();
     }
     const service = reported.data?.operations?.[0]?.nativeServiceSetup;
-    assert.equal(service?.state, "ready", `the Codex daemon did not start: ${JSON.stringify(reported)}`);
+    if (service?.state !== "ready") {
+      // What ACC compared when it refused the daemon: Codex's own account of
+      // it, its pid file, and the command line the system reports for that pid.
+      const version = await runExecutable(codex, ["app-server", "daemon", "version"], { env, timeout: 30_000 })
+        .then(({ stdout }) => stdout.trim(), error => `version failed: ${error.message}`);
+      const pidFile = await readFile(path.join(codexHome, "app-server-daemon", "daemon.pid"), "utf8")
+        .catch(error => `daemon.pid: ${error.code}`);
+      const pid = Number(/"pid"\s*:\s*(\d+)/.exec(pidFile)?.[1]);
+      const command = process.platform === "win32" && pid > 0
+        ? await run(powershellCandidates(process.env)[0], ["-NoLogo", "-NoProfile", "-NonInteractive", "-Command",
+          `(Get-CimInstance Win32_Process -Filter "ProcessId = ${pid}") | ForEach-Object { $_.CommandLine; $_.CreationDate }`],
+        { timeout: 60_000 }).then(({ stdout }) => stdout.trim(), error => `process read failed: ${error.message}`)
+        : await run("ps", ["-p", String(pid), "-o", "lstart=,command="]).then(({ stdout }) => stdout.trim(), () => "");
+      assert.fail(`the Codex daemon is not ready: ${JSON.stringify(service)}\nversion: ${version}\n`
+        + `daemon.pid: ${pidFile}\nprocess: ${command}\nreport: ${JSON.stringify(reported).slice(0, 4000)}`);
+    }
 
     step("connecting to the daemon");
     const peer = openCodexAppServer({ socketPath: controlSocketPath(env), timeoutMs: 30_000 });
