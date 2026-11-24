@@ -1,0 +1,123 @@
+{
+  "schemaVersion": 1,
+  "suite": "codex-turn-steer",
+  "source": "real-client-capture",
+  "client": "codex-cli",
+  "phase": "product",
+  "clientVersion": "0.171.0",
+  "platform": "darwin-arm64",
+  "packageSha256": "a4dd48e5c792065051ade860b0740a2a808c505d8cd17f85687ceaf7cc07efae",
+  "startedAt": "2026-11-24T00:14:26.000Z",
+  "finishedAt": "2026-11-24T00:18:00.680Z",
+  "scenarioCount": 5,
+  "passedCount": 5,
+  "failedCount": 0,
+  "cleanup": {
+    "attempted": true,
+    "outcome": "passed",
+    "ownedProcesses": "stopped",
+    "temporaryState": "removed"
+  },
+  "scenarios": [
+    {
+      "caseId": "X01",
+      "outcome": "passed",
+      "startedAt": "2026-11-24T00:14:26.000Z",
+      "finishedAt": "2026-11-24T00:18:00.431Z",
+      "messageId": "message_7jWFpZSH6BtP1Sn60e_2KQ",
+      "observations": [
+        {
+          "kind": "delivery",
+          "at": "2026-11-24T00:18:00.431Z",
+          "outcome": "offered"
+        },
+        {
+          "kind": "presented",
+          "at": "2026-11-24T00:14:27.712Z",
+          "outcome": "started-turn"
+        }
+      ]
+    },
+    {
+      "caseId": "X02",
+      "outcome": "passed",
+      "startedAt": "2026-11-24T00:14:49.000Z",
+      "finishedAt": "2026-11-24T00:18:00.475Z",
+      "messageId": "message_JQpKiIRfn38-gsI_1mKW8Q",
+      "observations": [
+        {
+          "kind": "delivery",
+          "at": "2026-11-24T00:18:00.475Z",
+          "outcome": "offered"
+        },
+        {
+          "kind": "presented",
+          "at": "2026-11-24T00:15:00.770Z",
+          "outcome": "in-running-turn"
+        }
+      ]
+    },
+    {
+      "caseId": "X03",
+      "outcome": "passed",
+      "startedAt": "2026-11-24T00:14:59.716Z",
+      "finishedAt": "2026-11-24T00:18:00.526Z",
+      "messageId": "message_JQpKiIRfn38-gsI_1mKW8Q",
+      "observations": [
+        {
+          "kind": "answer",
+          "at": "2026-11-24T00:15:06.142Z",
+          "outcome": "recorded"
+        },
+        {
+          "kind": "receipt",
+          "at": "2026-11-24T00:15:06.142Z",
+          "outcome": "acknowledged"
+        }
+      ]
+    },
+    {
+      "caseId": "X04",
+      "outcome": "passed",
+      "startedAt": "2026-11-24T00:15:00.000Z",
+      "finishedAt": "2026-11-24T00:18:00.622Z",
+      "messageId": "message_JQpKiIRfn38-gsI_1mKW8Q",
+      "observations": [
+        {
+          "kind": "logical-message",
+          "at": "2026-11-24T00:18:00.622Z",
+          "outcome": "same-message-id"
+        },
+        {
+          "kind": "offer",
+          "at": "2026-11-24T00:15:00.043Z",
+          "outcome": "once"
+        },
+        {
+          "kind": "presented",
+          "at": "2026-11-24T00:15:00.770Z",
+          "outcome": "once"
+        }
+      ]
+    },
+    {
+      "caseId": "X05",
+      "outcome": "passed",
+      "startedAt": "2026-11-24T00:16:20.000Z",
+      "finishedAt": "2026-11-24T00:18:00.680Z",
+      "messageId": "message__o8wdTK4pnrR5-SZs6segQ",
+      "observations": [
+        {
+          "kind": "delivery",
+          "at": "2026-11-24T00:18:00.680Z",
+          "outcome": "queued"
+        },
+        {
+          "kind": "client",
+          "outcome": "exited",
+          "at": "2026-11-24T00:16:03.335Z"
+        }
+      ]
+    }
+  ]
+}

@@ -118,8 +118,9 @@ sessions, conversations in the Antigravity desktop app, and local Code sessions 
 `--delivery off` turns it off. It needs an active verified connection and can spend model
 tokens. Claude Code sessions wake through the inbox that Claude Code itself opens, so you start
 Claude Code with your ordinary command. A busy Claude Code session gets the message between two
-tool calls. A busy Codex session gets it when the current turn ends. Chats in the Codex app run
-on the app’s own server and get messages at their next turn.
+tool calls. A busy Codex session gets it inside the running turn, at the model's next
+request. Chats in the Codex app run on the app’s own server and get messages at their next
+turn.
 
 See [client capabilities](docs/CAPABILITIES.md) for exact support. Run `acc doctor` from your
 project if a peer is missing or delivery differs from what you expect; see

@@ -198,6 +198,17 @@ export const PASS_EXPECTATIONS = Object.freeze({
       "fixtures/delivery/codex-cli-0.152.1-local-daemon-current-binding-product.json"),
     ...codexNativeDelivery("0.153.4", "2026-09-08T10:45:35.663Z",
       "fixtures/delivery/codex-cli-0.153.4-local-daemon-current-binding-product.json"),
+    // #132: a busy thread's message joins its running turn through turn/steer.
+    ...nativeDelivery("codex-cli", "0.171.0", "2026-11-24T00:18:00.680Z",
+      "fixtures/delivery/codex-cli-0.171.0-turn-steer.json", "codex-app-server-thread-queue-v1",
+      "offered", "presented_in_running_turn", [
+      "Observed on darwin-arm64 with Codex CLI 0.171.0 in the TUI on its app-server daemon, model gpt-6.2-sol at low reasoning effort, through a private candidate built from this branch and installed into an isolated HOME, CODEX_HOME and ACC data home; the hooks were trusted by writing the hashes Codex's hooks/list reported, as /hooks records them.",
+      "ACC reads the newest turn with thread/turns/list and its items not loaded, and steers with turn/steer naming that turn. A message sent seven seconds into a running turn joined that turn as user input; the model answered it with acc reply six seconds later, and the turn ran another 56 seconds through three shell commands.",
+      "An idle thread started a turn for its message with no user input. A thread with no running turn, a daemon that cannot list turns, and a turn that ends before the steer take the queue, which holds a busy thread's message until its turn ends; the last two are covered by tests, not by this capture.",
+      "The observed reply loop uses the installed acc reply CLI; native delivery.replyRoute remains false. The busy prompt asked the model to answer peer questions with acc reply; a model may also leave a steered message for after its current step.",
+      "A repeated logical send kept its message id and was not offered again, because its receipt was no longer queued: a steered message is never withdrawn or repeated.",
+      "Stopping the daemon closed the session; the next message stayed queued as recipient_offline. Linux and native Windows remain uncaptured for this path.",
+    ], ["delivery.livePush"]).map(entry => ({ ...entry, launchMode: "ordinary-command-with-installed-hooks" })),
   ],
   // Re-captured on the version this machine actually runs. 0.57.0 added folder
   // trust, which silently downgrades the approval mode and with it the toolset,

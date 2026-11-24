@@ -30,6 +30,8 @@
     "fixtures/delivery/codex-cli-0.152.1-local-daemon-current-binding-product.json",
     "fixtures/delivery/codex-cli-0.152.1-local-daemon-current-binding-product-evidence.json",
     "fixtures/delivery/codex-cli-0.153.4-local-daemon-current-binding-product.json",
-    "fixtures/delivery/codex-cli-0.153.4-local-daemon-current-binding-product-evidence.json"
+    "fixtures/delivery/codex-cli-0.153.4-local-daemon-current-binding-product-evidence.json",
+    "fixtures/delivery/codex-cli-0.171.0-turn-steer.json",
+    "fixtures/delivery/codex-cli-0.171.0-turn-steer-product-evidence.json"
   ]
 }

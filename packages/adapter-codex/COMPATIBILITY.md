@@ -1579,3 +1579,59 @@ you cannot ask for escalated permissions if the approval policy is Granular(...)
 **Not observed.** Whether ACC's `agents-can-communicate.rules` file applies in Work Mode; the
 policy's `rules: false` was not tested against it. The app's other approval modes, and whether
 one of them allows escalation. The project folder the chat used was shown by name only.
+
+## A busy thread takes a message into its running turn — Codex 0.171.0, 2026-11-23
+
+Until this change, a message for a thread with a running turn waited in the daemon's queue
+until the turn ended (`queued_after_turn`, captured on 0.152.1 and 0.153.4). The app-server
+protocol also has `turn/steer`, which adds user input to the running turn. It requires the
+running turn's id as `expectedTurnId`.
+
+**How a second client learns the turn id.** Measured on 0.171.0 with a TUI on the daemon and
+two more daemon clients:
+
+- A client that only initializes receives no turn notifications for the TUI's thread. It
+  receives `thread/status/changed`, but no turn id.
+- A client that calls `thread/resume` with `excludeTurns: true` on the TUI's thread receives
+  `turn/started` and `turn/completed` for later turns that the TUI starts. It cannot resume
+  a thread that has no turn yet: the daemon answers "no rollout found".
+- `thread/turns/list` with `limit: 1` and `itemsView: "notLoaded"` returns the newest turn's
+  `id` and `status` (`inProgress` while it runs) with an empty `items` list. This needs no
+  subscription and reads no history. ACC uses this method and keeps one short connection
+  per delivery.
+
+**Steer.** `turn/steer` takes `{ threadId, expectedTurnId, input, clientUserMessageId }` and
+answers `{ turnId }`. The input is recorded as a user message inside the running turn. The
+model reads it at its next request in that turn, and the TUI shows it. The daemon refuses
+some steers with `-32600`:
+
+- a wrong turn id: "expected active turn id ... but found ...";
+- a thread with no running turn: "no active turn to steer".
+
+`thread/turns/list` itself answers `-32600` for an ephemeral thread and for a thread with no
+turn yet.
+
+**What ACC does.** An offer checks the queue for the same message first. It then reads the
+newest turn, and steers when that turn is `inProgress`. Any JSON-RPC error from the turn read
+or the steer sends the message to the queue: an older daemon, an unstarted thread, or a turn
+that ended in between. A broken connection still fails the offer. The protocol contract and
+its 0.152.1 minimum are unchanged, so existing bindings keep working.
+
+**Captured through the installed package** (darwin-arm64, TUI, `gpt-6.2-sol` at low effort,
+isolated HOME and data home). Evidence:
+`fixtures/delivery/codex-cli-0.171.0-turn-steer-product-evidence.json`.
+
+- **idle.** The message started a turn, and the model answered with `acc reply`.
+- **busy.** The user had asked for three 20-second shell commands. A question sent 7 s into
+  that turn joined the turn as user input, and the model answered it 6 s later. The turn then
+  ran its three commands and ended 56 s after the answer.
+- **reply.** The answer is an `acc reply` record, so native `replyRoute` stays false.
+- **duplicate.** A repeated logical send kept its message id. It was not offered again,
+  because its receipt was no longer queued.
+- **fallback.** `codex app-server daemon stop` closed the session. The next message was
+  queued as `recipient_offline`.
+
+**Not captured.** A turn that ends between the turn read and the steer. Tests cover it: the
+steer is refused and the message is queued. Linux and native Windows were not captured. The
+capture's busy prompt asked the model to answer peer questions. Without that request, a model
+can finish its current step first, or can leave the message unanswered.

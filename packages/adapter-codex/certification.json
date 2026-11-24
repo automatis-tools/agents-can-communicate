@@ -170,6 +170,28 @@
         "P16 is controlled endpoint fault injection. P18 uses an actual legacy npm artifact; its unrelated Claude shell artifact is not a real Claude capability capture."
       ],
       "result": "pass"
+    },
+    {
+      "client": "codex-cli",
+      "version": "0.171.0",
+      "platform": "darwin-arm64",
+      "observedAt": "2026-11-24T00:18:00.680Z",
+      "capability": "delivery.livePush",
+      "fixture": "fixtures/delivery/codex-cli-0.171.0-turn-steer.json",
+      "provenance": "fixtures/certification-provenance.json",
+      "provenanceId": "native-delivery-0-171-0-turn-steer",
+      "idleBehavior": "offered",
+      "busyBehavior": "presented_in_running_turn",
+      "authorityLevel": "experimental",
+      "limitations": [
+        "Observed on darwin-arm64 with Codex CLI 0.171.0 in the TUI on its app-server daemon, model gpt-6.2-sol at low reasoning effort, through a private candidate built from this branch and installed into an isolated HOME, CODEX_HOME and ACC data home; the hooks were trusted by writing the hashes Codex's hooks/list reported, as /hooks records them.",
+        "ACC reads the newest turn with thread/turns/list and its items not loaded, and steers with turn/steer naming that turn. A message sent seven seconds into a running turn joined that turn as user input; the model answered it with acc reply six seconds later, and the turn ran another 56 seconds through three shell commands.",
+        "An idle thread started a turn for its message with no user input. A thread with no running turn, a daemon that cannot list turns, and a turn that ends before the steer take the queue, which holds a busy thread's message until its turn ends; the last two are covered by tests, not by this capture.",
+        "The observed reply loop uses the installed acc reply CLI; native delivery.replyRoute remains false. The busy prompt asked the model to answer peer questions with acc reply; a model may also leave a steered message for after its current step.",
+        "A repeated logical send kept its message id and was not offered again, because its receipt was no longer queued: a steered message is never withdrawn or repeated.",
+        "Stopping the daemon closed the session; the next message stayed queued as recipient_offline. Linux and native Windows remain uncaptured for this path."
+      ],
+      "result": "pass"
     }
   ]
 }
