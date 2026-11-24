@@ -1,5 +1,23 @@
 # Changelog
 
+## Unreleased — ACC checks Codex service access on Windows by its access lists
+
+- **Codex live delivery can become ready on Windows.** Before ACC trusts the Codex service, it
+  checks that no other account can change the Codex home, the daemon directories or the
+  executables. On Windows that check read mode bits, which Node reports as writable by everyone,
+  so `acc install` refused every Codex home with `unsafe_service_directory`. Windows now reads
+  the access control lists, and a refusal on any platform names the path and what made it unsafe
+  (#445).
+
+| Development artifact | Value |
+|---|---|
+| Built from | `d8b050c61380e6fdff0acfb542b995222982e16b` |
+| Tarball | `agents-can-communicate-0.15.4.tgz`, 674,442 bytes, 398 files |
+| sha256 | `f0e3412a9f72d7d49ed94634b300f11043fde3fa807a8a3be40e1dd18934cb4d` |
+
+The exact archive passed package verification. See
+[development evidence](docs/release-evidence/windows-acl-codex-service-2026-11-24.md).
+
 ## Unreleased — an update keeps Codex hook trust with a linked data home
 
 - **An update no longer makes Codex ask to trust ACC's hooks again when the data home path goes
