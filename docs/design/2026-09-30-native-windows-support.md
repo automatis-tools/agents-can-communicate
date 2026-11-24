@@ -335,6 +335,13 @@ different installation.
   administrator privileges". GitHub's Windows runner is elevated, so the 0.9.x Codex live check
   runs the daemon and the TUI under a non-elevated token (`runas /trustlevel:0x20000` or a
   standard local user created in the job).
+  Since #251 the real-clients job runs `tests/acceptance/codex-live-daemon-stub.test.mjs` as a
+  standard local user through `scripts/ci-standard-user.mjs`: ACC installs, Codex starts its
+  daemon, a daemon thread attaches through its hooks, and a peer message reaches the model in a
+  turn the daemon starts. The user's work directory drops the `Users` write right the runner's
+  `D:\` grants, and Codex is installed into an npm prefix inside it, because the runner's own
+  prefix lets every authenticated user write to it. A person's profile and `%APPDATA%\npm` are
+  private; ACC refuses either path when it is not (#445).
 
 ## Open measurements
 
