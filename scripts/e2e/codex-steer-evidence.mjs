@@ -13,15 +13,15 @@
 export const CODEX_STEER_SUITE = "codex-turn-steer";
 
 export const CODEX_STEER_PRODUCT_CASES = Object.freeze({
-  X01: Object.freeze({ branch: "idle", requires: Object.freeze({ delivery: "offered",
+  X01: Object.freeze({ requires: Object.freeze({ delivery: "offered",
     presented: "started-turn" }) }),
-  X02: Object.freeze({ branch: "busy", requires: Object.freeze({ delivery: "offered",
+  X02: Object.freeze({ requires: Object.freeze({ delivery: "offered",
     presented: "in-running-turn" }) }),
-  X03: Object.freeze({ branch: "reply", requires: Object.freeze({ answer: "recorded",
+  X03: Object.freeze({ requires: Object.freeze({ answer: "recorded",
     receipt: "acknowledged" }) }),
-  X04: Object.freeze({ branch: "duplicate", requires: Object.freeze({
+  X04: Object.freeze({ requires: Object.freeze({
     "logical-message": "same-message-id", offer: "once", presented: "once" }) }),
-  X05: Object.freeze({ branch: "fallback", requires: Object.freeze({ client: "exited",
+  X05: Object.freeze({ requires: Object.freeze({ client: "exited",
     delivery: "queued" }) }),
 });
 
@@ -46,6 +46,10 @@ function closed(value, fields, label) {
   for (const key of Object.keys(value)) expect(fields.includes(key), `${label} has unknown field ${key}`);
   for (const key of fields) expect(Object.hasOwn(value, key), `${label} requires ${key}`);
 }
+
+// The one fact neither ACC nor Codex records: that the client's service stopped.
+// Every other kind is derived, and the operator cannot add to it.
+const OPERATOR_KINDS = Object.freeze(["client"]);
 
 const timestamp = value => typeof value === "string" && UTC.test(value) && Number.isFinite(Date.parse(value));
 
@@ -84,6 +88,8 @@ export function assertCodexSteerRunEvidence(value) {
       && Date.parse(scenario.finishedAt) <= Date.parse(value.finishedAt),
     "scenario timestamps are within run bounds");
     expect(Array.isArray(scenario.observations), "scenario observations is an array");
+    const kinds = scenario.observations.map(item => item?.kind);
+    expect(new Set(kinds).size === kinds.length, `${scenario.caseId} repeats an observation kind`);
     for (const item of scenario.observations) {
       closed(item, OBSERVATION_FIELDS, "observation");
       expect(IDENTIFIER.test(item.kind) && IDENTIFIER.test(item.outcome) && timestamp(item.at),
@@ -176,6 +182,9 @@ export function observationsFrom({ caseId, delivery, events = [], rollout = [], 
   for (const item of observed) {
     const match = /^([a-z][a-z0-9-]*)=([a-z][a-z0-9-]*)@(.+)$/.exec(item);
     if (match === null) throw new Error(`observation ${item} is not kind=outcome@<iso>`);
+    if (!OPERATOR_KINDS.includes(match[1])) {
+      throw new Error(`observation ${match[1]} is derived from ACC or Codex records, not typed in`);
+    }
     observations.push({ kind: match[1], outcome: match[2], at: match[3] });
   }
   return observations;

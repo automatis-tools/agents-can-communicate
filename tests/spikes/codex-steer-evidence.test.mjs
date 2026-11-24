@@ -91,3 +91,15 @@ test("the capture accepts the steer run as Codex product evidence and its busy v
   assert.equal(validateCapture(capture, { productEvidence: evidence }).busy, "presented_in_running_turn");
   assert.throws(() => validateCapture(capture, { productEvidence: { ...evidence, suite: undefined } }));
 });
+
+test("an operator can add only what no record holds, and a case cannot carry a kind twice", () => {
+  assert.throws(() => observationsFrom({ caseId: "X02", delivery: offered, rollout: [], messageId: ID,
+    sentAt: at(6), observed: [`presented=in-running-turn@${at(7)}`], at: at(8) }), /derived from ACC or Codex/);
+  const exited = observationsFrom({ caseId: "X05", delivery: { delivery: [{ outcome: "queued",
+    transport: "durable" }] }, messageId: ID, observed: [`client=exited@${at(5)}`], at: at(8) });
+  assert.equal(scenarioPasses("X05", exited), true);
+  const repeated = steerRun();
+  const busy = repeated.scenarios[1];
+  busy.observations = [...busy.observations, { kind: "presented", at: at(2), outcome: "absent" }];
+  assert.throws(() => assertCodexSteerRunEvidence(repeated), /X02 repeats an observation kind/);
+});
