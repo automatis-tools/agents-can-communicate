@@ -17,7 +17,7 @@ import { promisify } from "node:util";
 
 import { gitProvenance } from "./git-provenance.mjs";
 import { verifyCertificationFixtureAllowlist } from "./package-certification.mjs";
-import { treeSnapshot } from "./tree-snapshot.mjs";
+import { snapshotDifferences, treeSnapshot } from "./tree-snapshot.mjs";
 import { runtimeWorkersQuiet } from "../tests/helpers/runtime-workers.mjs";
 
 const run = promisify(execFile);
@@ -288,8 +288,9 @@ async function main() {
       || (removed.operations[0].removed.length + removed.operations[0].changes.length) === 0) {
       fail("first uninstall did not report its removals", JSON.stringify(removed));
     }
-    if (JSON.stringify(await treeSnapshot(clientHome)) !== JSON.stringify(before)) {
-      fail("uninstall did not restore client-home topology and bytes");
+    const restored = snapshotDifferences(before, await treeSnapshot(clientHome));
+    if (restored.length > 0) {
+      fail("uninstall did not restore client-home topology and bytes", restored.join("\n"));
     }
 
     const repeated = JSON.parse((await acc("uninstall", "--adapter", "kimi",
@@ -301,8 +302,9 @@ async function main() {
       || (repeatedOperation.changes?.length ?? 0) > 0) {
       fail("second uninstall was not an idempotent no-op", JSON.stringify(repeated));
     }
-    if (JSON.stringify(await treeSnapshot(clientHome)) !== JSON.stringify(before)) {
-      fail("second uninstall changed client-home topology or bytes");
+    const repeatedChanges = snapshotDifferences(before, await treeSnapshot(clientHome));
+    if (repeatedChanges.length > 0) {
+      fail("second uninstall changed client-home topology or bytes", repeatedChanges.join("\n"));
     }
     ok("client-home topology, modes, links, and bytes restored; repeated uninstall was a no-op");
 
