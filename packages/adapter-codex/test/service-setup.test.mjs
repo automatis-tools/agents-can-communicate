@@ -428,6 +428,8 @@ test("an owner that is not the user gets no chmod advice", async t => {
   const plan = await setup.inspectNativeServiceSetup({ ...f.context, platform: "win32-x64" });
   assert.equal(plan.reasonCode, "unsafe_service_directory");
   assert.doesNotMatch(plan.diagnostic, /chmod/);
+});
+
 test("a service path of the wrong kind is refused with its path and kind", async t => {
   const f = await serviceFixture(t, { binLayout: true });
   const control = path.dirname(f.socketPath);
