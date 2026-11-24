@@ -1,5 +1,19 @@
 # Upgrading
 
+## From 0.15.4 to 0.15.5
+
+Update as usual with `acc update`, or let the automatic update run. Version 0.15.5 keeps store
+contract 8 and adds no data migration. Codex keeps trusting ACC's hooks: their plugin's files are
+unchanged, so this update asks nothing. This now also holds when the data home path goes through
+a symbolic link (#440).
+
+On Windows and Linux, Codex live delivery can now become ready with the daemon that Codex
+installs itself. On Windows, ACC reads the access control lists of the Codex home and the daemon
+files, and it accepts the daemon path that Codex reports with both separators. On Linux, Codex
+0.165.0 and 0.172.0 install the daemon executable with mode `0777`. ACC refuses that file, as
+before, and the refusal now gives the command that fixes it: `chmod go-w "<file>"`. Run it, then
+run `acc install` again.
+
 ## From 0.15.3 to 0.15.4
 
 Update as usual with `acc update`, or let the automatic update run. Version 0.15.4 keeps store
