@@ -1,5 +1,42 @@
 # Changelog
 
+## 0.15.4 — release candidate
+
+This release carries the work merged to main after 0.15.3: #418, #211, #200, #149, #146, #150,
+#143, #135 and #132, with #325 in the tests. It keeps store contract 8 and adds no data
+migration, and Codex keeps trusting ACC's hooks across it. See
+[Upgrading](docs/UPGRADING.md#from-0153-to-0154).
+
+- **A message for a busy Codex session joins its running turn.** The model reads it at its next
+  request in that turn, where it waited for the turn to end before. Without a running turn the
+  message is queued as before (#132).
+- **Kimi Code and Gemini CLI load the `acc` skill only when a model needs it.** With no peer, a
+  session starts about 4,700 tokens lighter on Kimi Code and 4,900 on Gemini CLI. The token cost
+  of every text ACC injects is published in `docs/CONFIGURATION.md` (#135).
+- **A peer body cannot imitate a second message.** Codex and Antigravity live pushes put the body
+  in an `acc-peer-body` block (#143). Unicode line breaks in a peer subject stay escaped on every
+  one-line header (#200).
+- **A claim refusal names the holder, its lease and the next action** (#146).
+- **`acc-mcp` lists its tools outside a workspace**, and a tool call there says `no workspace:`
+  (#149).
+- **The sender no longer sees `recipient_unavailable` for a peer that a live push reached**
+  (#211).
+- **`acc update` and `acc doctor` name the session behind an update blocker without a client
+  process** (#418).
+- **The cost of one ACC start is measured and published** in `docs/ARCHITECTURE.md` (#150).
+
+| Candidate artifact | Value |
+|---|---|
+| Built from | `f05c6b51b90fafe527f0704d8dc5ada1965187be` |
+| Tarball | `agents-can-communicate-0.15.4.tgz`, 671,223 bytes, 397 files |
+| sha256 | `673e05f6d09fcce55fefee3fd7b878dcf9351a1e3fc192052604fac83b6d9531` |
+
+The exact archive passed package verification, 25 managed-update checks and an upgrade from
+published 0.15.3 with real Claude Code, Codex, Kimi Code and Gemini CLI executables. In that
+upgrade Codex's hooks plugin kept its files and content hash, Kimi Code's plugin stopped
+preloading the skill, and Gemini CLI's extension moved to the short `ACC.md`. See
+[release evidence](docs/release-evidence/v0.15.4.md). This candidate is not published.
+
 ## Unreleased — a busy Codex session reads a peer message inside its running turn
 
 - **A message for a Codex session that is running a turn joins that turn.** Previously the
@@ -20,6 +57,7 @@
 The exact archive passed package verification. Its Codex code is the captured archive's; it
 also carries the main branch's token-cost change (#135), documentation, certification and fixtures. See
 [development evidence](docs/release-evidence/codex-turn-steer-2026-11-23.md).
+
 ## Unreleased — what ACC's injected context costs in tokens
 
 - **The token cost of every text ACC injects is measured and published.**
