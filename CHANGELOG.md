@@ -13,12 +13,12 @@
 
 | Development artifact | Value |
 |---|---|
-| Built from | `6c3410114e0e13c202a5cc3fccedc6564db4d2b7` |
-| Tarball | `agents-can-communicate-0.15.3.tgz`, 669,907 bytes, 396 files |
-| sha256 | `9bc1bffe9fc93c8132d4b82a9567293cbab140dc1cf4b3628d070f5b3b3340ff` |
+| Built from | `ff34f9481bb2a56da4a88c7001ad3d2335b6a58f` |
+| Tarball | `agents-can-communicate-0.15.3.tgz`, 671,024 bytes, 397 files |
+| sha256 | `e2f8e065c07b596336f5789b5623f399b881630bc935727e5e9deffac8428703` |
 
-The exact archive passed package verification. It differs from the captured archive only in
-documentation, certification and fixtures. See
+The exact archive passed package verification. Its Codex code is the captured archive's; it
+also carries the main branch's token-cost change (#135), documentation, certification and fixtures. See
 [development evidence](docs/release-evidence/codex-turn-steer-2026-11-23.md).
 ## Unreleased — what ACC's injected context costs in tokens
 

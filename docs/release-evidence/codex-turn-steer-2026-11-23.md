@@ -61,16 +61,18 @@ Its product evidence is in `codex-cli-0.171.0-turn-steer-product-evidence.json`.
 
 - Captured archive: built from `b1a7cf0f`, SHA-256
   `a4dd48e5c792065051ade860b0740a2a808c505d8cd17f85687ceaf7cc07efae`.
-- Recorded candidate: clean commit `6c3410114e0e13c202a5cc3fccedc6564db4d2b7`.
-- `agents-can-communicate-0.15.3.tgz`, 669,907 bytes, 396 files.
-- SHA-256: `9bc1bffe9fc93c8132d4b82a9567293cbab140dc1cf4b3628d070f5b3b3340ff`.
+- Recorded candidate: clean commit `ff34f9481bb2a56da4a88c7001ad3d2335b6a58f`, the branch with
+  main merged after the token-cost change (#135).
+- `agents-can-communicate-0.15.3.tgz`, 671,024 bytes, 397 files.
+- SHA-256: `e2f8e065c07b596336f5789b5623f399b881630bc935727e5e9deffac8428703`.
 - Built with Node 24.4.0 and npm 11.4.2 on macOS arm64.
 
-The candidate differs from the captured archive only in these files:
+In the Codex adapter's code the candidate is the captured archive. It differs in these files:
 
 - `README.md`, `docs/CAPABILITIES.md` and `docs/HOW_IT_WORKS.md`;
 - the Codex adapter's certification, provenance and `package.json` file list;
-- the two new fixtures.
+- the two new fixtures;
+- the Kimi Code and Gemini CLI skill manifests, `ACC.md` and the docs from #135, merged from main.
 
 It passed `scripts/verify-package.mjs`.
 
