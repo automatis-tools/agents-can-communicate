@@ -32,7 +32,7 @@ On 2026-11-24 a throwaway workflow ran Codex as a standard local user created in
 
 ## Development candidate
 
-- Source: clean commit `b34f0f8f07e9fdd95d87112945543591aca75d99`.
+- Source: clean commit `07a3cd6d6d9a255575fc8216656ef4ca8ead5242`.
 - `agents-can-communicate-0.15.4.tgz`, 674,823 bytes, 398 files.
 - SHA-256: `b4c77491e0389270878a26761d622c3554a7584d2fb169acf807898c76c9ad11`.
 - The exact archive passed `scripts/verify-package.mjs`.
