@@ -24,4 +24,4 @@ jobs:
       - name: Windows as a standard user
         if: runner.os == 'Windows'
         env: { ACC_REAL_CLIENTS: '1' }
-        run: node scripts/ci-standard-user.mjs node.exe --test --test-reporter=tap tests/acceptance/codex-live-daemon-stub.test.mjs
+        run: node scripts/ci-standard-user.mjs --npm-global @openai/codex@0.165.0 node.exe --test --test-reporter=tap tests/acceptance/codex-live-daemon-stub.test.mjs

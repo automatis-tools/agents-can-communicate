@@ -9,7 +9,12 @@
 // environment, with its temporary, profile and npm cache directories moved into
 // a work directory the user owns.
 //
-//   node scripts/ci-standard-user.mjs <command> [args...]
+//   node scripts/ci-standard-user.mjs [--npm-global <package>] <command> [args...]
+//
+// --npm-global installs a package into an npm prefix inside the work
+// directory and puts it first on the user's PATH. The runner's own global
+// prefix lets every authenticated user write to it, and ACC rightly refuses a
+// Codex CLI there; a person's prefix, %APPDATA%\npm, is private.
 //
 // Windows only; CI only. The runner is discarded after the job.
 import { execFile, spawn } from "node:child_process";
@@ -19,6 +24,8 @@ import path from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { pathToFileURL } from "node:url";
 import { promisify } from "node:util";
+
+import { npmCli } from "../packages/cli/src/managed-runtime/download.mjs";
 
 const run = promisify(execFile);
 const RESULT_TIMEOUT_MS = 25 * 60_000;
@@ -47,7 +54,8 @@ async function grantBatchLogon(sid, work) {
 
 const grant = (target, user, rights) => run("icacls.exe", [target, "/grant", `${user}:(OI)(CI)${rights}`, "/Q"]);
 
-export async function runAsStandardUser(command, args, { cwd = process.cwd(), env = process.env } = {}) {
+export async function runAsStandardUser(command, args, { cwd = process.cwd(), env = process.env,
+  npmGlobal = [] } = {}) {
   if (process.platform !== "win32") throw new Error("standard-user runs are for Windows CI only");
   if (!env.RUNNER_TEMP) throw new Error("RUNNER_TEMP is required");
   const user = `acc-ci-${randomBytes(3).toString("hex")}`;
@@ -75,9 +83,18 @@ export async function runAsStandardUser(command, args, { cwd = process.cwd(), en
     await grant(work, user, "F");
     await grant(cwd, user, "RX");
 
+    // Installed by this elevated process into the private work directory: the
+    // files inherit its list, and their owner is Administrators.
+    const prefix = path.join(work, "npm-global");
+    const pathKey = Object.keys(env).find(key => key.toUpperCase() === "PATH") ?? "Path";
+    if (npmGlobal.length > 0) {
+      await run(process.execPath, [await npmCli(env), "install", "--global", "--prefix", prefix, ...npmGlobal],
+        { env: { ...env, npm_config_cache: path.join(work, "npm-cache") }, maxBuffer: 16 << 20 });
+    }
     const job = {
       command, args, cwd,
-      env: { ...env, TEMP: path.join(work, "temp"), TMP: path.join(work, "temp"),
+      env: { ...env, ...(npmGlobal.length > 0 ? { [pathKey]: `${prefix}${path.delimiter}${env[pathKey] ?? ""}` } : {}),
+        TEMP: path.join(work, "temp"), TMP: path.join(work, "temp"),
         USERPROFILE: path.join(work, "profile"), HOME: path.join(work, "profile"),
         LOCALAPPDATA: path.join(work, "local"), APPDATA: path.join(work, "roaming"),
         npm_config_cache: path.join(work, "npm-cache") },
@@ -160,9 +177,13 @@ if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.ar
   try {
     if (process.argv[2] === "--child") await child(process.argv[3]);
     else {
-      const [command, ...args] = process.argv.slice(2);
-      if (!command) throw new Error("usage: ci-standard-user.mjs <command> [args...]");
-      process.exitCode = await runAsStandardUser(command, args);
+      const rest = process.argv.slice(2), npmGlobal = [];
+      while (rest[0] === "--npm-global" && rest[1]) npmGlobal.push(rest.splice(0, 2)[1]);
+      const [command, ...args] = rest;
+      if (!command || command.startsWith("--")) {
+        throw new Error("usage: ci-standard-user.mjs [--npm-global <package>] <command> [args...]");
+      }
+      process.exitCode = await runAsStandardUser(command, args, { npmGlobal });
     }
   } catch (error) { console.error(error.stack ?? error.message); process.exitCode = 1; }
 }
