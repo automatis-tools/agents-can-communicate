@@ -1,6 +1,6 @@
 import { lstat, realpath } from "node:fs/promises";
 import path from "node:path";
-import { isWindowsPlatform, otherWindowsWriters, readWindowsAcls, windowsPrincipal }
+import { isWindowsPlatform, otherWindowsWriters, readWindowsAcls, shellQuote, windowsPrincipal }
   from "@agents-can-communicate/adapter-sdk";
 import { compareVersions } from "./app-server-client.mjs";
 import { readySocketPath, socketIsReady } from "./native-endpoint.mjs";
@@ -17,11 +17,12 @@ const prerequisiteKeys = ["home", "codexHome", "cliPath", "cliVersion", "cliIden
 const same = (a, b, fields = keys) => fields.every(key => a?.[key] === b?.[key]);
 const own = info => typeof process.getuid !== "function" || info.uid === process.getuid();
 // A service file another account can change, named so a person can fix it.
-const unsafe = (reasonCode, unsafePath, unsafeWriters) => {
-  throw Object.assign(new Error(reasonCode), { reasonCode, unsafePath, unsafeWriters });
+// ACC never changes a vendor's file: the person runs the repair it names.
+const unsafe = (reasonCode, unsafePath, unsafeWriters, unsafeRepair = null) => {
+  throw Object.assign(new Error(reasonCode), { reasonCode, unsafePath, unsafeWriters, unsafeRepair });
 };
 const unsafeFacts = error => (typeof error?.unsafePath === "string"
-  ? { unsafePath: error.unsafePath, unsafeWriters: error.unsafeWriters } : {});
+  ? { unsafePath: error.unsafePath, unsafeWriters: error.unsafeWriters, unsafeRepair: error.unsafeRepair ?? null } : {});
 // The first CLI measured installing the daemon's own package in a home that
 // has none (2026-09-26; again on 0.159.0, 2026-09-29).
 const SELF_INSTALL_MINIMUM = "0.157.1";
@@ -47,7 +48,8 @@ function report(state, reasonCode, facts = {}) {
     : facts.startsOnLaunch === true ? startsOnLaunch
     : typeof facts.unsafePath === "string"
       ? `Another account can change the Codex service file ${facts.unsafePath} (${facts.unsafeWriters.join(", ")}); `
-        + "remove that write access, then retry acc install"
+        + (typeof facts.unsafeRepair === "string" ? `run ${facts.unsafeRepair}` : "remove that write access")
+        + ", then retry acc install"
     : diagnostics[reasonCode] ?? `Codex service preparation could not verify ${reasonCode}; inspect the vendor service and retry acc install` };
 }
 
@@ -88,7 +90,11 @@ export function createCodexServiceSetup({ run = runMaintenanceCommand, probe = p
     if (!isWindowsPlatform(paths.platform)) {
       for (const { file, stat, reasonCode } of entries) {
         if (!own(stat)) unsafe(reasonCode, file, [`owner uid ${stat.uid}`]);
-        if (stat.mode & 0o022) unsafe(reasonCode, file, [`mode ${(stat.mode & 0o777).toString(8)}`]);
+        // Codex 0.165.0 and 0.172.0 install the Linux daemon executable with
+        // mode 0777 (#446): anyone on the machine could replace it.
+        if (stat.mode & 0o022) {
+          unsafe(reasonCode, file, [`mode ${(stat.mode & 0o777).toString(8)}`], `chmod go-w ${shellQuote(file)}`);
+        }
       }
       return;
     }
