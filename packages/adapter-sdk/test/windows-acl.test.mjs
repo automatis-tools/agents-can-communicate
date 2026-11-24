@@ -121,9 +121,17 @@ test("Windows reads a real access list and sees a write grant to Users", {
     JSON.stringify(opened.acls.get(dir)));
   assert.match(windowsPrincipal(opened.acls.get(dir), USERS), /Users \(S-1-5-32-545\)$/);
   // No access list at all: everyone has full access, and no rule says so.
-  await promisify(execFile)("pwsh.exe", ["-NoProfile", "-NonInteractive", "-Command",
-    "$a = Get-Acl -LiteralPath $env:ACC_DIR; $a.SetSecurityDescriptorSddlForm('D:NO_ACCESS_CONTROL'); "
-      + "Set-Acl -LiteralPath $env:ACC_DIR -AclObject $a"], { env: { ...process.env, ACC_DIR: dir } });
+  // Through the shells the reader uses, by absolute path and in its order.
+  const { powershellCandidates } = await import("../src/process-table.mjs");
+  const env = Object.fromEntries(Object.entries(process.env).filter(([key]) => key.toLowerCase() !== "psmodulepath"));
+  let applied = null;
+  for (const shell of powershellCandidates(process.env)) {
+    applied = await promisify(execFile)(shell, ["-NoProfile", "-NonInteractive", "-Command",
+      "$a = Get-Acl -LiteralPath $env:ACC_DIR; $a.SetSecurityDescriptorSddlForm('D:NO_ACCESS_CONTROL'); "
+        + "Set-Acl -LiteralPath $env:ACC_DIR -AclObject $a"], { env: { ...env, ACC_DIR: dir } }).then(() => shell, () => null);
+    if (applied !== null) break;
+  }
+  assert.notEqual(applied, null, "no PowerShell could remove the access list");
   const open = await readWindowsAcls([dir]);
   assert.deepEqual(otherWindowsWriters(open.acls.get(dir), open.user), ["S-1-1-0"], JSON.stringify(open.acls.get(dir)));
 });
