@@ -329,3 +329,88 @@ test("a stopped service that Codex starts at launch says so too", async t => {
   assert.equal(plan.startsOnLaunch, true);
   assert.match(plan.diagnostic, /next Codex session/);
 });
+
+// Node reports every Windows file as 0o666 and every directory as 0o777, so a
+// mode test refuses every Codex home there (#445). Windows reads the ACLs: the
+// three service directories and the two executables, in one read.
+const USER_SID = "S-1-5-21-1-2-3-1001";
+const privateAcl = { owner: USER_SID, ownerName: "HOST\\me", rules: [
+  { sid: USER_SID, name: "HOST\\me", rights: 0x1f01ff, type: "Allow", inheritOnly: false },
+  { sid: "S-1-5-18", name: "NT AUTHORITY\\SYSTEM", rights: 0x1f01ff, type: "Allow", inheritOnly: false },
+  { sid: "S-1-5-32-545", name: "BUILTIN\\Users", rights: 0x1200a9, type: "Allow", inheritOnly: false }] };
+function windowsSetup(f, aclOf) {
+  const reads = [];
+  const readAcls = async (files, options) => {
+    reads.push({ files, env: options.env });
+    return { user: aclOf.user === undefined ? USER_SID : aclOf.user,
+      acls: new Map(files.map(file => [file, aclOf(file)])) };
+  };
+  return { reads, ...createCodexServiceSetup({ run: f.run, probe: f.probe, readAcls }) };
+}
+const windows = f => ({ ...f.context, platform: "win32-x64" });
+
+test("on Windows the service is prepared by its access lists, whatever the mode bits say", async t => {
+  const f = await serviceFixture(t, { binLayout: true });
+  await chmod(f.codexHome, 0o777);
+  const setup = windowsSetup(f, () => privateAcl);
+  const plan = await setup.inspectNativeServiceSetup(windows(f));
+  assert.equal(plan.state, "needed", plan.diagnostic);
+  assert.equal(plan.reasonCode, "native_endpoint_unavailable");
+  const read = setup.reads.at(-1).files;
+  assert.ok(read.includes(f.codexHome));
+  assert.ok(read.includes(await realpath(f.cliPath)));
+  assert.equal(read.length, 5, JSON.stringify(read));
+  assert.equal(setup.reads.at(-1).env.CODEX_HOME, f.codexHome);
+});
+
+test("on Windows a service directory another account can write is refused by name", async t => {
+  const f = await serviceFixture(t, { binLayout: true });
+  const open = { ...privateAcl, rules: [...privateAcl.rules,
+    { sid: "S-1-5-32-545", name: "BUILTIN\\Users", rights: 0x2, type: "Allow", inheritOnly: false }] };
+  const setup = windowsSetup(f, file => (file === f.codexHome ? open : privateAcl));
+  const plan = await setup.inspectNativeServiceSetup(windows(f));
+  assert.equal(plan.state, "blocked");
+  assert.equal(plan.reasonCode, "unsafe_service_directory");
+  assert.equal(plan.unsafePath, f.codexHome);
+  assert.deepEqual(plan.unsafeWriters, ["BUILTIN\\Users (S-1-5-32-545)"]);
+  assert.ok(plan.diagnostic.includes(f.codexHome), plan.diagnostic);
+  assert.match(plan.diagnostic, /BUILTIN\\Users/);
+  assert.equal(f.starts.length, 0);
+});
+
+test("on Windows an access list that cannot be read is refused, never trusted", async t => {
+  const f = await serviceFixture(t, { binLayout: true });
+  const unreadable = () => null;
+  const setup = windowsSetup(f, unreadable);
+  const plan = await setup.inspectNativeServiceSetup(windows(f));
+  assert.equal(plan.state, "blocked");
+  assert.equal(plan.reasonCode, "unsafe_service_directory");
+  assert.deepEqual(plan.unsafeWriters, ["unreadable"]);
+  const noUser = Object.assign(() => privateAcl, { user: null });
+  assert.equal((await windowsSetup(f, noUser).inspectNativeServiceSetup(windows(f))).reasonCode,
+    "unsafe_service_directory");
+});
+
+test("a POSIX service directory others can write is refused with its path and mode", async t => {
+  const f = await serviceFixture(t, { binLayout: true });
+  await chmod(f.codexHome, 0o777);
+  const plan = await f.inspectNativeServiceSetup(f.context);
+  assert.equal(plan.state, "blocked");
+  assert.equal(plan.reasonCode, "unsafe_service_directory");
+  assert.equal(plan.unsafePath, f.codexHome);
+  assert.deepEqual(plan.unsafeWriters, ["mode 777"]);
+  assert.ok(plan.diagnostic.includes(f.codexHome), plan.diagnostic);
+});
+
+test("a service path of the wrong kind is refused with its path and kind", async t => {
+  const f = await serviceFixture(t, { binLayout: true });
+  const control = path.dirname(f.socketPath);
+  await rm(control, { recursive: true, force: true });
+  await writeFile(control, "not a directory");
+  const plan = await f.inspectNativeServiceSetup(f.context);
+  assert.equal(plan.state, "blocked");
+  assert.equal(plan.reasonCode, "unsafe_service_directory");
+  assert.equal(plan.unsafePath, control);
+  assert.equal(plan.unsafeShape, "not a directory");
+  assert.equal(plan.diagnostic, `The Codex service path ${control} is not a directory; inspect it, then retry acc install`);
+});

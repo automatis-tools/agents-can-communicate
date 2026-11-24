@@ -1,5 +1,7 @@
 import { lstat, realpath } from "node:fs/promises";
 import path from "node:path";
+import { isWindowsPlatform, otherWindowsWriters, readWindowsAcls, windowsPrincipal }
+  from "@agents-can-communicate/adapter-sdk";
 import { compareVersions } from "./app-server-client.mjs";
 import { readySocketPath, socketIsReady } from "./native-endpoint.mjs";
 import { probeNativeDelivery } from "./native-delivery.mjs";
@@ -14,6 +16,19 @@ const keys = ["home", "codexHome", "cliPath", "cliVersion", "managedPath", "mana
 const prerequisiteKeys = ["home", "codexHome", "cliPath", "cliVersion", "cliIdentity", "socketPath", "pidPath", "platform"];
 const same = (a, b, fields = keys) => fields.every(key => a?.[key] === b?.[key]);
 const own = info => typeof process.getuid !== "function" || info.uid === process.getuid();
+// A service file another account can change, named so a person can fix it.
+const unsafe = (reasonCode, unsafePath, unsafeWriters) => {
+  throw Object.assign(new Error(reasonCode), { reasonCode, unsafePath, unsafeWriters });
+};
+// A service path of the wrong kind: a link, or a file where a directory belongs.
+const misshapen = (reasonCode, unsafePath, unsafeShape) => {
+  throw Object.assign(new Error(reasonCode), { reasonCode, unsafePath, unsafeWriters: [], unsafeShape });
+};
+const shapeOf = (stat, directory) => (stat.isSymbolicLink() ? "a symbolic link"
+  : directory ? "not a directory" : "not a regular file");
+const unsafeFacts = error => (typeof error?.unsafePath === "string"
+  ? { unsafePath: error.unsafePath, unsafeWriters: error.unsafeWriters,
+    ...(typeof error.unsafeShape === "string" ? { unsafeShape: error.unsafeShape } : {}) } : {});
 // The first CLI measured installing the daemon's own package in a home that
 // has none (2026-09-26; again on 0.159.0, 2026-09-29).
 const SELF_INSTALL_MINIMUM = "0.157.1";
@@ -37,6 +52,11 @@ function report(state, reasonCode, facts = {}) {
     ? reasonCode === "native_session_unavailable" ? sessionNeeded
       : "Codex service infrastructure is ready; current session binding is reported separately"
     : facts.startsOnLaunch === true ? startsOnLaunch
+    : typeof facts.unsafeShape === "string"
+      ? `The Codex service path ${facts.unsafePath} is ${facts.unsafeShape}; inspect it, then retry acc install`
+    : typeof facts.unsafePath === "string"
+      ? `Another account can change the Codex service file ${facts.unsafePath} (${facts.unsafeWriters.join(", ")}); `
+        + "remove that write access, then retry acc install"
     : diagnostics[reasonCode] ?? `Codex service preparation could not verify ${reasonCode}; inspect the vendor service and retry acc install` };
 }
 
@@ -51,7 +71,7 @@ async function launchStart(run, paths, facts) {
 
 export function createCodexServiceSetup({ run = runMaintenanceCommand, probe = probeNativeDelivery,
   fs = { lstat, realpath }, contextPaths = maintenanceContext,
-  installStandalone = installCodexStandalone } = {}) {
+  installStandalone = installCodexStandalone, readAcls = readWindowsAcls } = {}) {
   async function info(file) {
     try { return await fs.lstat(file); }
     catch (error) { if (error.code === "ENOENT") return null; throw error; }
@@ -70,42 +90,69 @@ export function createCodexServiceSetup({ run = runMaintenanceCommand, probe = p
     const target = await fs.realpath(paths.socketPath).catch(() => null);
     return target === null || (await socketIsReady(target) && await refusesConnections(target));
   }
-  async function safeDirectories(paths) {
+  // Whether only the user can change these paths. POSIX reads owner and mode
+  // bits. Windows has neither - Node reports every file as 0o666 and every
+  // directory as 0o777 - so it reads each path's ACL instead, all in one run (#445).
+  async function privateOrFail(paths, entries) {
+    if (!isWindowsPlatform(paths.platform)) {
+      for (const { file, stat, reasonCode } of entries) {
+        if (!own(stat)) unsafe(reasonCode, file, [`owner uid ${stat.uid}`]);
+        if (stat.mode & 0o022) unsafe(reasonCode, file, [`mode ${(stat.mode & 0o777).toString(8)}`]);
+      }
+      return;
+    }
+    if (entries.length === 0) return;
+    const { user, acls } = await readAcls(entries.map(entry => entry.file), { env: paths.options.env });
+    for (const { file, reasonCode } of entries) {
+      const writers = otherWindowsWriters(acls.get(file), user);
+      if (writers.length > 0) unsafe(reasonCode, file, writers.map(sid => windowsPrincipal(acls.get(file), sid)));
+    }
+  }
+  async function serviceDirectories(paths) {
+    const entries = [];
     for (const dir of [paths.codexHome, path.dirname(paths.socketPath), path.dirname(paths.pidPath)]) {
       const stat = await info(dir);
-      if (stat && (!stat.isDirectory() || stat.isSymbolicLink() || !own(stat) || (stat.mode & 0o022))) {
-        failMaintenance("unsafe_service_directory");
-      }
+      if (!stat) continue;
+      if (!stat.isDirectory() || stat.isSymbolicLink()) misshapen("unsafe_service_directory", dir, shapeOf(stat, true));
+      entries.push({ file: dir, stat, reasonCode: "unsafe_service_directory" });
     }
+    return entries;
+  }
+  async function safeDirectories(paths) {
+    await privateOrFail(paths, await serviceDirectories(paths));
   }
   async function executableIdentity(file) {
     const resolved = await fs.realpath(file), stat = await fs.lstat(resolved);
-    if (!stat.isFile() || !own(stat) || (stat.mode & 0o022)) failMaintenance("unsafe_service_executable");
-    return { resolved, identity: `${stat.dev}:${stat.ino}:${stat.size}:${stat.mtimeMs}:${stat.ctimeMs}` };
+    if (!stat.isFile()) misshapen("unsafe_service_executable", resolved, shapeOf(stat, false));
+    return { resolved, identity: `${stat.dev}:${stat.ino}:${stat.size}:${stat.mtimeMs}:${stat.ctimeMs}`,
+      entry: { file: resolved, stat, reasonCode: "unsafe_service_executable" } };
   }
   async function installed(paths) {
-    await safeDirectories(paths);
+    const directories = await serviceDirectories(paths);
     if (!await info(paths.managedPath)) failMaintenance("managed_install_missing");
     const installation = await probeMaintenanceInstall(paths, run);
     const cli = await executableIdentity(installation.cliPath);
     const managed = await executableIdentity(paths.managedPath);
+    await privateOrFail(paths, [...directories, cli.entry, managed.entry]);
     return { home: paths.options.env.HOME, codexHome: paths.codexHome,
       managedPath: paths.managedPath, managedRealPath: managed.resolved,
       cliIdentity: cli.identity, managedIdentity: managed.identity,
       socketPath: paths.socketPath, pidPath: paths.pidPath, platform: paths.platform, ...installation };
   }
   async function missingPrerequisite(paths) {
+    const directories = [];
     for (const name of ["packages", "packages/standalone", "packages/standalone/bin", "packages/standalone/releases"]) {
-      const stat = await info(path.join(paths.codexHome, name));
-      if (stat && (!stat.isDirectory() || stat.isSymbolicLink() || !own(stat) || (stat.mode & 0o022))) {
-        failMaintenance("unsafe_service_directory");
-      }
+      const dir = path.join(paths.codexHome, name), stat = await info(dir);
+      if (!stat) continue;
+      if (!stat.isDirectory() || stat.isSymbolicLink()) misshapen("unsafe_service_directory", dir, shapeOf(stat, true));
+      directories.push({ file: dir, stat, reasonCode: "unsafe_service_directory" });
     }
     if (await info(path.join(paths.codexHome, "packages/standalone/current"))) failMaintenance("managed_install_incomplete");
     if (await info(paths.pidPath) || await info(paths.socketPath)) failMaintenance("daemon_identity_unavailable");
     const installation = await probeMaintenanceCli({ ...paths,
       options: { ...paths.options, cwd: paths.options.env.HOME } }, run);
     const cli = await executableIdentity(installation.cliPath);
+    await privateOrFail(paths, [...directories, cli.entry]);
     const facts = { home: paths.options.env.HOME, codexHome: paths.codexHome, cliIdentity: cli.identity,
       socketPath: paths.socketPath, pidPath: paths.pidPath, platform: paths.platform, ...installation };
     // A CLI that installs the daemon's own package at its first start needs
@@ -141,7 +188,8 @@ export function createCodexServiceSetup({ run = runMaintenanceCommand, probe = p
       }
       return { ...await verify(paths, facts), started };
     } catch (error) {
-      return { ...report(started ? "failed" : "blocked", error.reasonCode ?? "daemon_start_failed"), started };
+      return { ...report(started ? "failed" : "blocked", error.reasonCode ?? "daemon_start_failed",
+        unsafeFacts(error)), started };
     }
   }
   async function verify(paths, facts) {
@@ -188,7 +236,7 @@ export function createCodexServiceSetup({ run = runMaintenanceCommand, probe = p
       return await verify(paths, facts);
     } catch (error) {
       const reason = error.reasonCode ?? "service_inspection_failed";
-      return report(reason.endsWith("_unsupported") ? "unsupported" : "blocked", reason);
+      return report(reason.endsWith("_unsupported") ? "unsupported" : "blocked", reason, unsafeFacts(error));
     }
   }
   async function preparePrerequisite(context, plan, consent, download) {
@@ -212,7 +260,8 @@ export function createCodexServiceSetup({ run = runMaintenanceCommand, probe = p
       const result = await prepareNativeServiceSetup({ context, plan: next });
       return { ...result, installedPrerequisite: true };
     } catch (error) {
-      return { ...report(attempted ? "failed" : "blocked", error.reasonCode ?? "prerequisite_install_failed"),
+      return { ...report(attempted ? "failed" : "blocked", error.reasonCode ?? "prerequisite_install_failed",
+        unsafeFacts(error)),
         started: false, installedPrerequisite: false };
     }
   }
@@ -251,7 +300,8 @@ export function createCodexServiceSetup({ run = runMaintenanceCommand, probe = p
       if (!same(plan, await installed(paths))) failMaintenance("service_identity_changed");
       return { ...await verify(paths, current), started };
     } catch (error) {
-      return { ...report(started ? "failed" : "blocked", error.reasonCode ?? "daemon_start_failed"), started };
+      return { ...report(started ? "failed" : "blocked", error.reasonCode ?? "daemon_start_failed",
+        unsafeFacts(error)), started };
     }
   }
   return { inspectNativeServiceSetup: context => inspect(context), prepareNativeServiceSetup };

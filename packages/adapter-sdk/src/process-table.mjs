@@ -76,7 +76,7 @@ ConvertTo-Json -Compress -InputObject @($chain)`;
 // PowerShell 7 is not part of Windows; where it is installed it answers faster
 // (0.37 s against 1.07 s for a full scan, measured), and a missing one fails to
 // spawn at once.
-function powershellCandidates(env) {
+export function powershellCandidates(env) {
   const root = env.SystemRoot ?? env.SYSTEMROOT ?? "C:\\Windows";
   const programs = env.ProgramFiles ?? env.PROGRAMFILES ?? "C:\\Program Files";
   return [path.win32.join(programs, "PowerShell", "7", "pwsh.exe"),
