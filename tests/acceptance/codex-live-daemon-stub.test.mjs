@@ -13,7 +13,8 @@ import test from "node:test";
 import { setTimeout as delay } from "node:timers/promises";
 import { promisify } from "node:util";
 
-import { resolveExecutable } from "../../packages/adapter-sdk/src/executables.mjs";
+import { resolveExecutable, runExecutable } from "../../packages/adapter-sdk/src/executables.mjs";
+import { powershellCandidates } from "../../packages/adapter-sdk/src/process-table.mjs";
 import { controlSocketPath, hooksForDirectories, initializeCodex, openCodexAppServer }
   from "../../packages/adapter-codex/src/app-server-client.mjs";
 import { startModelStub, promptText } from "../helpers/model-stub.mjs";
@@ -28,13 +29,19 @@ const tomlString = value => JSON.stringify(value);
 // Codex's daemon leaves helpers of its own (a pid-update-loop, an updater)
 // running from its install inside CODEX_HOME after `daemon stop`. They would
 // outlive the test and, on Windows, hold the client home it removes.
+// On Windows through PowerShell by absolute path, without a module path
+// inherited from another PowerShell, which Windows PowerShell cannot load.
 async function stopProcessesUnder(directory) {
   if (process.platform === "win32") {
-    await run("powershell.exe", ["-NoLogo", "-NoProfile", "-NonInteractive", "-Command",
-      "Get-CimInstance Win32_Process | Where-Object { $_.ExecutablePath -and"
-        + " $_.ExecutablePath.StartsWith($env:ACC_STOP_UNDER, 'OrdinalIgnoreCase') }"
-        + " | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }"],
-    { env: { ...process.env, ACC_STOP_UNDER: directory } }).catch(() => {});
+    const env = Object.fromEntries(Object.entries(process.env).filter(([key]) => key.toLowerCase() !== "psmodulepath"));
+    for (const shell of powershellCandidates(process.env)) {
+      const stopped = await run(shell, ["-NoLogo", "-NoProfile", "-NonInteractive", "-Command",
+        "Get-CimInstance Win32_Process | Where-Object { $_.ExecutablePath -and"
+          + " $_.ExecutablePath.StartsWith($env:ACC_STOP_UNDER, 'OrdinalIgnoreCase') }"
+          + " | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }"],
+      { env: { ...env, ACC_STOP_UNDER: directory }, timeout: 60_000 }).then(() => true, () => false);
+      if (stopped) return;
+    }
   } else {
     await run("pkill", ["-f", "--", directory]).catch(() => {});
   }
@@ -60,11 +67,11 @@ test("a peer message reaches an idle Codex thread through the app-server daemon"
     // removes the client home in its own. The daemon lives in that home, so it
     // is stopped first.
     let stopDaemon = async () => {};
-    t.after(() => stopDaemon());
+    t.after(async () => { step("stopping the daemon"); await stopDaemon(); step("stopped the daemon"); });
     step("packing ACC");
     const packed = await createPackedAcc(t);
     const stub = await startModelStub({ reply: "noted" });
-    t.after(() => stub.close());
+    t.after(async () => { step("closing the model stub"); await stub.close(); });
     const codex = await resolveExecutable("codex");
     assert.notEqual(codex, null, "codex is not on PATH");
     const system = process.platform === "win32" ? [] : ["/usr/bin", "/bin"];
@@ -86,33 +93,33 @@ test("a peer message reaches an idle Codex thread through the app-server daemon"
     const acc = async args => JSON.parse((await run(process.execPath, [packed.accBin, ...args, "--json"],
       { cwd: packed.project, env })).stdout).data;
 
-    // An install that leaves the service unprepared exits non-zero and still
-    // reports, on stdout, which step stopped and why.
-    const install = async () => {
-      const { stdout } = await run(process.execPath, [packed.accBin, "install", "--adapter", "codex",
-        "--delivery", "actionable", "--home", packed.clientHome, "--json"], { cwd: packed.project, env })
-        .catch(error => (typeof error.stdout === "string" && error.stdout.trim() ? error
-          : Promise.reject(error)));
-      const reported = JSON.parse(stdout);
-      return reported.data?.operations?.[0]?.nativeServiceSetup ?? { unreported: reported };
-    };
+    // An install that leaves an adapter unprepared exits non-zero, and its
+    // report on stdout names what stopped it.
+    const install = async () => JSON.parse((await run(process.execPath, [packed.accBin, "install",
+      "--adapter", "codex", "--delivery", "actionable", "--home", packed.clientHome, "--json"],
+    { cwd: packed.project, env }).catch(error => (typeof error.stdout === "string" && error.stdout.trim()
+      ? error : Promise.reject(error)))).stdout);
     step("installing ACC for Codex");
-    let service = await install();
+    let reported = await install();
     stopDaemon = async () => {
-      await run(codex, ["app-server", "daemon", "stop"], { env, timeout: 30_000 }).catch(() => {});
+      // codex is an npm .cmd shim on Windows, which execFile cannot start.
+      await runExecutable(codex, ["app-server", "daemon", "stop"], { env, timeout: 30_000 }).catch(() => {});
       await stopProcessesUnder(codexHome);
     };
     // Codex 0.165.0 and 0.172.0 install the Linux daemon executable with mode
-    // 0777 (#446). ACC refuses it and names the repair; a person runs it and
-    // installs again, and so does this check.
-    for (let repairs = 0; repairs < 3 && service?.reasonCode === "unsafe_service_executable"
-      && process.platform !== "win32"; repairs += 1) {
-      assert.equal(service.unsafeRepair, `chmod go-w "${service.unsafePath}"`, JSON.stringify(service));
-      assert.match(service.diagnostic, /run chmod go-w ".+", then retry acc install$/);
-      await run("chmod", ["go-w", service.unsafePath]);
-      service = await install();
+    // 0777 (#446). ACC refuses it and names the repair; a person runs that
+    // command and installs again, and so does this check.
+    for (let repairs = 0; repairs < 3 && process.platform !== "win32"; repairs += 1) {
+      const refused = reported.ok === false
+        ? reported.error?.details?.failed?.find(item => item.adapterId === "codex")?.error ?? "" : "";
+      const repair = /run chmod go-w "([^"]+)", then retry acc install/.exec(refused);
+      if (!repair) break;
+      step(`running the repair ACC named: chmod go-w ${repair[1]}`);
+      await run("chmod", ["go-w", repair[1]]);
+      reported = await install();
     }
-    assert.equal(service?.state, "ready", `the Codex daemon did not start: ${JSON.stringify(service)}`);
+    const service = reported.data?.operations?.[0]?.nativeServiceSetup;
+    assert.equal(service?.state, "ready", `the Codex daemon did not start: ${JSON.stringify(reported)}`);
 
     step("connecting to the daemon");
     const peer = openCodexAppServer({ socketPath: controlSocketPath(env), timeoutMs: 30_000 });

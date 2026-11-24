@@ -54,6 +54,13 @@ export async function runAsStandardUser(command, args, { cwd = process.cwd(), en
   const password = `Acc-${randomBytes(18).toString("base64url")}9!`;
   const work = path.join(env.RUNNER_TEMP, "su");
   await rm(work, { recursive: true, force: true });
+  await mkdir(work);
+  // A person's profile is private. The runner's D:\ lets Users write to
+  // everything below it, and ACC rightly refuses a Codex home anyone can
+  // change, so the work directory drops that inheritance: SYSTEM and
+  // Administrators here, the user below once it exists.
+  await run("icacls.exe", [work, "/inheritance:r", "/grant:r", "*S-1-5-18:(OI)(CI)F",
+    "*S-1-5-32-544:(OI)(CI)F", "/Q"]);
   for (const name of ["temp", "profile", "local", "roaming", "npm-cache"]) {
     await mkdir(path.join(work, name), { recursive: true });
   }
