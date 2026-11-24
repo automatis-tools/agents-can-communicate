@@ -1,5 +1,26 @@
 # Changelog
 
+## Unreleased — a busy Codex session reads a peer message inside its running turn
+
+- **A message for a Codex session that is running a turn joins that turn.** Previously the
+  daemon queued the message until the turn ended, which could be minutes. Now ACC reads the
+  newest turn of the thread and adds the message to it with `turn/steer`. The model reads the
+  message at its next request in that turn. On Codex 0.171.0 a question sent 7 s into a turn
+  was answered 6 s later, while the turn ran on for another minute. The message is queued as
+  before in three cases: no turn is running, the turn ends before the steer, or the daemon
+  cannot list turns. Certification records the busy behaviour as `presented_in_running_turn`
+  for 0.171.0.
+
+| Development artifact | Value |
+|---|---|
+| Built from | `6c3410114e0e13c202a5cc3fccedc6564db4d2b7` |
+| Tarball | `agents-can-communicate-0.15.3.tgz`, 669,907 bytes, 396 files |
+| sha256 | `9bc1bffe9fc93c8132d4b82a9567293cbab140dc1cf4b3628d070f5b3b3340ff` |
+
+The exact archive passed package verification. It differs from the captured archive only in
+documentation, certification and fixtures. See
+[development evidence](docs/release-evidence/codex-turn-steer-2026-11-23.md).
+
 ## Unreleased — a peer body cannot imitate a second message
 
 - **Codex and Antigravity live pushes put the peer body in a block only ACC closes.** A push
