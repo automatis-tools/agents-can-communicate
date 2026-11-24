@@ -9,6 +9,29 @@ import { sweepStaleBindings } from "./activation.mjs";
 import { listRuntimeHolds } from "./leases.mjs";
 import { stablePaths, writeLaunchers } from "./launchers.mjs";
 import { bridgeLegacyMaintenance } from "./legacy-maintenance.mjs";
+import { platformDataHome } from "../runtime-paths.mjs";
+import { canonicalManagerRoot } from "./state.mjs";
+
+/**
+ * The data home as the person configured it, when it names the runtime's own.
+ *
+ * Install pins the data home into Codex's hook shim as configured, and Codex
+ * trusts its hooks plugin by a hash of those bytes. The runtime root an update
+ * passes here is canonical, so a data home reached through a symbolic link came
+ * back resolved: the shim changed, and Codex asked to trust every ACC hook again
+ * (#440). The configured path is kept only while it still leads to this runtime.
+ */
+export async function refreshDataHome(root, env) {
+  const own = path.dirname(path.dirname(root));
+  let configured;
+  try { configured = platformDataHome({ env }); } catch { return own; }
+  if (!path.isAbsolute(configured) || configured === own) return own;
+  try {
+    return await canonicalManagerRoot(configured) === await canonicalManagerRoot(own) ? configured : own;
+  } catch {
+    return own;
+  }
+}
 
 /** Loaded from the candidate, so its own adapters supply its integration bytes. */
 export async function prepareRefresh({ control, root, env = process.env, callerProtocol = 1 }) {
@@ -19,7 +42,7 @@ export async function prepareRefresh({ control, root, env = process.env, callerP
   // It counts a zombie's lease as a live ACC process too (#280); a zombie's lease
   // is removed like a dead process's.
   await listRuntimeHolds(root, { zombie: processIsZombie }).catch(() => {});
-  const dataHome = path.dirname(path.dirname(root));
+  const dataHome = await refreshDataHome(root, env);
   const wanted = new Set(control.targets);
   const adapters = ALL_ADAPTERS().filter(adapter => wanted.has(adapter.id));
   if (adapters.length !== wanted.size) throw new Error("candidate cannot refresh every installed integration");

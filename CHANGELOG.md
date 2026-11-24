@@ -1,5 +1,23 @@
 # Changelog
 
+## Unreleased — an update keeps Codex hook trust with a linked data home
+
+- **An update no longer makes Codex ask to trust ACC's hooks again when the data home path goes
+  through a symbolic link.** Install wrote the data home into Codex's hook shim as configured,
+  and an update wrote the resolved path. The hooks plugin then changed, and Codex marked every ACC
+  hook as modified. The update now keeps the configured data home while it leads to the same
+  directory (#440).
+
+| Development artifact | Value |
+|---|---|
+| Built from | `09d03fffa3cd120cefd4a2974884d793a2dd607c` |
+| Tarball | `agents-can-communicate-0.15.4.tgz`, 671,552 bytes, 397 files |
+| sha256 | `1632423ae99a82267f78577ba46ee9565847639af160778abeb09385132730af` |
+
+The exact archive passed package verification, and an update onto it under `/tmp` kept Codex's
+hooks plugin and its content hash. See
+[development evidence](docs/release-evidence/refresh-data-home-link-2026-11-24.md).
+
 ## 0.15.4 — release candidate
 
 This release carries the work merged to main after 0.15.3: #418, #211, #200, #149, #146, #150,

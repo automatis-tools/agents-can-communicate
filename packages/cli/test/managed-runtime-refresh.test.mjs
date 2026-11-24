@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { realpathSync } from "node:fs";
-import { chmod, mkdir, mkdtemp, readdir, readFile, realpath, rm, writeFile } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, readdir, readFile, realpath, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -153,4 +153,52 @@ test("an automatic update keeps a person's own off", { skip: POSIX_LIVE_TRANSPOR
     assert.equal(install.deliveryPolicy, "off", decision.source);
     assert.deepEqual(install.deliveryDecision, decision);
   }
+});
+
+// Issue #440. Install writes the data home into Codex's hook shim as the person
+// configured it, and Codex trusts the hooks plugin by a hash of its bytes. The
+// runtime root an update passes is canonical, so a data home reached through a
+// symbolic link came back resolved: the shim changed, the hooks plugin moved to a
+// new copy, and Codex asked to trust every ACC hook again.
+async function refreshCodexShim(t, configured) {
+  const base = await realpath(await mkdtemp(path.join(tmpdir(), "acc-refresh-link-")));
+  t.after(() => rm(base, { recursive: true, force: true }));
+  const dataHome = path.join(base, "data");
+  const link = path.join(base, "link");
+  const home = path.join(base, "home");
+  const bin = path.join(base, "bin");
+  await mkdir(path.join(dataHome, "acc", "runtime"), { recursive: true });
+  await symlink(dataHome, link);
+  await mkdir(bin, { recursive: true });
+  await writeFakeClient(bin, "codex", { output: "codex-cli 0.171.0" });
+  await recordInstall({ dataHome, adapterId: "codex", version: "0.171.0", artifacts: [],
+    deliveryPolicy: "off", deliveryDecision: { source: "explicit-option", completeSetup: false } });
+  const control = { home, targets: ["codex"],
+    active: { version: "0.15.4", root: process.cwd() }, pending: { version: "0.15.5", root: process.cwd() } };
+  const env = { HOME: home, PATH: `${bin}:/usr/bin:/bin`,
+    ...(configured === undefined ? {} : { ACC_DATA_HOME: configured({ dataHome, link, base }) }) };
+  const refresh = await prepareRefresh({ control, root: path.join(dataHome, "acc", "runtime"),
+    callerProtocol: 2, env });
+  assert.deepEqual((await refresh()).failed, []);
+  const shims = [];
+  const walk = async directory => {
+    for (const entry of await readdir(directory, { withFileTypes: true })) {
+      const file = path.join(directory, entry.name);
+      if (entry.isDirectory()) await walk(file);
+      else if (entry.name === "acc-hook.sh") shims.push(await readFile(file, "utf8"));
+    }
+  };
+  await walk(home);
+  assert.ok(shims.length > 0, "the refresh wrote Codex's hook shim");
+  return { shims, dataHome, link };
+}
+
+test("an update keeps a data home configured through a symbolic link", { skip: POSIX_LIVE_TRANSPORT }, async t => {
+  const { shims, link } = await refreshCodexShim(t, ({ link }) => link);
+  for (const shim of shims) assert.match(shim, new RegExp(`^export ACC_DATA_HOME="${link}"$`, "m"));
+});
+
+test("an update writes the runtime's own data home when the configured one is elsewhere", { skip: POSIX_LIVE_TRANSPORT }, async t => {
+  const { shims, dataHome } = await refreshCodexShim(t, ({ base }) => path.join(base, "elsewhere"));
+  for (const shim of shims) assert.match(shim, new RegExp(`^export ACC_DATA_HOME="${dataHome}"$`, "m"));
 });
