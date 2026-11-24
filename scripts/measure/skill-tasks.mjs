@@ -9,7 +9,7 @@
 //     --run claude_code=haiku --run claude_code=opus [--repeat 2] [--out run.json]
 //
 // It spends real tokens: one working session per task, model and repeat.
-import { readdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { parseArgs } from "node:util";
@@ -60,6 +60,10 @@ const ofMeasured = full => {
   return { sessions, messages: (full.snapshot.messages ?? []).filter(m => m.fromParticipantId === "measured") };
 };
 
+// The peer blocks ACC injects, and the ACC header lines around them.
+export const withoutPeerBlocks = text => text.replace(/```acc-peer[\s\S]*?(?:```|$)/g, "")
+  .split("\n").filter(line => !/^ACC[ :]/.test(line)).join("\n");
+
 export const TASKS = [
   {
     name: "reply",
@@ -76,7 +80,8 @@ export const TASKS = [
     setup: async ({ send }) => send("peer-a", ["message", "--to", "measured", "--type", "note",
       "--subject", "staging database", "--body", "The staging database moved to port 6543 today."]),
     prompt: "Did another session tell you anything about the staging database? Tell me what it said.",
-    check: ({ reply }) => /6543/.test(reply),
+    // Only the model's own words count: a client can repeat the hook's peer block, port and all.
+    check: ({ reply }) => /6543/.test(withoutPeerBlocks(reply)),
   },
   {
     name: "claim",
@@ -113,7 +118,7 @@ async function runTask({ id, model, task, tarball, templateHome }) {
     const peers = { "peer-a": await fixture.attach("peer-a"), "peer-b": await fixture.attach("peer-b") };
     const write = async (relative, text) => {
       const file = path.join(dirs.project, relative);
-      await spawned("mkdir", ["-p", path.dirname(file)], { cwd: dirs.project, env });
+      await mkdir(path.dirname(file), { recursive: true });
       await writeFile(file, text);
     };
     await task.setup({ write, send: (from, args) => fixture.cli(args, peers[from]) });

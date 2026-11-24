@@ -281,21 +281,6 @@
     {
       "client": "kimi",
       "model": "kimi-code/kimi-for-coding",
-      "task": "read",
-      "passed": true,
-      "exit": 0,
-      "seconds": 19,
-      "events": [
-        "session.opened",
-        "session.opened",
-        "message.recorded",
-        "session.opened",
-        "message.offer_succeeded"
-      ]
-    },
-    {
-      "client": "kimi",
-      "model": "kimi-code/kimi-for-coding",
       "task": "claim",
       "passed": true,
       "exit": 0,
@@ -339,21 +324,6 @@
         "message.offer_succeeded",
         "message.recorded",
         "message.acknowledged"
-      ]
-    },
-    {
-      "client": "kimi",
-      "model": "kimi-code/k3.1-pro",
-      "task": "read",
-      "passed": true,
-      "exit": 0,
-      "seconds": 12,
-      "events": [
-        "session.opened",
-        "session.opened",
-        "message.recorded",
-        "session.opened",
-        "message.offer_succeeded"
       ]
     },
     {
@@ -455,6 +425,36 @@
         "message.recorded",
         "message.recorded",
         "session.closed"
+      ]
+    },
+    {
+      "client": "kimi",
+      "model": "kimi-code/kimi-for-coding",
+      "task": "read",
+      "passed": true,
+      "exit": 0,
+      "seconds": 13,
+      "events": [
+        "session.opened",
+        "session.opened",
+        "message.recorded",
+        "session.opened",
+        "message.offer_succeeded"
+      ]
+    },
+    {
+      "client": "kimi",
+      "model": "kimi-code/k3.1-pro",
+      "task": "read",
+      "passed": true,
+      "exit": 0,
+      "seconds": 12,
+      "events": [
+        "session.opened",
+        "session.opened",
+        "message.recorded",
+        "session.opened",
+        "message.offer_succeeded"
       ]
     }
   ],
@@ -820,36 +820,6 @@
       ]
     },
     {
-      "client": "kimi",
-      "model": "kimi-code/kimi-for-coding",
-      "task": "read",
-      "passed": true,
-      "exit": 0,
-      "seconds": 6,
-      "events": [
-        "session.opened",
-        "session.opened",
-        "message.recorded",
-        "session.opened",
-        "message.offer_succeeded"
-      ]
-    },
-    {
-      "client": "kimi",
-      "model": "kimi-code/k3.1-pro",
-      "task": "read",
-      "passed": true,
-      "exit": 0,
-      "seconds": 12,
-      "events": [
-        "session.opened",
-        "session.opened",
-        "message.recorded",
-        "session.opened",
-        "message.offer_succeeded"
-      ]
-    },
-    {
       "client": "gemini_cli",
       "model": "gemini-3.1-flash-lite",
       "task": "reply",
@@ -916,7 +886,37 @@
         "message.recorded",
         "session.closed"
       ]
+    },
+    {
+      "client": "kimi",
+      "model": "kimi-code/kimi-for-coding",
+      "task": "read",
+      "passed": true,
+      "exit": 0,
+      "seconds": 9,
+      "events": [
+        "session.opened",
+        "session.opened",
+        "message.recorded",
+        "session.opened",
+        "message.offer_succeeded"
+      ]
+    },
+    {
+      "client": "kimi",
+      "model": "kimi-code/k3.1-pro",
+      "task": "read",
+      "passed": true,
+      "exit": 0,
+      "seconds": 13,
+      "events": [
+        "session.opened",
+        "session.opened",
+        "message.recorded",
+        "session.opened",
+        "message.offer_succeeded"
+      ]
     }
   ],
-  "notes": "The task script reads the last assistant message of a Kimi stream, which also repeats hook text. The before rows for Kimi read were rerun with that reading; every candidate row comes from one run of the script at 24f870f0. Gemini CLI ran one model, the only one the free API tier allowed that day."
+  "notes": "Kimi Code streams the hook peer block as assistant text, so the read check strips ACC peer blocks and header lines and counts only the model's own words; the Kimi read rows come from a rerun of the script with that check, on the same before and candidate archives. The other candidate rows come from one run of the script at 24f870f0. Gemini CLI ran one model, the only one the free API tier allowed that day."
 }

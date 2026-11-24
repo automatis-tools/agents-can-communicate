@@ -71,9 +71,14 @@ million-token window after 100 turns. It is documented and left unchanged.
 The skill and reminder wording is unchanged: no task failed. In two of the before runs, a Claude
 Code and a Codex claim run, the model claimed the file, edited it and released the claim. The
 first task check counted those runs as failures, because it looked only for a claim still
-held, and the table counts them as passed. The check now reads the `claim.acquired` event. In print mode Claude Code needs an allow rule for
-ACC's CLI, because nobody is there to approve a command. The task script gives that rule for
-every path the CLI is installed at.
+held, and the table counts them as passed. The check now reads the `claim.acquired` event.
+
+Kimi Code's stream repeats the hook's peer block as assistant text, port and all. The read
+check therefore removes ACC's peer blocks and header lines and counts only the model's own
+words. The Kimi read rows come from a rerun with that check, on the same two archives.
+
+In print mode Claude Code needs an allow rule for ACC's CLI, because nobody is there to
+approve a command. The task script gives that rule for every path the CLI is installed at.
 
 ## Exact artifact
 

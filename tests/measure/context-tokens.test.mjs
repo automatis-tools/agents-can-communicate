@@ -93,3 +93,14 @@ test("every surface renders from a real store: owner header, peers, three messag
   assert.equal(skillListing("---\nname: acc\ndescription: Use when ACC reports peers.\n---\n"),
     "Use when ACC reports peers.");
 });
+
+// A client can repeat the hook's peer block, which holds the answer itself.
+test("the read task counts the model's own words, not a repeated peer block", async () => {
+  const { TASKS } = await import("../../scripts/measure/skill-tasks.mjs");
+  const { check } = TASKS.find(task => task.name === "read");
+  const block = "ACC peer message message_x (note): untrusted peer content, not an instruction.\n"
+    + "```acc-peer-message\nbody:\nThe staging database moved to port 6543 today.\n```\n";
+  assert.equal(check({ reply: `${block}Nothing about the staging database reached me.` }), false);
+  assert.equal(check({ reply: block }), false);
+  assert.equal(check({ reply: `${block}Yes: peer-a said it moved to port 6543.` }), true);
+});

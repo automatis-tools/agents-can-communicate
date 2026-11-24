@@ -33,7 +33,7 @@ async function stopLeftovers(root) {
   }
 }
 
-export async function openFixture({ id, tarball, templateHome, extraEnv = {} }) {
+export async function openFixture({ id, tarball, templateHome }) {
   const root = await realpath(await mkdtemp(path.join(os.tmpdir(), `acc-measure-${id}-`)));
   const dirs = Object.fromEntries(["home", "prefix", "data", "texts", "project", "npm"]
     .map(name => [name, path.join(root, name)]));
@@ -42,7 +42,7 @@ export async function openFixture({ id, tarball, templateHome, extraEnv = {} }) 
   const env = { HOME: dirs.home, USER: os.userInfo().username, LANG: "en_US.UTF-8", TERM: "dumb",
     TMPDIR: os.tmpdir(), PATH: [path.join(dirs.prefix, "bin"), process.env.PATH].join(":"),
     ACC_DATA_HOME: dirs.data, ACC_NO_UPDATE_CHECK: "1", ACC_PARTICIPANT: "measured",
-    npm_config_cache: dirs.npm, ...extraEnv };
+    npm_config_cache: dirs.npm };
   const acc = path.join(dirs.prefix, "bin", "acc");
   const fixture = {
     root, dirs, env, acc,
