@@ -55,7 +55,7 @@ async function grantBatchLogon(sid, work) {
 const grant = (target, user, rights) => run("icacls.exe", [target, "/grant", `${user}:(OI)(CI)${rights}`, "/Q"]);
 
 export async function runAsStandardUser(command, args, { cwd = process.cwd(), env = process.env,
-  npmGlobal = [] } = {}) {
+  npmGlobal = null } = {}) {
   if (process.platform !== "win32") throw new Error("standard-user runs are for Windows CI only");
   if (!env.RUNNER_TEMP) throw new Error("RUNNER_TEMP is required");
   const user = `acc-ci-${randomBytes(3).toString("hex")}`;
@@ -87,13 +87,13 @@ export async function runAsStandardUser(command, args, { cwd = process.cwd(), en
     // files inherit its list, and their owner is Administrators.
     const prefix = path.join(work, "npm-global");
     const pathKey = Object.keys(env).find(key => key.toUpperCase() === "PATH") ?? "Path";
-    if (npmGlobal.length > 0) {
-      await run(process.execPath, [await npmCli(env), "install", "--global", "--prefix", prefix, ...npmGlobal],
+    if (npmGlobal) {
+      await run(process.execPath, [await npmCli(env), "install", "--global", "--prefix", prefix, npmGlobal],
         { env: { ...env, npm_config_cache: path.join(work, "npm-cache") }, maxBuffer: 16 << 20 });
     }
     const job = {
       command, args, cwd,
-      env: { ...env, ...(npmGlobal.length > 0 ? { [pathKey]: `${prefix}${path.delimiter}${env[pathKey] ?? ""}` } : {}),
+      env: { ...env, ...(npmGlobal ? { [pathKey]: `${prefix}${path.delimiter}${env[pathKey] ?? ""}` } : {}),
         TEMP: path.join(work, "temp"), TMP: path.join(work, "temp"),
         USERPROFILE: path.join(work, "profile"), HOME: path.join(work, "profile"),
         LOCALAPPDATA: path.join(work, "local"), APPDATA: path.join(work, "roaming"),
@@ -177,10 +177,10 @@ if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.ar
   try {
     if (process.argv[2] === "--child") await child(process.argv[3]);
     else {
-      const rest = process.argv.slice(2), npmGlobal = [];
-      while (rest[0] === "--npm-global" && rest[1]) npmGlobal.push(rest.splice(0, 2)[1]);
+      const rest = process.argv.slice(2);
+      const npmGlobal = rest[0] === "--npm-global" ? rest.splice(0, 2)[1] : null;
       const [command, ...args] = rest;
-      if (!command || command.startsWith("--")) {
+      if (!command || command.startsWith("--") || npmGlobal?.startsWith("--")) {
         throw new Error("usage: ci-standard-user.mjs [--npm-global <package>] <command> [args...]");
       }
       process.exitCode = await runAsStandardUser(command, args, { npmGlobal });
