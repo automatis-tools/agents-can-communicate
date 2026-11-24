@@ -15,6 +15,15 @@ export const MINIMUM_MAINTENANCE_CLI = "0.154.0";
 export const absolute = value => typeof value === "string" && path.isAbsolute(value)
   && !/[\0\r\n]/.test(value);
 export const failMaintenance = reasonCode => { throw Object.assign(new Error(reasonCode), { reasonCode }); };
+// Whether a path the daemon reports names the path ACC expects. Codex 0.165.0
+// on Windows reports `<CODEX_HOME>\packages/app-server-daemon\current\bin\codex.exe`
+// (#449): one file, written with both separators. Windows reads `/` as `\`, so
+// there the comparison does too; any other difference still refuses.
+export function sameServicePath(reported, expected, platform) {
+  if (typeof reported !== "string" || typeof expected !== "string") return false;
+  return isWindowsPlatform(platform) ? path.win32.normalize(reported) === path.win32.normalize(expected)
+    : reported === expected;
+}
 const own = info => typeof process.getuid !== "function" || info.uid === process.getuid();
 // `ps -o lstart` on POSIX; a FILETIME string on Windows, where Codex records one
 // and WMI reports one to the microsecond (measured on 0.159.3).

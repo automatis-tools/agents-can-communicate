@@ -3,7 +3,7 @@ import { openCodexAppServer, versionOrder } from "./app-server-client.mjs";
 import { readySocketPath } from "./native-endpoint.mjs";
 import { absolute, approvedProcessIsDead, failMaintenance, maintenanceContext,
   managedExecutablePaths, metadataExists, probeMaintenanceInstall, readMaintenancePid, runMaintenanceCommand,
-  startTimeValid, verifyMaintenanceProcess } from "./maintenance-host.mjs";
+  sameServicePath, startTimeValid, verifyMaintenanceProcess } from "./maintenance-host.mjs";
 import { maintenanceWorkload } from "./maintenance-threads.mjs";
 
 const identityKeys = ["serviceId", "pid", "processStartTime", "codexHome", "cliPath", "cliVersion",
@@ -42,7 +42,8 @@ export function createCodexMaintenance({ run = runMaintenanceCommand, open = ope
       if (version.status !== 0) failMaintenance("daemon_version_unavailable");
       const observed = JSON.parse(version.stdout);
       if (observed.status !== "running" || observed.backend !== "pid") failMaintenance("maintenance_backend_unsupported");
-      if (observed.managedCodexPath !== snapshot.managedPath || observed.socketPath !== snapshot.socketPath
+      if (!sameServicePath(observed.managedCodexPath, snapshot.managedPath, paths.platform)
+        || !sameServicePath(observed.socketPath, snapshot.socketPath, paths.platform)
         || observed.cliVersion !== snapshot.cliVersion || observed.managedCodexVersion !== snapshot.managedVersion
         || !versionOrder(observed.appServerVersion)) failMaintenance("daemon_identity_unavailable");
       snapshot.serverVersion = observed.appServerVersion;
