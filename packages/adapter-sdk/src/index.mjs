@@ -40,6 +40,7 @@ export { windowsHookCommand } from "./windows-command.mjs";
 export { shortPath } from "./windows-command.mjs";
 export { mergeEnv } from "./executables.mjs";
 export { closedTo, isWindowsPlatform, openRegularNoFollow } from "./private-files.mjs";
+export { otherWindowsWriters, readWindowsAcls, windowsPrincipal } from "./windows-acl.mjs";
 export { configureTomlIndicator, readTomlIndicatorSettings } from './toml-indicator.mjs';
 export { indicatorGlyph, footerText, footerCwd } from './indicator-text.mjs';
 export { indicatorCommand } from './indicator-command.mjs';

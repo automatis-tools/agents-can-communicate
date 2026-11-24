@@ -306,6 +306,11 @@ different installation.
 
 - Windows privacy is the profile ACL, checked once for the data home, instead of mode bits on each
   file.
+- Before ACC trusts or starts the Codex service, it reads the access control lists of the Codex
+  home, the daemon directories and both executables in one PowerShell run. A write right held by
+  anyone but the user, SYSTEM or Administrators, or another owner, refuses the service and names the
+  path. Node reports mode 0o666 or 0o777 for every Windows path, so the POSIX mode test refused
+  every Codex home (#445).
 - On Windows ACC reads the Claude peer key; it still never reads the child token.
 - `assertRoot` refuses rooted, drive-relative and UNC config roots everywhere.
 - Named pipes live in a machine-wide namespace. ACC's own pipe names carry 128 random bits and
