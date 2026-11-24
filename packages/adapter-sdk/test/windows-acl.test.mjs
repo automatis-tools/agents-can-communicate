@@ -86,8 +86,9 @@ test("a writer is named by its account where Windows resolves one", () => {
   assert.equal(windowsPrincipal(null, "unreadable"), "unreadable");
 });
 
-// The script itself, against a real directory: the profile's temp directory is
-// private, and a write right granted to Users makes Users a writer.
+// The script itself, against a real directory. A temp directory need not be
+// private: on the CI runner it inherits a write right for Users from D:\. So
+// the test makes it private first, then grants Users a write right.
 test("Windows reads a real access list and sees a write grant to Users", {
   skip: process.platform === "win32" ? false : "reads Windows access control lists",
 }, async t => {
@@ -98,11 +99,14 @@ test("Windows reads a real access list and sees a write grant to Users", {
   const path = await import("node:path");
   const dir = await mkdtemp(path.join(os.tmpdir(), "acc-acl-"));
   t.after(() => rm(dir, { recursive: true, force: true }));
+  const icacls = (...args) => promisify(execFile)("icacls.exe", [dir, ...args]);
   const first = await readWindowsAcls([dir]);
   assert.match(first.user ?? "", /^S-1-5-21-/);
   assert.notEqual(first.acls.get(dir), null);
-  assert.equal(first.acls.get(dir).rules.some(rule => rule.sid === first.user), true, JSON.stringify(first.acls.get(dir)));
-  await promisify(execFile)("icacls.exe", [dir, "/grant", "*S-1-5-32-545:(W)"]);
+  await icacls("/inheritance:r", "/grant:r", `*${first.user}:(OI)(CI)F`, "*S-1-5-18:(OI)(CI)F");
+  const closed = await readWindowsAcls([dir]);
+  assert.deepEqual(otherWindowsWriters(closed.acls.get(dir), closed.user), [], JSON.stringify(closed.acls.get(dir)));
+  await icacls("/grant", "*S-1-5-32-545:(W)");
   const opened = await readWindowsAcls([dir]);
   assert.ok(otherWindowsWriters(opened.acls.get(dir), opened.user).includes(USERS),
     JSON.stringify(opened.acls.get(dir)));
