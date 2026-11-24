@@ -20,8 +20,15 @@ const own = info => typeof process.getuid !== "function" || info.uid === process
 const unsafe = (reasonCode, unsafePath, unsafeWriters) => {
   throw Object.assign(new Error(reasonCode), { reasonCode, unsafePath, unsafeWriters });
 };
+// A service path of the wrong kind: a link, or a file where a directory belongs.
+const misshapen = (reasonCode, unsafePath, unsafeShape) => {
+  throw Object.assign(new Error(reasonCode), { reasonCode, unsafePath, unsafeWriters: [], unsafeShape });
+};
+const shapeOf = (stat, directory) => (stat.isSymbolicLink() ? "a symbolic link"
+  : directory ? "not a directory" : "not a regular file");
 const unsafeFacts = error => (typeof error?.unsafePath === "string"
-  ? { unsafePath: error.unsafePath, unsafeWriters: error.unsafeWriters } : {});
+  ? { unsafePath: error.unsafePath, unsafeWriters: error.unsafeWriters,
+    ...(typeof error.unsafeShape === "string" ? { unsafeShape: error.unsafeShape } : {}) } : {});
 // The first CLI measured installing the daemon's own package in a home that
 // has none (2026-09-26; again on 0.159.0, 2026-09-29).
 const SELF_INSTALL_MINIMUM = "0.157.1";
@@ -45,6 +52,8 @@ function report(state, reasonCode, facts = {}) {
     ? reasonCode === "native_session_unavailable" ? sessionNeeded
       : "Codex service infrastructure is ready; current session binding is reported separately"
     : facts.startsOnLaunch === true ? startsOnLaunch
+    : typeof facts.unsafeShape === "string"
+      ? `The Codex service path ${facts.unsafePath} is ${facts.unsafeShape}; inspect it, then retry acc install`
     : typeof facts.unsafePath === "string"
       ? `Another account can change the Codex service file ${facts.unsafePath} (${facts.unsafeWriters.join(", ")}); `
         + "remove that write access, then retry acc install"
@@ -104,7 +113,7 @@ export function createCodexServiceSetup({ run = runMaintenanceCommand, probe = p
     for (const dir of [paths.codexHome, path.dirname(paths.socketPath), path.dirname(paths.pidPath)]) {
       const stat = await info(dir);
       if (!stat) continue;
-      if (!stat.isDirectory() || stat.isSymbolicLink()) failMaintenance("unsafe_service_directory");
+      if (!stat.isDirectory() || stat.isSymbolicLink()) misshapen("unsafe_service_directory", dir, shapeOf(stat, true));
       entries.push({ file: dir, stat, reasonCode: "unsafe_service_directory" });
     }
     return entries;
@@ -114,7 +123,7 @@ export function createCodexServiceSetup({ run = runMaintenanceCommand, probe = p
   }
   async function executableIdentity(file) {
     const resolved = await fs.realpath(file), stat = await fs.lstat(resolved);
-    if (!stat.isFile()) failMaintenance("unsafe_service_executable");
+    if (!stat.isFile()) misshapen("unsafe_service_executable", resolved, shapeOf(stat, false));
     return { resolved, identity: `${stat.dev}:${stat.ino}:${stat.size}:${stat.mtimeMs}:${stat.ctimeMs}`,
       entry: { file: resolved, stat, reasonCode: "unsafe_service_executable" } };
   }
@@ -135,7 +144,7 @@ export function createCodexServiceSetup({ run = runMaintenanceCommand, probe = p
     for (const name of ["packages", "packages/standalone", "packages/standalone/bin", "packages/standalone/releases"]) {
       const dir = path.join(paths.codexHome, name), stat = await info(dir);
       if (!stat) continue;
-      if (!stat.isDirectory() || stat.isSymbolicLink()) failMaintenance("unsafe_service_directory");
+      if (!stat.isDirectory() || stat.isSymbolicLink()) misshapen("unsafe_service_directory", dir, shapeOf(stat, true));
       directories.push({ file: dir, stat, reasonCode: "unsafe_service_directory" });
     }
     if (await info(path.join(paths.codexHome, "packages/standalone/current"))) failMaintenance("managed_install_incomplete");

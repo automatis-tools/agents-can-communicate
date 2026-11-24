@@ -10,7 +10,7 @@ const USERS = "S-1-5-32-545";
 const FULL = 0x1f01ff;
 const READ_EXECUTE = 0x1200a9;
 
-const acl = (rules, owner = USER) => ({ owner, rules: rules.map(([sid, rights, extra = {}]) =>
+const acl = (rules, owner = USER) => ({ owner, nullDacl: false, rules: rules.map(([sid, rights, extra = {}]) =>
   ({ sid, rights, type: "Allow", inheritOnly: false, ...extra })) });
 
 test("a profile directory grants write only to the user, SYSTEM and Administrators", () => {
@@ -37,6 +37,14 @@ test("an owner other than the user, SYSTEM or Administrators can rewrite the lis
   assert.deepEqual(otherWindowsWriters(acl([[USER, FULL]], ADMINISTRATORS), USER), []);
 });
 
+test("a null DACL grants everyone full access, though it lists no rule", () => {
+  const open = { owner: USER, nullDacl: true, rules: [] };
+  assert.deepEqual(otherWindowsWriters(open, USER), ["S-1-1-0"]);
+  assert.equal(windowsPrincipal(open, "S-1-1-0"), "Everyone (S-1-1-0, no access list)");
+  // A reader that did not say is not trusted to have seen a list.
+  assert.deepEqual(otherWindowsWriters({ owner: USER, rules: [] }, USER), []);
+});
+
 test("an unreadable list is not a private one", () => {
   assert.deepEqual(otherWindowsWriters(null, USER), ["unreadable"]);
   assert.deepEqual(otherWindowsWriters(acl([[USER, FULL]]), null), ["unreadable"]);
@@ -59,6 +67,7 @@ test("one PowerShell run reads every path, by absolute path, without the caller'
   assert.equal(Object.keys(calls[0].options.env).some(key => key.toLowerCase() === "psmodulepath"), false);
   assert.equal(result.user, USER);
   assert.deepEqual(result.acls.get("C:\\a").owner, USER);
+  assert.equal(result.acls.get("C:\\a").nullDacl, true, "a reply without nullDacl: false is not a list");
   assert.equal(result.acls.get("C:\\b"), null);
 });
 
@@ -111,4 +120,10 @@ test("Windows reads a real access list and sees a write grant to Users", {
   assert.ok(otherWindowsWriters(opened.acls.get(dir), opened.user).includes(USERS),
     JSON.stringify(opened.acls.get(dir)));
   assert.match(windowsPrincipal(opened.acls.get(dir), USERS), /Users \(S-1-5-32-545\)$/);
+  // No access list at all: everyone has full access, and no rule says so.
+  await promisify(execFile)("pwsh.exe", ["-NoProfile", "-NonInteractive", "-Command",
+    "$a = Get-Acl -LiteralPath $env:ACC_DIR; $a.SetSecurityDescriptorSddlForm('D:NO_ACCESS_CONTROL'); "
+      + "Set-Acl -LiteralPath $env:ACC_DIR -AclObject $a"], { env: { ...process.env, ACC_DIR: dir } });
+  const open = await readWindowsAcls([dir]);
+  assert.deepEqual(otherWindowsWriters(open.acls.get(dir), open.user), ["S-1-1-0"], JSON.stringify(open.acls.get(dir)));
 });

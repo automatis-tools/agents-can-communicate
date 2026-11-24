@@ -401,3 +401,16 @@ test("a POSIX service directory others can write is refused with its path and mo
   assert.deepEqual(plan.unsafeWriters, ["mode 777"]);
   assert.ok(plan.diagnostic.includes(f.codexHome), plan.diagnostic);
 });
+
+test("a service path of the wrong kind is refused with its path and kind", async t => {
+  const f = await serviceFixture(t, { binLayout: true });
+  const control = path.dirname(f.socketPath);
+  await rm(control, { recursive: true, force: true });
+  await writeFile(control, "not a directory");
+  const plan = await f.inspectNativeServiceSetup(f.context);
+  assert.equal(plan.state, "blocked");
+  assert.equal(plan.reasonCode, "unsafe_service_directory");
+  assert.equal(plan.unsafePath, control);
+  assert.equal(plan.unsafeShape, "not a directory");
+  assert.equal(plan.diagnostic, `The Codex service path ${control} is not a directory; inspect it, then retry acc install`);
+});
