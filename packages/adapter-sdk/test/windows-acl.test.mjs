@@ -10,7 +10,7 @@ const USERS = "S-1-5-32-545";
 const FULL = 0x1f01ff;
 const READ_EXECUTE = 0x1200a9;
 
-const acl = (rules, owner = USER) => ({ owner, rules: rules.map(([sid, rights, extra = {}]) =>
+const acl = (rules, owner = USER) => ({ owner, nullDacl: false, rules: rules.map(([sid, rights, extra = {}]) =>
   ({ sid, rights, type: "Allow", inheritOnly: false, ...extra })) });
 
 test("a profile directory grants write only to the user, SYSTEM and Administrators", () => {
@@ -37,6 +37,14 @@ test("an owner other than the user, SYSTEM or Administrators can rewrite the lis
   assert.deepEqual(otherWindowsWriters(acl([[USER, FULL]], ADMINISTRATORS), USER), []);
 });
 
+test("a null DACL grants everyone full access, though it lists no rule", () => {
+  const open = { owner: USER, nullDacl: true, rules: [] };
+  assert.deepEqual(otherWindowsWriters(open, USER), ["S-1-1-0"]);
+  assert.equal(windowsPrincipal(open, "S-1-1-0"), "Everyone (S-1-1-0, no access list)");
+  // A reader that did not say is not trusted to have seen a list.
+  assert.deepEqual(otherWindowsWriters({ owner: USER, rules: [] }, USER), []);
+});
+
 test("an unreadable list is not a private one", () => {
   assert.deepEqual(otherWindowsWriters(null, USER), ["unreadable"]);
   assert.deepEqual(otherWindowsWriters(acl([[USER, FULL]]), null), ["unreadable"]);
@@ -59,6 +67,7 @@ test("one PowerShell run reads every path, by absolute path, without the caller'
   assert.equal(Object.keys(calls[0].options.env).some(key => key.toLowerCase() === "psmodulepath"), false);
   assert.equal(result.user, USER);
   assert.deepEqual(result.acls.get("C:\\a").owner, USER);
+  assert.equal(result.acls.get("C:\\a").nullDacl, true, "a reply without nullDacl: false is not a list");
   assert.equal(result.acls.get("C:\\b"), null);
 });
 
@@ -86,8 +95,9 @@ test("a writer is named by its account where Windows resolves one", () => {
   assert.equal(windowsPrincipal(null, "unreadable"), "unreadable");
 });
 
-// The script itself, against a real directory: the profile's temp directory is
-// private, and a write right granted to Users makes Users a writer.
+// The script itself, against a real directory. A temp directory need not be
+// private: on the CI runner it inherits a write right for Users from D:\. So
+// the test makes it private first, then grants Users a write right.
 test("Windows reads a real access list and sees a write grant to Users", {
   skip: process.platform === "win32" ? false : "reads Windows access control lists",
 }, async t => {
@@ -98,13 +108,30 @@ test("Windows reads a real access list and sees a write grant to Users", {
   const path = await import("node:path");
   const dir = await mkdtemp(path.join(os.tmpdir(), "acc-acl-"));
   t.after(() => rm(dir, { recursive: true, force: true }));
+  const icacls = (...args) => promisify(execFile)("icacls.exe", [dir, ...args]);
   const first = await readWindowsAcls([dir]);
   assert.match(first.user ?? "", /^S-1-5-21-/);
   assert.notEqual(first.acls.get(dir), null);
-  assert.equal(first.acls.get(dir).rules.some(rule => rule.sid === first.user), true, JSON.stringify(first.acls.get(dir)));
-  await promisify(execFile)("icacls.exe", [dir, "/grant", "*S-1-5-32-545:(W)"]);
+  await icacls("/inheritance:r", "/grant:r", `*${first.user}:(OI)(CI)F`, "*S-1-5-18:(OI)(CI)F");
+  const closed = await readWindowsAcls([dir]);
+  assert.deepEqual(otherWindowsWriters(closed.acls.get(dir), closed.user), [], JSON.stringify(closed.acls.get(dir)));
+  await icacls("/grant", "*S-1-5-32-545:(W)");
   const opened = await readWindowsAcls([dir]);
   assert.ok(otherWindowsWriters(opened.acls.get(dir), opened.user).includes(USERS),
     JSON.stringify(opened.acls.get(dir)));
   assert.match(windowsPrincipal(opened.acls.get(dir), USERS), /Users \(S-1-5-32-545\)$/);
+  // No access list at all: everyone has full access, and no rule says so.
+  // Through the shells the reader uses, by absolute path and in its order.
+  const { powershellCandidates } = await import("../src/process-table.mjs");
+  const env = Object.fromEntries(Object.entries(process.env).filter(([key]) => key.toLowerCase() !== "psmodulepath"));
+  let applied = null;
+  for (const shell of powershellCandidates(process.env)) {
+    applied = await promisify(execFile)(shell, ["-NoProfile", "-NonInteractive", "-Command",
+      "$a = Get-Acl -LiteralPath $env:ACC_DIR; $a.SetSecurityDescriptorSddlForm('D:NO_ACCESS_CONTROL'); "
+        + "Set-Acl -LiteralPath $env:ACC_DIR -AclObject $a"], { env: { ...env, ACC_DIR: dir } }).then(() => shell, () => null);
+    if (applied !== null) break;
+  }
+  assert.notEqual(applied, null, "no PowerShell could remove the access list");
+  const open = await readWindowsAcls([dir]);
+  assert.deepEqual(otherWindowsWriters(open.acls.get(dir), open.user), ["S-1-1-0"], JSON.stringify(open.acls.get(dir)));
 });

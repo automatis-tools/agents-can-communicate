@@ -11,9 +11,9 @@
 
 | Development artifact | Value |
 |---|---|
-| Built from | `d8b050c61380e6fdff0acfb542b995222982e16b` |
-| Tarball | `agents-can-communicate-0.15.4.tgz`, 674,442 bytes, 398 files |
-| sha256 | `f0e3412a9f72d7d49ed94634b300f11043fde3fa807a8a3be40e1dd18934cb4d` |
+| Built from | `07a3cd6d6d9a255575fc8216656ef4ca8ead5242` |
+| Tarball | `agents-can-communicate-0.15.4.tgz`, 674,823 bytes, 398 files |
+| sha256 | `b4c77491e0389270878a26761d622c3554a7584d2fb169acf807898c76c9ad11` |
 
 The exact archive passed package verification. See
 [development evidence](docs/release-evidence/windows-acl-codex-service-2026-11-24.md).

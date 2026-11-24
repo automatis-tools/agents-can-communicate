@@ -11,6 +11,7 @@ import { powershellCandidates } from "./process-table.mjs";
 const execFileAsync = promisify(execFile);
 const SYSTEM = "S-1-5-18";
 const ADMINISTRATORS = "S-1-5-32-544";
+const EVERYONE = "S-1-1-0";
 
 // WriteData/CreateFiles, AppendData/CreateDirectories, WriteExtendedAttributes,
 // DeleteSubdirectoriesAndFiles, Delete, ChangePermissions, TakeOwnership,
@@ -24,9 +25,12 @@ const WRITE_RIGHTS = 0x2 | 0x4 | 0x10 | 0x40 | 0x10000 | 0x40000 | 0x80000 | 0x1
  * that applies to the path itself, or an owner, who can always rewrite the list.
  * Deny rules are not subtracted, so the answer can only be stricter than
  * Windows. An unreadable list, or an unknown user, is one writer: "unreadable".
+ * A null DACL - no list at all - grants everyone full access, though it lists
+ * no rule: its writer is Everyone.
  */
 export function otherWindowsWriters(acl, userSid) {
   if (acl === null || acl === undefined || typeof userSid !== "string") return ["unreadable"];
+  if (acl.nullDacl === true) return [EVERYONE];
   const trusted = new Set([userSid, SYSTEM, ADMINISTRATORS]);
   const writers = new Set();
   if (!trusted.has(acl.owner)) writers.add(String(acl.owner));
@@ -52,7 +56,9 @@ foreach ($p in @(ConvertFrom-Json $env:ACC_ACL_PATHS)) {
          type = $_.AccessControlType.ToString()
          inheritOnly = (($_.PropagationFlags -band [System.Security.AccessControl.PropagationFlags]::InheritOnly) -ne 0) } })
     $owner = $acl.GetOwner($sid)
-    $out += @{ path = $p; owner = $owner.Value; ownerName = Name $owner; rules = $rules }
+    $sddl = $acl.GetSecurityDescriptorSddlForm([System.Security.AccessControl.AccessControlSections]::Access)
+    $out += @{ path = $p; owner = $owner.Value; ownerName = Name $owner; rules = $rules
+      nullDacl = ($sddl -notmatch '^D:' -or $sddl -match 'NO_ACCESS_CONTROL') }
   } catch { $out += @{ path = $p; error = $_.Exception.Message } }
 }
 @{ user = [System.Security.Principal.WindowsIdentity]::GetCurrent().User.Value; paths = $out } | ConvertTo-Json -Depth 6 -Compress`;
@@ -68,6 +74,7 @@ const list = value => (Array.isArray(value) ? value : value === undefined || val
  */
 /** A principal as a person reads it: its account name with the SID, or the SID. */
 export function windowsPrincipal(acl, sid) {
+  if (sid === EVERYONE && acl?.nullDacl === true) return `Everyone (${EVERYONE}, no access list)`;
   const name = acl?.owner === sid && acl.ownerName ? acl.ownerName
     : (acl?.rules ?? []).find(rule => rule?.sid === sid && typeof rule.name === "string")?.name;
   return name ? `${name} (${sid})` : sid;
@@ -92,7 +99,8 @@ export async function readWindowsAcls(paths, { run = execFileAsync, env = proces
     }
     for (const entry of list(parsed?.paths)) {
       if (!acls.has(entry?.path) || typeof entry.owner !== "string") continue;
-      acls.set(entry.path, { owner: entry.owner, ownerName: entry.ownerName ?? null, rules: list(entry.rules) });
+      acls.set(entry.path, { owner: entry.owner, ownerName: entry.ownerName ?? null, rules: list(entry.rules),
+        nullDacl: entry.nullDacl !== false });
     }
     return { user: typeof parsed?.user === "string" ? parsed.user : null, acls };
   }
