@@ -48,8 +48,11 @@ process.stderr.write(value.stderr??'');process.exitCode=value.code??0; }
   const dependencies = { npmCli: async () => program, spawn(executable, args, options) {
     // On Windows the live phase runs its test file as a standard user.
     if (executable === process.execPath && args[0] === "scripts/ci-standard-user.mjs") {
+      // The exact version is each test's to check: it is the observed one.
       standardUserCalls.push([...args]);
-      assert.deepEqual(args.slice(1, 4), ["--npm-global", "@openai/codex@0.165.0", process.execPath]);
+      assert.equal(args[1], "--npm-global");
+      assert.match(args[2], /^@openai\/codex@\d+\.\d+\.\d+$/);
+      assert.equal(args[3], process.execPath);
       args = args.slice(4);
     }
     const isTest = args[0] === "--test";
@@ -182,15 +185,19 @@ test("command approval runs strictly between hooks and interactive on POSIX and 
 
 test("main and manual latest retain moving installs while other events cannot install", async t => {
   for (const [event, ref, code] of [["push", "refs/heads/main", 0], ["workflow_dispatch", "refs/heads/main", 0],
-    ["push", "refs/heads/other", 1], ["schedule", "refs/heads/main", 1]]) {
+    ["push", "refs/heads/other", 1], ["schedule", "refs/heads/main", 1]]) for (const platform of ["linux", "win32"]) {
     const f = await fixture(t, { GITHUB_EVENT_NAME: event, GITHUB_REF: ref,
       GITHUB_WORKFLOW: event === "workflow_dispatch" ? "Client compatibility (latest)" : "CI" });
     f.config({ claude: { stdout: "9.2.1 (Claude Code)\n" }, codex: { stdout: "codex-cli 8.4.2\n" } });
-    const { report: r, phases: p, code: actual } = await f.invoke();
-    assert.equal(actual, code);
+    const { report: r, phases: p, code: actual } = await f.invoke({ platform });
+    assert.equal(actual, code, `${event} ${ref} ${platform}`);
     if (code === 0) {
       assert.equal(r.policy, "latest");
       assert.deepEqual(p.install.args.slice(1), ["install", "--global", "@anthropic-ai/claude-code", "@openai/codex"]);
+      // A moving install has no requested version; the live check on Windows
+      // installs the one the runner observed.
+      assert.deepEqual(f.standardUserCalls.map(args => args[2]),
+        platform === "win32" ? ["@openai/codex@8.4.2"] : []);
     } else assert.equal(p.install.status, "not-run");
   }
 });
