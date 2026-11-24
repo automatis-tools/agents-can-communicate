@@ -132,6 +132,21 @@ test("sender environment cannot replace the bound receiver socket or thread", as
   assert.equal(h.state.queue.length, 1);
 });
 
+// #132: on 0.171.0 a message for a busy thread reached the model inside the
+// running turn; queued, it waited for the turn to end.
+test("a message for a busy session joins its running turn with the same fenced text", async t => {
+  const h = await nativeFixture(t);
+  const handshake = await native.bindNativeSession(h);
+  h.state.turns = [{ id: "turn_running", status: "inProgress" }];
+  const offer = await native.offerMessage({ ...h, binding: bindingOf(handshake), message });
+  assert.equal(offer.accepted, true);
+  assert.equal(h.state.queue.length, 0);
+  assert.equal(h.state.steered.length, 1);
+  assert.equal(h.state.steered[0].expectedTurnId, "turn_running");
+  assert.equal(h.state.steered[0].clientUserMessageId, message.messageId);
+  assert.match(h.state.steered[0].input[0].text, /```acc-peer-body[\s\S]*diagnostic peer message/);
+});
+
 test("missing event cwd, wrong identity, PID and a daemon below the minimum never bind", async t => {
   const h = await nativeFixture(t);
   for (const changed of [{ event: { sessionId: THREAD } },

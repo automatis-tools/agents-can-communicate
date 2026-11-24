@@ -1,5 +1,25 @@
 # Changelog
 
+## Unreleased — a busy Codex session reads a peer message inside its running turn
+
+- **A message for a Codex session that is running a turn joins that turn.** Previously the
+  daemon queued the message until the turn ended, which could be minutes. Now ACC reads the
+  newest turn of the thread and adds the message to it with `turn/steer`. The model reads the
+  message at its next request in that turn. On Codex 0.171.0 a question sent 7 s into a turn
+  was answered 6 s later, while the turn ran on for another minute. The message is queued as
+  before in three cases: no turn is running, the turn ends before the steer, or the daemon
+  cannot list turns. Certification records the busy behaviour as `presented_in_running_turn`
+  for 0.171.0.
+
+| Development artifact | Value |
+|---|---|
+| Built from | `ff34f9481bb2a56da4a88c7001ad3d2335b6a58f` |
+| Tarball | `agents-can-communicate-0.15.3.tgz`, 671,024 bytes, 397 files |
+| sha256 | `e2f8e065c07b596336f5789b5623f399b881630bc935727e5e9deffac8428703` |
+
+The exact archive passed package verification. Its Codex code is the captured archive's; it
+also carries the main branch's token-cost change (#135), documentation, certification and fixtures. See
+[development evidence](docs/release-evidence/codex-turn-steer-2026-11-23.md).
 ## Unreleased — what ACC's injected context costs in tokens
 
 - **The token cost of every text ACC injects is measured and published.**

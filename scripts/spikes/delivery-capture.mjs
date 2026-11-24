@@ -13,6 +13,7 @@ import { assertAntigravityDesktopRunEvidence } from "../e2e/antigravity-desktop-
 import { assertAntigravityRunEvidence } from "../e2e/antigravity-relay-evidence.mjs";
 import { assertClaudeInboxRunEvidence } from "../e2e/claude-inbox-evidence.mjs";
 import { assertRunEvidence } from "../e2e/codex-local-daemon-evidence.mjs";
+import { CODEX_STEER_SUITE, assertCodexSteerRunEvidence } from "../e2e/codex-steer-evidence.mjs";
 import { assertKimiWebRunEvidence } from "../e2e/kimi-web-evidence.mjs";
 
 export const CAPTURE_CAPABILITY = "native_delivery";
@@ -20,7 +21,10 @@ export const CAPTURE_CAPABILITY = "native_delivery";
 // Each client's installed-product matrix is its own closed shape, so the
 // validator is chosen by the capture's client and never substitutes for another.
 export const INSTALLED_PRODUCT_EVIDENCE = Object.freeze({
-  "codex-cli": assertRunEvidence,
+  // Codex has two matrices: the twenty-case queue run, and the five-case run of
+  // delivery into a running turn (#132), which names its suite.
+  "codex-cli": evidence => (evidence?.suite === CODEX_STEER_SUITE
+    ? assertCodexSteerRunEvidence(evidence) : assertRunEvidence(evidence)),
   "antigravity-cli": assertAntigravityRunEvidence,
   "antigravity-desktop": assertAntigravityDesktopRunEvidence,
   "claude-code": assertClaudeInboxRunEvidence,
@@ -60,7 +64,8 @@ export const DELIVERY_LAUNCH_MODES = Object.freeze([
 // tool calls of it (the Claude Code inbox) - or an explicit rejection.
 export const PASSING_DELIVERY_BRANCHES = Object.freeze({
   idle: Object.freeze(["offered"]),
-  busy: Object.freeze(["queued_after_turn", "presented_between_tool_calls", "rejected_busy"]),
+  busy: Object.freeze(["queued_after_turn", "presented_between_tool_calls",
+    "presented_in_running_turn", "rejected_busy"]),
   reply: Object.freeze(["routed"]),
   duplicate: Object.freeze(["same_message_id"]),
   fallback: Object.freeze(["queued"]),

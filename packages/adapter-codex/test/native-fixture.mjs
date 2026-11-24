@@ -19,7 +19,8 @@ export async function nativeFixture(t) {
   t.after(async () => { await new Promise(resolve => socket.close(resolve));
     await rm(root, { recursive: true, force: true }); });
   const state = { version: "0.152.1", loaded: [THREAD],
-    threads: [{ id: THREAD, cwd, status: { type: "idle" } }], queue: [], error: null };
+    threads: [{ id: THREAD, cwd, status: { type: "idle" } }], queue: [], turns: [], steered: [],
+    error: null };
   const calls = [];
   const peer = {
     notify() {}, async close() {},
@@ -37,6 +38,11 @@ export async function nativeFixture(t) {
           clientUserMessageId: params.clientUserMessageId, input: params.input };
         state.queue.push(item);
         return { queuedSubmission: item };
+      }
+      if (method === "thread/turns/list") return { data: state.turns.slice(0, 1), nextCursor: null };
+      if (method === "turn/steer") {
+        state.steered.push(params);
+        return { turnId: params.expectedTurnId };
       }
       throw new Error("unexpected method");
     },

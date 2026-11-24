@@ -12,8 +12,11 @@ import { openWebSocketPeer } from "./ws-json-rpc.mjs";
 // The Codex App Server queue protocol, captured on codex-cli 0.152.1. Every
 // method here is official and present in the generated schema: initialize,
 // thread/loaded/list, thread/list, metadata-only thread/read, thread/queue/list,
-// thread/queue/add, hooks/list. Thread history is never requested; metadata reads explicitly
-// exclude turns. Closed safe results only; no vendor string escapes to core.
+// thread/queue/add, hooks/list. Captured on 0.171.0 and used when the daemon
+// answers them: thread/turns/list for the newest turn's id and status, with
+// its items not loaded, and turn/steer. Thread history is never requested;
+// metadata reads explicitly exclude turns. Closed safe results only; no vendor
+// string escapes to core.
 
 export const PROTOCOL_CONTRACT = "codex-app-server-thread-queue-v1";
 export const MINIMUM_VERSION = "0.152.1";
@@ -252,6 +255,52 @@ export async function addCodexQueueMessage(peer, { threadId, messageId, text }) 
       { code: "EPROTOCOL" });
   }
   return { accepted: true, duplicate: false, queuedSubmissionId: submission.id };
+}
+
+// The newest turn of a thread, when it is running. Only its id and status are
+// read: `notLoaded` leaves its items out. A daemon that cannot answer, such as
+// one older than the method or a thread with no turn yet, has no running turn
+// to steer, and the message takes the queue. A broken connection still fails.
+export async function runningCodexTurn(peer, { threadId }) {
+  let listed;
+  try {
+    listed = await peer.request("thread/turns/list", { threadId, limit: 1, itemsView: "notLoaded" });
+  } catch (error) {
+    if (Number.isInteger(error?.code)) return null;
+    throw error;
+  }
+  const newest = Array.isArray(listed?.data) ? listed.data[0] : undefined;
+  return newest?.status === "inProgress" && typeof newest.id === "string" && newest.id !== ""
+    ? newest.id : null;
+}
+
+// A message for a busy thread joins its running turn: Codex adds it to the
+// turn's input, and the model reads it at its next request in that turn. The
+// queue would hold it until the turn ends. Steering names the turn it read,
+// so a turn that ended in between refuses it, and the message is queued.
+// A message still waiting in the queue is that same offer, never a second one.
+export async function deliverCodexMessage(peer, { threadId, messageId, text }) {
+  const listed = await peer.request("thread/queue/list", { threadId });
+  const existing = queueEntries(listed).find(item => item.clientUserMessageId === messageId);
+  if (existing) return { accepted: true, duplicate: true, queuedSubmissionId: existing.id };
+  const turnId = await runningCodexTurn(peer, { threadId });
+  if (turnId !== null) {
+    let steered;
+    try {
+      steered = await peer.request("turn/steer", { threadId, expectedTurnId: turnId,
+        input: [{ type: "text", text }], clientUserMessageId: messageId });
+    } catch (error) {
+      if (!Number.isInteger(error?.code)) throw error;
+    }
+    if (steered !== undefined) {
+      if (steered?.turnId !== turnId) {
+        throw Object.assign(new Error("steer acknowledgement did not name the running turn"),
+          { code: "EPROTOCOL" });
+      }
+      return { accepted: true, duplicate: false, steeredTurnId: turnId };
+    }
+  }
+  return addCodexQueueMessage(peer, { threadId, messageId, text });
 }
 
 export function safeReason(error) {
