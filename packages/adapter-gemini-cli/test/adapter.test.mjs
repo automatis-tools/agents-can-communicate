@@ -89,13 +89,18 @@ test("the installed extension carries a stamped manifest and coordination skill"
   const target = path.join(context.home, ".gemini", "extensions", "agents-can-communicate");
 
   assert.deepEqual((await readdir(target)).sort(),
-    ["acc-cli.sh", "gemini-extension.json", "hooks", "skills"]);
+    ["ACC.md", "acc-cli.sh", "gemini-extension.json", "hooks", "skills"]);
   const manifest = JSON.parse(await readFile(
     path.join(target, "gemini-extension.json"), "utf8"));
   assert.equal(manifest.name, "agents-can-communicate");
   assert.equal(manifest.version, await adapterVersion(),
     "installed extension manifest drifted from the adapter package version");
-  assert.equal(manifest.contextFileName, "skills/acc/SKILL.md");
+  // A short pointer stays in context; Gemini CLI lists the skill itself and loads it on use (#135).
+  assert.equal(manifest.contextFileName, "ACC.md");
+  const pointer = await readFile(path.join(target, "ACC.md"), "utf8");
+  assert.ok(Buffer.byteLength(pointer) < 600, `${Buffer.byteLength(pointer)} bytes`);
+  assert.match(pointer, /`acc` skill/);
+  assert.match(pointer, /skills\/acc\/SKILL\.md/);
 });
 
 test("hook entries carry the name and timeout this client supports", async t => {

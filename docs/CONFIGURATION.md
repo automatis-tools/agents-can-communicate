@@ -52,6 +52,39 @@ link can point anywhere, including at a file the repository does not control.
 | `requiredAdapters` | Validated compatibility metadata; does not affect `acc doctor` diagnostics | `[]` |
 | `extensions` | Anything else, namespaced by whoever wrote it | `{}` |
 
+### What the injected context costs in tokens
+
+`contextBudgetBytes` limits bytes. Each client counts tokens with its own tokenizer. The
+table gives the tokens of each text ACC puts in front of a model, measured on 2026-11-23
+with the clients' own usage reports. A turn's text includes the owner header line.
+
+| Text | When the model gets it | Claude Code | Codex | Gemini CLI | Kimi Code |
+|---|---|---|---|---|---|
+| Skill listing | every request, while ACC is installed | 60 | 35 | 36 | 35 |
+| Owner header | session start, and again on every turn | 142 | 104 | 136 | 100 |
+| Turn with two peers present | a turn with nothing to act on | 168 | 120 | 141 | 116 |
+| Turn with three messages waiting | a question, a request and a note | 821 | 569 | 642 | 577 |
+| Turn after them | the replies still owed | 174 | 122 | 150 | 118 |
+| Inbox wake | a live message reaches an idle session | 125 | - | - | - |
+| The `acc` skill | once, when a model loads it | 7,606 | 5,321 | 4,929 | 4,683 |
+
+Measured on Claude Code 2.1.331 (`claude-opus-5-5`, 1,000,000-token window), Codex 0.171.0
+(`gpt-6.2-sol`, 475,000), Gemini CLI 0.60.0 (`gemini-3.1-flash-lite`, 1,048,576) and Kimi
+Code 2.5.3 (`k3.1-pro`, 1,048,576). The skill differs per client in its paths and examples.
+
+The rule ACC keeps: a session with no peer pays under 0.1% of its context window at start,
+and the skill is loaded only when a model needs it. With ACC installed and no peer, the
+first request of a session grows by 499 tokens on Claude Code, 208 on Codex, 476 on Gemini
+CLI and 195 on Kimi Code. A long session pays the owner header on every turn: 100 turns
+add about 10,000 to 14,000 tokens, about 1% of a million-token window. When peers
+coordinate, a turn stays under the byte budget above, and loading the skill costs about
+0.5% to 1.1% of the window once.
+
+To measure again, run `node scripts/measure/context-tokens.mjs` with an ACC package and a
+HOME that holds only the clients' sign-ins. `node scripts/measure/skill-tasks.mjs` checks
+that a small and a large model still reply, read a note, claim a file and hand work over
+with the skill as it is.
+
 `policy.claimMode` and `requiredAdapters` are stored but have no claim or doctor effect in
 0.4. CLI claims default to advisory; request `--enforcement guarded` on each claim when
 appropriate, subject to every live participant's certified guard. MCP claims remain
