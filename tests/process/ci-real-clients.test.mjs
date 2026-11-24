@@ -37,15 +37,24 @@ else { process.stdout.write(value.stdout ?? ({claude:'2.1.312 (Claude Code)\\n',
 process.stderr.write(value.stderr??'');process.exitCode=value.code??0; }
 `);
   const files = {};
-  for (const name of ["first", "approval", "second"]) {
+  for (const name of ["first", "approval", "second", "live"]) {
     files[name] = path.join(root, `${name}.test.mjs`);
     await writeFile(files[name], "import test from 'node:test'; test('one',()=>{}); test('two',()=>{});\n");
   }
   const env = { ...process.env, ...identity, RUNNER_TEMP: root, FIXTURE_CALLS: calls,
     FIXTURE_CONFIG: "{}", ...changes };
   delete env.NODE_TEST_CONTEXT;
-  const testCalls = [];
+  const testCalls = [], standardUserCalls = [];
   const dependencies = { npmCli: async () => program, spawn(executable, args, options) {
+    // On Windows the live phase runs its test file as a standard user.
+    if (executable === process.execPath && args[0] === "scripts/ci-standard-user.mjs") {
+      // The exact version is each test's to check: it is the observed one.
+      standardUserCalls.push([...args]);
+      assert.equal(args[1], "--npm-global");
+      assert.match(args[2], /^@openai\/codex@\d+\.\d+\.\d+$/);
+      assert.equal(args[3], process.execPath);
+      args = args.slice(4);
+    }
     const isTest = args[0] === "--test";
     if (isTest) {
       assert.equal(executable, process.execPath);
@@ -54,6 +63,7 @@ process.stderr.write(value.stderr??'');process.exitCode=value.code??0; }
         "tests/acceptance/real-clients-stub.test.mjs": "first",
         "tests/acceptance/codex-command-approval.test.mjs": "approval",
         "tests/acceptance/real-claude-live-stub.test.mjs": "second",
+        "tests/acceptance/codex-live-daemon-stub.test.mjs": "live",
       };
       assert.equal(args.length, 3, "each phase must run exactly one acceptance file");
       const target = targets[args[2]];
@@ -85,7 +95,7 @@ process.stderr.write(value.stderr??'');process.exitCode=value.code??0; }
     const report = JSON.parse(await readFile(path.join(evidenceDir, "compatibility.json"), "utf8"));
     return { code, report, phases: Object.fromEntries(report.phases.map(phase => [phase.id, phase])) };
   };
-  return { root, env, files, invoke, program, calls, testCalls, dependencies,
+  return { root, env, files, invoke, program, calls, testCalls, standardUserCalls, dependencies,
     config(value) { env.FIXTURE_CONFIG = JSON.stringify(value); } };
 }
 
@@ -113,7 +123,7 @@ test("pinned PR runs exact installs, behavioral commands and complete evidence",
   assert.equal(r.conditions.modelEndpoint, "loopback-stub");
   assert.equal(r.conditions.privateClientHomes, true);
   assert.equal(r.conditions.packedAcc, true);
-  for (const id of ["install", "claude-version", "codex-version", "hooks", "interactive"]) {
+  for (const id of ["install", "claude-version", "codex-version", "hooks", "interactive", "codex-live"]) {
     assert.equal(p[id].status, "passed", id);
     assert.equal(p[id].exitCode, 0);
     assert.ok(p[id].durationMs >= 0);
@@ -135,14 +145,23 @@ test("command approval runs strictly between hooks and interactive on POSIX and 
     assert.equal(r.status, "passed");
     const approval = ["--test", "--test-reporter=tap", "tests/acceptance/codex-command-approval.test.mjs"];
     assert.deepEqual(p["command-approval"].args, approval);
+    const live = ["--test", "--test-reporter=tap", "tests/acceptance/codex-live-daemon-stub.test.mjs"];
     assert.deepEqual(f.testCalls, platform === "win32" ? [
       ["--test", "--test-reporter=tap", "tests/acceptance/real-clients-stub.test.mjs"],
       ["--test", "--test-reporter=tap", "tests/acceptance/real-claude-live-stub.test.mjs"],
+      live,
     ] : [
       ["--test", "--test-reporter=tap", "tests/acceptance/real-clients-stub.test.mjs"],
       approval,
       ["--test", "--test-reporter=tap", "tests/acceptance/real-claude-live-stub.test.mjs"],
+      live,
     ]);
+    // Only Windows runs the live check as a standard user, with the observed
+    // Codex in a private prefix.
+    assert.deepEqual(f.standardUserCalls, platform === "win32" ? [["scripts/ci-standard-user.mjs",
+      "--npm-global", "@openai/codex@0.165.0", process.execPath, ...live]] : []);
+    assert.equal(p["codex-live"].status, "passed");
+    assert.equal(p["codex-live"].tests.pass, 2);
     assert.equal(p.hooks.status, "passed");
     assert.equal(p.interactive.status, "passed");
     assert.equal(p.pywinpty.status, platform === "win32" ? "passed" : "not-applicable");
@@ -166,15 +185,19 @@ test("command approval runs strictly between hooks and interactive on POSIX and 
 
 test("main and manual latest retain moving installs while other events cannot install", async t => {
   for (const [event, ref, code] of [["push", "refs/heads/main", 0], ["workflow_dispatch", "refs/heads/main", 0],
-    ["push", "refs/heads/other", 1], ["schedule", "refs/heads/main", 1]]) {
+    ["push", "refs/heads/other", 1], ["schedule", "refs/heads/main", 1]]) for (const platform of ["linux", "win32"]) {
     const f = await fixture(t, { GITHUB_EVENT_NAME: event, GITHUB_REF: ref,
       GITHUB_WORKFLOW: event === "workflow_dispatch" ? "Client compatibility (latest)" : "CI" });
     f.config({ claude: { stdout: "9.2.1 (Claude Code)\n" }, codex: { stdout: "codex-cli 8.4.2\n" } });
-    const { report: r, phases: p, code: actual } = await f.invoke();
-    assert.equal(actual, code);
+    const { report: r, phases: p, code: actual } = await f.invoke({ platform });
+    assert.equal(actual, code, `${event} ${ref} ${platform}`);
     if (code === 0) {
       assert.equal(r.policy, "latest");
       assert.deepEqual(p.install.args.slice(1), ["install", "--global", "@anthropic-ai/claude-code", "@openai/codex"]);
+      // A moving install has no requested version; the live check on Windows
+      // installs the one the runner observed.
+      assert.deepEqual(f.standardUserCalls.map(args => args[2]),
+        platform === "win32" ? ["@openai/codex@8.4.2"] : []);
     } else assert.equal(p.install.status, "not-run");
   }
 });
@@ -239,18 +262,20 @@ test("actual failed, empty, skipped, todo and cancelled TAP processes cannot pas
   for (const [body, expected] of [["test('bad',()=>{throw Error('behavior fault')})", "fail"],
     ["test('present-case',()=>{})", "tests"], ["test.skip('skipped',()=>{})", "skipped"], ["test.todo('later')", "todo"],
     ["test('cancelled',{timeout:20},()=>new Promise(()=>{}))", "cancelled"]]) {
-    for (const target of ["first", "approval", "second"]) {
+    for (const target of ["first", "approval", "second", "live"]) {
       const f = await fixture(t);
       if (expected === "tests") f.env.FIXTURE_ZERO = target;
       await writeFile(f.files[target], `import test from 'node:test'; ${body};\n`);
       const { code, report: r, phases: p } = await f.invoke(target === "approval" ? { platform: "linux" } : {});
       assert.equal(code, 1, `${expected} ${target}`);
-      const phase = p[{ first: "hooks", approval: "command-approval", second: "interactive" }[target]];
+      const phase = p[{ first: "hooks", approval: "command-approval", second: "interactive", live: "codex-live" }[target]];
       assert.equal(phase.status, "failed");
       // Node 24 wraps a no-matching-test file as one passing file; its empty
       // plan still must fail this compatibility gate, with raw counters intact.
       assert.equal(phase.tests[expected], 1);
-      if (target !== "second") assert.equal(p.interactive.status, "not-run");
+      if (!["second", "live"].includes(target)) assert.equal(p.interactive.status, "not-run");
+      if (target !== "live") assert.equal(p["codex-live"].status, "not-run", "an earlier failure blocks the live check");
+      if (target === "live") assert.equal(p.interactive.status, "passed");
       if (target === "first" && process.platform !== "win32") assert.equal(p["command-approval"].status, "not-run");
       if (target !== "first") assert.equal(p.hooks.status, "passed");
       if (target === "approval") {

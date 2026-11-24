@@ -76,6 +76,11 @@ export async function runRealClients({ cwd, env, evidenceDir, platform = process
   if (platform !== "win32") Object.assign(terminal, { status: "not-applicable", reason: "POSIX uses Python pty" });
   const interactive = phase("interactive", process.execPath,
     ["--test", "--test-reporter=tap", "tests/acceptance/real-claude-live-stub.test.mjs"]);
+  // Codex's daemon and ACC's live delivery through it (#251). Windows runs it as
+  // a standard user, the only token the daemon accepts, with the observed Codex
+  // in a private npm prefix: the runner's own prefix is writable by every user.
+  const live = phase("codex-live", process.execPath,
+    ["--test", "--test-reporter=tap", "tests/acceptance/codex-live-daemon-stub.test.mjs"]);
   await mkdir(evidenceDir, { recursive: true });
   const checkpoint = async () => {
     const file = path.join(evidenceDir, "compatibility.json");
@@ -205,6 +210,12 @@ export async function runRealClients({ cwd, env, evidenceDir, platform = process
     if (report.failure) return finish();
   }
   await behavior(interactive);
+  if (report.failure) return finish();
+  if (platform === "win32") {
+    live.args = ["scripts/ci-standard-user.mjs", "--npm-global", `@openai/codex@${report.observedClients.codex.version}`,
+      process.execPath, ...live.args];
+  }
+  await behavior(live);
   return finish();
 }
 
