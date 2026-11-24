@@ -1298,6 +1298,22 @@ Measured at the time: in a `CODEX_HOME` with no standalone package, 0.157.1's
 `app-server-daemon/daemon.pid` and `daemon-updater.*`, with `managedCodexPath`
 `packages/app-server-daemon/current/bin/codex`. Supported since the 2026-09-29 capture below.
 
+## Service file access on Linux and Windows — Codex 0.165.0 and 0.172.0, 2026-11-24
+
+Measured on GitHub's `ubuntu-latest` and `windows-latest` runners with a fresh Codex home and
+`codex app-server daemon start`:
+
+- Linux (`x86_64-unknown-linux-musl`): the self-installed
+  `packages/app-server-daemon/releases/<version>/bin/codex` has mode `0777` in directories with
+  mode `755`; `app-server-control` and `app-server-daemon` are `700`. Any local account that can
+  reach the file can replace the daemon. ACC refuses it with `unsafe_service_executable`, names
+  the file and its mode, and tells the person to run `chmod go-w <file>` (#446). On macOS 0.172.0
+  installs the same file with mode `755`.
+- Windows: Node reports mode `40666` for every directory and `100666` for `codex.exe`, so ACC
+  checks these paths by their access control lists (#445). For a standard user the daemon
+  started; for an elevated token Codex refused: "start the Windows daemon from a non-elevated
+  terminal".
+
 ## The LocalDaemon minimum applies on every platform, 2026-09-26
 
 The 0.152.1 and 0.153.4 captures above were taken on darwin-arm64, and the contract,

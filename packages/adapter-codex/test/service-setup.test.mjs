@@ -402,6 +402,34 @@ test("a POSIX service directory others can write is refused with its path and mo
   assert.ok(plan.diagnostic.includes(f.codexHome), plan.diagnostic);
 });
 
+// Codex 0.165.0 and 0.172.0 install the Linux daemon executable with mode 0777
+// (#446). ACC refuses it, names it, gives the command that closes it, and
+// leaves the vendor's file as it is.
+test("a daemon executable others can write is refused with the command that closes it", async t => {
+  const f = await serviceFixture(t, { binLayout: true });
+  const managed = await realpath(f.managedPath);
+  await chmod(managed, 0o777);
+  const plan = await f.inspectNativeServiceSetup(f.context);
+  assert.equal(plan.state, "blocked");
+  assert.equal(plan.reasonCode, "unsafe_service_executable");
+  assert.equal(plan.unsafePath, managed);
+  assert.deepEqual(plan.unsafeWriters, ["mode 777"]);
+  assert.ok(plan.diagnostic.includes(`run chmod go-w "${managed}", then retry`), plan.diagnostic);
+  assert.equal((await lstat(managed)).mode & 0o777, 0o777, "ACC must not change the vendor's file");
+  await chmod(managed, 0o755);
+  assert.equal((await f.inspectNativeServiceSetup(f.context)).state, "needed");
+});
+
+test("an owner that is not the user gets no chmod advice", async t => {
+  const f = await serviceFixture(t, { binLayout: true });
+  const foreign = Object.assign(new Error("unsafe_service_directory"), { reasonCode: "unsafe_service_directory",
+    unsafePath: f.codexHome, unsafeWriters: ["owner uid 0"] });
+  const setup = createCodexServiceSetup({ run: f.run, probe: f.probe, readAcls: async () => { throw foreign; } });
+  const plan = await setup.inspectNativeServiceSetup({ ...f.context, platform: "win32-x64" });
+  assert.equal(plan.reasonCode, "unsafe_service_directory");
+  assert.doesNotMatch(plan.diagnostic, /chmod/);
+});
+
 test("a service path of the wrong kind is refused with its path and kind", async t => {
   const f = await serviceFixture(t, { binLayout: true });
   const control = path.dirname(f.socketPath);

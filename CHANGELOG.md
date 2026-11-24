@@ -1,5 +1,22 @@
 # Changelog
 
+## Unreleased — a world-writable Codex daemon on Linux is refused with its repair
+
+- **`acc install` names the Codex daemon executable that anyone can replace, and the command
+  that fixes it.** Codex 0.165.0 and 0.172.0 install the Linux daemon executable with mode
+  `0777`, so ACC refuses it with `unsafe_service_executable`. The refusal now names the file and
+  its mode, and gives the command to run: `chmod go-w "<file>"`. ACC does not change the vendor's
+  file itself (#446).
+
+| Development artifact | Value |
+|---|---|
+| Built from | `04055c1505129e8b2b2aa1ec38d617d811181378` |
+| Tarball | `agents-can-communicate-0.15.4.tgz`, 675,007 bytes, 398 files |
+| sha256 | `516a30ecbbad3f28b683e66326ce4510d97574d5637d71a3cc68cdf9381d9360` |
+
+The exact archive passed package verification. See
+[development evidence](docs/release-evidence/linux-daemon-mode-2026-11-24.md).
+
 ## Unreleased — ACC checks Codex service access on Windows by its access lists
 
 - **Codex live delivery can become ready on Windows.** Before ACC trusts the Codex service, it
