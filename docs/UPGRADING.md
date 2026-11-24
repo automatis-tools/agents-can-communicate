@@ -1,5 +1,20 @@
 # Upgrading
 
+## From 0.15.3 to 0.15.4
+
+Update as usual with `acc update`, or let the automatic update run. Version 0.15.4 keeps store
+contract 8 and adds no data migration. Codex keeps trusting ACC's hooks: their plugin's files are
+unchanged, so this update asks nothing.
+
+Kimi Code and Gemini CLI stop loading the whole `acc` skill into every session. The update
+rewrites Kimi Code's plugin manifest so that it only lists the skill. It also gives Gemini CLI's
+extension a short `ACC.md` context file in place of the skill. Sessions that start after the
+update get the change.
+
+A busy Codex session now receives a peer message inside its running turn, where it waited for
+the turn to end before. No setting changes this, and an idle session still starts a turn for the
+message as before.
+
 ## From 0.15.2 to 0.15.3
 
 Update as usual with `acc update`, or let the automatic update run. Version 0.15.3 keeps store

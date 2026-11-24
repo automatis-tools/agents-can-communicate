@@ -1,6 +1,6 @@
 {
   "name": "agents-can-communicate",
-  "version": "0.15.3",
+  "version": "0.15.4",
   "description": "Coordinate this Gemini CLI session with other AI agent sessions working in the same workspace.",
   "contextFileName": "ACC.md"
 }
