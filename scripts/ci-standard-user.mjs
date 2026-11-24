@@ -105,7 +105,17 @@ export async function runAsStandardUser(command, args, { cwd = process.cwd(), en
         const launched = await readFile(path.join(work, "launcher.log"), "utf8").catch(() => "(no launcher log)");
         throw new Error(`the task did not start as ${user}\n${query}\n${launched}`);
       }
-      if (Date.now() > resultDeadline) throw new Error(`no result from the task as ${user}`);
+      if (Date.now() > resultDeadline) {
+        // What the command printed so far, and what still runs as the user,
+        // is the only evidence of where it stopped.
+        process.stdout.write(await readFile(job.stdout).catch(() => "(no stdout)\n"));
+        process.stderr.write(await readFile(job.stderr).catch(() => "(no stderr)\n"));
+        const running = await powershell("Get-CimInstance Win32_Process | Where-Object {"
+          + " (Invoke-CimMethod -InputObject $_ -MethodName GetOwner -ErrorAction SilentlyContinue).User -eq $env:ACC_SU_NAME }"
+          + " | ForEach-Object { \"$($_.ProcessId) $($_.ParentProcessId) $($_.CommandLine)\" }",
+        { ...env, ACC_SU_NAME: user }).then(({ stdout }) => stdout, error => error.message);
+        throw new Error(`no result from the task as ${user}; its processes:\n${running}`);
+      }
       await delay(1_000);
     }
   } finally {

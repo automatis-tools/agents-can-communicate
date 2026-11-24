@@ -40,6 +40,10 @@ async function stopProcessesUnder(directory) {
   }
 }
 
+// Each step is logged as it starts: a run that stops answering is then
+// placed by the last line it printed.
+const step = label => process.stderr.write(`codex-live: ${label}\n`);
+
 async function until(label, check, { timeoutMs = 120_000, everyMs = 500 } = {}) {
   const deadline = Date.now() + timeoutMs;
   for (;;) {
@@ -57,6 +61,7 @@ test("a peer message reaches an idle Codex thread through the app-server daemon"
     // is stopped first.
     let stopDaemon = async () => {};
     t.after(() => stopDaemon());
+    step("packing ACC");
     const packed = await createPackedAcc(t);
     const stub = await startModelStub({ reply: "noted" });
     t.after(() => stub.close());
@@ -81,8 +86,17 @@ test("a peer message reaches an idle Codex thread through the app-server daemon"
     const acc = async args => JSON.parse((await run(process.execPath, [packed.accBin, ...args, "--json"],
       { cwd: packed.project, env })).stdout).data;
 
-    const install = async () => (await acc(["install", "--adapter", "codex", "--delivery", "actionable",
-      "--home", packed.clientHome])).operations[0]?.nativeServiceSetup;
+    // An install that leaves the service unprepared exits non-zero and still
+    // reports, on stdout, which step stopped and why.
+    const install = async () => {
+      const { stdout } = await run(process.execPath, [packed.accBin, "install", "--adapter", "codex",
+        "--delivery", "actionable", "--home", packed.clientHome, "--json"], { cwd: packed.project, env })
+        .catch(error => (typeof error.stdout === "string" && error.stdout.trim() ? error
+          : Promise.reject(error)));
+      const reported = JSON.parse(stdout);
+      return reported.data?.operations?.[0]?.nativeServiceSetup ?? { unreported: reported };
+    };
+    step("installing ACC for Codex");
     let service = await install();
     stopDaemon = async () => {
       await run(codex, ["app-server", "daemon", "stop"], { env, timeout: 30_000 }).catch(() => {});
@@ -100,6 +114,7 @@ test("a peer message reaches an idle Codex thread through the app-server daemon"
     }
     assert.equal(service?.state, "ready", `the Codex daemon did not start: ${JSON.stringify(service)}`);
 
+    step("connecting to the daemon");
     const peer = openCodexAppServer({ socketPath: controlSocketPath(env), timeoutMs: 30_000 });
     t.after(() => peer.close?.());
     await initializeCodex(peer);
@@ -123,6 +138,7 @@ test("a peer message reaches an idle Codex thread through the app-server daemon"
 
     // One turn in a daemon thread: its SessionStart hook attaches it and binds
     // the thread to the daemon's endpoint.
+    step("starting a daemon thread");
     const started = await peer.request("thread/start", { cwd: packed.project });
     const threadId = started?.thread?.id;
     assert.equal(typeof threadId, "string", JSON.stringify(started));
@@ -139,6 +155,7 @@ test("a peer message reaches an idle Codex thread through the app-server daemon"
 
     // The thread is idle. The send records the message and offers it through
     // the daemon, which starts a turn with it.
+    step("sending the peer message");
     const before = stub.requests.length;
     const sent = await acc(["message", "--to", participant, "--type", "question", "--subject", "live",
       "--body", "PEER-BODY-LIVE-FOR-CODEX", ...owner]);
@@ -146,5 +163,6 @@ test("a peer message reaches an idle Codex thread through the app-server daemon"
     await until("the message to reach the model", () => stub.requests.slice(before)
       .some(item => item.url.includes("/responses") && promptText(item).includes("PEER-BODY-LIVE-FOR-CODEX")));
 
+    step("uninstalling");
     await acc(["uninstall", "--adapter", "codex", "--home", packed.clientHome]);
   });
