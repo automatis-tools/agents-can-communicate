@@ -31,7 +31,7 @@ On 2026-11-24 a throwaway workflow ran Codex as a standard local user created in
 
 ## Development candidate
 
-- Source: clean commit `d8b050c61380e6fdff0acfb542b995222982e16b`.
+- Source: clean commit `4412ce47d319f16e1d4b760c14755ff466166a1a`.
 - `agents-can-communicate-0.15.4.tgz`, 674,442 bytes, 398 files.
 - SHA-256: `f0e3412a9f72d7d49ed94634b300f11043fde3fa807a8a3be40e1dd18934cb4d`.
 - The exact archive passed `scripts/verify-package.mjs`.
@@ -40,8 +40,10 @@ On 2026-11-24 a throwaway workflow ran Codex as a standard local user created in
 
 - `packages/adapter-sdk/test/windows-acl.test.mjs`: the writer rules for each write right, rules
   that do not apply to the path itself, owners, unreadable lists, the PowerShell order and the
-  dropped module path. On Windows it also reads a real temporary directory, grants Users a write
-  right with `icacls`, and finds Users as a writer.
+  dropped module path. On Windows it also reads a real temporary directory. It makes the directory private with
+  `icacls`, finds no other writer, grants Users a write right, and finds Users as a writer. On the
+  CI runner the fresh temporary directory was not private: it inherits WriteData and AppendData
+  for `BUILTIN\Users` from `D:\`.
 - `packages/adapter-codex/test/service-setup.test.mjs`: on a Windows platform, a Codex home with
   mode `0o777` and private lists is prepared; a write right for Users on the Codex home is refused
   with the path and `BUILTIN\Users (S-1-5-32-545)`; an unreadable list is refused. On POSIX a
