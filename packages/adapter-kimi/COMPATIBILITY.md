@@ -29,6 +29,12 @@ carries are `name`, `version`, `description`, `skills`, `sessionStart.skill`,
 `config.toml`, and there is no project-level config to put them in, so ACC edits the
 user's global file.
 
+ACC's manifest declares only `skills`. Until #135 it also set `sessionStart.skill = "acc"`,
+which loads the whole skill into every session at start: measured on 2.5.3 with
+`k3.1-pro`, 4,683 tokens in every session, peers or not. Without it, Kimi lists the skill
+(35 tokens) and a model loads it when the hook context asks for it. `kimi-for-coding` and
+`k3.1-pro` replied to a peer, read a note, claimed a file and handed work over both ways.
+
 That is why ACC owns a delimited region rather than parsing the file: ACC ships without
 dependencies, and a hand-written TOML round-tripper would take the user's comments and
 formatting down with it. Install rewrites the region between the markers; everything

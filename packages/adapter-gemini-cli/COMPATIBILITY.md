@@ -182,6 +182,19 @@ different model than the turn, so a stand-in endpoint must answer both
 `:streamGenerateContent?alt=sse` (the turn itself, as SSE). Answering only the second makes
 the client retry the first and give up before offering any tool.
 
+## The skill is listed, not preloaded (2026-11-23, 0.60.0)
+
+The extension's `contextFileName` used to be the skill itself, so every session started
+with the whole skill in its context: 4,929 tokens on `gemini-3.1-flash-lite`, peers or not.
+Gemini CLI 0.60.0 also loads an extension's `skills/` directory as skills, listed by name
+and description and activated on use, so the skill was there twice. The context file is
+now `ACC.md`: a few lines that say when to load the `acc` skill, and where its `SKILL.md`
+is for a client without skills. A session with no peer now starts 476 tokens heavier
+instead of 5,370. With either context file, `gemini-3.1-flash-lite` replied to a peer, read a
+note, claimed a file and handed work over; the free API tier allowed no larger model that
+day. Which earlier release first loaded extension skills is not verified; on
+such a client a model reads the skill file the pointer names.
+
 ## The extension's hooks.json is a template, measured 2026-08-17 on 0.55.1
 
 This client loads an extension's own `hooks/hooks.json` **in addition to** the

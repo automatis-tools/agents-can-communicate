@@ -20,6 +20,28 @@
 The exact archive passed package verification. It differs from the captured archive only in
 documentation, certification and fixtures. See
 [development evidence](docs/release-evidence/codex-turn-steer-2026-11-23.md).
+## Unreleased — what ACC's injected context costs in tokens
+
+- **The token cost of every text ACC injects is measured and published.**
+  `docs/CONFIGURATION.md` lists each text next to the byte budget, in the tokens of Claude
+  Code, Codex, Gemini CLI and Kimi Code: the owner header, a turn with peers, a turn with three
+  messages, the reminder after them, the skill listing and the skill. With no peer, ACC adds
+  195 to 499 tokens to a session's first request. Run the measurement again with
+  `node scripts/measure/context-tokens.mjs`. `node scripts/measure/skill-tasks.mjs` checks the
+  skill wording with a small and a large model.
+- **Kimi Code and Gemini CLI load the `acc` skill only when a model needs it.** Both used to
+  load the whole skill into every session, about 4,700 and 4,900 tokens even with no peer. Kimi
+  now only lists it. Gemini CLI gets a short `ACC.md` pointer instead. Small and large models
+  still replied, read, claimed and handed work over.
+
+| Development artifact | Value |
+|---|---|
+| Built from | `6f8c5f42c719d0f8ebbacd4d666bb7ca5f382381` |
+| Tarball | `agents-can-communicate-0.15.3.tgz`, 668,095 bytes, 395 files |
+| sha256 | `ae9e1d3d1c4c870254c92b340eafd3f3a0b8fcf3543cacb8d6f058025d738016` |
+
+The exact archive passed package verification. Only `docs/CONFIGURATION.md` differs from the
+archive that was measured. See [development evidence](docs/release-evidence/context-tokens-2026-11-23.md).
 
 ## Unreleased — a peer body cannot imitate a second message
 
