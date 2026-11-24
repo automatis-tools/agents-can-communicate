@@ -8,7 +8,7 @@ import { probeNativeDelivery } from "./native-delivery.mjs";
 import { installCodexStandalone } from "./standalone-install.mjs";
 import { refusesConnections } from "./ws-json-rpc.mjs";
 import { approvedProcessIsDead, failMaintenance, maintenanceContext, probeMaintenanceCli,
-  probeMaintenanceInstall, readMaintenancePid, runMaintenanceCommand, verifyMaintenanceProcess }
+  probeMaintenanceInstall, readMaintenancePid, runMaintenanceCommand, sameServicePath, verifyMaintenanceProcess }
   from "./maintenance-host.mjs";
 
 const keys = ["home", "codexHome", "cliPath", "cliVersion", "managedPath", "managedVersion",
@@ -204,7 +204,8 @@ export function createCodexServiceSetup({ run = runMaintenanceCommand, probe = p
     if (version.status !== 0) failMaintenance("daemon_version_unavailable");
     const observed = JSON.parse(version.stdout);
     if (observed.status !== "running" || observed.backend !== "pid") failMaintenance("maintenance_backend_unsupported");
-    if (observed.managedCodexPath !== facts.managedPath || observed.socketPath !== facts.socketPath
+    if (!sameServicePath(observed.managedCodexPath, facts.managedPath, paths.platform)
+      || !sameServicePath(observed.socketPath, facts.socketPath, paths.platform)
       || observed.cliVersion !== facts.cliVersion || observed.managedCodexVersion !== facts.managedVersion
       || observed.appServerVersion !== facts.cliVersion) failMaintenance("daemon_identity_unavailable");
     const pid = await readMaintenancePid(paths.pidPath);

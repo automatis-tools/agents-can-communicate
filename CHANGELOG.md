@@ -1,5 +1,23 @@
 # Changelog
 
+## Unreleased — ACC accepts the Codex daemon on Windows when its path mixes separators
+
+- **Codex live delivery can become ready on Windows with the daemon Codex installs itself.**
+  Codex 0.165.0 reports its daemon executable as
+  `<CODEX_HOME>\packages/app-server-daemon\current\bin\codex.exe`, with both separators. ACC
+  compared that text with its own path, written with backslashes only, and refused the running
+  daemon with `daemon_identity_unavailable`. On Windows the comparison now reads `/` as `\`, as
+  Windows does; a path that names another file is still refused (#449).
+
+| Development artifact | Value |
+|---|---|
+| Built from | `d5f4ff42a1025203a9c4513190e24273e9b6f438` |
+| Tarball | `agents-can-communicate-0.15.4.tgz`, 675,293 bytes, 398 files |
+| sha256 | `879f3820898345fa8a418790bddc29df1b9508ec02ea8962e07b80c196441c64` |
+
+The exact archive passed package verification. See
+[development evidence](docs/release-evidence/windows-daemon-path-2026-11-24.md).
+
 ## Unreleased — a world-writable Codex daemon on Linux is refused with its repair
 
 - **`acc install` names the Codex daemon executable that anyone can replace, and the command

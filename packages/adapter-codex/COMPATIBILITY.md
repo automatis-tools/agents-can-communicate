@@ -1313,6 +1313,9 @@ Measured on GitHub's `ubuntu-latest` and `windows-latest` runners with a fresh C
   checks these paths by their access control lists (#445). For a standard user the daemon
   started; for an elevated token Codex refused: "start the Windows daemon from a non-elevated
   terminal".
+- Windows: `codex app-server daemon version` reports the self-installed executable as
+  `<CODEX_HOME>\packages/app-server-daemon\current\bin\codex.exe`, with both separators;
+  the socket path has backslashes only. ACC compares Windows paths with `/` read as `\` (#449).
 
 ## The LocalDaemon minimum applies on every platform, 2026-09-26
 
