@@ -1,0 +1,27 @@
+name: tmp codex live daemon
+on:
+  push:
+    branches: [test/codex-live-daemon-ci]
+jobs:
+  live:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24'
+      - run: npm ci
+      - run: npm install --global @openai/codex@0.165.0
+      - name: Linux
+        if: runner.os == 'Linux'
+        env: { ACC_REAL_CLIENTS: '1' }
+        run: node --test --test-reporter=tap tests/acceptance/codex-live-daemon-stub.test.mjs
+      - name: Windows as a standard user
+        if: runner.os == 'Windows'
+        env: { ACC_REAL_CLIENTS: '1' }
+        run: node scripts/ci-standard-user.mjs node.exe --test --test-reporter=tap tests/acceptance/codex-live-daemon-stub.test.mjs
