@@ -10,6 +10,7 @@ import { createReceiptService } from "./receipts.mjs";
 import { createSessionService } from "./sessions.mjs";
 import { createGuardStateService, createStatusService } from "./status.mjs";
 import { createSyncService } from "./sync.mjs";
+import { createWithdrawalService } from "./withdrawals.mjs";
 
 /**
  * Composition root for the domain services. Everything time- or
@@ -34,6 +35,7 @@ export function createCoordinationService({ store, clock, ids,
   const conversations = createConversationService(ports, sessions);
   const deliveryBindings = createDeliveryBindingService(ports, sessions);
   const inbox = createInboxService(ports, sessions);
+  const withdrawals = createWithdrawalService(ports, sessions);
   const receipts = createReceiptService(ports);
   const sync = createSyncService(ports, sessions);
   const status = createStatusService(ports, sessions, deliveryBindings);
@@ -61,6 +63,7 @@ export function createCoordinationService({ store, clock, ids,
     listDeliveryBindings: deliveryBindings.listDeliveryBindings,
     refreshDeliveryBinding: deliveryBindings.refreshDeliveryBinding,
     ...inbox,
+    ...withdrawals,
     ...receipts,
     ...sync,
     ...status,

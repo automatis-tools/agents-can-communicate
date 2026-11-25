@@ -3,7 +3,7 @@ import { AccError, EXIT } from "@agents-can-communicate/protocol";
 // Inbox retrieves bodies and advances receipts, so it needs the same owner
 // proof as a mutation. Public observations never need somebody else's token.
 const NEEDS_OWNER = Object.freeze(new Set(["work", "claim", "release", "message",
-  "inbox", "reply", "request", "ack", "finish"]));
+  "inbox", "reply", "request", "ack", "withdraw", "finish"]));
 const WANTS_OWNER = Object.freeze(new Set(["sync", "status"]));
 
 export const needsOwner = command => NEEDS_OWNER.has(command);

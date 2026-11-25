@@ -120,6 +120,8 @@ export async function recordMessageInTransaction({ tx, session, input: raw, now,
     handoff: input.handoff ?? null,
     ...(input.decisionChange === undefined ? {} : { decisionChange: input.decisionChange }),
     sentAt: now,
+    // Facts an older ACC must be able to read past, such as what a withdrawal withdraws (#145).
+    ...(input.extensions === undefined ? {} : { extensions: input.extensions }),
   });
   const recipientParticipantIds = addressedRecipients(tx, message, session);
   await tx.load("message", messageId);
