@@ -1,5 +1,25 @@
 # Changelog
 
+## Unreleased — doctor reports a session whose client exited as offline
+
+- **`acc doctor` no longer reports a session whose client exited as a failed handshake.** A
+  client that exits without a session end leaves its ACC session open. Presence calls it
+  offline, and the router offers it nothing: its messages wait until it returns. Doctor still
+  asked its receiver, then printed "the session handshake failed; check the client's
+  integration/channel setup" beside a last attempt that had succeeded. Doctor now names the
+  session offline and asks nothing. `acc status --json` lists no delivery binding for an offline
+  session, so the adapter line reads "no live channel bound in this workspace" where it read
+  "channel unreachable" (#453).
+
+| Development artifact | Value |
+|---|---|
+| Built from | `b3836f714b4b36562a34094fedd103094a73fdbe` |
+| Tarball | `agents-can-communicate-0.15.5.tgz`, 675,812 bytes, 398 files |
+| sha256 | `b87795e667e05b43ae87f57532784624ac627dd7be4fc239e7aabf66e356f74e` |
+
+The exact archive passed package verification. See
+[development evidence](docs/release-evidence/doctor-offline-session-2026-11-25.md).
+
 ## 0.15.5 — release candidate
 
 This release carries the work merged to main after 0.15.4: #440, #445, #446 and #449. It keeps
