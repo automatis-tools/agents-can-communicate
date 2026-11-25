@@ -1,5 +1,17 @@
 # Upgrading
 
+## From 0.15.5 to 0.15.6
+
+Update as usual with `acc update`, or let the automatic update run. Version 0.15.6 keeps store
+contract 8 and adds no data migration. Codex keeps trusting ACC's hooks: their plugin's files are
+unchanged, so this update asks nothing.
+
+`acc doctor` now reports a session whose client exited without a session end as `offline`. It
+no longer reports such a session as a failed handshake with advice to check the integration.
+`acc status --json` lists no delivery binding for an offline session, so doctor's adapter line
+reads "no live channel bound in this workspace" where it read "channel unreachable". Messages to
+an offline session still wait until it returns (#453).
+
 ## From 0.15.4 to 0.15.5
 
 Update as usual with `acc update`, or let the automatic update run. Version 0.15.5 keeps store
