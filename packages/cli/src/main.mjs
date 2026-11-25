@@ -316,6 +316,17 @@ const HANDLERS = Object.freeze({
       text: `${await describeRecorded(result.reply, routed.delivery)}; acknowledged ${result.receipt.messageId}` };
   },
 
+  withdraw: async ({ options, context }) => {
+    const routed = await recordAndOffer({ router: context.deliveryRouter,
+      selectMessage: value => value.note, record: () => context.service.withdrawMessage({
+        sessionId: options.session, generation: options.generation, messageId: options.message,
+        reason: options.reason, clientMessageId: clientMessageId(options, context) }) });
+    const result = routed.recorded;
+    const names = result.withdrawn.map(receipt => receipt.recipientParticipantId).join(", ");
+    return { data: { message: result.note, withdrawn: result.withdrawn, delivery: routed.delivery },
+      text: `${await describeRecorded(result.note, routed.delivery)}; withdrew ${options.message} for ${names}` };
+  },
+
   request: async ({ options, context }) => {
     const routed = await recordAndOffer({ router: context.deliveryRouter, record: () =>
       context.service.sendMessage({

@@ -79,11 +79,12 @@ const packed = await loadPackedSurface();
 test("packed public commands are communication and lifecycle only", () => {
   // `prune` joins doctor, install and config as maintenance of the store
   // itself. Maintaining what a workspace keeps is not orchestrating who does
-  // what in it, which is the creep this list exists to catch.
+  // what in it, which is the creep this list exists to catch. `withdraw` takes
+  // back the caller's own question, which is communication about its own message.
   assert.deepEqual(Object.keys(packed.commands).sort(), ["ack", "attach", "claim", "config",
     "detach", "doctor", "finish", "heartbeat", "help", "inbox", "install", "message",
     "prune", "release", "reply", "request", "status", "sync", "uninstall", "update",
-    "version", "work"]);
+    "version", "withdraw", "work"]);
 });
 
 test("packed MCP tools are communication only", () => {

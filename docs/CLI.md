@@ -44,6 +44,7 @@ option value remains data: `--body --help` sends the literal body `--help`.
 | `acc inbox` | — | `--message`, `--cursor`, `--limit`, `--wait`, owner flags |
 | `acc reply` | `--message`, `--body` | `--subject`, `--client-message-id`, owner flags |
 | `acc ack` | `--message` | owner flags |
+| `acc withdraw` | `--message`, `--reason` | `--client-message-id`, owner flags |
 | `acc finish` | `--goal` | `--status`, `--to`, repeated `--completed`, `--remaining`, `--blocker`, `--client-message-id`, owner flags |
 
 Owner flags are `--session` and `--generation`; both are needed. The CLI also accepts the
@@ -352,6 +353,16 @@ Reply creates an `answer` in the same thread and acknowledges the original atomi
 `ack` acknowledges without writing an answer and has no state override. For an unanswered
 question or request, it exits `5` without changing the receipt: use `reply` to answer,
 clarify, or decline. An already acknowledged receipt remains an idempotent no-op.
+
+`acc withdraw --message <id> --reason "<text>"` withdraws a question or request you sent and
+no longer need. Each recipient that has not answered it stops owing an answer: its receipt
+becomes `acknowledged` with `extensions.withdrawn: {messageId, at}`, so the message leaves its
+inbox and attention, also in older ACC versions that share the store. Each of those recipients
+gets a `note` in the same thread, `Withdrawn: <subject>`, with the reason as its body. The
+original message, its receipts and the note stay in history. Only the sender may withdraw, only
+a question or request, and only while some recipient still owes an answer; otherwise it exits
+`5`. A repeated `--client-message-id` returns the recorded withdrawal. Decisions use
+`message --withdraws` instead.
 
 You can `reply` after `ack` or an earlier answer without changing the original receipt
 timestamp. Use a new `--client-message-id` for a distinct reply, and the same key and

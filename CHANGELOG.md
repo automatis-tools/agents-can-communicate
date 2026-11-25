@@ -17,6 +17,22 @@
 
 The exact archive passed package verification. See
 [development evidence](docs/release-evidence/inbox-wait-2026-11-25.md).
+## Unreleased — withdraw a pending question or request
+
+- **`acc withdraw --message <id> --reason <text>` withdraws your own question or request.** Each
+  recipient that has not answered stops owing an answer and receives the reason as a note in
+  the same thread. Its receipt becomes `acknowledged` with `extensions.withdrawn`, so older ACC
+  versions that share the store stop showing the message too. Only the sender may withdraw, and
+  only while a recipient still owes an answer (#145).
+
+| Development artifact | Value |
+|---|---|
+| Built from | `8a042f1b198f7ac7c58444e2b9d92a2f9d802b93` |
+| Tarball | `agents-can-communicate-0.15.6.tgz`, 678,668 bytes, 399 files |
+| sha256 | `95fa51c4f58fc4eb80ccbb6860bd00a515620c2672111fa51f232036fb5bd420` |
+
+The exact archive passed package verification. See
+[development evidence](docs/release-evidence/withdraw-pending-2026-11-25.md).
 
 ## 0.15.6 — release candidate
 

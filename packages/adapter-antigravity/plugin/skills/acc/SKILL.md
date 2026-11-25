@@ -131,6 +131,15 @@ When the peer should own a concrete piece of work, send one reply-required reque
   --detail "Check queued -> retrieved and reply -> acknowledged; return only defects."
 ```
 
+When you no longer need the answer to your own question or request, withdraw it with a
+reason rather than leave it pending:
+
+```bash
+{{ACC}} withdraw --message message_x --reason "Settled in the design review."
+```
+
+Each recipient that has not answered stops owing a reply and receives your reason as a note.
+
 Address a peer by its client - `codex`, `claude_code`, `gemini_cli` - when one session of
 it is here; `{{ACC}} status --json` names them all, and two sessions of one client have to be
 named exactly. A request is not an order.

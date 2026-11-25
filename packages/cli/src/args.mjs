@@ -37,6 +37,9 @@ export const COMMANDS = Object.freeze({
   request: { required: ["to", "title"],
     optional: ["session", "generation", "detail", "client-message-id"] },
   ack: { required: ["message"], optional: ["session", "generation"] },
+  // Only the sender's own question or request, and only while someone still owes an answer.
+  withdraw: { required: ["message", "reason"],
+    optional: ["session", "generation", "client-message-id"] },
   finish: { required: ["goal"], optional: ["session", "generation", "status", "to",
     "client-message-id"],
     repeated: ["completed", "remaining", "blocker"] },

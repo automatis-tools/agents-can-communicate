@@ -54,6 +54,7 @@ const BY_CLI = Object.freeze({
   acquireClaims: "claim", releaseClaims: "release",
   forceReleaseClaim: "release", sendMessage: "message", acknowledgeMessage: "ack",
   listInbox: "inbox", readInbox: "inbox", waitForInbox: "inbox", replyToMessage: "reply",
+  withdrawMessage: "withdraw",
   finishSession: "finish", collectStatus: "status",
   planPrune: "prune", prune: "prune",
 });
