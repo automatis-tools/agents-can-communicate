@@ -1,8 +1,10 @@
 import assert from "node:assert/strict";
+import { mkdir, mkdtemp, realpath, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
 
-import { PATHS, childCpuMs, measure, percentile, renderTable, summarize }
+import { PATHS, childCpuMs, measure, measured, percentile, renderTable, summarize }
   from "../../scripts/measure/cold-start.mjs";
 
 test("CPU time is the children line of times, in bash and in dash format", () => {
@@ -42,4 +44,20 @@ test("one round measures every hook path and inbox of the checkout", {
   }
   assert.equal(run.hookBudgetMs, 5_000);
   assert.match(renderTable(run.summary), /\| guard \| 1 \|/);
+});
+
+test("a command that exits without reading its input is measured, not failed by EPIPE",
+  { skip: process.platform === "win32" ? "measured runs a POSIX shell" : false }, async t => {
+  // More input than a pipe holds, to a command that never reads it: the write
+  // can only finish after the command has exited, which is the EPIPE a loaded
+  // runner hit with `node -e 0` and a few bytes.
+  const root = await realpath(await mkdtemp(path.join(tmpdir(), "acc-cold-epipe-")));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const cwd = path.join(root, "project");
+  await mkdir(cwd);
+
+  const run = await measured("/bin/sh", ["-c", "exit 0"],
+    { cwd, env: { PATH: "/usr/bin:/bin" }, input: "x".repeat(1 << 20) });
+
+  assert.equal(typeof run.wallMs, "number");
 });
