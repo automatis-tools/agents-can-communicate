@@ -1,5 +1,36 @@
 # Changelog
 
+## 0.15.5 — release candidate
+
+This release carries the work merged to main after 0.15.4: #440, #445, #446 and #449. It keeps
+store contract 8 and adds no data migration, and Codex keeps trusting ACC's hooks across it. See
+[Upgrading](docs/UPGRADING.md#from-0154-to-0155).
+
+- **Codex live delivery can become ready on Windows.** ACC reads the access control lists of the
+  Codex home, the daemon directories and the executables, where it read mode bits that Node
+  reports as writable by everyone (#445). It also accepts the daemon path that Codex reports with
+  both separators (#449).
+- **On Linux, the refusal of a world-writable Codex daemon executable names the file and the
+  command that fixes it,** `chmod go-w "<file>"`. Codex 0.165.0 and 0.172.0 install that file
+  with mode `0777` (#446).
+- **An update no longer makes Codex ask to trust ACC's hooks again when the data home path goes
+  through a symbolic link** (#440).
+- Package verification names every client-home entry that it did not restore (#442). The
+  real-clients CI job now checks Codex live delivery through its daemon on Linux and on Windows,
+  as a standard user on Windows (#251).
+
+| Candidate artifact | Value |
+|---|---|
+| Built from | `703ca1b3c96d05a423a7c74be0a9ebba4721b252` |
+| Tarball | `agents-can-communicate-0.15.5.tgz`, 675,516 bytes, 398 files |
+| sha256 | `ec0b9ac1e2896920c40bd20f02d313d81d62a344030acff2d36fe4aaaf9821b9` |
+
+The exact archive passed package verification, 25 managed-update checks and an upgrade from
+published 0.15.4 with real Claude Code, Codex, Kimi Code and Gemini CLI executables. In that
+upgrade Codex's hooks plugin kept its files and content hash, also with the data home path
+through a symbolic link. See [release evidence](docs/release-evidence/v0.15.5.md). This
+candidate is not published.
+
 ## Unreleased — ACC accepts the Codex daemon on Windows when its path mixes separators
 
 - **Codex live delivery can become ready on Windows with the daemon Codex installs itself.**
