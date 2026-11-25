@@ -1,5 +1,28 @@
 # Changelog
 
+## 0.15.6 — release candidate
+
+This release carries the work merged to main after 0.15.5: #453. It keeps store contract 8 and
+adds no data migration, and Codex keeps trusting ACC's hooks across it. See
+[Upgrading](docs/UPGRADING.md#from-0155-to-0156).
+
+- **`acc doctor` reports a session whose client exited as offline,** not as a failed handshake
+  with advice to check the integration. `acc status --json` lists no delivery binding for an
+  offline session, so doctor's adapter line reads "no live channel bound in this workspace"
+  where it read "channel unreachable" (#453).
+
+| Candidate artifact | Value |
+|---|---|
+| Built from | `3059964236723e29953f3f9dc57c2e9be952ba50` |
+| Tarball | `agents-can-communicate-0.15.6.tgz`, 676,001 bytes, 398 files |
+| sha256 | `4153ef95941c6bc0edc97f948a84484383d9bd90877fc5fd4e0abeae30853973` |
+
+The exact archive passed package verification, 25 managed-update checks and an upgrade from
+published 0.15.5 with real Claude Code, Codex, Kimi Code and Gemini CLI executables. In that
+upgrade Codex's hooks plugin kept its files and content hash, also with the data home path
+through a symbolic link. See [release evidence](docs/release-evidence/v0.15.6.md). This
+candidate is not published.
+
 ## Unreleased — doctor reports a session whose client exited as offline
 
 - **`acc doctor` no longer reports a session whose client exited as a failed handshake.** A
