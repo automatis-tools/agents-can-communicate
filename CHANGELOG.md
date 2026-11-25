@@ -1,5 +1,31 @@
 # Changelog
 
+## 0.16.0 — release candidate
+
+This release carries the work merged to main after 0.15.6: #145 and #147. It adds two commands,
+keeps store contract 8 and adds no data migration, and Codex keeps trusting ACC's hooks across
+it. See [Upgrading](docs/UPGRADING.md#from-0156-to-0160).
+
+- **`acc inbox --wait <seconds>` waits for the next message** recorded for you after the wait
+  starts, or until the time passes, and returns the first inbox page with
+  `wait: {arrived, waitedMs}`. The `acc` skill's review wait now uses `inbox --wait 60` in place
+  of a foreground `sleep` (#147).
+- **`acc withdraw --message <id> --reason <text>` withdraws your own question or request.** Each
+  recipient that has not answered stops owing an answer and receives the reason as a note in
+  the same thread. Older ACC versions that share the store stop showing the message too (#145).
+
+| Candidate artifact | Value |
+|---|---|
+| Built from | `7642b80f236d307aeec8e4321a5e1229345bac0f` |
+| Tarball | `agents-can-communicate-0.16.0.tgz`, 681,217 bytes, 401 files |
+| sha256 | `c9570e3123663360fe96093237735f9051039bb3044073d871a3753631e2ff20` |
+
+The exact archive passed package verification, 25 managed-update checks and an upgrade from
+published 0.15.6 with real Claude Code, Codex, Kimi Code and Gemini CLI executables. In that
+upgrade Codex's hooks plugin kept its files and content hash, and both new commands worked on a
+store written by 0.15.6, also with the data home path through a symbolic link. See
+[release evidence](docs/release-evidence/v0.16.0.md). This candidate is not published.
+
 ## Unreleased — a bounded wait on the inbox
 
 - **`acc inbox --wait <seconds>` waits for the next message.** It returns the first inbox page
