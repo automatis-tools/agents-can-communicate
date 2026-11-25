@@ -52,9 +52,12 @@ export function createInboxWait(ports, sessions, inbox) {
       throw new AccError(EXIT.CONFLICT, "cannot wait on the inbox from this session generation",
         { sessionId: input.sessionId });
     }
+    // The wait starts once its starting point is read. A message recorded while
+    // that read runs may fall below it, so it counts as already pending; taking
+    // the time first would miss a message recorded after the wait had started.
+    let cursor = await headCursor(session.workspaceId);
     const started = Date.parse(clock.now());
     const deadline = started + waitMs;
-    let cursor = await headCursor(session.workspaceId);
     let arrived = false;
     for (;;) {
       ({ arrived, cursor } = await readSince(session.workspaceId, session.participantId, cursor));

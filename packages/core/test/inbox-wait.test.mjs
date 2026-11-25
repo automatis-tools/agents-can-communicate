@@ -20,13 +20,13 @@ function fixture() {
   const store = createMemoryStore({ clock, ids, workspaceId: WORKSPACE });
   const sleeps = [];
   let onSleep = async () => {};
-  const service = createCoordinationService({ store, clock, ids,
-    sleep: async milliseconds => {
-      sleeps.push(milliseconds);
-      clock.advance(milliseconds);
-      await onSleep(sleeps.length);
-    } });
-  return { clock, store, service, sleeps, during: callback => { onSleep = callback; } };
+  const sleep = async milliseconds => {
+    sleeps.push(milliseconds);
+    clock.advance(milliseconds);
+    await onSleep(sleeps.length);
+  };
+  const service = createCoordinationService({ store, clock, ids, sleep });
+  return { clock, ids, store, service, sleeps, sleep, during: callback => { onSleep = callback; } };
 }
 
 const opening = participantId => ({ workspaceId: WORKSPACE, participantId,
@@ -102,7 +102,7 @@ test("a log trimmed during the wait is followed from its boundary", async () => 
   const { sender, recipient } = await peers(service);
   during(async count => {
     // Everything the wait has read so far goes, as retention trims it.
-    if (count === 1) await store.trimHistory(await store.eventCursor(WORKSPACE));
+    if (count === 1) await store.trimHistory((await store.eventsSince(WORKSPACE, null, 1_000)).cursor);
     if (count === 2) await send(service, sender, "recipient", "after the trim");
   });
 
@@ -138,4 +138,23 @@ test("a burst longer than one page of events is read to its end", async () => {
 
   assert.equal(result.wait.arrived, true);
   assert.equal(result.wait.waitedMs, 500);
+});
+
+test("the wait's time starts once its starting point is read", async () => {
+  const { service, store, clock, ids, sleeps, sleep } = fixture();
+  const { recipient } = await peers(service);
+  // Reading the starting point takes time on a real store; here it takes ten
+  // seconds of fake time. Counting it would leave a 2 s wait no time at all.
+  let reads = 0;
+  const slowStart = { ...store, eventsSince: async (...args) => {
+    if ((reads += 1) === 1) clock.advance(10_000);
+    return store.eventsSince(...args);
+  } };
+  const waiting = createCoordinationService({ store: slowStart, clock, ids, sleep });
+
+  const result = await waiting.waitForInbox({ ...owner(recipient), waitMs: 2_000 });
+
+  assert.equal(result.wait.arrived, false);
+  assert.equal(result.wait.waitedMs, 2_000);
+  assert.deepEqual(sleeps, [500, 500, 500, 500]);
 });

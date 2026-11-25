@@ -299,11 +299,17 @@ export async function openFilesystemStore({ root, clock, ids, workspaceId, failA
    * sequence below an open journal, without reading a single event file. A
    * caller that waits for what comes next starts here, so the wait costs one
    * directory listing per poll however long the log already is (#147).
+   *
+   * The journal is read after the listing. A transaction that opens its journal
+   * after the journal is read could otherwise publish an event file before the
+   * listing, and the cursor would pass an event of an unfinished transaction:
+   * a wait starting there never sees it. A journal opened after the listing
+   * starts above every listed file, so reading it late excludes nothing finished.
    */
   async function eventCursor() {
+    const listed = await listJsonFiles(paths.events, { root });
     const ceiling = await readJournalCeiling(paths, root);
-    const names = (await listJsonFiles(paths.events, { root }))
-      .map(filePath => path.basename(filePath, ".json"))
+    const names = listed.map(filePath => path.basename(filePath, ".json"))
       .filter(sequence => ceiling === null || sequence < ceiling);
     return names.at(-1) ?? await readEventFloor(paths, root) ?? ZERO_CURSOR;
   }
