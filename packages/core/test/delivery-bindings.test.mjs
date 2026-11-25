@@ -251,6 +251,27 @@ test("a stale generation cannot clear a successor's binding", async () => {
     [binding(successor)]);
 });
 
+// A client that exits without a session end leaves its session open, and its
+// binding with it. Once presence calls the session offline the router offers
+// it nothing, so the binding is no live channel; reporting it made doctor read
+// "channel unreachable" for a workspace where nothing was running.
+test("status reports no binding for a session that is offline", async () => {
+  const { service, clock } = fixture();
+  const session = await open(service, "models", "session_models");
+  await service.publishDeliveryBinding(binding(session));
+
+  // Quiet is not gone: a stale session's binding is still reported.
+  clock.advance(5 * 60_000);
+  assert.deepEqual((await service.collectStatus({ workspaceId: WORKSPACE })).deliveryBindings
+    .map(item => item.reachable), [false]);
+
+  clock.advance(24 * 60 * 60_000);
+  assert.deepEqual((await service.collectStatus({ workspaceId: WORKSPACE })).deliveryBindings, []);
+  assert.equal((await service.listDeliveryBindings({ participantId: "models",
+    now: clock.now(), includeExpired: true })).length, 1,
+  "the record stays; only the report of a live channel changes");
+});
+
 test("closing a session retires its own current binding", async () => {
   const { service } = fixture();
   const session = await open(service, "models", "session_models");

@@ -86,6 +86,7 @@ export function createStatusService(ports, sessions, deliveryBindings) {
     const classified = sessionRecords
       .map(session => ({ session, presence: classifySessionPresence(session, now, pidIsAlive) }));
     const live = classified.filter(item => item.presence !== "offline");
+    const present = new Set(live.map(item => item.session.sessionId));
     const claims = snapshot.claims
       .filter(claim => Date.parse(claim.expiresAt) > Date.parse(now));
     const currentBindings = await deliveryBindings.currentBindings(now);
@@ -193,14 +194,17 @@ export function createStatusService(ports, sessions, deliveryBindings) {
           .find(session => session.sessionId === claim.ownerSessionId)?.participantId ?? null,
         expiresAt: claim.expiresAt,
       })),
-      deliveryBindings: currentBindings.map(({ binding, reachable }) => ({
-        adapterId: binding.adapterId,
-        clientVersion: binding.clientVersion,
-        availableModes: [...binding.availableModes],
-        livePolicy: binding.livePolicy,
-        reachable,
-        leaseUntil: binding.leaseUntil,
-      })),
+      // An offline session's binding is no live channel: the router offers that
+      // session nothing. Its own row still says it had one, beside `waiting`.
+      deliveryBindings: currentBindings.filter(({ binding }) => present.has(binding.sessionId))
+        .map(({ binding, reachable }) => ({
+          adapterId: binding.adapterId,
+          clientVersion: binding.clientVersion,
+          availableModes: [...binding.availableModes],
+          livePolicy: binding.livePolicy,
+          reachable,
+          leaseUntil: binding.leaseUntil,
+        })),
       attention: computeAttention(snapshot, { session: null,
         participantId: input.participantId, now, pidIsAlive }),
       counts: {

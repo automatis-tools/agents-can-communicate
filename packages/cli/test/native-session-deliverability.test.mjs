@@ -38,14 +38,14 @@ const service = (leaseUntil = LEASE) => ({
     livePolicy: "actionable", opaqueEndpointRef: "codex_endpoint_ref", leaseUntil }],
 });
 
-const status = { participants: [{ sessionId: "session_a", participantId: "reviewer",
-  harness: "codex", presence: "live" }] };
+const status = (presence = "live") => ({ participants: [{ sessionId: "session_a",
+  participantId: "reviewer", harness: "codex", presence }] });
 
 const adapterThat = refreshNativeSession => ({ id: "codex", refreshNativeSession });
 
-async function report(t, adapter, { leaseUntil, runtime } = {}) {
+async function report(t, adapter, { leaseUntil, runtime, presence } = {}) {
   const adapters = [entry(runtime)];
-  await updateNativeSessions(adapters, { service: service(leaseUntil), status,
+  await updateNativeSessions(adapters, { service: service(leaseUntil), status: status(presence),
     root: await runtimeDir(t), now: NOW, registry: adapter === null ? [] : [adapter] });
   return { adapters, lines: nativeSessionLines(adapters) };
 }
@@ -157,6 +157,31 @@ test("a lapsed lease on an adapter that cannot re-verify stays degraded", async 
   assert.equal(adapters[0].nativeDelivery.sessions[0].runtime, "degraded");
   assert.equal(adapters[0].nativeDelivery.runtime, "degraded");
 });
+
+// A client that exits without a session end leaves its session open and
+// offline, and a message waiting for it keeps it listed for weeks. The router
+// offers such a session nothing: the message waits for it to return. Doctor
+// asked its long-gone receiver anyway and reported a failed handshake with
+// advice to check the integration, beside a last attempt that had succeeded.
+test("a session whose client exited is offline and is not re-verified",
+  async t => {
+    let asked = 0;
+    const { adapters, lines } = await report(t, adapterThat(async () => { asked += 1;
+      return { supported: false, reasonCode: "handshake_failed" }; }),
+    { leaseUntil: LAPSED, runtime: "waiting", presence: "offline" });
+    assert.equal(asked, 0);
+    const [session] = adapters[0].nativeDelivery.sessions;
+    assert.equal(session.runtime, "offline");
+    assert.equal(session.delivery, null);
+    assert.match(lines[0], new RegExp(": offline: its client is no longer running, so ACC attempts "
+      + "no live push; messages wait until the session returns; "));
+    assert.doesNotMatch(lines[0], /handshake failed|check the client's integration/);
+    // Status reports no binding for an offline session, so the binding pass
+    // found no live channel here, and the session pass leaves that answer.
+    assert.equal(adapters[0].nativeDelivery.runtime, "waiting");
+    assert.equal(describeNative(adapters[0].nativeDelivery),
+      "available; enabled (actionable); no live channel bound in this workspace");
+  });
 
 test("a session that runs embedded names the cause and what to do about it", () => {
   const [line] = nativeSessionLines([{ displayName: "Codex CLI", nativeDelivery: { sessions: [{

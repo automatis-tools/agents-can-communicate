@@ -91,7 +91,9 @@ captured client behavior, including what could not be observed.
 Certification is static evidence; reachability is runtime state. A live-capable adapter
 would publish a generation-bound binding with `availableModes`, `clientVersion`,
 `livePolicy`, and `leaseUntil`. `acc status --json` reports these as `deliveryBindings`
-with a computed `reachable` boolean while keeping the opaque endpoint private.
+with a computed `reachable` boolean while keeping the opaque endpoint private. A session
+that is offline has no binding in that list: the router offers it nothing, and its messages
+wait until it returns.
 
 The router requires exactly one current eligible generation. No binding, several live
 sessions for one participant, and an adapter refusal keep delivery on the durable
