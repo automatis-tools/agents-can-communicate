@@ -21,7 +21,7 @@ const repo = path.resolve(import.meta.dirname, "..", "..");
 // `heartbeat`, `detach`) are deliberately absent — a skill that taught those
 // would have models running the installer.
 const TAUGHT = Object.freeze(["sync", "work", "claim", "request", "message",
-  "inbox", "reply", "finish", "status", "ack"]);
+  "inbox", "reply", "finish", "status", "ack", "withdraw"]);
 
 // Reachable by an agent but not worth a section: `release` is covered by
 // `finish`. Another section in every skill is another section read on every turn.

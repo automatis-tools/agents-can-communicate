@@ -19,7 +19,7 @@ import { needsOwner } from "./session-owner.mjs";
 const GROUPS = Object.freeze([
   ["Set up", ["install", "uninstall", "doctor", "config", "prune"]],
   ["In a session", ["status", "sync", "work", "claim", "release", "inbox", "reply",
-    "ack", "message", "request", "finish"]],
+    "ack", "message", "request", "withdraw", "finish"]],
   ["Session lifecycle", ["attach", "heartbeat", "detach"]],
   ["About acc", ["help", "version", "update"]],
 ]);
@@ -40,6 +40,7 @@ const SUMMARY = Object.freeze({
   inbox: "list pending message headers; --message reads one complete message",
   reply: "reply to one message and acknowledge it in the same operation",
   request: "ask another agent to do something in a reply-required message",
+  withdraw: "withdraw your own pending question or request, with a reason",
   finish: "write the handoff and release what this session held",
   attach: "open a manual session and return its session/generation pair",
   heartbeat: "say the session is still alive",
@@ -103,6 +104,9 @@ const NOTES = Object.freeze({
     "Replaced decisions leave the pending list without changing receipts; exact inbox and history retain them.",
     "--message reads one complete addressed message, including acknowledged mail; do not combine with cursor or limit.",
     "Exact reads return a one-item array. Acknowledged inspection leaves the receipt unchanged."],
+  withdraw: ["Withdraws a question or request you sent. Each recipient that has not answered stops owing one.",
+    "Those recipients get a note with --reason in the same thread; their receipts become acknowledged with extensions.withdrawn.",
+    "Refused when every recipient already answered or acknowledged it. Decisions use message --withdraws instead."],
   sync: ["Default delta uses 16-digit event cursors. full adds an unbounded diagnostic snapshot.",
     "history lists read-only message summaries, newest first: default 20 items, at most 12000 bytes of formatted page JSON.",
     "With history, --type filters before paging; --cursor takes the complete message ID in nextCursor.",

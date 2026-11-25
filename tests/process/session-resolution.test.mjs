@@ -151,6 +151,7 @@ const AGENT_FACING = Object.freeze([
   ["reply", ["--message", "message_absent", "--body", "answer"]],
   ["request", ["--to", "peer", "--title", "please take this"]],
   ["ack", ["--message", "message_absent"]],
+  ["withdraw", ["--message", "message_absent", "--reason", "no longer needed"]],
   ["release", ["--claim", "claim_absent"]],
   // Finish closes the resolved session, so it must be the last identity check.
   ["finish", ["--goal", "what this session was for"]],
