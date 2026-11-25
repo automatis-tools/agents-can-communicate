@@ -143,6 +143,13 @@ export function createMemoryStore({ clock, ids, workspaceId }) {
       trimmedThrough: trimmedThrough };
   }
 
+  // The cursor a caller reaches by reading every event: the newest sequence,
+  // or the trimmed boundary when nothing is left above it.
+  async function eventCursor(workspaceId) {
+    const newest = events.filter(event => event.workspaceId === workspaceId).at(-1)?.sequence;
+    return newest ?? trimmedThrough ?? ZERO_CURSOR;
+  }
+
   // One record by id, with the checks a snapshot applies to it: absent,
   // removed, or another workspace's all answer null.
   async function stateRecord(workspaceId, kind, id) {
@@ -269,7 +276,7 @@ export function createMemoryStore({ clock, ids, workspaceId }) {
     },
   });
 
-  return Object.freeze({ transaction, eventsSince, snapshot, stateRecord, stateEnvelopes,
+  return Object.freeze({ transaction, eventsSince, eventCursor, snapshot, stateRecord, stateEnvelopes,
     reclaimRecords, trimHistory, ephemeral, clock, ids,
     workspaceId, indexDiagnostics: () => [] });
 }

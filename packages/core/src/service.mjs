@@ -3,6 +3,7 @@ import { createConversationService } from "./conversations.mjs";
 import { createDeliveryBindingService } from "./delivery-bindings.mjs";
 import { createIntentService } from "./intents.mjs";
 import { createInboxService } from "./inbox.mjs";
+import { createInboxWait } from "./inbox-wait.mjs";
 import { defaultPidIsAlive } from "./pid.mjs";
 import { assertPorts } from "./ports.mjs";
 import { createPruneService } from "./prune.mjs";
@@ -17,23 +18,24 @@ import { createSyncService } from "./sync.mjs";
  * no module reaches for a global.
  *
  * @param {{ store: object, clock: object, ids: object, pidIsAlive?: function,
- *   policies?: object }} ports
+ *   sleep?: function, policies?: object }} ports
  */
 export function createCoordinationService({ store, clock, ids,
-  pidIsAlive = defaultPidIsAlive, policies = {} }) {
+  pidIsAlive = defaultPidIsAlive, sleep, policies = {} }) {
   // Defaulted here, where the default is a real implementation, and required in
   // the classifier, where a default could only be a lie. Passed into
   // assertPorts rather than spread on afterward, so an explicit non-function -
   // `null` included, since the default above only applies to `undefined` - is
   // shape-checked at construction like every other port instead of surfacing
   // as a raw TypeError the first time presence is classified.
-  const ports = assertPorts({ store, clock, ids, pidIsAlive });
+  const ports = assertPorts({ store, clock, ids, pidIsAlive, sleep });
   const sessions = createSessionService(ports);
   const intents = createIntentService(ports, sessions);
   const claims = createClaimService(ports, sessions);
   const conversations = createConversationService(ports, sessions);
   const deliveryBindings = createDeliveryBindingService(ports, sessions);
   const inbox = createInboxService(ports, sessions);
+  const inboxWait = createInboxWait(ports, sessions, inbox);
   const receipts = createReceiptService(ports);
   const sync = createSyncService(ports, sessions);
   const status = createStatusService(ports, sessions, deliveryBindings);
@@ -61,6 +63,7 @@ export function createCoordinationService({ store, clock, ids,
     listDeliveryBindings: deliveryBindings.listDeliveryBindings,
     refreshDeliveryBinding: deliveryBindings.refreshDeliveryBinding,
     ...inbox,
+    ...inboxWait,
     ...receipts,
     ...sync,
     ...status,
