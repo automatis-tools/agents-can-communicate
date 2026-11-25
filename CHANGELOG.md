@@ -11,9 +11,9 @@
 
 | Development artifact | Value |
 |---|---|
-| Built from | `fbc2375fbc112b51ee9a014b3bd626c03cc83f18` |
-| Tarball | `agents-can-communicate-0.15.6.tgz`, 678,048 bytes, 400 files |
-| sha256 | `8d757e211d5fe34c9b62704cacb9d629a3c39634e23d1591f29693b0fd8ae661` |
+| Built from | `57ae14eeeffc99b3b0850c2ee344ea3cd8e7d650` |
+| Tarball | `agents-can-communicate-0.15.6.tgz`, 678,255 bytes, 400 files |
+| sha256 | `ea1b15ad708978ac123e4200feb80c4faf691b8498582dc997692f4fce2d3a9f` |
 
 The exact archive passed package verification. See
 [development evidence](docs/release-evidence/inbox-wait-2026-11-25.md).

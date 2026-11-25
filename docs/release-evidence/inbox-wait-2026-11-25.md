@@ -10,19 +10,21 @@ in [docs/design/2026-11-25-inbox-wait.md](../design/2026-11-25-inbox-wait.md).
   `wait: {arrived, waitedMs}`. A timeout exits 0, and the text form ends with
   `no new message after <n>s`. `--wait` refuses `--message` and `--cursor`.
 - The core reads the event log from the newest event at the start, every 500 milliseconds,
-  and stops at a `message.recorded` event that names the caller. Reading the event log takes
+  and stops at a `message.recorded` event that names the caller. The wait's time starts once
+  that starting point is read, so a message recorded during the read counts as pending. Reading the event log takes
   no store lock. One ordinary inbox read follows.
 - The filesystem store gains `eventCursor`: the newest published event, from file names
-  alone, below an open journal.
+  alone, below an open journal. It reads the journal after listing the files, so a journal
+  opened in between cannot let the cursor pass an event of an unfinished transaction.
 - The six copies of the `acc` skill repeat `inbox --wait 60` for an agreed review wait, in
   place of an inbox read and a foreground `sleep 5`.
 - The store contract does not change: no record field, event type or receipt state is new.
 
 ## Development candidate
 
-- Source: clean commit `fbc2375fbc112b51ee9a014b3bd626c03cc83f18`.
-- `agents-can-communicate-0.15.6.tgz`, 678,048 bytes, 400 files.
-- SHA-256: `8d757e211d5fe34c9b62704cacb9d629a3c39634e23d1591f29693b0fd8ae661`.
+- Source: clean commit `57ae14eeeffc99b3b0850c2ee344ea3cd8e7d650`.
+- `agents-can-communicate-0.15.6.tgz`, 678,255 bytes, 400 files.
+- SHA-256: `ea1b15ad708978ac123e4200feb80c4faf691b8498582dc997692f4fce2d3a9f`.
 - The exact archive passed `scripts/verify-package.mjs`.
 
 The exact archive was also installed with an isolated home and data home, on macOS with Node
@@ -39,7 +41,12 @@ The exact archive was also installed with an isolated home and data home, on mac
   journal. Removing the journal ceiling or the trimmed boundary makes a test fail.
 - `packages/core/test/inbox-wait.test.mjs`, on a fake clock: arrival, an already pending
   message, a message for another participant, no receipt or event change, a trim during the
-  wait, a burst of more than one page of events, and refusals. Mutations of the recipient
-  check, the starting cursor, the session check and the paging each make a test fail.
+  wait, a burst of more than one page of events, a slow starting read, and refusals. The wait
+  tests use the core's `eventsSince` fallback for the starting point. Mutations of the
+  recipient check, the starting cursor, the session check, the paging and the start time
+  each make a test fail.
+- The order of the journal read and the listing in `eventCursor` has no deterministic test:
+  the race needs a journal opened between two reads of one call, and the store has no seam
+  there. The open-journal test covers the ceiling itself.
 - `packages/cli/test/inbox-wait-command.test.mjs`: the CLI in separate processes, arrival
   during the wait, a timeout, and option refusals.
