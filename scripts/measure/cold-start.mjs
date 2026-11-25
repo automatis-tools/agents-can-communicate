@@ -82,7 +82,7 @@ export async function measured(command, args, { cwd, env, input }) {
     // before the write; the pipe then fails with EPIPE (a loaded macOS runner,
     // PR #456). Whether it needed the input shows in its exit code and output.
     child.stdin.on("error", error => { if (error.code !== "EPIPE") reject(error); });
-    child.stdin.end(input ?? "");
+    child.stdin.end(input);
   });
   const wallMs = Number(process.hrtime.bigint() - started) / 1e6;
   const printed = await readFile(output, "utf8");
