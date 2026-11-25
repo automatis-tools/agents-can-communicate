@@ -73,5 +73,10 @@ export function assertPorts(ports) {
     throw new AccError(EXIT.USAGE, "the pidIsAlive port must be a function",
       { port: "pidIsAlive" });
   }
+  // Optional: the wait on the inbox sleeps through it, so a test can advance a
+  // fake clock instead of waiting in real time.
+  if (ports.sleep !== undefined && typeof ports.sleep !== "function") {
+    throw new AccError(EXIT.USAGE, "the sleep port must be a function", { port: "sleep" });
+  }
   return ports;
 }

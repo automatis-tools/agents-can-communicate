@@ -1,5 +1,22 @@
 # Changelog
 
+## Unreleased — a bounded wait on the inbox
+
+- **`acc inbox --wait <seconds>` waits for the next message.** It returns the first inbox page
+  as soon as a message for the caller is recorded after the wait starts, or when the time
+  passes, with `wait: {arrived, waitedMs}`. A message that was already pending does not end
+  the wait. The wait reads the event log without the store lock and changes no receipt. The
+  `acc` skill's review wait now repeats `inbox --wait 60`, where it read the inbox and then ran
+  a foreground `sleep 5` (#147).
+
+| Development artifact | Value |
+|---|---|
+| Built from | `2f4990da1e667c454004ecaa4b7d775d27fe1c6a` |
+| Tarball | `agents-can-communicate-0.15.6.tgz`, 680,909 bytes, 401 files |
+| sha256 | `6edaa38ca8c577e8c8746df66302f8558a584f1f738ed6c218efef5d9dd2b8d8` |
+
+The exact archive passed package verification. See
+[development evidence](docs/release-evidence/inbox-wait-2026-11-25.md).
 ## Unreleased — withdraw a pending question or request
 
 - **`acc withdraw --message <id> --reason <text>` withdraws your own question or request.** Each

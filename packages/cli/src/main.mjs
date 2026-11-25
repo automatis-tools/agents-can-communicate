@@ -287,6 +287,9 @@ const HANDLERS = Object.freeze({
   },
 
   inbox: async ({ options, context }) => {
+    if (options.wait !== undefined) {
+      return (await import("./inbox-wait-command.mjs")).runInboxWait({ options, context });
+    }
     if (options.message === undefined) {
       const page = await context.service.listInbox({ sessionId: options.session,
         generation: options.generation, cursor: options.cursor,

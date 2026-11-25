@@ -5,6 +5,7 @@ import path from "node:path";
 import { promisify } from "node:util";
 import test from "node:test";
 import { resolveExecutable } from "../../packages/adapter-sdk/src/executables.mjs";
+import { waitForCodexWriters } from "../helpers/codex-late-writers.mjs";
 import { createPackedAcc } from "../helpers/packed-acc.mjs";
 import { startCommandModel } from "../helpers/codex-approval-stub.mjs";
 
@@ -22,6 +23,9 @@ test("real Codex executes packed ACC reads and carries local evidence to approva
     const version = (await run(binary, ["--version"])).stdout.trim();
     await packed.setClientVersions({ codex: version.replace(/^codex-cli /, "") });
     const codexHome = path.join(packed.clientHome, ".codex");
+    // Deferred before anything runs Codex, so it runs after every stub closes
+    // and before the client home is removed.
+    packed.defer(() => waitForCodexWriters(codexHome));
     await mkdir(codexHome, { recursive: true });
     await packed.acc(["install", "--adapter", "codex", "--delivery", "off", "--home", packed.clientHome]);
     const plugin = path.join(packed.clientHome, ".agents", "acc-local", "plugins", "agents-can-communicate");

@@ -67,7 +67,7 @@ export function renderTable(summary) {
 }
 
 /** Run one command under `sh`, timing the wall clock here and CPU through `times`. */
-async function measured(command, args, { cwd, env, input }) {
+export async function measured(command, args, { cwd, env, input }) {
   const script = 'out=$1; shift; "$@" > "$out" 2>&1; status=$?; times; exit $status';
   const output = path.join(cwd, "..", "out.txt");
   const started = process.hrtime.bigint();
@@ -75,10 +75,14 @@ async function measured(command, args, { cwd, env, input }) {
     { cwd, env, stdio: ["pipe", "pipe", "inherit"] });
   let times = "";
   child.stdout.on("data", chunk => { times += chunk; });
-  child.stdin.end(input ?? "");
   const code = await new Promise((resolve, reject) => {
     child.on("error", reject);
     child.on("close", resolve);
+    // A command that never reads its input, such as `node -e 0`, can exit
+    // before the write; the pipe then fails with EPIPE (a loaded macOS runner,
+    // PR #456). Whether it needed the input shows in its exit code and output.
+    child.stdin.on("error", error => { if (error.code !== "EPIPE") reject(error); });
+    child.stdin.end(input);
   });
   const wallMs = Number(process.hrtime.bigint() - started) / 1e6;
   const printed = await readFile(output, "utf8");

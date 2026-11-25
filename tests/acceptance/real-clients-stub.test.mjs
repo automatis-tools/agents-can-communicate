@@ -13,6 +13,7 @@ import { promisify } from "node:util";
 
 import { resolveExecutable, runExecutable } from "../../packages/adapter-sdk/src/executables.mjs";
 import { startModelStub, promptText } from "../helpers/model-stub.mjs";
+import { waitForCodexWriters } from "../helpers/codex-late-writers.mjs";
 import { createPackedAcc } from "../helpers/packed-acc.mjs";
 
 const run = promisify(execFile);
@@ -70,6 +71,8 @@ test("real Claude Code and Codex attach through their hooks and carry a message 
     const PATH = [...new Set([...bins.map(file => path.dirname(file)), path.dirname(process.execPath),
       ...system])].join(path.delimiter);
     const codexHome = path.join(packed.clientHome, ".codex");
+    // `codex exec` can leave its plugin sync writing here; see codex-late-writers.mjs.
+    if (process.platform !== "win32") packed.defer(() => waitForCodexWriters(codexHome));
     await mkdir(codexHome, { recursive: true });
     await writeFile(path.join(codexHome, "config.toml"), [
       "model = \"stub-model\"", "model_provider = \"stub\"", "",

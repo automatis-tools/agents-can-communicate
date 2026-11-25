@@ -295,6 +295,26 @@ export async function openFilesystemStore({ root, clock, ids, workspaceId, failA
   }
 
   /**
+   * Where `eventsSince` would stop if asked for everything: the newest published
+   * sequence below an open journal, without reading a single event file. A
+   * caller that waits for what comes next starts here, so the wait costs one
+   * directory listing per poll however long the log already is (#147).
+   *
+   * The journal is read after the listing. A transaction that opens its journal
+   * after the journal is read could otherwise publish an event file before the
+   * listing, and the cursor would pass an event of an unfinished transaction:
+   * a wait starting there never sees it. A journal opened after the listing
+   * starts above every listed file, so reading it late excludes nothing finished.
+   */
+  async function eventCursor() {
+    const listed = await listJsonFiles(paths.events, { root });
+    const ceiling = await readJournalCeiling(paths, root);
+    const names = listed.map(filePath => path.basename(filePath, ".json"))
+      .filter(sequence => ceiling === null || sequence < ceiling);
+    return names.at(-1) ?? await readEventFloor(paths, root) ?? ZERO_CURSOR;
+  }
+
+  /**
    * Read the durable state, or the part of it a caller actually needs.
    *
    * Every kind is read by default, which is what most callers want and what
@@ -451,7 +471,7 @@ export async function openFilesystemStore({ root, clock, ids, workspaceId, failA
       () => trimEventLog(paths, boundary, { root, publish, limit, deadlineAt: bounded }));
   }
 
-  return Object.freeze({ transaction, eventsSince, snapshot, stateRecord, stateEnvelopes,
+  return Object.freeze({ transaction, eventsSince, eventCursor, snapshot, stateRecord, stateEnvelopes,
     reclaimRecords, trimHistory, ephemeral, paths, root, workspaceId,
     indexDiagnostics: indexCache.diagnostics });
 }
