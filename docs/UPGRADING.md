@@ -1,5 +1,24 @@
 # Upgrading
 
+## From 0.15.6 to 0.16.0
+
+Update as usual with `acc update`, or let the automatic update run. Version 0.16.0 keeps store
+contract 8 and adds no data migration. Codex keeps trusting ACC's hooks: their plugin's files are
+unchanged, so this update asks nothing.
+
+Two commands are new:
+
+- `acc inbox --wait <seconds>` (1..600) waits for a message addressed to you that is recorded
+  after the wait starts, then returns the first inbox page with `wait: {arrived, waitedMs}`. The
+  `acc` skill's review wait now uses `inbox --wait 60` in place of a foreground `sleep` (#147).
+- `acc withdraw --message <id> --reason <text>` withdraws a question or request you sent. Each
+  recipient that has not answered stops owing an answer and receives the reason as a note in the
+  same thread (#145).
+
+A withdrawal closes the recipient's receipt as `acknowledged` with `extensions.withdrawn`. A
+0.15.6 session that shares the store reads that receipt as answered, so it stops showing the
+withdrawn message too.
+
 ## From 0.15.5 to 0.15.6
 
 Update as usual with `acc update`, or let the automatic update run. Version 0.15.6 keeps store
