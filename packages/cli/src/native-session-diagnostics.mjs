@@ -65,14 +65,20 @@ export async function updateNativeSessions(adapters, { service, status, root, no
       // receiver and refreshes the lease before it offers. Stopping at the
       // lease reported sessions that answered a live question in seconds as
       // degraded, with advice to start a new one.
-      const delivery = off || binding === undefined ? null
+      // A session whose client exited is offline, and the router offers it
+      // nothing: the message waits for the session to return. Asking its
+      // receiver reported a failed handshake and sent people to check an
+      // integration that was fine, so an offline session is not asked.
+      const offline = peer.presence === "offline";
+      const delivery = off || offline || binding === undefined ? null
         : await verifyDelivery(byAdapterId.get(entry.adapterId), { binding, runtimeDir: root });
       // Without a re-verification the router cannot refresh a lapsed lease
       // either, so only a live lease keeps the old answer.
       const runtime = off ? "inactive"
-        : binding === undefined ? "unbound"
-          : delivery === null ? (leased ? "active" : "degraded")
-            : !delivery.deliverable ? "degraded" : leased ? "active" : "idle";
+        : offline ? "offline"
+          : binding === undefined ? "unbound"
+            : delivery === null ? (leased ? "active" : "degraded")
+              : !delivery.deliverable ? "degraded" : leased ? "active" : "idle";
       // A session in another product the adapter serves - Antigravity 2.0
       // beside Antigravity CLI - is named by that product.
       const product = (byAdapterId.get(entry.adapterId)?.client?.variants ?? [])
@@ -155,7 +161,9 @@ function describeDelivery(session) {
     : "receiver verified";
 }
 
-const RUNTIME_TEXT = { active: "local transport active", idle: "idle, lease lapsed" };
+const RUNTIME_TEXT = { active: "local transport active", idle: "idle, lease lapsed",
+  offline: "offline: its client is no longer running, so ACC attempts no live push; "
+    + "messages wait until the session returns" };
 
 export function nativeSessionLines(adapters) {
   return adapters.flatMap(entry => (entry.nativeDelivery.sessions ?? []).map(session =>
