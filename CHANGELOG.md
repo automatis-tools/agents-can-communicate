@@ -1,5 +1,23 @@
 # Changelog
 
+## Unreleased — a bounded wait on the inbox
+
+- **`acc inbox --wait <seconds>` waits for the next message.** It returns the first inbox page
+  as soon as a message for the caller is recorded after the wait starts, or when the time
+  passes, with `wait: {arrived, waitedMs}`. A message that was already pending does not end
+  the wait. The wait reads the event log without the store lock and changes no receipt. The
+  `acc` skill's review wait now repeats `inbox --wait 60`, where it read the inbox and then ran
+  a foreground `sleep 5` (#147).
+
+| Development artifact | Value |
+|---|---|
+| Built from | `fbc2375fbc112b51ee9a014b3bd626c03cc83f18` |
+| Tarball | `agents-can-communicate-0.15.6.tgz`, 678,048 bytes, 400 files |
+| sha256 | `8d757e211d5fe34c9b62704cacb9d629a3c39634e23d1591f29693b0fd8ae661` |
+
+The exact archive passed package verification. See
+[development evidence](docs/release-evidence/inbox-wait-2026-11-25.md).
+
 ## 0.15.6 — release candidate
 
 This release carries the work merged to main after 0.15.5: #453. It keeps store contract 8 and
