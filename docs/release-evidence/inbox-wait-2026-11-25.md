@@ -22,9 +22,10 @@ in [docs/design/2026-11-25-inbox-wait.md](../design/2026-11-25-inbox-wait.md).
 
 ## Development candidate
 
-- Source: clean commit `57ae14eeeffc99b3b0850c2ee344ea3cd8e7d650`.
-- `agents-can-communicate-0.15.6.tgz`, 678,255 bytes, 400 files.
-- SHA-256: `ea1b15ad708978ac123e4200feb80c4faf691b8498582dc997692f4fce2d3a9f`.
+- Source: clean commit `2f4990da1e667c454004ecaa4b7d775d27fe1c6a`, this branch merged with `main`
+  after #457 (`acc withdraw`).
+- `agents-can-communicate-0.15.6.tgz`, 680,909 bytes, 401 files.
+- SHA-256: `6edaa38ca8c577e8c8746df66302f8558a584f1f738ed6c218efef5d9dd2b8d8`.
 - The exact archive passed `scripts/verify-package.mjs`.
 
 The exact archive was also installed with an isolated home and data home, on macOS with Node
