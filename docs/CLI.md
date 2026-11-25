@@ -41,7 +41,7 @@ option value remains data: `--body --help` sends the literal body `--help`.
 | `acc release` | exactly one selector family: repeated `--claim`, repeated `--resource`, or `--all` | `--session`, `--generation`, `--authority` (`human` or `policy`, single target only), `--reason` |
 | `acc message` | `--subject`, `--body` | repeated `--to`, `--supersedes` or `--withdraws`, `--type`, `--obligation`, `--client-message-id`, owner flags |
 | `acc request` | `--to`, `--title` | `--detail`, `--client-message-id`, owner flags |
-| `acc inbox` | — | `--message`, `--cursor`, `--limit`, owner flags |
+| `acc inbox` | — | `--message`, `--cursor`, `--limit`, `--wait`, owner flags |
 | `acc reply` | `--message`, `--body` | `--subject`, `--client-message-id`, owner flags |
 | `acc ack` | `--message` | owner flags |
 | `acc finish` | `--goal` | `--status`, `--to`, repeated `--completed`, `--remaining`, `--blocker`, `--client-message-id`, owner flags |
@@ -316,6 +316,7 @@ Human output distinguishes `recorded <reply-id>` from `acknowledged <original-id
 ```bash
 acc inbox
 acc inbox --message message_x
+acc inbox --wait 60
 acc reply --message message_x --body "Yes. Use offered."
 acc ack --message message_y
 ```
@@ -339,6 +340,13 @@ combined with `--cursor` or `--limit`. An exact id also reads an acknowledged me
 preserving its receipt, timestamp, and event history.
 Use the original message id to inspect acknowledgement; the outgoing reply belongs to
 its recipient's inbox. Resolved messages stay out of the ordinary inbox.
+
+`--wait <seconds>` (1..600) waits for a message addressed to you that is recorded after the
+wait starts, then returns the first page as above, with `wait: {arrived, waitedMs}`. A
+message that was already pending does not end the wait. When the time passes first, it
+returns the page with `arrived: false`, the text form adds `no new message after <n>s`, and
+the exit code is still `0`. The wait reads the event log without taking the store lock and
+changes no receipt. It combines with `--limit` and refuses `--message` and `--cursor`.
 
 Reply creates an `answer` in the same thread and acknowledges the original atomically.
 `ack` acknowledges without writing an answer and has no state override. For an unanswered

@@ -30,7 +30,7 @@ export const COMMANDS = Object.freeze({
   message: { required: ["subject", "body"],
     optional: ["session", "generation", "type", "obligation", "client-message-id"],
     repeated: ["to", "supersedes", "withdraws"] },
-  inbox: { required: [], optional: ["session", "generation", "message", "cursor", "limit"] },
+  inbox: { required: [], optional: ["session", "generation", "message", "cursor", "limit", "wait"] },
   reply: { required: ["message", "body"],
     optional: ["session", "generation", "subject", "client-message-id"] },
   // Asking another agent to do something as a message with a reply obligation.

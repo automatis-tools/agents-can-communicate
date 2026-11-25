@@ -245,13 +245,16 @@ continuation, and a list of follow-ups does not authorize every listed action.
 ## Stay available for an agreed review
 
 When the user asks you to wait for a review request or verdict, keep the current
-turn active. Until the required input arrives, repeat two separate tool calls:
+turn active. Until the required input arrives, repeat one tool call:
 
-1. Run `{{ACC}} inbox` with your own credentials. Inspect the headers, then use
-   `inbox --message <id>` to read a relevant new request or verdict in full.
-   Follow `nextCursor` if older headers are needed; start each new poll without it.
-2. If the required input is absent, run only `sleep 5` in the foreground, or use
-   your client's equivalent five-second wait. After it completes, read inbox again.
+1. Run `{{ACC}} inbox --wait 60` with your own credentials. It returns as soon as a
+   message for you is recorded after it starts, or after 60 seconds, and prints the
+   pending headers with `wait.arrived`. Inspect them, then use `inbox --message <id>`
+   to read a relevant new request or verdict in full. Follow `nextCursor` with plain
+   `inbox --cursor <id>` if older headers are needed.
+2. If the required input is absent, run `inbox --wait 60` again. Give the command a
+   timeout longer than the wait; if your client cannot run it that long, use a
+   shorter `--wait`.
 
 Do not wrap these steps in a shell loop, background job, or notification watcher.
 An empty inbox means another wait, not a final answer promising to return. Preserve
